@@ -10,11 +10,6 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::IDComponent)
     .AddVariable<&Surge::IDComponent::ID>("ID")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::IDComponent)
 
-SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::ParentChildComponent)
-    .AddVariable<&Surge::ParentChildComponent::ParentID>("ParentID")
-    .AddVariable<&Surge::ParentChildComponent::ChildIDs>("ChildrenIDs")
-SURGE_REFLECT_CLASS_REGISTER_END(Surge::ParentChildComponent)
-
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::NameComponent)
     .AddVariable<&Surge::NameComponent::Name>("Name")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::NameComponent)

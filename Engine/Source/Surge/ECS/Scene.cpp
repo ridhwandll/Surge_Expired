@@ -48,20 +48,16 @@ namespace Surge
                 auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
                 if (mesh.Mesh)
                 {
-                    glm::mat4 transform = GetWorldSpaceTransformMatrix(Entity(entity, this));
-                    renderer->SubmitMesh(mesh, transform);
+                    renderer->SubmitMesh(mesh, transformComponent.GetTransform());
                 }
             }
         }
         {
-            auto view = mRegistry.view<PointLightComponent>();
-            for (auto& entity : view)
+            auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
+            for (auto& entity : group)
             {
-                auto light = view.get<PointLightComponent>(entity);
-                glm::mat4 transformMatrix = GetWorldSpaceTransformMatrix(Entity(entity, this));
-                glm::vec3 position, rotation, scale;
-                Math::DecomposeTransform(transformMatrix, position, rotation, scale);
-                renderer->SubmitPointLight(light, position);
+                auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
+                renderer->SubmitPointLight(pointLight, transformComponent.Position);
             }
         }
         {
@@ -90,20 +86,16 @@ namespace Surge
                     auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
                     if (mesh.Mesh)
                     {
-                        glm::mat4 transform = GetWorldSpaceTransformMatrix(Entity(entity, this));
-                        renderer->SubmitMesh(mesh, transform);
+                        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
                     }
                 }
             }
             {
-                auto view = mRegistry.view<PointLightComponent>();
-                for (auto& entity : view)
+                auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
+                for (auto& entity : group)
                 {
-                    auto light = view.get<PointLightComponent>(entity);
-                    glm::mat4 transformMatrix = GetWorldSpaceTransformMatrix(Entity(entity, this));
-                    glm::vec3 position, rotation, scale;
-                    Math::DecomposeTransform(transformMatrix, position, rotation, scale);
-                    renderer->SubmitPointLight(light, position);
+                    auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
+                    renderer->SubmitPointLight(pointLight, transformComponent.Position);
                 }
             }
             renderer->EndFrame();
@@ -142,7 +134,6 @@ namespace Surge
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<PointLightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<DirectionalLightComponent>(other->mRegistry, mRegistry, enttMap);
-        CopyComponent<ParentChildComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -165,7 +156,6 @@ namespace Surge
         outEntity.AddComponent<IDComponent>();
         outEntity.AddComponent<NameComponent>(name);
         outEntity.AddComponent<TransformComponent>();
-        outEntity.AddComponent<ParentChildComponent>();
     }
 
     void Scene::CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name)
@@ -175,122 +165,10 @@ namespace Surge
         outEntity.AddComponent<IDComponent>(id);
         outEntity.AddComponent<NameComponent>(name);
         outEntity.AddComponent<TransformComponent>();
-        outEntity.AddComponent<ParentChildComponent>();
-    }
-
-    void Scene::ParentEntity(Entity& entity, Entity& parent)
-    {
-        ParentChildComponent& parentChildComponent = entity.GetComponent<ParentChildComponent>();
-
-        // Case where the entity to be parented is the child of something else
-        if (parent.IsChildOf(entity))
-        {
-            // Un-parent the parent first
-            UnparentEntity(parent);
-
-            Entity newParent = FindEntityByUUID(entity.GetParent());
-            if (newParent)
-            {
-                UnparentEntity(entity);
-                ParentEntity(parent, newParent);
-            }
-        }
-        else
-        {
-            // Unparent if 'entity' was parented to something else before
-            Entity previousParent = FindEntityByUUID(entity.GetParent());
-            if (previousParent)
-                UnparentEntity(entity);
-        }
-
-        parentChildComponent.ParentID = parent.GetUUID();
-        parent.GetComponent<ParentChildComponent>().ChildIDs.push_back(entity.GetUUID());
-        ConvertToLocalSpace(entity);
-    }
-
-    glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity)
-    {
-        glm::mat4 transform(1.0f);
-
-        Entity parent = FindEntityByUUID(entity.GetParent());
-        if (parent)
-            transform = GetWorldSpaceTransformMatrix(parent);
-
-        return transform * entity.GetComponent<TransformComponent>().GetTransform();
-    }
-
-    void Scene::ConvertToLocalSpace(Entity entity)
-    {
-        Entity parent = FindEntityByUUID(entity.GetParent());
-
-        if (!parent)
-            return;
-
-        TransformComponent& transform = entity.GetComponent<TransformComponent>();
-        glm::mat4 parentTransform = GetWorldSpaceTransformMatrix(parent);
-
-        glm::mat4 localTransform = glm::inverse(parentTransform) * transform.GetTransform();
-        Math::DecomposeTransform(localTransform, transform.Position, transform.Rotation, transform.Scale);
-    }
-
-    void Scene::UnparentEntity(Entity& child)
-    {
-        // Check if the entity has a valid parent
-        Entity parent = FindEntityByUUID(child.GetParent());
-        if (!parent)
-            return;
-
-        // Get the child UUIDs
-        auto& children = parent.GetComponent<ParentChildComponent>().ChildIDs;
-
-        // Remove the child from the children UUID list
-        children.erase(std::remove(children.begin(), children.end(), child.GetUUID()), children.end());
-
-        ConvertToWorldSpace(child);
-
-        // Set the Parent to be NULL, because, hey we just unparented the entity
-        child.GetComponent<ParentChildComponent>().ParentID = 0;
-    }
-
-    void Scene::ConvertToWorldSpace(Entity entity)
-    {
-        // Get the parent
-        Entity parent = FindEntityByUUID(entity.GetParent());
-        if (!parent)
-            return;
-
-        // Get the transformation matrix
-        glm::mat4 transform = GetWorldSpaceTransformMatrix(entity);
-
-        TransformComponent& entityTransform = entity.GetComponent<TransformComponent>();
-        Math::DecomposeTransform(transform, entityTransform.Position, entityTransform.Rotation, entityTransform.Scale);
     }
 
     void Scene::DestroyEntity(Entity entity)
     {
-        ParentChildComponent& pcc = entity.GetComponent<ParentChildComponent>();
-
-        // Remove the current entity from the parent
-        if (pcc.ParentID)
-        {
-            Entity parent = FindEntityByUUID(pcc.ParentID);
-            Vector<UUID>& children = parent.GetComponent<ParentChildComponent>().ChildIDs;
-            children.erase(std::remove(children.begin(), children.end(), entity.GetUUID()), children.end());
-        }
-
-        // Destroy all the child entities of the current entity, which will get destroyed
-        Vector<UUID> children = pcc.ChildIDs;
-        for (UUID childID : children)
-        {
-            Entity child = FindEntityByUUID(childID);
-            if (child)
-            {
-                String childName = child.GetComponent<NameComponent>().Name;
-                pcc.ChildIDs.erase(std::remove(pcc.ChildIDs.begin(), pcc.ChildIDs.end(), child.GetUUID()), pcc.ChildIDs.end());
-                DestroyEntity(child); // Destroy the childs recursively
-            }
-        }
-
         mRegistry.destroy(entity.Raw());
     }
 

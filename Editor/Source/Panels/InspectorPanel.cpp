@@ -281,24 +281,6 @@ namespace Surge
                 ImGuiAux::TProperty<float>("Size", &component.Size);
             });
         }
-
-        // Debug Only
-        if (entity.HasComponent<ParentChildComponent>())
-        {
-            ParentChildComponent& component = entity.GetComponent<ParentChildComponent>();
-            DrawComponent<ParentChildComponent>(
-                entity, "Parent Child", [this, &component]() {
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted("Parent:");
-                    ImGui::TableNextColumn();
-                    Entity parent = mHierarchy->GetSceneContext()->FindEntityByUUID(component.ParentID);
-                    parent ? ImGui::TextUnformatted(parent.GetComponent<NameComponent>().Name.c_str()) : ImGui::TextUnformatted("None");
-
-                    ImGui::TableNextColumn();
-                    ImGui::Text("ChildCount: %i", component.ChildIDs.size());
-                },
-                false);
-        }
     }
 
 } // namespace Surge

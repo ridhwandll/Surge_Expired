@@ -22,18 +22,6 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API ParentChildComponent
-    {
-        ParentChildComponent() = default;
-        ParentChildComponent(const UUID& parentID)
-            : ParentID(parentID), ChildIDs({}) {}
-
-        UUID ParentID = 0;
-        Vector<UUID> ChildIDs;
-
-        SURGE_REFLECTION_ENABLE;
-    };
-
     struct SURGE_API NameComponent
     {
         NameComponent() = default;
@@ -119,6 +107,6 @@ namespace Surge
 //! NOTE: ALL THE MAJOR COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define ALL_MAJOR_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
                              ::Surge::MeshComponent, ::Surge::CameraComponent, ::Surge::PointLightComponent, \
-                             ::Surge::DirectionalLightComponent, ::Surge::ParentChildComponent
+                             ::Surge::DirectionalLightComponent
 
 } // namespace Surge
