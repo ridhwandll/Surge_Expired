@@ -12,7 +12,6 @@ namespace Surge
         mMetadata.Name = name;
         mMetadata.SceneUUID = UUID();
         mMetadata.ScenePath = path;
-        mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
     }
 
     Scene::Scene(Project* parentProject, const SceneMetadata& sceneMetadata, bool runtime)
@@ -20,12 +19,10 @@ namespace Surge
         mRuntime = runtime;
         mParentProject = parentProject;
         mMetadata = sceneMetadata;
-        mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
     }
 
     Scene::~Scene()
     {
-        mRegistry.on_destroy<ScriptComponent>().disconnect<&Scene::OnScriptComponentDestroy>(this);
         mRegistry.clear();
     }
 
@@ -146,7 +143,6 @@ namespace Surge
         CopyComponent<PointLightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<DirectionalLightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<ParentChildComponent>(other->mRegistry, mRegistry, enttMap);
-        CopyComponent<ScriptComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -319,16 +315,6 @@ namespace Surge
             }
         }
         return result;
-    }
-
-    void Scene::OnScriptComponentDestroy(entt::registry& registry, entt::entity entity)
-    {
-        if (mRuntime)
-            return;
-
-        ScriptComponent& component = registry.get<ScriptComponent>(entity);
-        if (component.ScriptEngineID != NULL_UUID)
-            Core::GetScriptEngine()->DestroyScript(component.ScriptEngineID);
     }
 
 } // namespace Surge

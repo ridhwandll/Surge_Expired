@@ -56,7 +56,6 @@ namespace Surge
     private:
         void ConvertToLocalSpace(Entity entity);
         void ConvertToWorldSpace(Entity entity);
-        void OnScriptComponentDestroy(entt::registry& registry, entt::entity entity);
 
     private:
         Project* mParentProject;

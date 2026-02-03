@@ -40,7 +40,6 @@ namespace Surge
         Serializer::Deserialize<Scene>("Engine/Assets/Scenes/Default.surge", scene.Raw());
         Serializer::Serialize<Scene>(scene->GetMetadata().ScenePath, scene.Raw());
         mIsValid = true;
-        Core::GetScriptEngine()->CompileScripts();
     }
 
     void Project::Invalidate(const ProjectMetadata& metadata)
@@ -55,7 +54,7 @@ namespace Surge
         {
             // Add a default scene if there is none
             Ref<Scene> scene = AddScene("Default", fmt::format("{0}", fmt::format("{0}/Default.surge", mMetadata.ProjPath)));
-            Serializer::Deserialize<Scene>("Engine/Assets/Scenes/Default.surge", scene.Raw()); // Load the defaule scene to the new scene
+            Serializer::Deserialize<Scene>("Engine/Assets/Scenes/Default.surge", scene.Raw()); // Load the default scene to the new scene
             Serializer::Serialize<Scene>(scene->GetMetadata().ScenePath, scene.Raw());         // Save the new scene in the project path
         }
         else
@@ -72,7 +71,6 @@ namespace Surge
 
         Serializer::Serialize<ProjectMetadata>(mMetadata.ProjectMetadataPath, &mMetadata); // Write the project metadata to file
         mIsValid = true;
-        Core::GetScriptEngine()->CompileScripts();
     }
 
     void Project::OnRuntimeStart()
@@ -87,7 +85,6 @@ namespace Surge
             runtimeScene->OnRuntimeStart();
         }
         Core::GetRenderer()->SetSceneContext(mRuntimeSceneStorage[mMetadata.ActiveSceneIndex]);
-        Core::GetScriptEngine()->OnRuntimeStart(GetActiveScene());
     }
 
     void Project::Update(EditorCamera& camera)
@@ -99,7 +96,6 @@ namespace Surge
                 break;
             case Surge::ProjectState::Play:
                 mRuntimeSceneStorage[mMetadata.ActiveSceneIndex]->Update();
-                Core::GetScriptEngine()->OnUpdate(GetActiveScene());
                 break;
         }
     }
@@ -110,7 +106,6 @@ namespace Surge
         {
             scene->OnRuntimeEnd();
         }
-        Core::GetScriptEngine()->OnRuntimeEnd(GetActiveScene());
         mRuntimeSceneStorage.clear();
         Core::GetRenderer()->SetSceneContext(mScenes[mMetadata.ActiveSceneIndex]);
     }
@@ -169,7 +164,6 @@ namespace Surge
         Serializer::Serialize<ProjectMetadata>(mMetadata.ProjectMetadataPath, &mMetadata);
 
         Ref<Scene>& activatedScene = GetScene(sceneindex);
-        Core::GetScriptEngine()->OnSceneChange(activatedScene.Raw());
 
         for (auto& func : mOnActiveSceneChangeCallbacks)
             func(activatedScene);

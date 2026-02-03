@@ -77,29 +77,6 @@ namespace Surge
                     {
                         mEditor->OnRuntimeStart();
                     }
-                    ImGui::SameLine();
-                    ScriptEngine* scriptEngine = Core::GetScriptEngine();
-                    if (!scriptEngine->GetCompiler()->IsCompiling())
-                    {
-                        if (ImGuiAux::Button(ICON_SURGE_CODE))
-                            Core::GetScriptEngine()->CompileScripts();
-                        ImGuiAux::DelayedToolTip("Recompile scripts");
-                    }
-                    else
-                    {
-                        ImGuiAux::Spinner("##compilation status", 6.0f, 2.0f);
-                    }
-                    ImGui::SameLine();
-                    if (scriptEngine->GetCompiler()->GetCompileStatus())
-                    {
-                        ImGui::TextUnformatted(ICON_SURGE_CHECK);
-                        ImGuiAux::DelayedToolTip("Your scripts are ready to execute!");
-                    }
-                    else
-                    {
-                        ImGui::TextUnformatted(ICON_SURGE_TIMES);
-                        ImGuiAux::DelayedToolTip("There is error in your script\nplease check console for debug information.");
-                    }
                 }
                 else if (projectState == ProjectState::Play)
                 {

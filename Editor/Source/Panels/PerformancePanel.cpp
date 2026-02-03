@@ -102,18 +102,6 @@ namespace Surge
                 });
                 ImGui::TreePop();
             }
-            if (ImGuiAux::PropertyGridHeader("All Scripts (Debug Only)", false))
-            {
-
-                const auto& scripts = Core::GetScriptEngine()->GetAllScripts();
-                for (auto& script : scripts)
-                {
-                    if (ImGui::TreeNode(fmt::format("{0} - {1}", script.first, std::filesystem::relative(script.second.ScriptSourcePath.Str(), editor->GetActiveProject().GetMetadata().ProjPath.Str()).string()).c_str()))
-                        ImGui::TreePop();
-                }
-
-                ImGui::TreePop();
-            }
 #endif
         }
         ImGui::End();

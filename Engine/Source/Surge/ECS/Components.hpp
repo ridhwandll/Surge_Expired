@@ -6,7 +6,6 @@
 #include "Surge/Graphics/Mesh.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
-#include "Surge/Scripting/ScriptEngine.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -117,21 +116,9 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API ScriptComponent
-    {
-        ScriptComponent() = default;
-        ScriptComponent(const Path& path, const ScriptID& scriptEngineID)
-            : ScriptPath(path), ScriptEngineID(scriptEngineID) {}
-
-        Path ScriptPath;
-        ScriptID ScriptEngineID = NULL_UUID;
-
-        SURGE_REFLECTION_ENABLE
-    };
-
 //! NOTE: ALL THE MAJOR COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define ALL_MAJOR_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
                              ::Surge::MeshComponent, ::Surge::CameraComponent, ::Surge::PointLightComponent, \
-                             ::Surge::DirectionalLightComponent, ::Surge::ParentChildComponent, ::Surge::ScriptComponent
+                             ::Surge::DirectionalLightComponent, ::Surge::ParentChildComponent
 
 } // namespace Surge

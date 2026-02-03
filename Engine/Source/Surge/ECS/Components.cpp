@@ -49,9 +49,3 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::DirectionalLightComponent)
     .AddVariable<&Surge::DirectionalLightComponent::Intensity>("Intensity")
     .AddVariable<&Surge::DirectionalLightComponent::Size>("Size")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::DirectionalLightComponent)
-
-
-SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::ScriptComponent)
-    .AddVariable<&Surge::ScriptComponent::ScriptPath>("ScriptPath")
-    .AddVariable<&Surge::ScriptComponent::ScriptEngineID>("ScriptEngineID")
-SURGE_REFLECT_CLASS_REGISTER_END(Surge::ScriptComponent)

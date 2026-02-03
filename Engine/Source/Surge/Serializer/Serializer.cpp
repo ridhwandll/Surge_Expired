@@ -349,15 +349,6 @@ namespace Surge
             out->CreateEntity(newEntity, "");
             DeserializeEntity(parsedJson["Scene"], newEntity, i);
         }
-
-        { // Create all the scripts
-            const auto& view = registry.view<IDComponent, ScriptComponent>();
-            for (auto& entity : view)
-            {
-                const auto& [id, script] = view.get<IDComponent, ScriptComponent>(entity);
-                script.ScriptEngineID = Core::GetScriptEngine()->CreateScript(script.ScriptPath, id.ID);
-            }
-        }
     }
 
     ///////////
