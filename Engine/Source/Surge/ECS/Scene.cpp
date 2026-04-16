@@ -98,6 +98,14 @@ namespace Surge
                     renderer->SubmitPointLight(pointLight, transformComponent.Position);
                 }
             }
+            {
+                const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
+                for (auto& entity : view)
+                {
+                    const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
+                    renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+                }
+            }
             renderer->EndFrame();
         }
     }

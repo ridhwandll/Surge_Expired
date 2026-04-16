@@ -48,6 +48,8 @@ namespace Surge
 
     void LightCullingProcedure::Shutdown()
     {
+        mProcData.LightCullingPipeline.Reset();
+        mProcData.LightListStorageBuffer.Reset();
     }
 
 } // namespace Surge

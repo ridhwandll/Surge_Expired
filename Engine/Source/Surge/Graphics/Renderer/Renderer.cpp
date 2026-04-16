@@ -64,8 +64,8 @@ namespace Surge
         mData->CameraPosition = transform[3];
         mData->RenderCmdBuffer->BeginRecording();
 
-        LightCullingProcedure::InternalData* lightCullingProcData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<LightCullingProcedure>();
-        GeometryProcedure::InternalData* geometryProcData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<GeometryProcedure>();
+        LightCullingProcedure::InternalData* lightCullingProcData = mProcManager.GetRenderProcData<LightCullingProcedure>();
+        GeometryProcedure::InternalData* geometryProcData = mProcManager.GetRenderProcData<GeometryProcedure>();
 
         UBufCameraData camData = {mData->ViewMatrix, mData->ProjectionMatrix, mData->ViewProjection};
         UBufRendererData rendererData = {lightCullingProcData->TileCountX, lightCullingProcData->ShowLightComplexity, 0.0, 0.0};
@@ -87,6 +87,7 @@ namespace Surge
         mData->ProjectionMatrix = camera.GetProjectionMatrix();
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
+        mData->RenderCmdBuffer->BeginRecording();
 
         LightCullingProcedure::InternalData* lightCullingProcData = mProcManager.GetRenderProcData<LightCullingProcedure>();
         GeometryProcedure::InternalData* geometryProcData = mProcManager.GetRenderProcData<GeometryProcedure>();
@@ -102,7 +103,6 @@ namespace Surge
 
         mData->DescriptorSet0->UpdateForRendering();
 
-        mData->RenderCmdBuffer->BeginRecording();
         mData->DescriptorSet0->Bind(mData->RenderCmdBuffer, geometryProcData->GeometryPipeline);
     }
 

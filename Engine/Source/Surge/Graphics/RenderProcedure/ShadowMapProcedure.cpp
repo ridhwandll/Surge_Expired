@@ -65,7 +65,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("ShadowMapProcedure::Update");
 
-        glm::vec3 direction;
+        glm::vec3 direction = {};
         if (mRendererData->SceneContext)
         {
             auto view = mRendererData->SceneContext->GetRegistry().view<TransformComponent, DirectionalLightComponent>();

@@ -94,7 +94,7 @@ namespace Surge
     {
         DirectionalLightComponent() = default;
         DirectionalLightComponent(glm::vec3 direction, glm::vec3 color, float intensity)
-            : Direction(Direction), Color(color), Intensity(intensity) {}
+            : Direction(direction), Color(color), Intensity(intensity) {}
 
         glm::vec3 Direction = {1.0f, 1.0f, 1.0f};
         glm::vec3 Color = {1.0f, 1.0f, 1.0f};
