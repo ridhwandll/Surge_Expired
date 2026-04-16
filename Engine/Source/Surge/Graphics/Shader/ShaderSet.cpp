@@ -13,7 +13,10 @@ namespace Surge
         std::filesystem::create_directory(SHADER_CACHE_PATH);
     }
 
-    void ShaderSet::AddShader(const String& shaderName) { mShaders.push_back(Shader::Create(fmt::format("{0}/{1}", mBaseShaderPath, shaderName))); }
+    void ShaderSet::AddShader(const String& shaderName)
+    {
+        mShaders.push_back(Shader::Create(fmt::format("{0}/{1}", mBaseShaderPath, shaderName)));
+    }
 
     Ref<Shader>& ShaderSet::GetShader(const String& shaderName)
     {
@@ -111,7 +114,7 @@ namespace Surge
 
                 fwrite(spirvToCache.SPIRV.data(), sizeof(Uint), spirvToCache.SPIRV.size(), f);
                 fclose(f);
-                Log<Severity::Debug>("Cached Shader at: {0}", path);
+                Log<Severity::Info>("Cached Shader at: {0}", path);
             }
         }
     }

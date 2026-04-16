@@ -75,7 +75,8 @@ namespace Surge
         material->Set<float>("Material.Metalness", metalness);
     }
 
-    Mesh::Mesh(const Path& filepath) : mPath(filepath)
+    Mesh::Mesh(const Path& filepath)
+        : mPath(filepath)
     {
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(filepath, sMeshImportFlags);

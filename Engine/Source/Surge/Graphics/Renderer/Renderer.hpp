@@ -19,7 +19,8 @@ namespace Surge
 {
     struct DrawCommand
     {
-        DrawCommand(MeshComponent* meshComp, const glm::mat4& transform) : MeshComp(meshComp), Transform(transform) {}
+        DrawCommand(MeshComponent* meshComp, const glm::mat4& transform)
+            : MeshComp(meshComp), Transform(transform) {}
 
         MeshComponent* MeshComp;
         glm::mat4 Transform;

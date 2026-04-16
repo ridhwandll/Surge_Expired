@@ -71,7 +71,7 @@ namespace Surge
 
     struct ShaderPushConstant
     {
-        String BufferName = "";
+        String BufferName;
         Uint Size = 0;
         ShaderType ShaderStages {}; // Specify what shader stages the buffer is being used for
     };

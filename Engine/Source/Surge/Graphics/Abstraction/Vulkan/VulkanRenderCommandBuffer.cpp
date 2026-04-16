@@ -83,7 +83,6 @@ namespace Surge
         VK_CALL(vkWaitForFences(logicalDevice, 1, &mWaitFences[frameIndex], VK_TRUE, UINT64_MAX));
         VK_CALL(vkResetFences(logicalDevice, 1, &mWaitFences[frameIndex]));
 
-        //vkResetCommandBuffer(mCommandBuffers[frameIndex], 0); TODO: Should we use this?
         VkCommandBufferBeginInfo cmdBufInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         cmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 

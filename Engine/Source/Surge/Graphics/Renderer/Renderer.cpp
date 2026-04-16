@@ -37,7 +37,7 @@ namespace Surge
         mData->ShaderSet.AddShader("LightCulling.glsl");
         mData->ShaderSet.LoadAll();
 
-        Ref<Shader> mainPBRShader = Core::GetRenderer()->GetShader("PBR");
+        Ref<Shader> mainPBRShader = GetShader("PBR");
         mData->LightUniformBuffer = UniformBuffer::Create(sizeof(LightUniformBufferData));
 
         mData->CameraUniformBuffer = UniformBuffer::Create(sizeof(UBufCameraData));
@@ -87,10 +87,9 @@ namespace Surge
         mData->ProjectionMatrix = camera.GetProjectionMatrix();
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
-        mData->RenderCmdBuffer->BeginRecording();
 
-        LightCullingProcedure::InternalData* lightCullingProcData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<LightCullingProcedure>();
-        GeometryProcedure::InternalData* geometryProcData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<GeometryProcedure>();
+        LightCullingProcedure::InternalData* lightCullingProcData = mProcManager.GetRenderProcData<LightCullingProcedure>();
+        GeometryProcedure::InternalData* geometryProcData = mProcManager.GetRenderProcData<GeometryProcedure>();
 
         UBufCameraData camData = {mData->ViewMatrix, mData->ProjectionMatrix, mData->ViewProjection};
         UBufRendererData rendererData = {lightCullingProcData->TileCountX, lightCullingProcData->ShowLightComplexity, 0.0, 0.0};
@@ -102,6 +101,8 @@ namespace Surge
         mData->DescriptorSet0->SetBuffer(mData->RendererDataUniformBuffer, 1);
 
         mData->DescriptorSet0->UpdateForRendering();
+
+        mData->RenderCmdBuffer->BeginRecording();
         mData->DescriptorSet0->Bind(mData->RenderCmdBuffer, geometryProcData->GeometryPipeline);
     }
 

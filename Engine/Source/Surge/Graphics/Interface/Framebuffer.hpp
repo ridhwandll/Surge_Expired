@@ -9,7 +9,7 @@ namespace Surge
 {
     struct FramebufferAttachmentSpec
     {
-        ImageFormat Format;
+        ImageFormat Format = {};
         SamplerProperties AttachmentSamplerProps = {};
     };
 
