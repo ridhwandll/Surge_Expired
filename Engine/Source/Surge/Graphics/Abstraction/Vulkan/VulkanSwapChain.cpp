@@ -105,7 +105,7 @@ namespace Surge
         mSwapChainExtent = swapChainExtent;
         mImageCount = imageCount;
 
-        Log<Severity::Fatal>("Swapchain Image count {0}, Frames in flight {1}", mImageCount, FRAMES_IN_FLIGHT);        
+        Log<Severity::Info>("Swapchain Image count {0}, Frames in flight {1}", mImageCount, FRAMES_IN_FLIGHT);        
     }
 
     void VulkanSwapChain::CreateRenderPass()

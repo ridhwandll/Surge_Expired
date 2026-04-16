@@ -22,13 +22,16 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Binaries/assimp-vc142-mt.dll
         ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIGURATION>
     )
+
 add_custom_command(
     TARGET Editor
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_BINARY_DIR}/Engine/$<CONFIGURATION>/Surge.dll
-        ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIGURATION>
-    )
+        "$<TARGET_FILE:Surge>"
+        "$<TARGET_FILE_DIR:Editor>"
+    COMMENT "Copying Surge DLL to Editor output directory"
+    VERBATIM
+)
 
 GroupSourcesByFolder(Editor)
 set_property(TARGET Editor PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

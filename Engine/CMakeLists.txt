@@ -81,6 +81,8 @@ add_custom_command(
     TARGET Surge
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_BINARY_DIR}/Engine/$<CONFIGURATION>/Surge.dll
-        ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIGURATION>
-    )
+        "$<TARGET_FILE:Surge>"
+        "$<TARGET_FILE_DIR:Editor>"
+    COMMENT "Build dll: Copying Surge dll to Editor output directory"
+    VERBATIM
+)
