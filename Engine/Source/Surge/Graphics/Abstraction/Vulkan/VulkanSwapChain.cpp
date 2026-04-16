@@ -21,8 +21,7 @@ namespace Surge
         CreateSwapChain();
         CreateRenderPass();
         CreateFramebuffer();
-        CreateCmdBuffers();
-        CreateSyncObjects();
+        CreateFrameObjects();
     }
 
     void VulkanSwapChain::CreateSwapChain()
@@ -36,7 +35,7 @@ namespace Surge
         VkSurfaceCapabilitiesKHR surfaceCapabilities;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, mSurface, &surfaceCapabilities);
 
-        Uint imageCount;
+        Uint imageCount = 0;
         if (FRAMES_IN_FLIGHT < surfaceCapabilities.minImageCount)
             imageCount = surfaceCapabilities.minImageCount;
         else
@@ -105,6 +104,8 @@ namespace Surge
         mColorFormat = pickedFormat;
         mSwapChainExtent = swapChainExtent;
         mImageCount = imageCount;
+
+        Log<Severity::Fatal>("Swapchain Image count {0}, Frames in flight {1}", mImageCount, FRAMES_IN_FLIGHT);        
     }
 
     void VulkanSwapChain::CreateRenderPass()
@@ -217,11 +218,12 @@ namespace Surge
         VK_CALL(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &mFramebuffer));
     }
 
-    void VulkanSwapChain::CreateCmdBuffers()
+    void VulkanSwapChain::CreateFrameObjects()
     {
         VulkanRenderContext* vkContext = nullptr;
         SURGE_GET_VULKAN_CONTEXT(vkContext);
         VulkanDevice* device = vkContext->GetDevice();
+        VkDevice vulkanDevice = device->GetLogicalDevice();
 
         // Command Pool Creation
         VkCommandPoolCreateInfo cmdPoolInfo {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -229,34 +231,26 @@ namespace Surge
         cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         VK_CALL(vkCreateCommandPool(device->GetLogicalDevice(), &cmdPoolInfo, nullptr, &mCommandPool));
 
-        // Command Buffers
-        VkCommandBufferAllocateInfo commandBufferAllocateInfo {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-        commandBufferAllocateInfo.commandPool = mCommandPool;
-        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        commandBufferAllocateInfo.commandBufferCount = mImageCount;
-        mCommandBuffers.resize(mImageCount);
-        VK_CALL(vkAllocateCommandBuffers(device->GetLogicalDevice(), &commandBufferAllocateInfo, mCommandBuffers.data()));
-    }
+        for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+        {
+            VkCommandBufferAllocateInfo cbai {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+            cbai.commandPool = mCommandPool;
+            cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            cbai.commandBufferCount = 1;
+            VK_CALL(vkAllocateCommandBuffers(vulkanDevice, &cbai, &mFrames[i].CmdBuf));
 
-    void VulkanSwapChain::CreateSyncObjects()
-    {
-        Uint framesInFlight = FRAMES_IN_FLIGHT; // TODO: More than two Frames in Flight
-        VulkanRenderContext* vkContext = nullptr;
-        SURGE_GET_VULKAN_CONTEXT(vkContext);
-        VkDevice device = vkContext->GetDevice()->GetLogicalDevice();
+            VkSemaphoreCreateInfo sci {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+            VK_CALL(vkCreateSemaphore(vulkanDevice, &sci, nullptr, &mFrames[i].PresentSemaphore));
 
-        // Semaphores
-        VkSemaphoreCreateInfo semaphoreCreateInfo {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        VK_CALL(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &mImageAvailable));
-        VK_CALL(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &mRenderAvailable));
+            VkFenceCreateInfo fci {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+            fci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+            VK_CALL(vkCreateFence(vulkanDevice, &fci, nullptr, &mFrames[i].Fence));
+        }
 
-        // Fences
-        VkFenceCreateInfo fenceCreateInfo {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-        mWaitFences.resize(framesInFlight);
-        for (VkFence& fence : mWaitFences)
-            VK_CALL(vkCreateFence(device, &fenceCreateInfo, nullptr, &fence));
+        mRenderSemaphores.resize(mSwapChainImages.size());
+        VkSemaphoreCreateInfo si {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        for (Uint i = 0; i < (Uint)mSwapChainImages.size(); i++)
+            VK_CALL(vkCreateSemaphore(vulkanDevice, &si, nullptr, &mRenderSemaphores[i]));
     }
 
     void VulkanSwapChain::Resize()
@@ -277,6 +271,24 @@ namespace Surge
         CreateFramebuffer();
     }
 
+    void VulkanSwapChain::DestroyFrameObjects()
+    {
+        VulkanRenderContext* renderContext = nullptr;
+        SURGE_GET_VULKAN_CONTEXT(renderContext);
+        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+
+        vkDestroyCommandPool(device, mCommandPool, nullptr);
+
+        for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+        {
+            vkDestroySemaphore(device, mFrames[i].PresentSemaphore, nullptr);
+            vkDestroyFence(device, mFrames[i].Fence, nullptr);
+        }
+
+        for (Uint i = 0; i < (Uint)mSwapChainImages.size(); i++)
+            vkDestroySemaphore(device, mRenderSemaphores[i], nullptr);
+    }
+
     void VulkanSwapChain::Destroy()
     {
         VulkanRenderContext* renderContext = nullptr;
@@ -295,11 +307,7 @@ namespace Surge
         vkDestroySwapchainKHR(device, mSwapChain, nullptr);
         vkDestroySurfaceKHR(instance, mSurface, nullptr);
 
-        vkDestroyCommandPool(device, mCommandPool, nullptr);
-        vkDestroySemaphore(device, mImageAvailable, nullptr);
-        vkDestroySemaphore(device, mRenderAvailable, nullptr);
-        for (VkFence& fence : mWaitFences)
-            vkDestroyFence(device, fence, nullptr);
+        DestroyFrameObjects();
     }
 
     VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore imageAvailableSemaphore, Uint* imageIndex)
@@ -316,8 +324,10 @@ namespace Surge
         VulkanRenderContext* renderContext = nullptr;
         SURGE_GET_VULKAN_CONTEXT(renderContext);
         VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
-        VK_CALL(vkWaitForFences(device, 1, &mWaitFences[mCurrentFrameIndex], VK_TRUE, UINT64_MAX));
-        VK_CALL(AcquireNextImage(mImageAvailable, &mCurrentImageIndex));
+        Frame currentFrameObj = GetCurrentFrameObjects();
+        VK_CALL(vkWaitForFences(device, 1, &currentFrameObj.Fence, VK_TRUE, UINT64_MAX));
+        VK_CALL(vkResetFences(device, 1, &currentFrameObj.Fence));
+        VK_CALL(AcquireNextImage(currentFrameObj.PresentSemaphore, &mCurrentImageIndex));
     }
 
     void VulkanSwapChain::Present()
@@ -325,24 +335,24 @@ namespace Surge
         VulkanRenderContext* renderContext = nullptr;
         SURGE_GET_VULKAN_CONTEXT(renderContext);
         VulkanDevice* device = renderContext->GetDevice();
+        Frame currentFrameObj = GetCurrentFrameObjects();
 
         VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         VkSubmitInfo submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
         submitInfo.pWaitDstStageMask = &waitStageMask;
-        submitInfo.pWaitSemaphores = &mImageAvailable;
+        submitInfo.pWaitSemaphores = &currentFrameObj.PresentSemaphore;
+        submitInfo.pSignalSemaphores = &mRenderSemaphores[mCurrentImageIndex];
         submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &mRenderAvailable;
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pCommandBuffers = &mCommandBuffers[mCurrentFrameIndex];
+        submitInfo.pCommandBuffers = &currentFrameObj.CmdBuf;
         submitInfo.commandBufferCount = 1;
 
-        VK_CALL(vkResetFences(device->GetLogicalDevice(), 1, &mWaitFences[mCurrentFrameIndex]));
-        VK_CALL(vkQueueSubmit(device->GetGraphicsQueue(), 1, &submitInfo, mWaitFences[mCurrentFrameIndex]));
+        VK_CALL(vkQueueSubmit(device->GetGraphicsQueue(), 1, &submitInfo, currentFrameObj.Fence));
 
         // Present
         VkPresentInfoKHR presentInfo {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &mRenderAvailable;
+        presentInfo.pWaitSemaphores = &mRenderSemaphores[mCurrentImageIndex];
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &mSwapChain;
         presentInfo.pImageIndices = &mCurrentImageIndex;
@@ -355,17 +365,18 @@ namespace Surge
     {
         VulkanRenderContext* vkContext = static_cast<VulkanRenderContext*>(Core::GetRenderContext());
         Uint frameIndex = vkContext->GetFrameIndex();
+        Frame currentFrameObj = GetCurrentFrameObjects();
 
-        vkResetCommandBuffer(mCommandBuffers[frameIndex], 0);
+        vkResetCommandBuffer(currentFrameObj.CmdBuf, 0);
         VkCommandBufferBeginInfo cmdBufInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         cmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
         // Render the ImGui
-        VK_CALL(vkBeginCommandBuffer(mCommandBuffers[frameIndex], &cmdBufInfo));
+        VK_CALL(vkBeginCommandBuffer(currentFrameObj.CmdBuf, &cmdBufInfo));
         BeginRenderPass();
         vkContext->RenderImGui();
         EndRenderPass();
-        VK_CALL(vkEndCommandBuffer(mCommandBuffers[frameIndex]));
+        VK_CALL(vkEndCommandBuffer(currentFrameObj.CmdBuf));
 
         Present();
     }
@@ -385,16 +396,25 @@ namespace Surge
         renderPassInfo.framebuffer = mFramebuffer;
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = mSwapChainExtent;
-        renderPassInfo.pNext = &attachmentInfo; // Imageless framebuffer
+        renderPassInfo.pNext = &attachmentInfo; // Image less framebuffer
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
 
-        vkCmdBeginRenderPass(mCommandBuffers[mCurrentFrameIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(mFrames[mCurrentFrameIndex].CmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     }
 
     void VulkanSwapChain::EndRenderPass()
     {
-        vkCmdEndRenderPass(mCommandBuffers[mCurrentFrameIndex]);
+        vkCmdEndRenderPass(mFrames[mCurrentFrameIndex].CmdBuf);
+    }
+
+    Vector<VkCommandBuffer> VulkanSwapChain::GetVulkanCommandBuffers() const
+    {
+        Vector<VkCommandBuffer> cmdBfrs;        
+        for (Uint i = 0; i < FRAMES_IN_FLIGHT; i++)        
+            cmdBfrs.push_back(mFrames[i].CmdBuf);
+           
+        return cmdBfrs;
     }
 
     void VulkanSwapChain::PickPresentQueue()

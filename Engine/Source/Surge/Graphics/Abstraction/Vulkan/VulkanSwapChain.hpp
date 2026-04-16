@@ -7,6 +7,12 @@ namespace Surge
 {
     class SURGE_API VulkanSwapChain
     {
+        struct Frame
+        {
+            VkCommandBuffer CmdBuf = VK_NULL_HANDLE;
+            VkSemaphore PresentSemaphore = VK_NULL_HANDLE;
+            VkFence Fence = VK_NULL_HANDLE;
+        };
     public:
         VulkanSwapChain() = default;
         ~VulkanSwapChain() = default;
@@ -31,7 +37,7 @@ namespace Surge
         VkFramebuffer GetVulkanFramebuffer() const { return mFramebuffer; }
         VkCommandPool GetVulkanCommandPool() const { return mCommandPool; }
         Vector<VkImageView> GetVulkanImageViews() const { return mSwapChainImageViews; }
-        Vector<VkCommandBuffer> GetVulkanCommandBuffers() const { return mCommandBuffers; }
+        Vector<VkCommandBuffer> GetVulkanCommandBuffers() const;
         Uint GetCurrentFrameIndex() const { return mCurrentFrameIndex; }
         Uint GetCurrentImageIndex() const { return mCurrentImageIndex; }
 
@@ -42,9 +48,9 @@ namespace Surge
         void CreateSwapChain();
         void CreateRenderPass();
         void CreateFramebuffer();
-        void CreateCmdBuffers();
-        void CreateSyncObjects();
-
+        void CreateFrameObjects();
+        void DestroyFrameObjects();
+        inline Frame GetCurrentFrameObjects() { return mFrames[mCurrentFrameIndex]; }
     private:
         // Swapchain
         VkSwapchainKHR mSwapChain = VK_NULL_HANDLE;
@@ -65,14 +71,11 @@ namespace Surge
         VkQueue mPresentQueue;
         Uint mPresentQueueIndex;
 
-        // Commandbuffer
+        // Frame objects
         VkCommandPool mCommandPool = VK_NULL_HANDLE;
-        Vector<VkCommandBuffer> mCommandBuffers {};
+        std::vector<VkSemaphore> mRenderSemaphores;
 
-        // Sync objects
-        VkSemaphore mImageAvailable = VK_NULL_HANDLE, mRenderAvailable = VK_NULL_HANDLE;
-        Vector<VkFence> mWaitFences {};
-
+        Frame mFrames[FRAMES_IN_FLIGHT];
         bool mVsync = false;
     };
 
