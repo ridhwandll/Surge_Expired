@@ -5,20 +5,13 @@
 
 namespace Surge
 {
-    Scene::Scene(Project* parentProject, const String& name, const Path& path, bool runtime)
+    Scene::Scene(bool runtime)
     {
         mRuntime = runtime;
-        mParentProject = parentProject;
-        mMetadata.Name = name;
-        mMetadata.SceneUUID = UUID();
-        mMetadata.ScenePath = path;
-    }
-
-    Scene::Scene(Project* parentProject, const SceneMetadata& sceneMetadata, bool runtime)
-    {
-        mRuntime = runtime;
-        mParentProject = parentProject;
-        mMetadata = sceneMetadata;
+        // mParentProject = parentProject;
+        // mMetadata.Name = name;
+        // mMetadata.SceneUUID = UUID();
+        // mMetadata.ScenePath = path;
     }
 
     Scene::~Scene()
@@ -135,7 +128,6 @@ namespace Surge
             enttMap[uuid] = e.Raw();
         }
 
-        // TODO: Copy ParentChildComponent to runtime
         CopyComponent<NameComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<TransformComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);

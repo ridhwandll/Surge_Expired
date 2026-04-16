@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Core/Project/Project.hpp"
+#include "Surge/ECS/Scene.hpp"
 #include "Surge/Core/Events/Event.hpp"
 #include "Surge/Core/Window/Window.hpp"
 
@@ -23,13 +23,13 @@ namespace Surge
         virtual void OnEvent(Event& e) {};
         virtual void OnImGuiRender() {};
         virtual void OnShutdown() {};
-        Project& GetActiveProject() { return mActiveProject; }
+        Ref<Scene> GetActiveProject() const { return mActiveScene; }
 
         void SetOptions(const ClientOptions& appCreateInfo) { mClientOptions = appCreateInfo; }
         const ClientOptions& GeClientOptions() const { return mClientOptions; }
 
     protected:
-        Project mActiveProject;
+        Ref<Scene> mActiveScene;
 
     private:
         ClientOptions mClientOptions;

@@ -10,7 +10,6 @@
 #include "Surge/Core/Thread/ThreadPool.hpp"
 #include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Core/Window/Window.hpp"
-#include "Surge/Core/Project/Project.hpp"
 #include "Surge/Core/Events/Event.hpp"
 
 #include "Surge/Graphics/Interface/GraphicsPipeline.hpp"

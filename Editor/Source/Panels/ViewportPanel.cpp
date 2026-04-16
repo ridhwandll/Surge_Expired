@@ -82,13 +82,11 @@ namespace Surge
 
                 glm::mat4 cameraView, cameraProjection;
                 Editor* app = static_cast<Editor*>(Core::GetClient());
-                if (app->GetActiveProject().GetState() == ProjectState::Edit)
-                {
-                    EditorCamera& camera = app->GetCamera();
-                    cameraProjection = camera.GetProjectionMatrix();
-                    cameraProjection[1][1] *= -1;
-                    cameraView = camera.GetViewMatrix();
-                }
+                
+                EditorCamera& camera = app->GetCamera();
+                cameraProjection = camera.GetProjectionMatrix();
+                cameraProjection[1][1] *= -1;
+                cameraView = camera.GetViewMatrix();                
 
                 Scene* activeScene = mSceneHierarchy->GetSceneContext();
                 TransformComponent& transformComponent = selectedEntity.GetComponent<TransformComponent>();

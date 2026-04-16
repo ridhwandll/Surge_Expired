@@ -10,33 +10,22 @@
 
 namespace Surge
 {
-    struct SURGE_API SceneMetadata
-    {
-        String Name;
-        Path ScenePath;
-        UUID SceneUUID;
-    };
-
     class Scene;
     class Entity;
-    class Project;
 
     class SURGE_API Scene : public RefCounted
     {
     public:
-        Scene() = default;
-        Scene(Project* parentProject, const SceneMetadata& sceneMetadata, bool runtime);
-        Scene(Project* parentProject, const String& name, const Path& path, bool runtime);
+        Scene() = delete;
+        Scene(bool runtime);
         ~Scene();
 
         void OnRuntimeStart();
-        void Update();                     // Runtime Update
+        void Update(); // Runtime Update
         void Update(EditorCamera& camera); // EditorCam Update
         void OnRuntimeEnd();
         void CopyTo(Scene* other);
         Entity FindEntityByUUID(UUID id);
-        SceneMetadata& GetMetadata() { return mMetadata; }
-        Project* GetParentProject() { return mParentProject; }
 
         // Entity manipulation
         void CreateEntity(Entity& outEntity, const String& name = "New Entity");
@@ -51,8 +40,6 @@ namespace Surge
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
 
     private:
-        Project* mParentProject;
-        SceneMetadata mMetadata;
         entt::registry mRegistry;
         bool mRuntime;
     };

@@ -7,7 +7,6 @@
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
 #include "Panels/RenderProcedurePanel.hpp"
-#include "Panels/ProjectSettingsPanel.hpp"
 
 namespace Surge
 {
@@ -27,40 +26,25 @@ namespace Surge
         mPanelManager.PushPanel<PerformancePanel>();
         ViewportPanel* viewport = mPanelManager.PushPanel<ViewportPanel>();
         mPanelManager.PushPanel<RenderProcedurePanel>();
-        mPanelManager.PushPanel<ProjectSettingsPanel>();
         mTitleBar.OnInit();
 
         mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
-
-        mProjectBrowser.SetProjectLaunchCallback([&](const ProjectMetadata& metadata) {
-            mActiveProject.Invalidate(metadata);
-            mActiveProject.AddActiveSceneChangeCallback([&](Ref<Scene>& scene) {
-                mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
-                mRenderer->SetSceneContext(scene);
-            });
-            mActiveProject.SetActiveScene(0);
-        });
-        mProjectBrowser.Initialize();
+        mActiveScene = Ref<Scene>::Create(false);
+        mRenderer->SetSceneContext(mActiveScene);
+        sceneHierarchy->SetSceneContext(mActiveScene.Raw());
     }
 
     void Editor::OnUpdate()
     {
-        if (!mActiveProject)
-            return;
-
         Resize();
-        mActiveProject.Update(mCamera);
+        mActiveScene->Update(mCamera);
     }
 
     void Editor::OnImGuiRender()
     {
         mTitleBar.Render();
         ImGuiAux::DockSpace();
-
-        if (mActiveProject)
-            mPanelManager.RenderAll();
-        else
-            mProjectBrowser.Render();
+        mPanelManager.RenderAll();
     }
 
     void Editor::OnEvent(Event& e)
@@ -71,48 +55,38 @@ namespace Surge
 
     void Editor::OnRuntimeStart()
     {
-        mActiveProject.SetState(ProjectState::Play);
-        mActiveProject.OnRuntimeStart();
-        Ref<Scene> activeScene = mActiveProject.GetActiveScene();
-        mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
-        mRenderer->SetSceneContext(activeScene);
+        //mActiveProject.SetState(ProjectState::Play);
+        //mActiveProject.OnRuntimeStart();
+        //Ref<Scene> activeScene = mActiveProject.GetActiveScene();
+        //mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
+        //mRenderer->SetSceneContext(activeScene);
     }
 
     void Editor::OnRuntimeEnd()
     {
-        mActiveProject.OnRuntimeEnd();
-        mActiveProject.SetState(ProjectState::Edit);
-        Ref<Scene> activeScene = mActiveProject.GetActiveScene();
-        mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
-        mRenderer->SetSceneContext(activeScene);
+        // mActiveProject.OnRuntimeEnd();
+        // mActiveProject.SetState(ProjectState::Edit);
+        // Ref<Scene> activeScene = mActiveProject.GetActiveScene();
+        // mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
+        // mRenderer->SetSceneContext(activeScene);
     }
 
     void Editor::Resize()
     {
-        if (!mActiveProject)
-            return;
-
-        Scene* activeScene = mActiveProject.GetActiveScene();
-
         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
         glm::vec2 viewportSize = viewportPanel->GetViewportSize();
         Ref<Framebuffer> framebuffer = mRenderer->GetFinalPassFramebuffer();
 
-        if (mActiveProject.GetState() == ProjectState::Play && activeScene && activeScene->GetMainCameraEntity().Data1 && activeScene->GetMainCameraEntity().Data1->GetAspectRatio() != (viewportSize.x / viewportSize.y))
-            activeScene->OnResize(viewportSize.x, viewportSize.y);
         if (FramebufferSpecification spec = framebuffer->GetSpecification(); viewportSize.x > 0.0f && viewportSize.y > 0.0f && (spec.Width != viewportSize.x || spec.Height != viewportSize.y))
         {
             mRenderer->SetRenderArea((Uint)viewportSize.x, (Uint)viewportSize.y);
             mCamera.SetViewportSize(viewportSize);
-
-            if (mActiveProject.GetState() == ProjectState::Edit)
-                activeScene->OnResize(viewportSize.x, viewportSize.y);
+            mActiveScene->OnResize(viewportSize.x, viewportSize.y);
         }
     }
 
     void Editor::OnShutdown()
     {
-        mProjectBrowser.Shutdown();
     }
 
 } // namespace Surge

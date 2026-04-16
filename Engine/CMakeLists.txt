@@ -36,7 +36,7 @@ set(LIB_LINKS
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Lib/assimp-vc142-mt.lib
 )
 
-add_library(Surge SHARED ${SOURCE_FILES})
+add_library(Surge STATIC ${SOURCE_FILES})
 target_include_directories(Surge PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(Surge PUBLIC ${LIB_LINKS})
 

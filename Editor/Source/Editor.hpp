@@ -5,7 +5,6 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Panels/Titlebar.hpp"
 #include "Panels/PaneManager.hpp"
-#include "ProjectBrowser.hpp"
 
 namespace Surge
 {
@@ -38,7 +37,5 @@ namespace Surge
 
         PanelManager mPanelManager;
         Titlebar mTitleBar {};
-        ProjectBrowserWindow mProjectBrowser;
-        friend class ProjectBrowserWindow;
     };
 } // namespace Surge

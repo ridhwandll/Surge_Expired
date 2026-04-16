@@ -12,9 +12,9 @@
 #define SCRIPT_API __declspec(dllexport)
 
 #ifdef SURGE_EXPORT
-#define SURGE_API __declspec(dllexport)
+#define SURGE_API
 #else
-#define SURGE_API __declspec(dllimport)
+#define SURGE_API
 #endif //SURGE_EXPORT
 
 #elif __APPLE__

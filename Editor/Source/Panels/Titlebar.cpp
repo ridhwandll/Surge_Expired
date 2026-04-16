@@ -47,7 +47,9 @@ namespace Surge
                 if (ImGui::BeginPopup("FilePopup"))
                 {
                     if (ImGui::MenuItem("Save Project"))
-                        editor->GetActiveProject().Save();
+                    {
+                        Log("Implement Project save here!");
+                    }
                     ImGui::EndPopup();
                 }
                 ImGui::SameLine();
@@ -67,28 +69,28 @@ namespace Surge
                 }
 
                 ImGuiAux::ShiftCursorY(-iconSize);
-                ProjectState projectState = mEditor->GetActiveProject().GetState();
-                float windowWidth = ImGui::GetWindowSize().x;
-                float textWidth = projectState == ProjectState::Edit ? ImGui::CalcTextSize(ICON_SURGE_PLAY ICON_SURGE_CODE ICON_SURGE_CHECK).x : ImGui::CalcTextSize(ICON_SURGE_PLAY).x;
-                ImGui::SetCursorPosX((windowWidth - (textWidth + 10)) * 0.5f);
-                if (projectState == ProjectState::Edit)
-                {
-                    if (ImGuiAux::Button(ICON_SURGE_PLAY))
-                    {
-                        mEditor->OnRuntimeStart();
-                    }
-                }
-                else if (projectState == ProjectState::Play)
-                {
-                    if (ImGuiAux::Button(ICON_SURGE_STOP))
-                    {
-                        mEditor->OnRuntimeEnd();
-                    }
-                }
+//                 ProjectState projectState = mEditor->GetActiveProject().GetState();
+                 float windowWidth = ImGui::GetWindowSize().x;
+//                 float textWidth = projectState == ProjectState::Edit ? ImGui::CalcTextSize(ICON_SURGE_PLAY ICON_SURGE_CODE ICON_SURGE_CHECK).x : ImGui::CalcTextSize(ICON_SURGE_PLAY).x;
+//                 ImGui::SetCursorPosX((windowWidth - (textWidth + 10)) * 0.5f);
+//                 if (projectState == ProjectState::Edit)
+//                 {
+//                     if (ImGuiAux::Button(ICON_SURGE_PLAY))
+//                     {
+//                         mEditor->OnRuntimeStart();
+//                     }
+//                 }
+//                 else if (projectState == ProjectState::Play)
+//                 {
+//                     if (ImGuiAux::Button(ICON_SURGE_STOP))
+//                     {
+//                         mEditor->OnRuntimeEnd();
+//                     }
+//                 }
 
                 ImGui::SameLine();
                 {
-                    String activeProjectName = editor->GetActiveProject().GetMetadata().Name;
+                    String activeProjectName = "Dummy Project";
                     ImGui::SetCursorPosX(windowWidth - 200);
                     ImGui::Text(activeProjectName.c_str());
 
@@ -104,7 +106,6 @@ namespace Surge
                     bool hovered = false;
                     if (ImGui::ButtonBehavior(rect, id, &hovered, nullptr, 0))
                     {
-                        editor->GetActiveProject().Destroy();
                         Window* window = Core::GetWindow();
                         window->RestoreFromMaximize();
                     }
