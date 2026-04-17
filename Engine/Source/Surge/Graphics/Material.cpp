@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Material.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHIDevice.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanRHISwapchain.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanShader.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanImage.hpp"
 #include "Surge/Core/Core.hpp"

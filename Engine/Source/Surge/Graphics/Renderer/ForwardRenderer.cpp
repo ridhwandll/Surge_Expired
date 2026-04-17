@@ -3,6 +3,8 @@
 #include "Surge/Graphics/RHI/RHICommandBuffer.hpp"
 #include "Surge/Graphics/Interface/Texture.hpp"
 
+#define BASE_SHADER_PATH "Engine/Assets/Shaders"
+
 namespace Surge
 {
     void ForwardRenderer::Initialize()
