@@ -1,6 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanImGuiContext.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanImage.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImGuiContext.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImage.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanRHIDevice.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanResources.hpp"
+#include "Surge/Core/Core.hpp"
 #include <ImGui/Backends/imgui_impl_vulkan.h>
 #include <ImGui/Backends/imgui_impl_win32.h>
 #include <ImGui/ImGuizmo.h>
@@ -10,12 +13,10 @@ namespace Surge
 {
     static void ImGuiCheckVkResult(VkResult err) { VK_CALL(err); }
 
-    void VulkanImGuiContext::Initialize(void* vulkanRenderContext)
+    void VulkanImGuiContext::Initialize(RHI::SwapchainHandle swapchain)
     {
-        mVulkanRenderContext = vulkanRenderContext;
-        VulkanRenderContext* renderContext = static_cast<VulkanRenderContext*>(vulkanRenderContext);
-        VulkanDevice* vulkanDevice = &renderContext->mDevice;
-        VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+        mSwapchain = swapchain;
+        VkDevice logicalDevice = RHI::gVulkanRHIDevice.GetLogicalDevice();
 
         VkDescriptorPoolSize poolSizes[] =
             {{VK_DESCRIPTOR_TYPE_SAMPLER, 100},
@@ -37,20 +38,18 @@ namespace Surge
         poolInfo.pPoolSizes = poolSizes;
         VK_CALL(vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &mImguiPool));
 
-        // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
         mImGuiContext = ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;   // Enable Docking
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         constexpr float fontSize = 14.0f;
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Bold.ttf", fontSize);        // Normal Bold
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Bold.ttf", 24.0f);           // Largest Bold
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Bold.ttf", fontSize + 3.0f); // MediumLarge Bold
+        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Bold.ttf", fontSize);
+        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Bold.ttf", 24.0f);
+        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Bold.ttf", fontSize + 3.0f);
 
         io.FontDefault = io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/OpenSans-Regular.ttf", fontSize);
 
-        // Merge Icons
         static const ImWchar iconsRanges[] = {ICON_MIN_FK, ICON_MAX_FK, 0};
         ImFontConfig iconsConfig {};
         iconsConfig.MergeMode = true;
@@ -65,24 +64,26 @@ namespace Surge
             style.Colors[ImGuiCol_WindowBg].w = 1.0f;
         }
 
-        // Setup Platform/Renderer backends
+        const RHI::VulkanSwapchain& sc = RHI::GetVulkanRegistry().GetSwapchain(swapchain);
+
         ImGui_ImplWin32_Init(Core::GetWindow()->GetNativeWindowHandle());
         ImGui_ImplVulkan_InitInfo initInfo {};
-        initInfo.Instance = renderContext->mVulkanInstance;
-        initInfo.PhysicalDevice = vulkanDevice->GetPhysicalDevice();
+        initInfo.Instance = RHI::gVulkanRHIDevice.GetInstance();
+        initInfo.PhysicalDevice = RHI::gVulkanRHIDevice.GetPhysicalDevice();
         initInfo.Device = logicalDevice;
-        initInfo.QueueFamily = vulkanDevice->GetQueueFamilyIndices().GraphicsQueue;
-        initInfo.Queue = vulkanDevice->GetGraphicsQueue();
+        initInfo.QueueFamily = RHI::gVulkanRHIDevice.GetGraphicsFamily();
+        initInfo.Queue = RHI::gVulkanRHIDevice.GetGraphicsQueue();
         initInfo.DescriptorPool = mImguiPool;
         initInfo.MinImageCount = 2;
-        initInfo.ImageCount = 3;
+        initInfo.ImageCount = RHI::FRAMES_IN_FLIGHT;
         initInfo.Allocator = VK_NULL_HANDLE;
         initInfo.PipelineCache = VK_NULL_HANDLE;
         initInfo.CheckVkResultFn = ImGuiCheckVkResult;
-        ImGui_ImplVulkan_Init(&initInfo, renderContext->mSwapChain.GetVulkanRenderPass());
+        ImGui_ImplVulkan_Init(&initInfo, sc.RenderPass);
 
-        VkCommandBuffer cmd = nullptr;
-        vulkanDevice->InstantSubmit(VulkanQueueType::Graphics, [&](VkCommandBuffer& cmd) { ImGui_ImplVulkan_CreateFontsTexture(cmd); });
+        RHI::gVulkanRHIDevice.InstantSubmit(RHI::QueueType::Graphics, [&](VkCommandBuffer cmd) {
+            ImGui_ImplVulkan_CreateFontsTexture(cmd);
+        });
 
         ImGui_ImplVulkan_DestroyFontUploadObjects();
         SetDarkThemeColors();
@@ -90,8 +91,8 @@ namespace Surge
 
     void VulkanImGuiContext::Destroy()
     {
-        VulkanRenderContext* renderContext = static_cast<VulkanRenderContext*>(mVulkanRenderContext);
-        vkDestroyDescriptorPool(renderContext->mDevice.GetLogicalDevice(), mImguiPool, nullptr);
+        vkDestroyDescriptorPool(RHI::gVulkanRHIDevice.GetLogicalDevice(), mImguiPool, nullptr);
+        mImguiPool = VK_NULL_HANDLE;
         ImGui_ImplWin32_Shutdown();
         ImGui_ImplVulkan_Shutdown();
         ImGui::DestroyContext();
@@ -107,11 +108,12 @@ namespace Surge
 
     void VulkanImGuiContext::Render()
     {
-        VulkanRenderContext* vkContext;
-        SURGE_GET_VULKAN_CONTEXT(vkContext);
-        VulkanSwapChain* swapchain = vkContext->GetSwapChain();
+        const RHI::VulkanSwapchain& sc = RHI::GetVulkanRegistry().GetSwapchain(mSwapchain);
+        uint32_t frameIdx = sc.CurrentFrameIdx;
+        VkCommandBuffer cmd = sc.Frames[frameIdx].CmdBuf;
+
         ImGui::Render();
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), swapchain->GetVulkanCommandBuffers()[vkContext->GetFrameIndex()]);
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
         if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
         {
             ImGui::UpdatePlatformWindows();
@@ -121,26 +123,24 @@ namespace Surge
 
     void VulkanImGuiContext::EndFrame()
     {
-        // Empty, because why not?
+        // Empty – presentation happens in the swapchain EndFrame.
     }
 
     void* VulkanImGuiContext::AddImage(const Ref<Image2D>& image2d) const
     {
-        VulkanRenderContext* renderContext = nullptr;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
+        const RHI::VulkanSwapchain& sc = RHI::GetVulkanRegistry().GetSwapchain(mSwapchain);
+        uint32_t frameIdx = sc.CurrentFrameIdx;
 
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
         VkDescriptorSetLayout descriptorSetLayout = ImGui_ImplVulkan_GetDescriptorSetLayout();
 
-        // Allocate the descriptor set (for the texture)
         VkDescriptorSetAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &descriptorSetLayout;
-        allocInfo.descriptorPool = renderContext->GetDescriptorPools()[renderContext->GetFrameIndex()];
+        allocInfo.descriptorPool = RHI::gVulkanRHIDevice.GetDescriptorPool(frameIdx);
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
         VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
 
-        // Add the texture
         Ref<VulkanImage2D> vulkanImage2d = image2d.As<VulkanImage2D>();
         ImGui_ImplVulkan_AddTexture(vulkanImage2d->GetVulkanImageView(), vulkanImage2d->GetVulkanImageLayout(), vulkanImage2d->GetVulkanSampler(), descriptorSet);
         return descriptorSet;
@@ -159,18 +159,16 @@ namespace Surge
 
         style.TabRounding = 1.5f;
         style.FrameRounding = 1.5f;
-        //style.FrameBorderSize = 1.0f;
         style.PopupRounding = 3.5f;
         style.ScrollbarRounding = 3.5f;
         style.GrabRounding = 3.5f;
         style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
         style.DisplaySafeAreaPadding = ImVec2(0, 0);
 
-        // Headers
         colors[ImGuiCol_Header] = colorFromBytes(51, 51, 51);
         colors[ImGuiCol_HeaderHovered] = {0.3f, 0.3f, 0.3f, 0.3f};
         colors[ImGuiCol_HeaderActive] = colorFromBytes(22, 22, 22);
-        colors[ImGuiCol_CheckMark] = colorFromBytes(10, 200, 10); // Green
+        colors[ImGuiCol_CheckMark] = colorFromBytes(10, 200, 10);
 
         colors[ImGuiCol_Button] = themeColor;
         colors[ImGuiCol_ButtonHovered] = colorFromBytes(66, 66, 66);
@@ -178,29 +176,23 @@ namespace Surge
         colors[ImGuiCol_SeparatorHovered] = {0.8f, 0.4f, 0.1f, 1.0f};
         colors[ImGuiCol_SeparatorActive] = {1.0f, 0.5f, 0.1f, 1.0f};
 
-        // Frame
         colors[ImGuiCol_FrameBg] = colorFromBytes(51, 51, 51);
         colors[ImGuiCol_FrameBgHovered] = colorFromBytes(55, 55, 55);
         colors[ImGuiCol_FrameBgActive] = colorFromBytes(110, 110, 110);
 
-        // Tabs
         colors[ImGuiCol_Tab] = colorFromBytes(56, 56, 56);
         colors[ImGuiCol_TabHovered] = colorFromBytes(56, 56, 56);
         colors[ImGuiCol_TabActive] = colorFromBytes(90, 90, 90);
         colors[ImGuiCol_TabUnfocused] = colorFromBytes(40, 40, 40);
         colors[ImGuiCol_TabUnfocusedActive] = colorFromBytes(88, 88, 88);
 
-        // Title
         colors[ImGuiCol_TitleBg] = colorFromBytes(40, 40, 40);
         colors[ImGuiCol_TitleBgActive] = colorFromBytes(40, 40, 40);
 
-        // Others
         colors[ImGuiCol_WindowBg] = themeColor;
         colors[ImGuiCol_PopupBg] = colorFromBytes(45, 45, 45);
         colors[ImGuiCol_DockingPreview] = colorFromBytes(26, 26, 26);
         colors[ImGuiCol_TitleBg] = {0.12, 0.12, 0.12, 1.0};
         colors[ImGuiCol_TitleBgActive] = {0.14, 0.14, 0.14, 1.0};
-        //colors[ImGuiCol_Separator] = colorFromBytes(10, 200, 10);
-        //colors[ImGuiCol_Border] = colorFromBytes(10, 200, 10);
     }
 } // namespace Surge

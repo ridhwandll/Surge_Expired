@@ -1,8 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanShader.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanDevice.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanShader.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanRHIDevice.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDiagnostics.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <shaderc/shaderc.hpp>
 #include <filesystem>
@@ -26,10 +26,7 @@ namespace Surge
         SG_ASSERT(mCallbacks.empty(), "Callbacks must be empty! Did you forgot to call 'RemoveReloadCallback(id);' somewhere?");
         Clear();
 
-        // DescriptorSetLayouts doesn't get recreated when the shader is reloaded, thus it is outside the Clear() function
-        VulkanRenderContext* renderContext;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
         for (auto& descriptorSetLayout : mDescriptorSetLayouts)
         {
             if (descriptorSetLayout.second)
@@ -46,7 +43,6 @@ namespace Surge
         ParseShader();
         Compile(compileStages);
 
-        // We want to make sure that the DescriptorSetLayouts doesn't get recreated when the shader is reloaded
         if (!mCreatedDescriptorSetLayouts)
         {
             CreateVulkanDescriptorSetLayouts();
@@ -81,26 +77,18 @@ namespace Surge
 
     void VulkanShader::Compile(const HashMap<ShaderType, bool>& compileStages)
     {
-        VulkanRenderContext* renderContext = nullptr;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
 
         shaderc::Compiler compiler;
         shaderc::CompileOptions options;
         options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
-        bool saveHash = false;
-
-        // NOTE(Rid - AC3R) If we enable optimization, it removes the name :kekCry:
-        // options.SetOptimizationLevel(shaderc_optimization_level_performance);
 
         for (auto&& [stage, source] : mShaderSources)
         {
             SPIRVHandle spirvHandle;
             spirvHandle.Type = stage;
-            bool compile = true; // Default is "true", shader should be compiled if not specified in compileStages
+            bool compile = true;
 
-            // If compileStages is not empty, then try to find the "compile" bool
-            // This "compile" bool determines if the shader should be recompiled or not
             if (!compileStages.empty())
             {
                 auto itr = compileStages.find(stage);
@@ -108,10 +96,8 @@ namespace Surge
                     compile = compileStages.at(stage);
             }
 
-            // Load or create the SPIRV
             if (compile)
             {
-                // Compile, not present in cache
                 shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, VulkanUtils::ShadercShaderKindFromSurgeShaderType(stage), mPath, options);
                 if (result.GetCompilationStatus() != shaderc_compilation_status_success)
                 {
@@ -124,14 +110,12 @@ namespace Surge
             }
             else
             {
-                // Load from cache
                 String name = fmt::format("{0}.{1}.spv", Filesystem::GetNameWithExtension(mPath), ShaderTypeToString(stage));
                 String path = fmt::format("{0}/{1}", SHADER_CACHE_PATH, name);
                 spirvHandle.SPIRV = Filesystem::ReadFile<Vector<Uint>>(path);
             }
             SG_ASSERT(!spirvHandle.SPIRV.empty(), "Invalid SPIRV!");
 
-            // Create the VkShaderModule
             VkShaderModuleCreateInfo createInfo {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
             createInfo.codeSize = spirvHandle.SPIRV.size() * sizeof(Uint);
             createInfo.pCode = spirvHandle.SPIRV.data();
@@ -144,19 +128,16 @@ namespace Surge
             for (auto& dir : std::filesystem::directory_iterator(SHADER_CACHE_PATH))
             {
                 String chachedShaderPath = dir.path().string();
-                if (dir.path().extension() != ".spv") // Early exit if it's not a spirv file
+                if (dir.path().extension() != ".spv")
                     continue;
 
-                // Get the shader type from filename
                 String shaderStageString = std::filesystem::path(Filesystem::RemoveExtension(chachedShaderPath)).extension().string().substr(1, std::string::npos);
-                ShaderType shaderStage = VulkanUtils::ShaderTypeFromString(shaderStageString + "]"); //TODO: remove this hack
+                ShaderType shaderStage = VulkanUtils::ShaderTypeFromString(shaderStageString + "]");
 
-                // Get the correct cache name for this shader
                 String cacheName = fmt::format("{0}.{1}.spv", Filesystem::GetNameWithExtension(mPath), ShaderTypeToString(shaderStage));
                 String cachePath = fmt::format("{0}/{1}", SHADER_CACHE_PATH, cacheName);
                 std::replace(chachedShaderPath.begin(), chachedShaderPath.end(), '\\', '/');
 
-                // We are iterating the whole shader cache directory, so skip the other files
                 if (cachePath != chachedShaderPath)
                     continue;
 
@@ -178,12 +159,9 @@ namespace Surge
 
     void VulkanShader::Clear()
     {
-        VulkanRenderContext* renderContext = nullptr;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
 
         mShaderSources.clear();
-
         mShaderSPIRVs.clear();
 
         for (auto&& [stage, source] : mVkShaderModules)
@@ -197,11 +175,8 @@ namespace Surge
 
     void VulkanShader::CreateVulkanDescriptorSetLayouts()
     {
-        VulkanRenderContext* renderContext = nullptr;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
 
-        // Iterate through all the sets and creating the layouts
         const Vector<Uint>& descriptorSetCount = mReflectionData.GetDescriptorSets();
 
         for (const Uint& descriptorSet : descriptorSetCount)
@@ -214,7 +189,7 @@ namespace Surge
 
                 VkDescriptorSetLayoutBinding& layoutBinding = layoutBindings.emplace_back();
                 layoutBinding.binding = buffer.Binding;
-                layoutBinding.descriptorCount = 1; // TODO: Need to add arrays
+                layoutBinding.descriptorCount = 1;
                 layoutBinding.descriptorType = VulkanUtils::ShaderBufferTypeToVulkan(buffer.ShaderUsage);
                 layoutBinding.stageFlags = VulkanUtils::GetShaderStagesFlagsFromShaderTypes(buffer.ShaderStages) | VK_SHADER_STAGE_ALL;
             }
@@ -226,7 +201,7 @@ namespace Surge
 
                 VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
                 LayoutBinding.binding = texture.Binding;
-                LayoutBinding.descriptorCount = 1; // TODO: Need to add arrays
+                LayoutBinding.descriptorCount = 1;
                 LayoutBinding.descriptorType = VulkanUtils::ShaderImageUsageToVulkan(texture.ShaderUsage);
                 LayoutBinding.stageFlags = VulkanUtils::GetShaderStagesFlagsFromShaderTypes(texture.ShaderStages) | VK_SHADER_STAGE_ALL;
             }

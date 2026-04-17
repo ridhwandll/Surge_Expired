@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanImage.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanGraphicsPipeline.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImage.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanRHIDevice.hpp"
+#include <vk_mem_alloc.h>
 
 namespace Surge
 {
@@ -16,26 +16,22 @@ namespace Surge
         if (mImage == VK_NULL_HANDLE)
             return;
 
-        VulkanRenderContext* renderContext;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VulkanMemoryAllocator* allocator = static_cast<VulkanMemoryAllocator*>(renderContext->GetMemoryAllocator());
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
         vkDeviceWaitIdle(device);
         vkDestroyImageView(device, mImageView, nullptr);
         vkDestroySampler(device, mImageSampler, nullptr);
-        allocator->DestroyImage(mImage, mImageMemory);
+        vmaDestroyImage(RHI::gVulkanRHIDevice.GetVMAAllocator(), mImage, mImageMemory);
 
         mImage = VK_NULL_HANDLE;
         mImageView = VK_NULL_HANDLE;
         mImageSampler = VK_NULL_HANDLE;
+        mImageMemory = nullptr;
     }
 
     void VulkanImage2D::Invalidate()
     {
-        VulkanRenderContext* renderContext;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VulkanDevice* device = renderContext->GetDevice();
-        VulkanMemoryAllocator* allocator = static_cast<VulkanMemoryAllocator*>(renderContext->GetMemoryAllocator());
+        VkDevice logicalDevice = RHI::gVulkanRHIDevice.GetLogicalDevice();
+        VmaAllocator allocator = RHI::gVulkanRHIDevice.GetVMAAllocator();
 
         VkFormat textureFormat = VulkanUtils::GetImageFormat(mSpecification.Format);
         VkImageUsageFlags usageFlags = VulkanUtils::GetImageUsageFlags(mSpecification.Usage, mSpecification.Format);
@@ -57,7 +53,10 @@ namespace Surge
         imageInfo.usage = usageFlags;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        mImageMemory = allocator->AllocateImage(imageInfo, VMA_MEMORY_USAGE_GPU_ONLY, mImage, nullptr);
+
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        vmaCreateImage(allocator, &imageInfo, &allocInfo, &mImage, &mImageMemory, nullptr);
         SET_VK_OBJECT_DEBUGNAME(mImage, VK_OBJECT_TYPE_IMAGE, "Image");
 
         // Create the image view
@@ -71,7 +70,7 @@ namespace Surge
         imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
         imageViewCreateInfo.subresourceRange.layerCount = 1;
         imageViewCreateInfo.image = mImage;
-        VK_CALL(vkCreateImageView(device->GetLogicalDevice(), &imageViewCreateInfo, nullptr, &mImageView));
+        VK_CALL(vkCreateImageView(logicalDevice, &imageViewCreateInfo, nullptr, &mImageView));
         SET_VK_OBJECT_DEBUGNAME(mImageView, VK_OBJECT_TYPE_IMAGE_VIEW, "Image View");
 
         // Sampler
@@ -90,13 +89,13 @@ namespace Surge
         samplerCreateInfo.compareEnable = mSpecification.SamplerProps.EnableComparison;
         samplerCreateInfo.compareOp = VulkanUtils::CompareOpToVkCompareOp(mSpecification.SamplerProps.SamplerCompareOp);
 
-        VK_CALL(vkCreateSampler(device->GetLogicalDevice(), &samplerCreateInfo, nullptr, &mImageSampler));
+        VK_CALL(vkCreateSampler(logicalDevice, &samplerCreateInfo, nullptr, &mImageSampler));
         SET_VK_OBJECT_DEBUGNAME(mImageSampler, VK_OBJECT_TYPE_SAMPLER, "Sampler");
 
-        // Transition image to VK_IMAGE_LAYOUT_GENERAL layout, if it is Storage
+        // Transition Storage images to VK_IMAGE_LAYOUT_GENERAL
         if (mSpecification.Usage == ImageUsage::Storage)
         {
-            device->InstantSubmit(VulkanQueueType::Graphics, [&](VkCommandBuffer& cmd) {
+            RHI::gVulkanRHIDevice.InstantSubmit(RHI::QueueType::Graphics, [&](VkCommandBuffer cmd) {
                 VkImageSubresourceRange subresourceRange {};
                 subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 subresourceRange.baseMipLevel = 0;
@@ -126,10 +125,7 @@ namespace Surge
 
     VulkanImage2D::~VulkanImage2D()
     {
-        VulkanRenderContext* renderContext;
-        SURGE_GET_VULKAN_CONTEXT(renderContext);
-        VulkanMemoryAllocator* allocator = static_cast<VulkanMemoryAllocator*>(renderContext->GetMemoryAllocator());
-        VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
+        VkDevice device = RHI::gVulkanRHIDevice.GetLogicalDevice();
         vkDeviceWaitIdle(device);
 
         if (mImageSampler)
@@ -144,8 +140,9 @@ namespace Surge
         }
         if (mImage)
         {
-            allocator->DestroyImage(mImage, mImageMemory);
+            vmaDestroyImage(RHI::gVulkanRHIDevice.GetVMAAllocator(), mImage, mImageMemory);
             mImage = VK_NULL_HANDLE;
+            mImageMemory = nullptr;
         }
     }
 } // namespace Surge

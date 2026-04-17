@@ -4,23 +4,21 @@
 #include "Surge/Core/String.hpp"
 #include "Surge/Graphics/Shader/Shader.hpp"
 #include "Surge/Graphics/Shader/ReflectionData.hpp"
-#include "Surge/Graphics/Interface/UniformBuffer.hpp"
 #include "Surge/Graphics/Interface/Texture.hpp"
-#include "Surge/Graphics/Interface/RenderCommandBuffer.hpp"
-#include "Surge/Graphics/Interface/GraphicsPipeline.hpp"
+#include <volk.h>
 
 namespace Surge
 {
     class SURGE_API Material : public RefCounted
     {
     public:
-        Material() = default;
-        virtual ~Material() = default;
+        Material(const Ref<Shader>& shader, const String& materialName);
+        ~Material();
 
-        virtual void UpdateForRendering() = 0;
-        virtual void Bind(const Ref<RenderCommandBuffer>& cmdBuffer, const Ref<GraphicsPipeline>& gfxPipeline) const = 0;
-        virtual void Load() = 0;
-        virtual void Release() = 0;
+        void UpdateForRendering();
+        void Bind(VkCommandBuffer cmd, VkPipelineLayout layout, uint32_t frameIndex) const;
+        void Load();
+        void Release();
 
         template <typename T>
         FORCEINLINE void Set(const String& name, const T& data)
@@ -75,20 +73,27 @@ namespace Surge
         static Ref<Material> Create(const String& shaderName, const String& materialName);
         static Ref<Texture2D> mDummyTexture;
 
-    protected:
+    private:
         Ref<Shader> mShader;
         String mName;
 
         // Buffer
         Buffer mBufferMemory;
         ShaderBuffer mShaderBuffer;
-        Ref<UniformBuffer> mUniformBuffer;
+
+        // Vulkan uniform buffer
+        VkBuffer mVkUniformBuffer = VK_NULL_HANDLE;
+        void* mAllocation = nullptr;
+        VkDescriptorBufferInfo mUniformDescriptorInfo = {};
+
+        // Descriptor sets
+        Vector<VkDescriptorSet> mDescriptorSets;
+        Vector<VkDescriptorSet> mTextureDescriptorSets;
+        Uint mBinding = 0;
 
         // Textures
-        //   Binding - Res
         HashMap<Uint, ShaderResource> mShaderResources;
         HashMap<Uint, Ref<Texture2D>> mTextures;
-
         Vector<Pair<Uint, Texture2D*>> mUpdatePendingTextures;
 
         UUID mShaderReloadID;

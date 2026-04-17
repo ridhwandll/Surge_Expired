@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDiagnostics.hpp"
 
 namespace Surge
 {
@@ -39,22 +39,6 @@ namespace Surge
         }
 
         return static_cast<shaderc_shader_kind>(-1);
-    }
-
-    VkPrimitiveTopology VulkanUtils::GetVulkanPrimitiveTopology(PrimitiveTopology primitive)
-    {
-        switch (primitive)
-        {
-            case PrimitiveTopology::PointList: return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-            case PrimitiveTopology::LineList: return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-            case PrimitiveTopology::LineStrip: return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-            case PrimitiveTopology::TriangleList: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-            case PrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-            case PrimitiveTopology::None: SG_ASSERT_INTERNAL("PrimitiveType::None is invalid!");
-        }
-
-        SG_ASSERT_INTERNAL("No Surge::PrimitiveType maps to VkPrimitiveTopology!");
-        return VkPrimitiveTopology();
     }
 
     VkFormat VulkanUtils::ShaderDataTypeToVulkanFormat(ShaderDataType type)
@@ -118,26 +102,17 @@ namespace Surge
         return stageFlags;
     }
 
-    void VulkanUtils::CreateWindowSurface(VkInstance instance, Window* windowHandle, VkSurfaceKHR* surface)
+    VkShaderStageFlagBits VulkanUtils::GetVulkanShaderStage(ShaderType type)
     {
-#ifdef SURGE_WINDOWS
-        PFN_vkCreateWin32SurfaceKHR vkCreateWin32SurfaceKHR;
-
-        // Getting the vkCreateWin32SurfaceKHR function pointer and assert if it doesnt exist
-        vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
-        if (!vkCreateWin32SurfaceKHR)
-            SG_ASSERT_INTERNAL("[Win32] Vulkan instance missing VK_KHR_win32_surface extension");
-
-        VkWin32SurfaceCreateInfoKHR sci;
-        memset(&sci, 0, sizeof(sci)); // Clear the info
-        sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-        sci.hinstance = GetModuleHandle(nullptr);
-        sci.hwnd = static_cast<HWND>(windowHandle->GetNativeWindowHandle());
-
-        VK_CALL(vkCreateWin32SurfaceKHR(instance, &sci, nullptr, surface));
-#else
-        SG_ASSERT_INTERNAL("Surge is currently Windows Only! :(");
-#endif
+        switch (type)
+        {
+            case ShaderType::Vertex: return VK_SHADER_STAGE_VERTEX_BIT;
+            case ShaderType::Pixel: return VK_SHADER_STAGE_FRAGMENT_BIT;
+            case ShaderType::Compute: return VK_SHADER_STAGE_COMPUTE_BIT;
+            case ShaderType::None: SG_ASSERT_INTERNAL("ShaderType::None is invalid in this case!");
+        }
+        SG_ASSERT_INTERNAL("Invalid shader type specified!");
+        return VkShaderStageFlagBits();
     }
 
     VkFormat VulkanUtils::GetImageFormat(ImageFormat format)
@@ -182,7 +157,7 @@ namespace Surge
 
     VkImageUsageFlags VulkanUtils::GetImageUsageFlags(ImageUsage usage, ImageFormat format)
     {
-        VkImageUsageFlags vkImageUsage = VK_IMAGE_USAGE_SAMPLED_BIT; // TODO: Maybe not force this?
+        VkImageUsageFlags vkImageUsage = VK_IMAGE_USAGE_SAMPLED_BIT;
         switch (usage)
         {
             case ImageUsage::Attachment:
@@ -220,61 +195,6 @@ namespace Surge
         imageMemoryBarrier.subresourceRange = subresourceRange;
         vkCmdPipelineBarrier(cmdbuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
     }
-    VkShaderStageFlagBits VulkanUtils::GetVulkanShaderStage(ShaderType type)
-    {
-        switch (type)
-        {
-            case ShaderType::Vertex: return VK_SHADER_STAGE_VERTEX_BIT;
-            case ShaderType::Pixel: return VK_SHADER_STAGE_FRAGMENT_BIT;
-            case ShaderType::Compute: return VK_SHADER_STAGE_COMPUTE_BIT;
-            case ShaderType::None: SG_ASSERT_INTERNAL("ShaderType::None is invalid in this case!");
-        }
-        SG_ASSERT_INTERNAL("Invalid shader type specified!");
-        return VkShaderStageFlagBits();
-    }
-
-    VkPolygonMode VulkanUtils::GetVulkanPolygonMode(PolygonMode mode)
-    {
-        switch (mode)
-        {
-            case PolygonMode::Fill: return VK_POLYGON_MODE_FILL;
-            case PolygonMode::Line: return VK_POLYGON_MODE_LINE;
-            case PolygonMode::Point: return VK_POLYGON_MODE_POINT;
-            case PolygonMode::None: SG_ASSERT_INTERNAL("PolygonMode::None is invalid in this case!");
-        }
-        SG_ASSERT_INTERNAL("Invalid polygon mode specified!");
-        return VK_POLYGON_MODE_MAX_ENUM;
-    }
-
-    VkCullModeFlags VulkanUtils::GetVulkanCullModeFlags(CullMode mode)
-    {
-        switch (mode)
-        {
-            case CullMode::Back: return VK_CULL_MODE_BACK_BIT;
-            case CullMode::Front: return VK_CULL_MODE_FRONT_BIT;
-            case CullMode::FrontAndBack: return VK_CULL_MODE_FRONT_AND_BACK;
-            case CullMode::None: return VK_CULL_MODE_NONE;
-        }
-        SG_ASSERT_INTERNAL("Invalid cull mode specified!");
-        return VK_CULL_MODE_FLAG_BITS_MAX_ENUM;
-    }
-
-    VkCompareOp VulkanUtils::GetVulkanCompareOp(CompareOperation op)
-    {
-        switch (op)
-        {
-            case CompareOperation::Never: return VK_COMPARE_OP_NEVER;
-            case CompareOperation::Less: return VK_COMPARE_OP_LESS;
-            case CompareOperation::Equal: return VK_COMPARE_OP_EQUAL;
-            case CompareOperation::LessOrEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
-            case CompareOperation::Greater: return VK_COMPARE_OP_GREATER;
-            case CompareOperation::NotEqual: return VK_COMPARE_OP_NOT_EQUAL;
-            case CompareOperation::GreaterOrEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
-            case CompareOperation::Always: return VK_COMPARE_OP_ALWAYS;
-        }
-        SG_ASSERT_INTERNAL("Invalid DepthCompareOperation specified!");
-        return VK_COMPARE_OP_MAX_ENUM;
-    }
 
     bool VulkanUtils::IsDepthFormat(ImageFormat imageFormat)
     {
@@ -298,9 +218,9 @@ namespace Surge
     {
         switch (format)
         {
-            case ImageFormat::RGBA8: return width * height * (4);                   // 32 bit(4 byte) per pixel
-            case ImageFormat::RGBA16F: return width * height * (4 * 2);             // 64 bit(8 byte) per pixel
-            case ImageFormat::RGBA32F: return width * height * (4 * sizeof(float)); // 128 bit(16 byte) per pixel
+            case ImageFormat::RGBA8: return width * height * (4);
+            case ImageFormat::RGBA16F: return width * height * (4 * 2);
+            case ImageFormat::RGBA32F: return width * height * (4 * sizeof(float));
         }
         SG_ASSERT_INTERNAL("Invalid ImageFormat!");
         return 0;

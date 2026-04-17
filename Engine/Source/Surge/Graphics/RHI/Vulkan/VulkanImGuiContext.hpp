@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDiagnostics.hpp"
+#include "Surge/Graphics/RHI/RHIResources.hpp"
 #include <volk.h>
 
 namespace Surge
@@ -11,25 +12,23 @@ namespace Surge
         VulkanImGuiContext() = default;
         ~VulkanImGuiContext() = default;
 
-    private:
-        void Initialize(void* vulkanRenderContext);
+        void Initialize(RHI::SwapchainHandle swapchain);
         void Destroy();
 
         void BeginFrame();
-        void Render(); // Must be called inside a "Graphics" command buffer
+        void Render();
         void EndFrame();
 
         void* AddImage(const Ref<Image2D>& image2d) const;
-        void SetDarkThemeColors();
         void* GetContext() { return mImGuiContext; }
 
     private:
-        VkDescriptorPool mImguiPool;
-        void* mVulkanRenderContext = nullptr;
-        void* mImGuiContext;
+        void SetDarkThemeColors();
 
     private:
-        friend class VulkanRenderContext;
+        VkDescriptorPool mImguiPool = VK_NULL_HANDLE;
+        void* mImGuiContext = nullptr;
+        RHI::SwapchainHandle mSwapchain;
     };
 
 } // namespace Surge

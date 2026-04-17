@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Shader/Shader.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanShader.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanShader.hpp"
 
 namespace Surge
 {

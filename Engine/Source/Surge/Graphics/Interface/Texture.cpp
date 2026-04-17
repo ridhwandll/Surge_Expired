@@ -1,5 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanTexture.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanTexture.hpp"
 
 namespace Surge
 {

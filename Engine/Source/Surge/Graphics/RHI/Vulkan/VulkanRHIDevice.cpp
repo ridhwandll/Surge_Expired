@@ -3,11 +3,8 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHICommandBuffer.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHISwapchain.hpp"
 #include <volk.h>
+#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
-
-// NOTE: VMA_IMPLEMENTATION is defined in the legacy VulkanMemoryAllocator.cpp.
-//       All VMA function bodies are provided by that translation unit; this
-//       file only needs the declarations (included above without the macro).
 
 namespace Surge::RHI
 {
@@ -271,8 +268,86 @@ namespace Surge::RHI
         reg.Framebuffers.Destroy(handle);
     }
 
-    // ── Dispatch table ─────────────────────────────────────────────────────────
+    // ── Immediate submit ──────────────────────────────────────────────────────
 
+    void VulkanRHIDevice::InstantSubmit(QueueType queue, const std::function<void(VkCommandBuffer)>& fn)
+    {
+        VkCommandPool pool = VK_NULL_HANDLE;
+        VkQueue       vkQ  = VK_NULL_HANDLE;
+        switch (queue)
+        {
+            case QueueType::Compute:  pool = mImmediateComputePool;  vkQ = mComputeQueue;  break;
+            case QueueType::Transfer: pool = mImmediateTransferPool; vkQ = mTransferQueue; break;
+            default:                  pool = mImmediateGraphicsPool; vkQ = mGraphicsQueue; break;
+        }
+
+        VkCommandBufferAllocateInfo ai = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        ai.commandPool        = pool;
+        ai.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        ai.commandBufferCount = 1;
+
+        VkCommandBuffer cmd = VK_NULL_HANDLE;
+        vkAllocateCommandBuffers(mDevice, &ai, &cmd);
+
+        VkCommandBufferBeginInfo bi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(cmd, &bi);
+
+        fn(cmd);
+
+        vkEndCommandBuffer(cmd);
+
+        VkFenceCreateInfo fi = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        VkFence fence = VK_NULL_HANDLE;
+        vkCreateFence(mDevice, &fi, nullptr, &fence);
+
+        VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        si.commandBufferCount = 1;
+        si.pCommandBuffers    = &cmd;
+        vkQueueSubmit(vkQ, 1, &si, fence);
+        vkWaitForFences(mDevice, 1, &fence, VK_TRUE, UINT64_MAX);
+        vkDestroyFence(mDevice, fence, nullptr);
+        vkFreeCommandBuffers(mDevice, pool, 1, &cmd);
+    }
+
+    // ── Descriptor pools ─────────────────────────────────────────────────────
+
+    void VulkanRHIDevice::CreateDescriptorPools()
+    {
+        VkDescriptorPoolSize poolSizes[] = {
+            {VK_DESCRIPTOR_TYPE_SAMPLER,                10000},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10000},
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          10000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          10000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   10000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   10000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         10000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10000},
+            {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       10000},
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        poolInfo.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets       = 1000 * (uint32_t)(sizeof(poolSizes) / sizeof(poolSizes[0]));
+        poolInfo.poolSizeCount = (uint32_t)(sizeof(poolSizes) / sizeof(poolSizes[0]));
+        poolInfo.pPoolSizes    = poolSizes;
+
+        for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; ++i)
+        {
+            vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &mDescriptorPools[i]);
+            vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &mPersistentDescriptorPools[i]);
+        }
+    }
+
+    void VulkanRHIDevice::ResetDescriptorPool(uint32_t frameIndex)
+    {
+        if (frameIndex < FRAMES_IN_FLIGHT)
+            vkResetDescriptorPool(mDevice, mDescriptorPools[frameIndex], 0);
+    }
+
+    // ── Dispatch table ─────────────────────────────────────────────────────────
     void VulkanRHIDevice::FillDispatchTable()
     {
         mDispatchTable.createBuffer     = sCreateBuffer;
@@ -415,6 +490,18 @@ namespace Surge::RHI
         vkGetDeviceQueue(mDevice, mGraphicsFamily, 0, &mGraphicsQueue);
         vkGetDeviceQueue(mDevice, mComputeFamily,  0, &mComputeQueue);
         vkGetDeviceQueue(mDevice, mTransferFamily, 0, &mTransferQueue);
+
+        // Command pools for InstantSubmit
+        auto makePool = [&](uint32_t family, VkCommandPool& out)
+        {
+            VkCommandPoolCreateInfo ci = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+            ci.queueFamilyIndex = family;
+            ci.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            vkCreateCommandPool(mDevice, &ci, nullptr, &out);
+        };
+        makePool(mGraphicsFamily, mImmediateGraphicsPool);
+        makePool(mComputeFamily,  mImmediateComputePool);
+        makePool(mTransferFamily, mImmediateTransferPool);
     }
 
     void VulkanRHIDevice::CreateVMAAllocator()
@@ -441,6 +528,7 @@ namespace Surge::RHI
         SelectPhysicalDevice();
         CreateLogicalDevice();
         CreateVMAAllocator();
+        CreateDescriptorPools();
         FillDispatchTable();
         SetRHIDevice(&mDispatchTable);
     }
@@ -449,6 +537,16 @@ namespace Surge::RHI
     {
         if (mDevice != VK_NULL_HANDLE)
             vkDeviceWaitIdle(mDevice);
+
+        for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; ++i)
+        {
+            if (mDescriptorPools[i])           { vkDestroyDescriptorPool(mDevice, mDescriptorPools[i], nullptr);           mDescriptorPools[i] = VK_NULL_HANDLE; }
+            if (mPersistentDescriptorPools[i]) { vkDestroyDescriptorPool(mDevice, mPersistentDescriptorPools[i], nullptr); mPersistentDescriptorPools[i] = VK_NULL_HANDLE; }
+        }
+
+        if (mImmediateGraphicsPool) { vkDestroyCommandPool(mDevice, mImmediateGraphicsPool, nullptr);  mImmediateGraphicsPool  = VK_NULL_HANDLE; }
+        if (mImmediateComputePool)  { vkDestroyCommandPool(mDevice, mImmediateComputePool,  nullptr);  mImmediateComputePool   = VK_NULL_HANDLE; }
+        if (mImmediateTransferPool) { vkDestroyCommandPool(mDevice, mImmediateTransferPool, nullptr);  mImmediateTransferPool  = VK_NULL_HANDLE; }
 
         if (mVMAAllocator)
         {

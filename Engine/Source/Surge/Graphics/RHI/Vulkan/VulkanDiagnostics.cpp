@@ -1,5 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDiagnostics.hpp"
 
 namespace Surge
 {
@@ -17,7 +17,6 @@ namespace Surge
                 Log<Severity::Error>("{0}", pCallbackData->pMessage);
                 break;
         }
-
         return VK_FALSE;
     }
 

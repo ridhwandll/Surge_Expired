@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Graphics/RHI/RHIDevice.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanResources.hpp"
+#include <functional>
 
 // Forward-declare VMA allocator type (full header only in .cpp)
 typedef struct VmaAllocator_T* VmaAllocator;
@@ -49,12 +50,31 @@ namespace Surge::RHI
         uint32_t         GetComputeFamily()  const { return mComputeFamily; }
         uint32_t         GetTransferFamily() const { return mTransferFamily; }
 
+        // Per-frame descriptor pools (reset each frame).
+        VkDescriptorPool GetDescriptorPool(uint32_t frameIndex) const
+        {
+            return frameIndex < FRAMES_IN_FLIGHT ? mDescriptorPools[frameIndex] : VK_NULL_HANDLE;
+        }
+
+        // Non-resetable descriptor pools (persist for object lifetime).
+        VkDescriptorPool GetPersistentDescriptorPool(uint32_t frameIndex) const
+        {
+            return frameIndex < FRAMES_IN_FLIGHT ? mPersistentDescriptorPools[frameIndex] : VK_NULL_HANDLE;
+        }
+
+        // Reset the per-frame descriptor pool for the given frame index.
+        void ResetDescriptorPool(uint32_t frameIndex);
+
+        // Submit a one-shot command buffer and wait for completion.
+        void InstantSubmit(QueueType queue, const std::function<void(VkCommandBuffer)>& fn);
+
     private:
         // Initialisation sub-steps
         void CreateInstance();
         void SelectPhysicalDevice();
         void CreateLogicalDevice();
         void CreateVMAAllocator();
+        void CreateDescriptorPools();
         void FillDispatchTable();
 
         VkInstance       mInstance       = VK_NULL_HANDLE;
@@ -70,6 +90,15 @@ namespace Surge::RHI
         uint32_t mComputeFamily  = 0;
         uint32_t mTransferFamily = 0;
 
+        // Descriptor pools (indexed by frame-in-flight index)
+        VkDescriptorPool mDescriptorPools[FRAMES_IN_FLIGHT]           = {};
+        VkDescriptorPool mPersistentDescriptorPools[FRAMES_IN_FLIGHT] = {};
+
+        // Command pools for InstantSubmit
+        VkCommandPool mImmediateGraphicsPool  = VK_NULL_HANDLE;
+        VkCommandPool mImmediateComputePool   = VK_NULL_HANDLE;
+        VkCommandPool mImmediateTransferPool  = VK_NULL_HANDLE;
+
         // Stored from Initialize() for use when the caller later creates the swapchain
         void*    mInitialWindowHandle = nullptr;
         uint32_t mInitialWidth        = 0;
@@ -82,4 +111,23 @@ namespace Surge::RHI
     // Initialized by the engine at startup when the new RHI path is selected.
     extern VulkanRHIDevice gVulkanRHIDevice;
 
+    // Debug object naming helper (no-op in Release builds).
+    template <typename T>
+    inline void SetDebugVkResourceName(T handle, VkObjectType type, const char* name)
+    {
+        static_assert(sizeof(T) == sizeof(uint64_t), "Invalid Vulkan handle size");
+        VkDebugUtilsObjectNameInfoEXT info {VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
+        info.objectType   = type;
+        info.objectHandle = reinterpret_cast<uint64_t>(handle);
+        info.pObjectName  = name;
+        vkSetDebugUtilsObjectNameEXT(gVulkanRHIDevice.GetLogicalDevice(), &info);
+    }
+
 } // namespace Surge::RHI
+
+#if defined(SURGE_DEBUG)
+#define SET_VK_OBJECT_DEBUGNAME(handle, type, name) \
+    ::Surge::RHI::SetDebugVkResourceName(handle, type, name)
+#else
+#define SET_VK_OBJECT_DEBUGNAME(handle, type, name)
+#endif

@@ -16,6 +16,10 @@ typedef struct VmaAllocation_T* VmaAllocation;
 //   ALL Vulkan backend code obtains resources through GetVulkanRegistry().
 // ---------------------------------------------------------------------------
 
+// Maximum number of frames that may be in-flight simultaneously.
+// Must match the size of VulkanSwapchain::Frames[].
+static constexpr uint32_t FRAMES_IN_FLIGHT = 3;
+
 namespace Surge::RHI
 {
     // ── Backing structs ──────────────────────────────────────────────────────

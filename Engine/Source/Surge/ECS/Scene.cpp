@@ -1,6 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
+#include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeMath/Math.hpp"
 
 namespace Surge
@@ -8,10 +10,6 @@ namespace Surge
     Scene::Scene(bool runtime)
     {
         mRuntime = runtime;
-        // mParentProject = parentProject;
-        // mMetadata.Name = name;
-        // mMetadata.SceneUUID = UUID();
-        // mMetadata.ScenePath = path;
     }
 
     Scene::~Scene()
@@ -32,7 +30,7 @@ namespace Surge
     void Scene::Update(EditorCamera& camera)
     {
         camera.OnUpdate();
-        Renderer* renderer = Core::GetRenderer();
+        ForwardRenderer* renderer = Core::GetRenderer();
         renderer->BeginFrame(camera);
         {
             auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
@@ -40,9 +38,7 @@ namespace Surge
             {
                 auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
                 if (mesh.Mesh)
-                {
                     renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                }
             }
         }
         {
@@ -50,7 +46,13 @@ namespace Surge
             for (auto& entity : group)
             {
                 auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-                renderer->SubmitPointLight(pointLight, transformComponent.Position);
+                PointLight light;
+                light.Position  = transformComponent.Position;
+                light.Intensity = pointLight.Intensity;
+                light.Radius    = pointLight.Radius;
+                light.Color     = pointLight.Color;
+                light.Falloff   = pointLight.Falloff;
+                renderer->SubmitPointLight(light);
             }
         }
         {
@@ -58,7 +60,12 @@ namespace Surge
             for (auto& entity : view)
             {
                 const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-                renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+                DirectionalLight dl;
+                dl.Direction = glm::normalize(transform.GetTransform()[2]);
+                dl.Intensity = light.Intensity;
+                dl.Color     = light.Color;
+                dl.Size      = light.Size;
+                renderer->SetDirectionalLight(dl);
             }
         }
         renderer->EndFrame();
@@ -70,17 +77,18 @@ namespace Surge
 
         if (camera.Data1)
         {
-            Renderer* renderer = Core::GetRenderer();
-            renderer->BeginFrame(*camera.Data1, camera.Data2);
+            ForwardRenderer* renderer = Core::GetRenderer();
+            const glm::mat4 view = glm::inverse(camera.Data2);
+            const glm::mat4 proj = camera.Data1->GetProjectionMatrix();
+            const glm::vec3 camPos = glm::vec3(camera.Data2[3]);
+            renderer->BeginFrame(view, proj, camPos);
             {
                 auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
                 for (auto& entity : group)
                 {
                     auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
                     if (mesh.Mesh)
-                    {
                         renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                    }
                 }
             }
             {
@@ -88,15 +96,26 @@ namespace Surge
                 for (auto& entity : group)
                 {
                     auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-                    renderer->SubmitPointLight(pointLight, transformComponent.Position);
+                    PointLight light;
+                    light.Position  = transformComponent.Position;
+                    light.Intensity = pointLight.Intensity;
+                    light.Radius    = pointLight.Radius;
+                    light.Color     = pointLight.Color;
+                    light.Falloff   = pointLight.Falloff;
+                    renderer->SubmitPointLight(light);
                 }
             }
             {
-                const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
-                for (auto& entity : view)
+                const auto& view2 = mRegistry.view<TransformComponent, DirectionalLightComponent>();
+                for (auto& entity : view2)
                 {
-                    const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-                    renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+                    const auto& [transform, light] = view2.get<TransformComponent, DirectionalLightComponent>(entity);
+                    DirectionalLight dl;
+                    dl.Direction = glm::normalize(transform.GetTransform()[2]);
+                    dl.Intensity = light.Intensity;
+                    dl.Color     = light.Color;
+                    dl.Size      = light.Size;
+                    renderer->SetDirectionalLight(dl);
                 }
             }
             renderer->EndFrame();

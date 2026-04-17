@@ -50,9 +50,6 @@ namespace Surge
         return nullptr;
     }
 
-    // NOTE(Rid):
-    // Owned by Vulkan Context
-    // Represents the "Debug Layer" of Vulkan
     class SURGE_API VulkanDiagnostics
     {
     public:
@@ -87,7 +84,6 @@ namespace Surge
     {                                                                                                                            \
         SG_ASSERT_INTERNAL("[Vulkan] (VK_ERROR_OUT_OF_DATE_KHR not checked) Returned value: {0}", Surge::VKResultToString(res)); \
     }
-
 #else
 #define VK_CALL(res) res
 #define VK_CHECK_WITHOUT_OUT_OF_DATE(res) res

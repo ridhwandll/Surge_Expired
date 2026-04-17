@@ -3,20 +3,22 @@
 #include "Surge/Core/Client.hpp"
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Window/Window.hpp"
-#include "Surge/Graphics/RenderContext.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Core/Time/Clock.hpp"
+#include "Surge/Graphics/Renderer/ForwardRenderer.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImGuiContext.hpp"
+#include "Surge/Graphics/RHI/RHIResources.hpp"
 
 namespace Surge::Core
 {
     struct CoreData
     {
-        Client* SurgeClient = nullptr; // Provided by the User
+        Client* SurgeClient = nullptr;
 
         Clock SurgeClock;
         Window* SurgeWindow = nullptr;
-        RenderContext* SurgeRenderContext = nullptr;
-        Renderer* SurgeRenderer = nullptr;
+        ForwardRenderer* SurgeRenderer = nullptr;
+        VulkanImGuiContext* SurgeImGuiContext = nullptr;
+        RHI::SwapchainHandle SurgeSwapchain;
 
         bool Running = false;
         Vector<std::function<void()>> FrameEndCallbacks;
@@ -26,16 +28,13 @@ namespace Surge::Core
     SURGE_API void Run();
     SURGE_API void Shutdown();
 
-    SURGE_API void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
+    SURGE_API void AddFrameEndCallback(const std::function<void()>& func);
 
-    // Window should be a part of core
     SURGE_API Window* GetWindow();
     SURGE_API Clock& GetClock();
-
-    // Part of renderer module
-    SURGE_API RenderContext* GetRenderContext();
-    SURGE_API Renderer* GetRenderer();
-
+    SURGE_API ForwardRenderer* GetRenderer();
+    SURGE_API VulkanImGuiContext* GetImGuiContext();
+    SURGE_API RHI::SwapchainHandle GetSwapchain();
     SURGE_API Client* GetClient();
     SURGE_API CoreData* GetData();
 

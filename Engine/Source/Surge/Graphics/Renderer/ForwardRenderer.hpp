@@ -4,6 +4,7 @@
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Mesh.hpp"
+#include "Surge/Graphics/Shader/ShaderSet.hpp"
 #include "Surge/ECS/Components.hpp"
 #include <glm/glm.hpp>
 
@@ -60,6 +61,10 @@ namespace Surge
         uint32_t GetRenderWidth()  const { return mRenderWidth; }
         uint32_t GetRenderHeight() const { return mRenderHeight; }
 
+        // ── Shaders & default resources ────────────────────────────────────
+        Ref<Shader>& GetShader(const String& name) { return mShaderSet.GetShader(name); }
+        const Ref<Texture2D>& GetWhiteTexture() const { return mWhiteTexture; }
+
         // ── Output ────────────────────────────────────────────────────────
         // Returns the physical texture handle for the final colour output.
         // Valid after EndFrame(); invalid if the RHI device is not yet wired up.
@@ -75,6 +80,8 @@ namespace Surge
     private:
         // ── State ──────────────────────────────────────────────────────────
         RenderGraph mRenderGraph;
+        ShaderSet   mShaderSet;
+        Ref<Texture2D> mWhiteTexture;
 
         uint32_t mRenderWidth  = 1280;
         uint32_t mRenderHeight = 720;

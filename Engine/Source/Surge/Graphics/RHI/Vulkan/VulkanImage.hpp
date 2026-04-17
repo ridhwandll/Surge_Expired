@@ -1,8 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanMemoryAllocator.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 #include "Surge/Graphics/Interface/Image.hpp"
+
+// VmaAllocation is an opaque pointer type from vk_mem_alloc.h
+typedef struct VmaAllocation_T* VmaAllocation;
 
 namespace Surge
 {
@@ -35,7 +37,7 @@ namespace Surge
         VkImage mImage = VK_NULL_HANDLE;
         VkImageView mImageView = VK_NULL_HANDLE;
         VkSampler mImageSampler = VK_NULL_HANDLE;
-        VmaAllocation mImageMemory;
+        VmaAllocation mImageMemory = nullptr;
 
         VkDescriptorImageInfo mDescriptorInfo;
         friend class SURGE_API VulkanTexture2D;

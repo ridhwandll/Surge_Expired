@@ -1,16 +1,26 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Renderer/ForwardRenderer.hpp"
 #include "Surge/Graphics/RHI/RHICommandBuffer.hpp"
+#include "Surge/Graphics/Interface/Texture.hpp"
 
 namespace Surge
 {
     void ForwardRenderer::Initialize()
     {
+        mShaderSet.Initialize(BASE_SHADER_PATH);
+        mShaderSet.AddShader("PBR.glsl");
+        mShaderSet.LoadAll();
+
+        Uint whitePixel = 0xffffffff;
+        mWhiteTexture = Texture2D::Create(ImageFormat::RGBA8, 1, 1, &whitePixel);
+
         mInitialized = true;
     }
 
     void ForwardRenderer::Shutdown()
     {
+        mWhiteTexture.Reset();
+        mShaderSet.Shutdown();
         mRenderGraph.Reset();
         mDrawList.clear();
         mPointLights.clear();

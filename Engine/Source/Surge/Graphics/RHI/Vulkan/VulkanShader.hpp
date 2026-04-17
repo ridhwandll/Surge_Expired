@@ -37,7 +37,7 @@ namespace Surge
 
     private:
         Path mPath;
-        bool mCreatedDescriptorSetLayouts; // We want to make sure that the DescriptorSetLayouts doesn't get recreated when the shader is reloaded
+        bool mCreatedDescriptorSetLayouts;
         HashMap<ShaderType, HashCode> mHashCodes;
         HashMap<ShaderType, String> mShaderSources;
         Vector<SPIRVHandle> mShaderSPIRVs {};
