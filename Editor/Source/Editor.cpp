@@ -12,7 +12,8 @@ namespace Surge
 {
     void Editor::OnInitialize()
     {
-        ImGui::SetCurrentContext((ImGuiContext*)Core::GetRenderContext()->GetImGuiContext());
+        if (Core::GetImGuiContext())
+            ImGui::SetCurrentContext((ImGuiContext*)Core::GetImGuiContext()->GetContext());
 
         mRenderer = Core::GetRenderer();
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
@@ -30,9 +31,8 @@ namespace Surge
 
         mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
         mActiveScene = Ref<Scene>::Create(false);
-        mRenderer->SetSceneContext(mActiveScene);
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
-        
+
         Entity runtimeCamera;
         Entity dirLight;
         Entity pointLight;
@@ -67,8 +67,8 @@ namespace Surge
             mActiveScene->CreateEntity(floor, "Floor");
             floor.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Cube.fbx");
             TransformComponent& transform = floor.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, -1, 0);            
-            transform.Scale = glm::vec3(10, 1, 10);            
+            transform.Position = glm::vec3(0, -1, 0);
+            transform.Scale = glm::vec3(10, 1, 10);
         }
         {
             mActiveScene->CreateEntity(cube, "Cube");
@@ -99,27 +99,21 @@ namespace Surge
     {
         //mActiveProject.SetState(ProjectState::Play);
         //mActiveProject.OnRuntimeStart();
-        //Ref<Scene> activeScene = mActiveProject.GetActiveScene();
-        //mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
-        //mRenderer->SetSceneContext(activeScene);
     }
 
     void Editor::OnRuntimeEnd()
     {
         // mActiveProject.OnRuntimeEnd();
         // mActiveProject.SetState(ProjectState::Edit);
-        // Ref<Scene> activeScene = mActiveProject.GetActiveScene();
-        // mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
-        // mRenderer->SetSceneContext(activeScene);
     }
 
     void Editor::Resize()
     {
         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
         glm::vec2 viewportSize = viewportPanel->GetViewportSize();
-        Ref<Framebuffer> framebuffer = mRenderer->GetFinalPassFramebuffer();
 
-        if (FramebufferSpecification spec = framebuffer->GetSpecification(); viewportSize.x > 0.0f && viewportSize.y > 0.0f && (spec.Width != viewportSize.x || spec.Height != viewportSize.y))
+        if (viewportSize.x > 0.0f && viewportSize.y > 0.0f &&
+            ((Uint)viewportSize.x != mRenderer->GetRenderWidth() || (Uint)viewportSize.y != mRenderer->GetRenderHeight()))
         {
             mRenderer->SetRenderArea((Uint)viewportSize.x, (Uint)viewportSize.y);
             mCamera.SetViewportSize(viewportSize);

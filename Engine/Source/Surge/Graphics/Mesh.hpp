@@ -1,10 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "SurgeMath/AABB.hpp"
-#include "Surge/Graphics/Interface/GraphicsPipeline.hpp"
-#include "Surge/Graphics/Interface/IndexBuffer.hpp"
-#include "Surge/Graphics/Interface/VertexBuffer.hpp"
 #include "Surge/Graphics/Material.hpp"
+#include "Surge/Graphics/RHI/RHIDevice.hpp"
 #include <glm/glm.hpp>
 
 struct aiMesh;
@@ -45,19 +43,12 @@ namespace Surge
     {
     public:
         Mesh(const Path& filepath);
+        ~Mesh();
 
-        // Returns the path from which the Mesh was loaded
         FORCEINLINE const Path& GetPath() const { return mPath; }
-
-        // Returns the vertex buffer of the mesh
-        FORCEINLINE const Ref<VertexBuffer>& GetVertexBuffer() const { return mVertexBuffer; }
-
-        // Returns the index buffer of the mesh
-        FORCEINLINE const Ref<IndexBuffer>& GetIndexBuffer() const { return mIndexBuffer; }
-
-        // Returns the submeshes of the mesh/model
+        FORCEINLINE RHI::BufferHandle GetVertexBufferHandle() const { return mVertexBuffer; }
+        FORCEINLINE RHI::BufferHandle GetIndexBufferHandle() const { return mIndexBuffer; }
         FORCEINLINE const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }
-
         FORCEINLINE Vector<Ref<Material>>& GetMaterials() { return mMaterials; }
 
     private:
@@ -69,12 +60,12 @@ namespace Surge
         Path mPath;
         Vector<Submesh> mSubmeshes;
 
-        Ref<VertexBuffer> mVertexBuffer;
-        Ref<IndexBuffer> mIndexBuffer;
+        RHI::BufferHandle mVertexBuffer;
+        RHI::BufferHandle mIndexBuffer;
         Vector<Ref<Material>> mMaterials;
 
         Vector<Vertex> mVertices;
-        Vector<Index> mIndices;
+        Vector<Index>  mIndices;
     };
 
 } // namespace Surge

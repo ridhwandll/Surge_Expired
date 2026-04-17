@@ -68,9 +68,10 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
         if (ImGui::Begin(PanelCodeToString(mCode), show))
         {
-            const Ref<Image2D>& outputImage = Core::GetRenderer()->GetFinalPassFramebuffer()->GetColorAttachment(0);
             mViewportSize = {ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y};
-            ImGuiAux::Image(outputImage, mViewportSize);
+            // TODO: Display final render output once RenderGraph executes and produces a texture
+            // const Ref<Image2D>& outputImage = ...
+            // ImGuiAux::Image(outputImage, mViewportSize);
 
             // Entity transform
             Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();

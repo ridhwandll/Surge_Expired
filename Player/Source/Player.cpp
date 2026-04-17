@@ -9,9 +9,7 @@ namespace Surge
     {
         mRenderer = Core::GetRenderer();
 
-        //mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
         mActiveScene = Ref<Scene>::Create(false);
-        mRenderer->SetSceneContext(mActiveScene);
         Entity runtimeCamera;
         Entity dirLight;
         Entity pointLight;

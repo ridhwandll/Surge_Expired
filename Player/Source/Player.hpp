@@ -2,7 +2,7 @@
 #pragma once
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Graphics/Renderer/ForwardRenderer.hpp"
 
 namespace Surge
 {
@@ -21,6 +21,6 @@ namespace Surge
         void Resize(Uint width, Uint height);
 
     private:
-        Renderer* mRenderer;
+        ForwardRenderer* mRenderer;
     };
 } // namespace Surge

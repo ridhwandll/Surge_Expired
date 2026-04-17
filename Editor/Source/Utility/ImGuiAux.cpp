@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Input/Input.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImGuiContext.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Editor.hpp"
 #include <imgui_stdlib.h>
@@ -17,7 +18,9 @@ namespace Surge
 
     void ImGuiAux::Image(const Ref<Image2D>& image, const glm::vec2& size)
     {
-        ImGui::Image(Core::GetRenderContext()->GetImGuiTextureID(image), {size.x, size.y});
+        VulkanImGuiContext* imguiCtx = Core::GetImGuiContext();
+        if (imguiCtx)
+            ImGui::Image(imguiCtx->AddImage(image), {size.x, size.y});
     }
 
     void ImGuiAux::TextCentered(const char* text)

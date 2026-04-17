@@ -13,10 +13,6 @@ typedef struct VmaAllocator_T* VmaAllocator;
 //   Owns VkInstance, VkPhysicalDevice, VkDevice, and a VmaAllocator.
 //   Creates and owns the RHIDevice dispatch table that is installed via
 //   SetRHIDevice() to make it the active global backend.
-//
-//   This class is SEPARATE from the legacy Surge::VulkanDevice and does NOT
-//   share its lifetime.  The old layer remains in Abstraction/Vulkan/ until
-//   every call-site has been migrated to the new RHI.
 // ---------------------------------------------------------------------------
 
 namespace Surge::RHI
@@ -29,10 +25,7 @@ namespace Surge::RHI
 
         SURGE_DISABLE_COPY_AND_MOVE(VulkanRHIDevice);
 
-        // Initialize the Vulkan instance, pick GPU, create logical device,
-        // create VMA allocator, fill the dispatch table, and register it as
-        // the global RHI device via SetRHIDevice().
-        void Initialize(void* windowHandle, uint32_t width, uint32_t height);
+        void Initialize();
         void Shutdown();
 
         // Returns a pointer to the filled RHIDevice dispatch table.
@@ -98,11 +91,6 @@ namespace Surge::RHI
         VkCommandPool mImmediateGraphicsPool  = VK_NULL_HANDLE;
         VkCommandPool mImmediateComputePool   = VK_NULL_HANDLE;
         VkCommandPool mImmediateTransferPool  = VK_NULL_HANDLE;
-
-        // Stored from Initialize() for use when the caller later creates the swapchain
-        void*    mInitialWindowHandle = nullptr;
-        uint32_t mInitialWidth        = 0;
-        uint32_t mInitialHeight       = 0;
 
         RHIDevice mDispatchTable = {};
     };

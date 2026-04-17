@@ -129,8 +129,27 @@ namespace Surge
             }
         }
 
-        mVertexBuffer = VertexBuffer::Create(mVertices.data(), static_cast<Uint>(mVertices.size()) * sizeof(Vertex));
-        mIndexBuffer = IndexBuffer::Create(mIndices.data(), static_cast<Uint>(mIndices.size() * sizeof(Index)));
+        mVertexBuffer = RHI::GetRHIDevice()->createBuffer({
+            static_cast<Uint>(mVertices.size()) * sizeof(Vertex),
+            RHI::BufferUsage::VertexBuffer,
+            RHI::GPUMemoryUsage::CPUToGPU});
+        RHI::GetRHIDevice()->uploadBuffer(mVertexBuffer, mVertices.data(), mVertices.size() * sizeof(Vertex), 0);
+
+        mIndexBuffer = RHI::GetRHIDevice()->createBuffer({
+            static_cast<Uint>(mIndices.size()) * sizeof(Index),
+            RHI::BufferUsage::IndexBuffer,
+            RHI::GPUMemoryUsage::CPUToGPU});
+        RHI::GetRHIDevice()->uploadBuffer(mIndexBuffer, mIndices.data(), mIndices.size() * sizeof(Index), 0);
+    }
+
+    Mesh::~Mesh()
+    {
+        RHI::RHIDevice* device = RHI::GetRHIDevice();
+        if (device)
+        {
+            if (mVertexBuffer) device->destroyBuffer(mVertexBuffer);
+            if (mIndexBuffer)  device->destroyBuffer(mIndexBuffer);
+        }
     }
 
     void Mesh::GetVertexData(const aiMesh* mesh, AABB& outAABB)

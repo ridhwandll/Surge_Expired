@@ -2,7 +2,7 @@
 #pragma once
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Graphics/Renderer/ForwardRenderer.hpp"
 #include "Panels/Titlebar.hpp"
 #include "Panels/PaneManager.hpp"
 
@@ -33,7 +33,7 @@ namespace Surge
 
     private:
         EditorCamera mCamera;
-        Renderer* mRenderer;
+        ForwardRenderer* mRenderer;
 
         PanelManager mPanelManager;
         Titlebar mTitleBar {};
