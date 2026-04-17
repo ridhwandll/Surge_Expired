@@ -38,6 +38,7 @@ namespace Surge
         VkCommandPool GetVulkanCommandPool() const { return mCommandPool; }
         Vector<VkImageView> GetVulkanImageViews() const { return mSwapChainImageViews; }
         Vector<VkCommandBuffer> GetVulkanCommandBuffers() const;
+        Vector<VkFence> GetVulkanFences() const;
         Uint GetCurrentFrameIndex() const { return mCurrentFrameIndex; }
         Uint GetCurrentImageIndex() const { return mCurrentImageIndex; }
 

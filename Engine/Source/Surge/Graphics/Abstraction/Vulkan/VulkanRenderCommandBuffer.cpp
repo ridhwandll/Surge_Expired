@@ -55,6 +55,10 @@ namespace Surge
             const Vector<VkCommandBuffer>& swapchainCommandBuffers = swapchain->GetVulkanCommandBuffers();
             for (const VkCommandBuffer& cmdBuffer : swapchainCommandBuffers)
                 mCommandBuffers.push_back(cmdBuffer);
+            
+            // const Vector<VkFence>& swapchainFences = swapchain->GetVulkanFences();
+            // for (const VkFence& fence : swapchainFences)
+            //     mWaitFences.push_back(fence);
         }
     }
 
@@ -66,10 +70,9 @@ namespace Surge
             SURGE_GET_VULKAN_CONTEXT(renderContext);
             VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
             vkDestroyCommandPool(device, mCommandPool, nullptr);
-            for (VkFence& fence : mWaitFences)
-            {
+            for (VkFence& fence : mWaitFences)            
                 vkDestroyFence(device, fence, nullptr);
-            }
+            
         }
     }
 
@@ -80,8 +83,11 @@ namespace Surge
         VkDevice logicalDevice = renderContext->GetDevice()->GetLogicalDevice();
         Uint frameIndex = renderContext->GetFrameIndex();
 
-        VK_CALL(vkWaitForFences(logicalDevice, 1, &mWaitFences[frameIndex], VK_TRUE, UINT64_MAX));
-        VK_CALL(vkResetFences(logicalDevice, 1, &mWaitFences[frameIndex]));
+        if (!mCreatedFromSwapchain)
+        {
+            VK_CALL(vkWaitForFences(logicalDevice, 1, &mWaitFences[frameIndex], VK_TRUE, UINT64_MAX));
+            VK_CALL(vkResetFences(logicalDevice, 1, &mWaitFences[frameIndex]));
+        }
 
         VkCommandBufferBeginInfo cmdBufInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         cmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;

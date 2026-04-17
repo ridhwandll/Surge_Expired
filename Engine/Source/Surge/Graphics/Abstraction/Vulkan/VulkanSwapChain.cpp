@@ -417,6 +417,15 @@ namespace Surge
         return cmdBfrs;
     }
 
+    Vector<VkFence> VulkanSwapChain::GetVulkanFences() const
+    {
+        Vector<VkFence> fences;
+        for (Uint i = 0; i < FRAMES_IN_FLIGHT; i++)
+            fences.push_back(mFrames[i].Fence);
+
+        return fences;
+    }
+
     void VulkanSwapChain::PickPresentQueue()
     {
         VulkanRenderContext* renderContext = nullptr;
