@@ -69,6 +69,8 @@ namespace Surge::Core
             {
                 GCoreData.SurgeRenderContext->BeginFrame();
                 GCoreData.SurgeClient->OnUpdate();
+                if (!GCoreData.SurgeClient->GeClientOptions().EnableImGui)
+                    GCoreData.SurgeRenderContext->SetBlitSourceImage(GCoreData.SurgeRenderer->GetFinalPassFramebuffer()->GetColorAttachment(0));
                 if (GCoreData.SurgeClient->GeClientOptions().EnableImGui)
                     GCoreData.SurgeClient->OnImGuiRender();
                 GCoreData.SurgeRenderContext->EndFrame();

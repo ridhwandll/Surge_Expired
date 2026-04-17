@@ -190,7 +190,7 @@ namespace Surge
                 if (VulkanUtils::IsDepthFormat(format))
                     vkImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
                 else
-                    vkImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+                    vkImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
                 break;
             }
             case ImageUsage::Texture: vkImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; break;

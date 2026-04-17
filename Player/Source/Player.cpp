@@ -21,8 +21,11 @@ namespace Surge
             mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
             cam.Primary = true;
+            cam.FixedAspectRatio = true;
+            cam.Camera.SetPerspectiveFarClip(1000);
             TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, 0, 10);
+            transform.Position = glm::vec3(-10, 6, 10);
+            transform.Rotation = glm::vec3(-30, -45, 0);
         }
         {
             mActiveScene->CreateEntity(dirLight, "Directional Light");
@@ -53,6 +56,9 @@ namespace Surge
             mActiveScene->CreateEntity(cube, "Cube");
             cube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Cube.fbx");
         }
+
+        glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        mActiveScene->OnResize(windowSize.x, windowSize.y);
     }
 
     void Player::OnUpdate()
@@ -66,11 +72,19 @@ namespace Surge
 
     void Player::OnEvent(Event& e)
     {
+        EventDispatcher dispatcher(e);
+        dispatcher.Dispatch<WindowResizeEvent>([&](WindowResizeEvent& resizeEvent) {
+            Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
+        });
     }
 
-    void Player::Resize()
+    void Player::Resize(Uint width, Uint height)
     {
-
+        if (width != 0 && height != 0)
+        {
+            mRenderer->SetRenderArea(width, height);
+            mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));
+        }
     }
 
     void Player::OnShutdown()

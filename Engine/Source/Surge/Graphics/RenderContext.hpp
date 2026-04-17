@@ -49,6 +49,7 @@ namespace Surge
 
         virtual void OnResize() = 0;
         virtual Uint GetFrameIndex() const = 0;
+        virtual void SetBlitSourceImage(const Ref<Image2D>& image) = 0;
 
         // Maybe move ImGui stuff somwhere else?
         virtual void RenderImGui() = 0;

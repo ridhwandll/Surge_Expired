@@ -18,7 +18,7 @@ namespace Surge
         virtual void OnEvent(Event& e) override;
         virtual void OnShutdown() override;
     private:
-        void Resize();
+        void Resize(Uint width, Uint height);
 
     private:
         Renderer* mRenderer;

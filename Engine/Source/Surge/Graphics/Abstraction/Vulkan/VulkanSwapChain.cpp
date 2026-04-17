@@ -84,7 +84,7 @@ namespace Surge
         createInfo.imageColorSpace = pickedFormat.colorSpace;
         createInfo.imageExtent = swapChainExtent;
         createInfo.imageArrayLayers = 1;
-        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; // VK_IMAGE_USAGE_TRANSFER_DST_BIT for blitting the final rendered image to the swapchain image
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // TODO(AC3R): Should add support for `VK_SHARING_MODE_CONCURRENT` later
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = nullptr;
@@ -361,7 +361,7 @@ namespace Surge
         mCurrentFrameIndex = (mCurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
     }
 
-    void VulkanSwapChain::EndFrame()
+    void VulkanSwapChain::EndFrame(VkImage blitSrcImage, VkExtent2D blitSrcExtent)
     {
         VulkanRenderContext* vkContext = static_cast<VulkanRenderContext*>(Core::GetRenderContext());
         Uint frameIndex = vkContext->GetFrameIndex();
@@ -370,12 +370,69 @@ namespace Surge
         vkResetCommandBuffer(currentFrameObj.CmdBuf, 0);
         VkCommandBufferBeginInfo cmdBufInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         cmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        // Render the ImGui
+        
         VK_CALL(vkBeginCommandBuffer(currentFrameObj.CmdBuf, &cmdBufInfo));
-        BeginRenderPass();
-        vkContext->RenderImGui();
-        EndRenderPass();
+
+        if (blitSrcImage != VK_NULL_HANDLE)
+        {
+            VkImageSubresourceRange subresourceRange {};
+            subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            subresourceRange.baseMipLevel = 0;
+            subresourceRange.levelCount = 1;
+            subresourceRange.baseArrayLayer = 0;
+            subresourceRange.layerCount = 1;
+
+            // Transition geometry output: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
+            VulkanUtils::InsertImageMemoryBarrier(currentFrameObj.CmdBuf, blitSrcImage,
+                                                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                  subresourceRange);
+
+            // Transition swapchain image: UNDEFINED -> TRANSFER_DST_OPTIMAL
+            VulkanUtils::InsertImageMemoryBarrier(currentFrameObj.CmdBuf, mSwapChainImages[mCurrentImageIndex],
+                                                  0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                                                  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                  subresourceRange);
+
+            // Blit from geometry output to swapchain image
+            VkImageBlit blitRegion {};
+            blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blitRegion.srcSubresource.layerCount = 1;
+            blitRegion.srcOffsets[0] = {0, 0, 0};
+            blitRegion.srcOffsets[1] = {(int32_t)blitSrcExtent.width, (int32_t)blitSrcExtent.height, 1};
+            blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blitRegion.dstSubresource.layerCount = 1;
+            blitRegion.dstOffsets[0] = {0, 0, 0};
+            blitRegion.dstOffsets[1] = {(int32_t)mSwapChainExtent.width, (int32_t)mSwapChainExtent.height, 1};
+
+            vkCmdBlitImage(currentFrameObj.CmdBuf,
+                           blitSrcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           mSwapChainImages[mCurrentImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &blitRegion, VK_FILTER_LINEAR);
+
+            // Transition geometry output back: TRANSFER_SRC_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
+            VulkanUtils::InsertImageMemoryBarrier(currentFrameObj.CmdBuf, blitSrcImage,
+                                                  VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT,
+                                                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                                  VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                                  subresourceRange);
+
+            // Transition swapchain image: TRANSFER_DST_OPTIMAL -> PRESENT_SRC_KHR
+            VulkanUtils::InsertImageMemoryBarrier(currentFrameObj.CmdBuf, mSwapChainImages[mCurrentImageIndex],
+                                                  VK_ACCESS_TRANSFER_WRITE_BIT, 0,
+                                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                                                  VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                                  subresourceRange);
+        }
+        else
+        {
+            // Render the ImGui
+            BeginRenderPass();
+            vkContext->RenderImGui();
+            EndRenderPass();
+        }
         VK_CALL(vkEndCommandBuffer(currentFrameObj.CmdBuf));
 
         Present();

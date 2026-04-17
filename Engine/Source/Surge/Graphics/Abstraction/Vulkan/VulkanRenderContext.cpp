@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
+#include "Surge/Graphics/Abstraction/Vulkan/VulkanImage.hpp"
 
 // clang-format off
 #define FORCE_VALIDATION 0    
@@ -77,7 +78,17 @@ namespace Surge
     void VulkanRenderContext::EndFrame()
     {
         SURGE_PROFILE_FUNC("VulkanRenderContext::EndFrame()");
-        mSwapChain.EndFrame(); // Present
+        VkImage blitSrcImage = VK_NULL_HANDLE;
+        VkExtent2D blitSrcExtent = {};
+        if (mBlitSourceImage)
+        {
+            Ref<VulkanImage2D> vkImage = mBlitSourceImage.As<VulkanImage2D>();
+            blitSrcImage = vkImage->GetVulkanImage();
+            blitSrcExtent = {vkImage->GetWidth(), vkImage->GetHeight()};
+            mBlitSourceImage = nullptr;
+        }
+
+        mSwapChain.EndFrame(blitSrcImage, blitSrcExtent); // Present
         if (mImGuiEnabled)
             mImGuiContext.EndFrame();
     }
