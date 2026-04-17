@@ -202,14 +202,10 @@ namespace Surge
             }
         }
 
-        // Kahn's algorithm (simple topological sort on a DAG)
-        Vector<uint32_t> inDegree(count, 0);
-        for (const auto& p : mPasses)
-            for (uint32_t dep : p.DependsOn)
-                inDegree[dep]++;   // NOTE: dep produces output for p, so dep has no in-degree from p
-
-        // Actually Kahn's works on who produces for whom; rebuild correctly:
-        // edge: A -> B means A must come before B (B depends on A)
+        // Kahn's algorithm – topological sort on the pass DAG.
+        // Edge A -> B means: pass A must execute before pass B (B depends on A).
+        // 'successors[A]' holds all passes that depend on A.
+        // 'inDeg[B]'      counts how many predecessors B has.
         Vector<Vector<uint32_t>> successors(count);
         Vector<uint32_t> inDeg(count, 0);
         for (uint32_t i = 0; i < count; ++i)
@@ -262,7 +258,12 @@ namespace Surge
                 if (wh.IsValid() && wh.id < static_cast<uint32_t>(mBuffers.size()))
                     if (mBuffers[wh.id].RefCount > 0) hasRefedOutput = true;
 
-            if (!hasRefedOutput && !pass.Desc.ColorWrites.empty())
+            // A pass is culled only if it produces outputs AND none are referenced.
+            // A pass with no declared outputs (e.g. a pure side-effect pass) is never culled.
+            const bool hasAnyOutputs = !pass.Desc.ColorWrites.empty()
+                                    || pass.Desc.DepthWrite.IsValid()
+                                    || !pass.Desc.BufferWrites.empty();
+            if (!hasRefedOutput && hasAnyOutputs)
             {
                 pass.Culled = true;
                 continue;

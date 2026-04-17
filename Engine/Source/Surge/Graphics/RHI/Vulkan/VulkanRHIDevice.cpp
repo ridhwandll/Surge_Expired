@@ -429,6 +429,14 @@ namespace Surge::RHI
 
     void VulkanRHIDevice::Initialize(void* windowHandle, uint32_t width, uint32_t height)
     {
+        // windowHandle, width, and height are forwarded to the swapchain
+        // once it is created via rhiCreateSwapchain() with a SwapchainDesc.
+        // They are stored here for convenience if the device needs to recreate
+        // the swapchain internally (e.g. on resize).
+        mInitialWindowHandle = windowHandle;
+        mInitialWidth        = width;
+        mInitialHeight       = height;
+
         CreateInstance();
         SelectPhysicalDevice();
         CreateLogicalDevice();

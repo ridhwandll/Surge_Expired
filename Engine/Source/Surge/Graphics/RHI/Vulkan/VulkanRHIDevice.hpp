@@ -70,6 +70,11 @@ namespace Surge::RHI
         uint32_t mComputeFamily  = 0;
         uint32_t mTransferFamily = 0;
 
+        // Stored from Initialize() for use when the caller later creates the swapchain
+        void*    mInitialWindowHandle = nullptr;
+        uint32_t mInitialWidth        = 0;
+        uint32_t mInitialHeight       = 0;
+
         RHIDevice mDispatchTable = {};
     };
 
