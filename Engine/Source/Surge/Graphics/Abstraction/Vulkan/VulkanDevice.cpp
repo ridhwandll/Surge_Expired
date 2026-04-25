@@ -392,7 +392,12 @@ namespace Surge
         int32_t score = 0;
 
         if (!features.geometryShader)
+        {
+#ifndef SURGE_ANDROID
+            // Mobile GPUs commonly lack geometry shaders; skip this requirement on Android
             return 0;
+#endif
+        }
 
         if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
             score += 250;

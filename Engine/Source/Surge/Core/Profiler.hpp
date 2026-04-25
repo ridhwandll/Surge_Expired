@@ -1,6 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 
+#ifdef SURGE_ANDROID
+// Optick does not support Android; disable profiling unconditionally
+#define PROFILE_SURGE 0
+#define USE_OPTICK 0
+#else
+
 #ifdef SURGE_DEBUG
 #define PROFILE_SURGE 1
 #define USE_OPTICK 1
@@ -12,6 +18,7 @@
 #endif
 
 #include <optick.h>
+#endif // SURGE_ANDROID
 
 #if PROFILE_SURGE
 #define SURGE_PROFILE_FRAME(...) OPTICK_FRAME(__VA_ARGS__)

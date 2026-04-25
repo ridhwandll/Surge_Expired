@@ -1,0 +1,74 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.surgetechnologies.surgeplayer'
+
+    compileSdk 33
+
+    // Pin the NDK version (must match gradle.properties)
+    ndkVersion "25.2.9519653"
+
+    defaultConfig {
+        applicationId "com.surgetechnologies.surgeplayer"
+        minSdk 24           // Vulkan 1.1 guaranteed at API 24+
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        // Build arm64-v8a only; add "x86_64" for emulator support
+        abiFilters "arm64-v8a"
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17 -frtti- -fexceptions"
+                arguments "-DANDROID_STL=c++_shared"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            // Path is relative to this build.gradle file
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            jniDebuggable true
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCMAKE_BUILD_TYPE=Debug"
+                }
+            }
+        }
+        release {
+            minifyEnabled false
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCMAKE_BUILD_TYPE=Release"
+                }
+            }
+        }
+    }
+
+    // Packaging options – strip debug symbols in release
+    packagingOptions {
+        jniLibs {
+            keepDebugSymbols += ['**/*.so']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // No Java/Kotlin dependencies; this is a pure native app
+}

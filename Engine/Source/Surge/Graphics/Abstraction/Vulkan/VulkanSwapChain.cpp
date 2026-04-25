@@ -89,7 +89,24 @@ namespace Surge
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = nullptr;
         createInfo.preTransform = surfaceCapabilities.currentTransform;
-        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
+        // Pick a composite alpha mode supported by the surface (Android often lacks OPAQUE)
+        VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        const VkCompositeAlphaFlagBitsKHR compositeAlphaCandidates[] = {
+            VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+            VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+            VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR
+        };
+        for (auto candidate : compositeAlphaCandidates)
+        {
+            if (surfaceCapabilities.supportedCompositeAlpha & candidate)
+            {
+                compositeAlpha = candidate;
+                break;
+            }
+        }
+        createInfo.compositeAlpha = compositeAlpha;
         createInfo.presentMode = pickedPresentMode;
         createInfo.clipped = VK_TRUE;
         createInfo.oldSwapchain = mSwapChain ? mSwapChain : VK_NULL_HANDLE;

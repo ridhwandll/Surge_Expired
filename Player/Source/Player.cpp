@@ -93,7 +93,8 @@ namespace Surge
 
 } // namespace Surge
 
-// Entry point
+// Entry point (desktop only – Android uses android_main in AndroidMain.cpp)
+#ifndef SURGE_ANDROID
 int main()
 {
     Surge::ClientOptions clientOptions;
@@ -107,3 +108,4 @@ int main()
     Surge::Core::Run();
     Surge::Core::Shutdown();
 }
+#endif // !SURGE_ANDROID

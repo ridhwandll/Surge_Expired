@@ -1,0 +1,8 @@
+# Copy this file to local.properties (in the android/ directory) and fill in your paths.
+# local.properties is listed in .gitignore and must NOT be committed.
+
+# Path to your Android SDK installation
+sdk.dir=/path/to/your/android/sdk
+
+# (Optional) Explicit NDK path – only needed if using a version not bundled with the SDK
+# ndk.dir=/path/to/your/ndk/25.2.9519653

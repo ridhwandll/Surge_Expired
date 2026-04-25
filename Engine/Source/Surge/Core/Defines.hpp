@@ -20,30 +20,44 @@
 #elif __APPLE__
 #define SURGE_APPLE
 #error "Haha Apple?"
-#define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
+#define SCRIPT_API "Compiler dependent kekw! Fill this with correct alternative of __declspec(dllexport)"
 
 #ifdef SURGE_EXPORT
-#define SURGE_API kekw
+#define SURGE_API
 #else
-#define SURGE_API kewk
+#define SURGE_API
+#endif //SURGE_EXPORT
+
+#elif __ANDROID__
+#define SURGE_ANDROID
+#define SCRIPT_API __attribute__((visibility("default")))
+
+#ifdef SURGE_EXPORT
+#define SURGE_API __attribute__((visibility("default")))
+#else
+#define SURGE_API
 #endif //SURGE_EXPORT
 
 #elif __linux__
 #define SURGE_LINUX
 #error "Haha LinuS?"
-#define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
+#define SCRIPT_API "Compiler dependent kekw! Fill this with correct alternative of __declspec(dllexport)"
 
 #ifdef SURGE_EXPORT
-#define SURGE_API kekw
+#define SURGE_API
 #else
-#define SURGE_API kewk
+#define SURGE_API
 #endif //SURGE_EXPORT
 
 #endif
 
 // Assertions
 #ifdef SURGE_DEBUG
+#ifdef SURGE_WINDOWS
 #define ASSERT() __debugbreak()
+#else
+#define ASSERT() __builtin_trap()
+#endif
 #define SG_ASSERT(condition, ...)                              \
     {                                                          \
         if (!(condition))                                      \
@@ -74,9 +88,13 @@
 #define SCOPED_TIMER(...) Timer tImEr(fmt::format(__VA_ARGS__), true)
 #endif
 
-// Defines and stuff, TODO: Support for more compilers
+// Defines and stuff
 #define BIT(x) (1 << x)
+#ifdef SURGE_WINDOWS
 #define FORCEINLINE __forceinline
+#else
+#define FORCEINLINE __attribute__((always_inline)) inline
+#endif
 #define NODISCARD [[nodiscard]]
 #define MAKE_BIT_ENUM(type)                                                                                                    \
     FORCEINLINE type operator|(type a, type b) { return static_cast<type>(static_cast<int>(a) | static_cast<int>(b)); }        \
