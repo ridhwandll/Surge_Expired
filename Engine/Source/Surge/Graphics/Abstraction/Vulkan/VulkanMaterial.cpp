@@ -103,7 +103,8 @@ namespace Surge
             {
                 for (Uint fidx = 0; fidx < FRAMES_IN_FLIGHT; ++fidx)
                 {
-                    VkWriteDescriptorSet& textureWriteDescriptorSet = writeDescriptorSets.emplace_back();
+                    writeDescriptorSets.emplace_back();
+                    VkWriteDescriptorSet& textureWriteDescriptorSet = writeDescriptorSets.back();
                     textureWriteDescriptorSet = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     textureWriteDescriptorSet.dstBinding = binding;
                     textureWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

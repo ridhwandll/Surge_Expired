@@ -7,11 +7,22 @@
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
 #include "Panels/RenderProcedurePanel.hpp"
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <random>
 
 namespace Surge
 {
     void Editor::OnInitialize()
     {
+        Log<Severity::Info>("{0}", UUID().ToString());
+        Log<Severity::Info>("{0}", UUID().ToString());
+        Log<Severity::Info>("{0}", UUID().ToString());
+        Log<Severity::Info>("{0}", UUID().ToString());
+        Log<Severity::Info>("{0}", UUID().ToString());
+
+
         ImGui::SetCurrentContext((ImGuiContext*)Core::GetRenderContext()->GetImGuiContext());
 
         mRenderer = Core::GetRenderer();
