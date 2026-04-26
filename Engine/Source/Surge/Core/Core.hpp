@@ -1,14 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Core/Client.hpp"
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/RenderContext.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Core/Time/Clock.hpp"
 
 namespace Surge::Core
-{
+{   
     struct CoreData
     {
         Client* SurgeClient = nullptr; // Provided by the User

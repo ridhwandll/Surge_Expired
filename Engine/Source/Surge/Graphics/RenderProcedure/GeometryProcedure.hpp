@@ -1,8 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/RenderProcedure/RenderProcedure.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/Interface/Framebuffer.hpp"
-#include "Surge/Graphics//Interface/GraphicsPipeline.hpp"
+#include "Surge/Graphics/Interface/GraphicsPipeline.hpp"
 
 namespace Surge
 {

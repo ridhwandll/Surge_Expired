@@ -1,0 +1,5 @@
+# Copy this file to local.properties (in the android/ directory) and fill in your paths.
+# local.properties is listed in .gitignore and must NOT be committed.
+
+# Path to your Android SDK installation
+sdk.dir="PATH TO SDK; Then rename file and remove .template"

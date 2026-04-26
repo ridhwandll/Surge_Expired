@@ -2,6 +2,7 @@
 #include "Surge/Utility/FileDialogs.hpp"
 #include <commdlg.h>
 #include <ShlObj_core.h>
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
@@ -76,7 +77,7 @@ namespace Surge
             IMalloc* imalloc = 0;
             if (SUCCEEDED(SHGetMalloc(&imalloc)))
             {
-                imalloc->Free(pidl);
+                imalloc->Free((void*)pidl);
                 imalloc->Release();
             }
 

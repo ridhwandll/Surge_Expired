@@ -16,9 +16,9 @@ private:                                                \
 #define SURGE_REFLECT_CLASS_REGISTER_BEGIN(ClassName)                             \
     ClassName::ReflectionRegister::ReflectionRegister()                           \
     {                                                                             \
-        SurgeReflect::Class& clazz = SurgeReflect::Class(#ClassName);             \
-        CookClassData(clazz);                                                     \
-        SurgeReflect::Registry::Get()->RegisterReflectionClass(std::move(clazz)); \
+        const SurgeReflect::Class& clazz = SurgeReflect::Class(#ClassName);             \
+        CookClassData(const_cast<SurgeReflect::Class&>(clazz));                                                     \
+        SurgeReflect::Registry::Get()->RegisterReflectionClass(std::move(const_cast<SurgeReflect::Class&>(clazz))); \
     }                                                                             \
     void ClassName::ReflectionRegister::CookClassData(SurgeReflect::Class& clazz) \
     {                                                                             \
@@ -57,7 +57,7 @@ namespace SurgeReflect
     }
 
     template <typename T>
-    Class* GetReflectionIfExists()
+    const Class* GetReflectionIfExists()
     {
         std::string className = std::string(TypeTraits::GetClassName<T>());
         const Class* clazz = Registry::Get()->GetIfExists(className);

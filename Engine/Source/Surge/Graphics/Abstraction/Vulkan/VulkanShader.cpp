@@ -4,6 +4,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
 #include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Core/Defines.hpp"
 #include <shaderc/shaderc.hpp>
 #include <filesystem>
 

@@ -93,6 +93,7 @@ namespace Surge
 
 } // namespace Surge
 
+#ifndef SURGE_PLATFORM_ANDROID
 // Entry point
 int main()
 {
@@ -107,3 +108,4 @@ int main()
     Surge::Core::Run();
     Surge::Core::Shutdown();
 }
+#endif

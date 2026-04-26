@@ -1,12 +1,11 @@
 ﻿// Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Utility/Filesystem.hpp"
-#include "Surge/ECS/Scene.hpp"
 #include "Surge/Graphics/RenderProcedure/PreDepthProcedure.hpp"
 #include "Surge/Graphics/RenderProcedure/ShadowMapProcedure.hpp"
 #include "Surge/Graphics/RenderProcedure/GeometryProcedure.hpp"
 #include "Surge/Graphics/RenderProcedure/LightCullingProcedure.hpp"
-#include <glm/gtc/matrix_transform.hpp>
+#include "Surge/Graphics/Interface/DescriptorSet.hpp"
+#include "Surge/Graphics/Camera/EditorCamera.hpp"
 
 namespace Surge
 {
@@ -141,6 +140,27 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         mProcManager.Shutdown();
         mData->ShaderSet.Shutdown();
+    }
+
+    void Renderer::SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position)
+    {
+        PointLight light;
+        light.Position = position;
+        light.Intensity = pointLight.Intensity;
+        light.Radius = pointLight.Radius;
+        light.Color = pointLight.Color;
+        light.Falloff = pointLight.Falloff;
+        mData->PointLights.push_back(light);
+    }
+
+    void Renderer::SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction)
+    {
+        DirectionalLight light;
+        light.Direction = direction;
+        light.Intensity = dirLight.Intensity;
+        light.Color = dirLight.Color;
+        light.Size = dirLight.Size;
+        mData->DirLight = light;
     }
 
 } // namespace Surge

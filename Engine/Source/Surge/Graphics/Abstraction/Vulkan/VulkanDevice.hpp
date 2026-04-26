@@ -3,6 +3,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include <unordered_set>
 #include <volk.h>
+#include "Surge/Core/String.hpp"
 
 namespace Surge
 {

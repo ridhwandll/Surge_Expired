@@ -3,6 +3,7 @@
 #include "Surge/Graphics/Interface/DescriptorSet.hpp"
 #include <array>
 #include <glm/glm.hpp>
+#include "../Renderer/Renderer.hpp"
 #define MAX_CASCADE_COUNT 4
 
 namespace Surge

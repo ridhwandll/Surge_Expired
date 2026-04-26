@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include <glm/glm.hpp>
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {

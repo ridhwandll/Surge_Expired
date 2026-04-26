@@ -62,6 +62,8 @@ namespace Surge
             case ShaderDataType::Mat3: return "Mat3";
             case ShaderDataType::Bool: return "Bool";
             case ShaderDataType::None: SG_ASSERT_INTERNAL("ShaderDataType::None is invalid in this case!");
+            default:
+                SG_ASSERT_INTERNAL("Tf?");
         }
         SG_ASSERT_INTERNAL("Unknown ShaderDataType!");
         return "None";

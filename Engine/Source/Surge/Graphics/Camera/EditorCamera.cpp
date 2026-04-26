@@ -4,6 +4,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
+#include "Surge/Core/Core.hpp"
 #define PI 3.14159f
 
 namespace Surge

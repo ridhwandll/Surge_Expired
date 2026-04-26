@@ -1,10 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Memory.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include <volk.h>
 
 namespace Surge
 {
+    class Image2D;
     class SURGE_API VulkanImGuiContext
     {
     public:

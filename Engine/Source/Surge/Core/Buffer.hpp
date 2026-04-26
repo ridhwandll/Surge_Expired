@@ -17,7 +17,7 @@ namespace Surge
 
         void Allocate(Uint size)
         {
-            delete[] Data;
+            delete[] static_cast<Byte*>(Data);
             Data = nullptr;
 
             if (size == 0)
@@ -29,7 +29,7 @@ namespace Surge
 
         void Release()
         {
-            delete[] Data;
+            delete[] static_cast<Byte*>(Data);
             Data = nullptr;
             Size = 0;
         }

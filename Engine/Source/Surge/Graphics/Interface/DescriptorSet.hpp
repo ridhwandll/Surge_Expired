@@ -3,10 +3,13 @@
 #include "Surge/Core/Memory.hpp"
 #include "Surge/Graphics/Interface/UniformBuffer.hpp"
 #include "Surge/Graphics/Interface/StorageBuffer.hpp"
-#include "Surge/Graphics/Interface/ComputePipeline.hpp"
 
 namespace Surge
 {
+    class RenderCommandBuffer;
+    class GraphicsPipeline;
+    class ComputePipeline;
+    class Shader;
     class SURGE_API DescriptorSet : public RefCounted
     {
     public:

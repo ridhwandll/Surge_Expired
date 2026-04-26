@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Input/Input.hpp"
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

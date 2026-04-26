@@ -2,6 +2,8 @@
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "SurgeMath/Math.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

@@ -178,6 +178,7 @@ namespace Surge
     template <>
     void Surge::Serializer::Serialize(const Path& path, Scene* in)
     {
+#ifndef SURGE_PLATFORM_ANDROID
         SG_ASSERT_NOMSG(in);
         SCOPED_TIMER("Serialization");
         nlohmann::json outJson = nlohmann::json();
@@ -200,6 +201,7 @@ namespace Surge
             fwrite(result.c_str(), sizeof(char), result.size(), f);
             fclose(f);
         }
+#endif // !SURGE_PLATFORM_ANDROID
     }
 
     //------------

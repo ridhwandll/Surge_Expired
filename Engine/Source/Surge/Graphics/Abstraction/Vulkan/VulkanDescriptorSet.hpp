@@ -5,6 +5,7 @@
 
 namespace Surge
 {
+    class RenderCommandBuffer;
     class SURGE_API VulkanDescriptorSet : public DescriptorSet
     {
     public:

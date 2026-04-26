@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Window/Window.hpp"
-#include "Surge/Graphics/Interface/Image.hpp"
+#include "Interface/Image.hpp"
 
 namespace Surge
 {

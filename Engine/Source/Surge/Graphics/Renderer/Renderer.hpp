@@ -1,16 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Memory.hpp"
-#include "Surge/Graphics/Camera/EditorCamera.hpp"
-#include "Surge/Graphics/Mesh.hpp"
-#include "Surge/Graphics/Interface/RenderCommandBuffer.hpp"
-#include "Surge/Graphics/Shader/Shader.hpp"
-#include "Surge/Graphics/Shader/ShaderSet.hpp"
-#include "Surge/Graphics/Interface/Texture.hpp"
-#include "Surge/Graphics/Renderer/Lights.hpp"
-#include "Surge/Graphics/Interface/DescriptorSet.hpp"
 #include "Surge/Graphics/RenderProcedure/RenderProcedureManager.hpp"
 #include "Surge/ECS/Components.hpp"
+#include "Lights.hpp"
+#include "Surge/Graphics/Shader/ShaderSet.hpp"
+#include "Surge/Graphics/Interface/DescriptorSet.hpp"
 
 #define FRAMES_IN_FLIGHT 3
 #define BASE_SHADER_PATH "Engine/Assets/Shaders" //Sadkek, we don't have an asset manager yet
@@ -53,6 +48,7 @@ namespace Surge
         glm::mat4 ViewProjection;
     };
 
+    class EditorCamera;
     class SURGE_API Renderer
     {
     public:
@@ -68,25 +64,9 @@ namespace Surge
         void SetRenderArea(Uint width, Uint height);
 
         FORCEINLINE void SubmitMesh(MeshComponent& meshComp, const glm::mat4& transform) { mData->DrawList.push_back(DrawCommand(&meshComp, transform)); }
-        FORCEINLINE void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position)
-        {
-            PointLight light;
-            light.Position = position;
-            light.Intensity = pointLight.Intensity;
-            light.Radius = pointLight.Radius;
-            light.Color = pointLight.Color;
-            light.Falloff = pointLight.Falloff;
-            mData->PointLights.push_back(light);
-        }
-        FORCEINLINE void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction)
-        {
-            DirectionalLight light;
-            light.Direction = direction;
-            light.Intensity = dirLight.Intensity;
-            light.Color = dirLight.Color;
-            light.Size = dirLight.Size;
-            mData->DirLight = light;
-        }
+        void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
+        void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction);
+
 
         RenderProcedureManager* GetRenderProcManager() { return &mProcManager; }
         RendererData* GetData() { return mData.get(); }

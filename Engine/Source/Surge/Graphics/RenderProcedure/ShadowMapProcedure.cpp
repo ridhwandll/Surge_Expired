@@ -2,6 +2,7 @@
 #include "Surge/Graphics/RenderProcedure/ShadowMapProcedure.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "GeometryProcedure.hpp"
+#include "Surge/Core/Core.hpp"
 #define NUM_FRUSTUM_CORNERS 8
 
 namespace Surge

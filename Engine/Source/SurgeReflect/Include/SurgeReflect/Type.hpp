@@ -3,6 +3,7 @@
 #include <string>
 #include <functional>
 #include "SurgeReflect/Utility.hpp"
+#include "TypeTraits.hpp"
 
 namespace SurgeReflect
 {

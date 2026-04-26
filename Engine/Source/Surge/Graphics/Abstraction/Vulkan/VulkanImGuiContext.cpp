@@ -1,10 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanImGuiContext.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanImage.hpp"
+#include "Surge/Graphics/Interface/Image.hpp"
 #include <ImGui/Backends/imgui_impl_vulkan.h>
-#include <ImGui/Backends/imgui_impl_win32.h>
+#ifdef SURGE_PLATFORM_WINDOWS
+    #include <ImGui/Backends/imgui_impl_win32.h>
+#endif
 #include <ImGui/ImGuizmo.h>
 #include <IconsFontAwesome.hpp>
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
@@ -66,7 +70,9 @@ namespace Surge
         }
 
         // Setup Platform/Renderer backends
+#ifdef SURGE_PLATFORM_WINDOWS
         ImGui_ImplWin32_Init(Core::GetWindow()->GetNativeWindowHandle());
+#endif
         ImGui_ImplVulkan_InitInfo initInfo {};
         initInfo.Instance = renderContext->mVulkanInstance;
         initInfo.PhysicalDevice = vulkanDevice->GetPhysicalDevice();
@@ -92,7 +98,9 @@ namespace Surge
     {
         VulkanRenderContext* renderContext = static_cast<VulkanRenderContext*>(mVulkanRenderContext);
         vkDestroyDescriptorPool(renderContext->mDevice.GetLogicalDevice(), mImguiPool, nullptr);
+#ifdef SURGE_PLATFORM_WINDOWS
         ImGui_ImplWin32_Shutdown();
+#endif
         ImGui_ImplVulkan_Shutdown();
         ImGui::DestroyContext();
     }
@@ -100,7 +108,9 @@ namespace Surge
     void VulkanImGuiContext::BeginFrame()
     {
         ImGui_ImplVulkan_NewFrame();
+#ifdef SURGE_PLATFORM_WINDOWS
         ImGui_ImplWin32_NewFrame();
+#endif
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
     }

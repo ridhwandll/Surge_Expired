@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.surgetechnologies.surgeplayer"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <!-- Require Vulkan 1.1 (API level 24+) -->
+    <uses-feature
+        android:name="android.hardware.vulkan.version"
+        android:version="0x401000"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.vulkan.level"
+        android:version="0"
+        android:required="true" />
+
+    <uses-sdk
+        android:minSdkVersion="24"
+        android:targetSdkVersion="33" />
+
+    <application
+        android:label="Surge Player"
+        android:hasCode="false"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+
+        <!--
+          NativeActivity hosts the engine main loop.
+          android:name points to the system NativeActivity class which loads
+          the shared library named in meta-data below.
+        -->
+        <activity
+            android:name="android.app.NativeActivity"
+            android:label="Surge Player"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustNothing"
+            android:configChanges="orientation|keyboardHidden|screenSize|density"
+            android:exported="true">
+
+            <!-- Name of the .so built by CMake (without "lib" prefix and ".so" suffix) -->
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="SurgePlayer" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

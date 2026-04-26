@@ -2,6 +2,7 @@
 #include "Surge/Graphics/Material.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanMaterial.hpp"
 #include "Renderer/Renderer.hpp"
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

@@ -1,7 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
-
+#ifdef SURGE_PLATFORM_ANDROID
+#include <android/native_window.h>
+#endif
 namespace Surge
 {
     ShaderType VulkanUtils::ShaderTypeFromString(const String& type)
@@ -120,7 +122,7 @@ namespace Surge
 
     void VulkanUtils::CreateWindowSurface(VkInstance instance, Window* windowHandle, VkSurfaceKHR* surface)
     {
-#ifdef SURGE_WINDOWS
+#ifdef SURGE_PLATFORM_WINDOWS
         PFN_vkCreateWin32SurfaceKHR vkCreateWin32SurfaceKHR;
 
         // Getting the vkCreateWin32SurfaceKHR function pointer and assert if it doesnt exist
@@ -135,8 +137,18 @@ namespace Surge
         sci.hwnd = static_cast<HWND>(windowHandle->GetNativeWindowHandle());
 
         VK_CALL(vkCreateWin32SurfaceKHR(instance, &sci, nullptr, surface));
+#elif defined(SURGE_PLATFORM_ANDROID)
+        PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR = (PFN_vkCreateAndroidSurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateAndroidSurfaceKHR");
+        if (!vkCreateAndroidSurfaceKHR)
+            SG_ASSERT_INTERNAL("[Android] Vulkan instance missing VK_KHR_android_surface extension");
+
+        VkAndroidSurfaceCreateInfoKHR sci {};
+        sci.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+        sci.window = static_cast<ANativeWindow*>(windowHandle->GetNativeWindowHandle());
+
+        VK_CALL(vkCreateAndroidSurfaceKHR(instance, &sci, nullptr, surface));
 #else
-        SG_ASSERT_INTERNAL("Surge is currently Windows Only! :(");
+        SG_ASSERT_INTERNAL("Surge is currently Windows/Android Only! :(");
 #endif
     }
 

@@ -1,7 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/RenderProcedure/LightCullingProcedure.hpp"
+#include "Surge/Graphics/Interface/DescriptorSet.hpp"
 #include "PreDepthProcedure.hpp"
 #include "GeometryProcedure.hpp"
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

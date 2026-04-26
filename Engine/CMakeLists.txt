@@ -31,7 +31,7 @@ set(LIB_LINKS
     volk
     SPIRV-Cross
     ImGui
-    Optick
+    #Optick
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Lib/assimp-vc142-mt.lib
 )
@@ -49,13 +49,18 @@ set_property(TARGET Surge PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_
 set_target_properties(Surge PROPERTIES FOLDER Engine)
 
 if (WIN32)
-set(PLATFORM_COMPILE_DEFS VK_USE_PLATFORM_WIN32_KHR NOMINMAX)
+    set(PLATFORM_COMPILE_DEFS VK_USE_PLATFORM_WIN32_KHR NOMINMAX SURGE_PLATFORM_WINDOWS)
 endif (WIN32)
+if (ANDROID)
+    set(PLATFORM_COMPILE_DEFS VK_USE_PLATFORM_ANDROID_KHR SURGE_PLATFORM_ANDROID)
+endif (ANDROID)
+
 
 target_compile_definitions(Surge
 
     PUBLIC
     "_CRT_SECURE_NO_WARNINGS"
+    "_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING"
     "GLM_FORCE_DEPTH_ZERO_TO_ONE"
     "GLM_FORCE_RADIANS"
     ${PLATFORM_COMPILE_DEFS}
@@ -71,7 +76,7 @@ add_custom_command(TARGET Surge PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_direc
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/$<CONFIGURATION>/Surge.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/ImGui/$<CONFIGURATION>/ImGui.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/fmt/$<CONFIGURATION>/fmt.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/Optick/$<CONFIGURATION>/Optick.lib Editor)
+#CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/Optick/$<CONFIGURATION>/Optick.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/SPIRV-Cross/$<CONFIGURATION>/SPIRV-Cross.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/volk/$<CONFIGURATION>/volk.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Lib/assimp-vc142-mt.lib Editor)

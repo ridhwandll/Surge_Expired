@@ -7,3 +7,9 @@ cmake-build-debug
 cmake-build-release
 *.surgeProj
 *.surge
+
+android/local.properties  # machine-specific SDK path
+android/.gradle/          # gradle cache
+android/app/build/ 
+android/app/.cxx/
+android/build/

@@ -1,49 +1,52 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Logger/Logger.hpp"
+#include "Surge/Core/Time/Timer.hpp"
 #include <deque>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
+
 // Platform detection
 #ifdef _WIN32
-#define SURGE_WINDOWS
-#define SCRIPT_API __declspec(dllexport)
+    #define SCRIPT_API __declspec(dllexport)
 
-#ifdef SURGE_EXPORT
-#define SURGE_API
-#else
-#define SURGE_API
-#endif //SURGE_EXPORT
+    #ifdef SURGE_EXPORT
+    #define SURGE_API
+    #else
+    #define SURGE_API
+    #endif // SURGE_EXPORT
 
 #elif __APPLE__
-#define SURGE_APPLE
-#error "Haha Apple?"
-#define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
+    #define SURGE_APPLE
+    #error "WE DO NOT SUPPORT AND WILL NOT SUPPORT MAC"
+    #define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
 
-#ifdef SURGE_EXPORT
-#define SURGE_API kekw
-#else
-#define SURGE_API kewk
-#endif //SURGE_EXPORT
+#elif __ANDROID__
+    #define SCRIPT_API __attribute__((visibility("default")))
+
+    #ifdef SURGE_EXPORT
+    #define SURGE_API
+    #else
+    #define SURGE_API
+    #endif // SURGE_EXPORT
 
 #elif __linux__
-#define SURGE_LINUX
-#error "Haha LinuS?"
-#define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
-
-#ifdef SURGE_EXPORT
-#define SURGE_API kekw
-#else
-#define SURGE_API kewk
-#endif //SURGE_EXPORT
-
+    #define SURGE_LINUX
+    #error "WE WILL NOT SUPPORT LINUX PC"
+    #define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
 #endif
 
 // Assertions
 #ifdef SURGE_DEBUG
-#define ASSERT() __debugbreak()
+
+#ifdef _MSC_VER
+    #define ASSERT() __debugbreak()
+#else
+    #define ASSERT() __builtin_trap()
+#endif
+
 #define SG_ASSERT(condition, ...)                              \
     {                                                          \
         if (!(condition))                                      \
@@ -74,9 +77,15 @@
 #define SCOPED_TIMER(...) Timer tImEr(fmt::format(__VA_ARGS__), true)
 #endif
 
-// Defines and stuff, TODO: Support for more compilers
+// Defines and stuff
 #define BIT(x) (1 << x)
-#define FORCEINLINE __forceinline
+
+#ifdef _MSC_VER
+    #define FORCEINLINE __forceinline
+#else
+    #define FORCEINLINE __attribute__((always_inline)) inline
+#endif
+
 #define NODISCARD [[nodiscard]]
 #define MAKE_BIT_ENUM(type)                                                                                                    \
     FORCEINLINE type operator|(type a, type b) { return static_cast<type>(static_cast<int>(a) | static_cast<int>(b)); }        \
@@ -98,7 +107,7 @@ public:                                    \
 //TODO: Maybe move to a platform specific file
 // Platform specific macros
 #define ENABLE_WIN32_DEBUG_MESSAGE 0
-#if defined(SURGE_WINDOWS) && defined(SURGE_DEBUG) && (ENABLE_WIN32_DEBUG_MESSAGE == 1)
+#if defined(SURGE_PLATFORM_WINDOWS) && defined(SURGE_DEBUG) && (ENABLE_WIN32_DEBUG_MESSAGE == 1)
 #define SURGE_GET_WIN32_LAST_ERROR                                                                                                                                                  \
     {                                                                                                                                                                               \
         DWORD err = GetLastError();                                                                                                                                                 \

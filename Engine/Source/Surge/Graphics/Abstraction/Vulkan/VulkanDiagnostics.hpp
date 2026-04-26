@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include <volk.h>
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {
@@ -46,6 +47,8 @@ namespace Surge
             case VK_OPERATION_DEFERRED_KHR: return "VK_OPERATION_DEFERRED_KHR";
             case VK_OPERATION_NOT_DEFERRED_KHR: return "VK_OPERATION_NOT_DEFERRED_KHR";
             case VK_PIPELINE_COMPILE_REQUIRED_EXT: return "VK_PIPELINE_COMPILE_REQUIRED_EXT";
+        default:
+                return "Your mom";
         }
         return nullptr;
     }

@@ -4,6 +4,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanShader.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanFramebuffer.hpp"
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {

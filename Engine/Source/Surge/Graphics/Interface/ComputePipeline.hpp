@@ -1,9 +1,13 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "RenderCommandBuffer.hpp"
+#include "Surge/Core/Defines.hpp"
+#include "Surge/Core/Memory.hpp"
+#include "Surge/Core/String.hpp"
 
 namespace Surge
 {
+    class Shader;
     class SURGE_API ComputePipeline : public RefCounted
     {
     public:

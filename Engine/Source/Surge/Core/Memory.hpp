@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {
@@ -138,6 +139,8 @@ namespace Surge
         }
 
         friend class Ref;
+
+    public:
         T* mInstance;
     };
 

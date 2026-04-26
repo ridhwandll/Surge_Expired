@@ -2,6 +2,7 @@
 #include "Surge/Utility/Platform.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <ShlObj_core.h>
+#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

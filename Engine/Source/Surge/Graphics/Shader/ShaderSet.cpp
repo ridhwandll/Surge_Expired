@@ -97,8 +97,8 @@ namespace Surge
                 continue;
 
             String path = GetCachePath(shader->GetPath(), stage.first);
-            FILE* f;
-            fopen_s(&f, path.c_str(), "wb");
+            FILE* f = nullptr;
+            f = fopen(path.c_str(), "wb");
             if (f)
             {
                 SPIRVHandle spirvToCache;
@@ -141,7 +141,7 @@ namespace Surge
         }
 
         String result = j.dump(4);
-        fopen_s(&f, SHADER_HASH_CACHE_PATH, "w");
+        f = fopen(SHADER_HASH_CACHE_PATH, "w");
         if (f)
         {
             fwrite(result.c_str(), sizeof(char), result.size(), f);

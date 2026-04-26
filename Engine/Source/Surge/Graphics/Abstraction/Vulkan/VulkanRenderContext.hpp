@@ -1,10 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDevice.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanImGuiContext.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanMemoryAllocator.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanSwapChain.hpp"
+#include "Surge/Graphics/Abstraction/Vulkan/VulkanMemoryAllocator.hpp"
 #include "Surge/Graphics/RenderContext.hpp"
 #include <volk.h>
 

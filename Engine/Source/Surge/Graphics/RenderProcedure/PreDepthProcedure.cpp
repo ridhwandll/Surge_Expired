@@ -1,5 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/RenderProcedure/PreDepthProcedure.hpp"
+#include "Surge/Graphics/Interface/Framebuffer.hpp"
+#include "Surge/Graphics/Interface/GraphicsPipeline.hpp"
 
 namespace Surge
 {

@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include <string>
 
 #if defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER)
 #define COMPILETIME_TYPENAME_WRAPPER_SUPPORTED 1

@@ -3,6 +3,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDevice.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanSwapChain.hpp"
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {

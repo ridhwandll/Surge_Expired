@@ -10,6 +10,7 @@
 #include <queue>
 #include <thread>
 #include <utility>
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {

@@ -13,7 +13,7 @@
 namespace Surge
 {
     template <typename XComponent, typename Func>
-    static void DrawComponent(Entity& entity, const String& name, Func& function, bool isRemoveable = true)
+    static void DrawComponent(Entity& entity, const String& name, Func&& function, bool isRemoveable = true)
     {
         const int64_t& hash = SurgeReflect::GetReflection<XComponent>()->GetHash();
         ImGui::PushID(static_cast<int>(hash));
@@ -30,7 +30,7 @@ namespace Surge
             {
                 ImGui::SameLine();
                 ImGui::SetCursorPosX(contentRegionAvailable.x + 13.0f);
-                if (ImGui::Button(ICON_SURGE_TRASH_O))
+                if (ImGui::Button(reinterpret_cast<const char*>(ICON_SURGE_TRASH_O)))
                     remvove = true;
             }
             if (ImGui::BeginTable("##ComponentTable", 2, ImGuiTableFlags_Resizable))
@@ -186,7 +186,7 @@ namespace Surge
         {
             MeshComponent& component = entity.GetComponent<MeshComponent>();
             DrawComponent<MeshComponent>(entity, "Mesh", [&component]() {
-                const String meshPath = component.Mesh ? component.Mesh->GetPath() : "";
+                const String meshPath = component.Mesh ? component.Mesh->GetPath().Str() : "";
                 if (ImGuiAux::TButton("Path", meshPath.empty() ? "Open..." : meshPath.c_str()))
                 {
                     String path = FileDialog::OpenFile("");

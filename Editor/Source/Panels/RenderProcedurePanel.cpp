@@ -18,7 +18,7 @@ namespace Surge
             {
                 RenderProcedureManager* renderProcManager = Core::GetRenderer()->GetRenderProcManager();
                 T* proc = renderProcManager->GetProcedure<T>();
-                T::InternalData* internaldata = renderProcManager->GetRenderProcData<T>();
+                typename T::InternalData* internaldata = renderProcManager->GetRenderProcData<T>();
 
                 bool isProcActive = renderProcManager->IsProcecureActive<T>();
                 if (ImGuiAux::TProperty<bool>("Active", &isProcActive))

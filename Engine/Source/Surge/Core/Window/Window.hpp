@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Core/Client.hpp"
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Core/Events/Event.hpp"
 #include <functional>
 #include <glm/glm.hpp>
 

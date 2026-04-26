@@ -15,7 +15,7 @@ namespace Surge
         virtual void Load(const HashMap<ShaderType, bool>& compileStages = {}) override;
         virtual void Reload() override;
         virtual UUID AddReloadCallback(const std::function<void()> callback) override;
-        virtual void RemoveReloadCallback(const UUID& id);
+        virtual void RemoveReloadCallback(const UUID& id) override;
         virtual const ShaderReflectionData& GetReflectionData() const override { return mReflectionData; }
         virtual const Vector<SPIRVHandle>& GetSPIRVs() const override { return mShaderSPIRVs; }
         virtual const Path& GetPath() const override { return mPath; }

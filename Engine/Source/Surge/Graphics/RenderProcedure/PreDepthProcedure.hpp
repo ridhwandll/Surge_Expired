@@ -1,9 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/RenderProcedure/RenderProcedure.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {
+    class GraphicsPipeline;
+    class Framebuffer;
     class SURGE_API PreDepthProcedure : public RenderProcedure
     {
     public:

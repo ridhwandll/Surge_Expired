@@ -3,6 +3,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderCommandBuffer.hpp"
 #include "VulkanUtils.hpp"
+#include "Surge/Core/Defines.hpp"
 
 namespace Surge
 {

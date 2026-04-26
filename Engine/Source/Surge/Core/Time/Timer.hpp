@@ -1,13 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include <chrono>
+#include <string>
+#include "Surge/Core/Logger/Logger.hpp"
 
 namespace Surge
 {
-    class SURGE_API Timer
+    class Timer
     {
     public:
-        Timer(const String& name = "Timer", bool logOnDestructor = false) : mName(name), mLogOnDestructor(logOnDestructor) { Reset(); }
+        Timer(const std::string& name = "Timer", bool logOnDestructor = false) : mName(name), mLogOnDestructor(logOnDestructor) { Reset(); }
 
         ~Timer()
         {
@@ -23,7 +25,7 @@ namespace Surge
         float ElapsedMillis() { return Elapsed() * 1000.0f; }
 
     private:
-        String mName;
+        std::string mName;
         bool mLogOnDestructor;
         std::chrono::time_point<std::chrono::high_resolution_clock> mStart;
     };

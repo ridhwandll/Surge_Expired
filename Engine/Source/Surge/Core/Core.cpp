@@ -1,13 +1,20 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Core.hpp"
-#include "Surge/Core/Input/Input.hpp"
 #include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Core/Window/Window.hpp"
-#include "Surge/Platform/Windows/WindowsWindow.hpp"
-#include "SurgeReflect/SurgeReflect.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
+#include "Surge/Utility/Platform.hpp"
 #include <filesystem>
+
+#ifdef SURGE_PLATFORM_WINDOWS
+#include "Surge/Platform/Windows/WindowsWindow.hpp"
+#endif
+
+#ifdef SURGE_PLATFORM_ANDROID
+#include "Surge/Platform/Android/AndroidWindow.hpp"
+#endif
+
 
 #define ENV_VAR_KEY "SURGE_DIR"
 namespace Surge::Core
@@ -38,7 +45,11 @@ namespace Surge::Core
         const ClientOptions& clientOptions = GCoreData.SurgeClient->GeClientOptions();
 
         // Window
+#ifdef SURGE_PLATFORM_ANDROID
+        GCoreData.SurgeWindow = new AndroidWindow(clientOptions.WindowDescription);
+#else
         GCoreData.SurgeWindow = new WindowsWindow(clientOptions.WindowDescription);
+#endif
         GCoreData.SurgeWindow->RegisterEventCallback(OnEvent);
 
         // Render Context

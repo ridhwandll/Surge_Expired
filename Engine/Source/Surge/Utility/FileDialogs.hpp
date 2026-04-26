@@ -1,10 +1,16 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Defines.hpp"
+#include "Surge/Core/String.hpp"
 
-namespace Surge::FileDialog
+namespace Surge
 {
-    SURGE_API String OpenFile(const char* filter);
-    SURGE_API String SaveFile(const char* filter);
-    SURGE_API String ChooseFolder();
+    class FileDialog
+    {
+    public:
+        static SURGE_API String OpenFile(const char* filter);
+        static SURGE_API String SaveFile(const char* filter);
+        static SURGE_API String ChooseFolder();
+    };
 
 } // namespace Surge::FileDialog

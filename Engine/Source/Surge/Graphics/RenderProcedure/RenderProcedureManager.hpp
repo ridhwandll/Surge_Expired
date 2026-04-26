@@ -3,7 +3,6 @@
 #include "Surge/Graphics/RenderProcedure/RenderProcedure.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
-#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
@@ -69,13 +68,13 @@ namespace Surge
         template <typename T>
         void RestartProcedure()
         {
-            Surge::Core::AddFrameEndCallback([this]() {
-                T* proc = GetProcedure<T>();
-                SG_ASSERT(proc, "Attempted to restart invalid Procedure!");
-
-                proc->Shutdown();
-                proc->Init(mRendererData);
-            });
+            //Core::AddFrameEndCallback([this]() {
+            //    T* proc = GetProcedure<T>();
+            //    SG_ASSERT(proc, "Attempted to restart invalid Procedure!");
+            //
+            //    proc->Shutdown();
+            //    proc->Init(mRendererData);
+            //});
         }
 
         FORCEINLINE void ResizeAll(Uint newWidth, Uint newHeight)

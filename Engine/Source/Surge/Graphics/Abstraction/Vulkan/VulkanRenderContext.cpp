@@ -30,7 +30,20 @@ namespace Surge
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Surge Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_2; // TODO(Rid): Check which version is available, use 1.1 if necessary
+
+        // Choose the highest supported Vulkan instance version (cap at 1.2)
+        {
+            uint32_t instanceVersion = VK_API_VERSION_1_0;
+            if (vkEnumerateInstanceVersion)
+                vkEnumerateInstanceVersion(&instanceVersion);
+
+            if (instanceVersion >= VK_API_VERSION_1_2)
+                appInfo.apiVersion = VK_API_VERSION_1_2;
+            else if (instanceVersion >= VK_API_VERSION_1_1)
+                appInfo.apiVersion = VK_API_VERSION_1_1;
+            else
+                appInfo.apiVersion = VK_API_VERSION_1_0;
+        }
 
         /// VkInstanceCreateInfo ///
         Vector<const char*> instanceExtensions = GetRequiredInstanceExtensions();
@@ -142,7 +155,11 @@ namespace Surge
     {
         Vector<const char*> instanceExtensions;
         instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-        instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME); // Currently windows Only
+#ifdef SURGE_PLATFORM_WINDOWS
+        instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif defined(SURGE_PLATFORM_ANDROID)
+        instanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+#endif
         ENABLE_IF_VK_VALIDATION(mVulkanDiagnostics.AddValidationExtensions(instanceExtensions));
         return instanceExtensions;
     }

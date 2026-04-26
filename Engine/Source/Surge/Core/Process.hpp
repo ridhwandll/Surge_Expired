@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#ifdef SURGE_PLATFORM_WINDOWS
 #include <string>
 
 namespace Surge::Process
@@ -9,3 +10,4 @@ namespace Surge::Process
     std::wstring OutputOf(const std::wstring& commandLine);
 
 } // namespace Surge::Process
+#endif

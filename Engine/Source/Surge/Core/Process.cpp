@@ -1,4 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
+#ifdef SURGE_PLATFORM_WINDOWS
 #include "Surge/Core/Process.hpp"
 #include <fcntl.h>
 #include <filesystem>
@@ -6,7 +7,7 @@
 #include <string>
 #include <codecvt>
 
-#if defined(SURGE_WINDOWS)
+#if defined(SURGE_PLATFORM_WINDOWS)
 #include <corecrt_io.h>
 #define fdopen _fdopen
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
@@ -14,7 +15,7 @@
 #include <unistd.h>
 #endif
 
-#if defined(SURGE_WINDOWS)
+#if defined(SURGE_PLATFORM_WINDOWS)
 using ProcessID = HANDLE;
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
 using ProcessID = pid_t;
@@ -24,7 +25,7 @@ namespace Surge
 {
     static ProcessID StartProcess(const std::wstring& commandLine, FILE* outputStream)
     {
-#if defined(SURGE_WINDOWS)
+#if defined(SURGE_PLATFORM_WINDOWS)
         STARTUPINFOW startupInfo = {};
         startupInfo.cb = sizeof(STARTUPINFO);
         startupInfo.wShowWindow = SW_HIDE;
@@ -56,7 +57,7 @@ namespace Surge
 
     static int WaitProcess(ProcessID pid)
     {
-#if defined(SURGE_WINDOWS)
+#if defined(SURGE_PLATFORM_WINDOWS)
         BOOL result;
         DWORD exitCode;
         result = GetExitCodeProcess(pid, &exitCode);
@@ -87,7 +88,7 @@ namespace Surge
 
     std::wstring Process::OutputOf(const std::wstring& commandLine, int& result)
     {
-#if defined(SURGE_WINDOWS)
+#if defined(SURGE_PLATFORM_WINDOWS)
         HANDLE read;
         HANDLE write;
         SECURITY_ATTRIBUTES securityAttributes = {};
@@ -152,3 +153,4 @@ namespace Surge
     }
 
 } // namespace Surge
+#endif
