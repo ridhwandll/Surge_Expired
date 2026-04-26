@@ -653,8 +653,11 @@ void main()
 {
     gPBRParams.Normal = CalculateNormal();
     gPBRParams.Albedo = texture(AlbedoMap, vInput.TexCoord).rgb * uMaterial.Albedo;
-    gPBRParams.Metalness = texture(MetalnessMap, vInput.TexCoord).r * uMaterial.Metalness;
-    gPBRParams.Roughness = texture(RoughnessMap, vInput.TexCoord).r * uMaterial.Roughness;
+
+    // glTF packs roughness (G) and metalness (B) into one texture (so this shader is gltf only?)
+    gPBRParams.Metalness = texture(MetalnessMap, vInput.TexCoord).b * uMaterial.Metalness;
+    gPBRParams.Roughness = texture(RoughnessMap, vInput.TexCoord).g * uMaterial.Roughness;
+
     gPBRParams.View = normalize(uLights.CameraPosition - vInput.WorldPos);
 
     // Fresnel reflectance at normal incidence for metals. Had to separate the

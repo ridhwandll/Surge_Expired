@@ -1,195 +1,224 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Mesh.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
+#include <glm/gtc/type_ptr.hpp>
+#include <cgltf.h>
 
 namespace Surge
 {
-    static glm::mat4 AssimpMat4ToGlmMat4(const aiMatrix4x4& matrix)
+    static void LoadTexture(const Path& meshPath, cgltf_texture_view& texView,
+                            Ref<Material>& material, const String& texName)
     {
-        glm::mat4 result;
-        result[0][0] = matrix.a1;
-        result[1][0] = matrix.a2;
-        result[2][0] = matrix.a3;
-        result[3][0] = matrix.a4;
-        result[0][1] = matrix.b1;
-        result[1][1] = matrix.b2;
-        result[2][1] = matrix.b3;
-        result[3][1] = matrix.b4;
-        result[0][2] = matrix.c1;
-        result[1][2] = matrix.c2;
-        result[2][2] = matrix.c3;
-        result[3][2] = matrix.c4;
-        result[0][3] = matrix.d1;
-        result[1][3] = matrix.d2;
-        result[2][3] = matrix.d3;
-        result[3][3] = matrix.d4;
-        return result;
-    }
+        if (!texView.texture || !texView.texture->image || !texView.texture->image->uri)
+            return;
 
-    static const Uint sMeshImportFlags = aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_GenUVCoords | aiProcess_OptimizeMeshes | aiProcess_ValidateDataStructure |
-                                         aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace;
-    template <aiTextureType texType>
-    static void LoadTexture(const Path& meshPath, aiMaterial* aiMat, Ref<Material>& material, const String& texName)
-    {
-        aiString aiTexPath;
-        if (aiMat->GetTexture(texType, 0, &aiTexPath) == aiReturn_SUCCESS)
-        {
-            Path texturePath = Filesystem::GetParentPath(meshPath) / String(aiTexPath.data);
-            Log<Severity::Trace>("{0} path: {1}", texName, texturePath);
+        Path texturePath = Filesystem::GetParentPath(meshPath) / String(texView.texture->image->uri);
+        Log<Severity::Trace>("{0} path: {1}", texName, texturePath);
 
-            TextureSpecification spec;
-            spec.UseMips = true;
-            Ref<Texture2D> texture = Texture2D::Create(texturePath, spec);
-            material->Set<Ref<Texture2D>>(texName, texture);
-        }
-        if constexpr (texType == aiTextureType_DIFFUSE)
-            material->Set("Material.Albedo", glm::vec3(1.0f));
-        else if constexpr (texType == aiTextureType_SHININESS)
-            material->Set("Material.Roughness", 1.0f);
-        else if constexpr (texType == aiTextureType_SPECULAR)
-            material->Set("Material.Metalness", 1.0f);
-    }
-
-    static void SetValues(aiMaterial* aiMaterial, Ref<Material>& material)
-    {
-        //Color
-        glm::vec3 albedoColor = {1.0f, 1.0f, 1.0f};
-        aiColor3D aiColor;
-        if (aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == AI_SUCCESS)
-            albedoColor = {aiColor.r, aiColor.g, aiColor.b};
-        material->Set("Material.Albedo", albedoColor);
-
-        //Roughness
-        float shininess;
-        if (aiMaterial->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)
-            shininess = 50.0f;
-        float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
-        material->Set<float>("Material.Roughness", roughness);
-
-        //Metalness
-        float metalness = 0.0f;
-        aiMaterial->Get(AI_MATKEY_REFLECTIVITY, metalness);
-        material->Set<float>("Material.Metalness", metalness);
+        TextureSpecification spec;
+        spec.UseMips = true;
+        Ref<Texture2D> texture = Texture2D::Create(texturePath, spec);
+        material->Set<Ref<Texture2D>>(texName, texture);
     }
 
     Mesh::Mesh(const Path& filepath)
         : mPath(filepath)
     {
-        Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(filepath, sMeshImportFlags);
+        cgltf_options options = {};
+        cgltf_data* data = nullptr;
 
-        if (!scene || !scene->HasMeshes())
-            Log<Severity::Error>("Failed to load mesh file: {0}", filepath);
+        if (cgltf_parse_file(&options, filepath.Str().c_str(), &data) != cgltf_result_success)
+        {
+            Log<Severity::Error>("Failed to parse glTF file: {0}", filepath);
+            return;
+        }
+
+        if (cgltf_load_buffers(&options, data, filepath.Str().c_str()) != cgltf_result_success)
+        {
+            Log<Severity::Error>("Failed to load glTF buffers: {0}", filepath);
+            cgltf_free(data);
+            return;
+        }
+
+        // Map each mesh to its first submesh index
+        // each primitive within a cgltf_mesh = one Submesh
+        Vector<Uint> meshSubmeshStart(data->meshes_count);
+        Uint totalSubmeshes = 0;
+        for (size_t i = 0; i < data->meshes_count; i++)
+        {
+            meshSubmeshStart[i] = totalSubmeshes;
+            totalSubmeshes += (Uint)data->meshes[i].primitives_count;
+        }
+        mSubmeshes.reserve(totalSubmeshes);
 
         Uint vertexCount = 0;
         Uint indexCount = 0;
 
-        mSubmeshes.reserve(scene->mNumMeshes);
-        for (size_t m = 0; m < scene->mNumMeshes; m++)
+        // Geometry extraction
+        for (size_t m = 0; m < data->meshes_count; m++)
         {
-            aiMesh* mesh = scene->mMeshes[m];
-            SG_ASSERT(mesh->HasPositions(), "Meshes require positions.");
-            SG_ASSERT(mesh->HasNormals(), "Meshes require normals.");
+            cgltf_mesh& mesh = data->meshes[m];
 
-            Submesh& submesh = mSubmeshes.emplace_back();
-            submesh.BaseVertex = vertexCount;
-            submesh.BaseIndex = indexCount;
-            submesh.MaterialIndex = mesh->mMaterialIndex;
-            submesh.IndexCount = mesh->mNumFaces * 3;
-            submesh.VertexCount = mesh->mNumVertices;
-            submesh.MeshName = mesh->mName.C_Str();
-            vertexCount += submesh.VertexCount;
-            indexCount += submesh.IndexCount;
+            for (size_t p = 0; p < mesh.primitives_count; p++)
+            {
+                cgltf_primitive& prim = mesh.primitives[p];
+                SG_ASSERT(prim.type == cgltf_primitive_type_triangles, "Only triangle primitives supported");
+                SG_ASSERT(prim.indices, "Mesh primitive requires indices");
 
-            GetVertexData(mesh, submesh.BoundingBox);
-            GetIndexData(mesh);
+                // Find per-attribute accessors
+                cgltf_accessor* posAccessor = nullptr;
+                cgltf_accessor* normalAccessor = nullptr;
+                cgltf_accessor* tangentAccessor = nullptr;
+                cgltf_accessor* texcoordAccessor = nullptr;
+
+                for (size_t a = 0; a < prim.attributes_count; a++)
+                {
+                    cgltf_attribute& attr = prim.attributes[a];
+                    switch (attr.type)
+                    {
+                        case cgltf_attribute_type_position:
+                            posAccessor = attr.data;
+                            break;
+                        case cgltf_attribute_type_normal:
+                            normalAccessor = attr.data;
+                            break;
+                        case cgltf_attribute_type_tangent:
+                            tangentAccessor = attr.data;
+                            break;
+                        case cgltf_attribute_type_texcoord:
+                            if (attr.index == 0)
+                                texcoordAccessor = attr.data;
+                            break;
+                        default: break;
+                    }
+                }
+
+                SG_ASSERT(posAccessor, "Mesh primitive requires positions");
+                SG_ASSERT(normalAccessor, "Mesh primitive requires normals");
+
+                mSubmeshes.emplace_back();
+                Submesh& submesh = mSubmeshes.back();
+                submesh.BaseVertex = vertexCount;
+                submesh.BaseIndex = indexCount;
+                submesh.VertexCount = (Uint)posAccessor->count;
+                submesh.IndexCount = (Uint)prim.indices->count;
+                submesh.MaterialIndex = prim.material ? (Uint)(prim.material - data->materials) : 0;
+                submesh.MeshName = mesh.name ? mesh.name : "Unnamed";
+                submesh.BoundingBox.Reset();
+
+                SG_ASSERT(submesh.IndexCount % 3 == 0, "Index count must be a multiple of 3");
+
+                // Vertices
+                for (size_t i = 0; i < posAccessor->count; i++)
+                {
+                    Vertex vertex = {};
+
+                    cgltf_accessor_read_float(posAccessor, i, &vertex.Position.x, 3);
+                    cgltf_accessor_read_float(normalAccessor, i, &vertex.Normal.x, 3);
+
+                    if (tangentAccessor)
+                    {
+                        float t[4];
+                        cgltf_accessor_read_float(tangentAccessor, i, t, 4);
+                        vertex.Tangent = {t[0], t[1], t[2]};
+                        // w component is handedness used to reconstruct bitangent
+                        vertex.Bitangent = glm::cross(vertex.Normal, vertex.Tangent) * t[3];
+                    }
+
+                    if (texcoordAccessor)
+                        cgltf_accessor_read_float(texcoordAccessor, i, &vertex.TexCoord.x, 2);
+
+                    submesh.BoundingBox.Min.x = glm::min(vertex.Position.x, submesh.BoundingBox.Min.x);
+                    submesh.BoundingBox.Min.y = glm::min(vertex.Position.y, submesh.BoundingBox.Min.y);
+                    submesh.BoundingBox.Min.z = glm::min(vertex.Position.z, submesh.BoundingBox.Min.z);
+                    submesh.BoundingBox.Max.x = glm::max(vertex.Position.x, submesh.BoundingBox.Max.x);
+                    submesh.BoundingBox.Max.y = glm::max(vertex.Position.y, submesh.BoundingBox.Max.y);
+                    submesh.BoundingBox.Max.z = glm::max(vertex.Position.z, submesh.BoundingBox.Max.z);
+
+                    mVertices.push_back(vertex);
+                }
+
+                // Indices; read as triangles (3 at a time)
+                for (size_t i = 0; i < prim.indices->count; i += 3)
+                {
+                    Index index = {
+                        (Uint)cgltf_accessor_read_index(prim.indices, i),
+                        (Uint)cgltf_accessor_read_index(prim.indices, i + 1),
+                        (Uint)cgltf_accessor_read_index(prim.indices, i + 2)};
+                    mIndices.push_back(index);
+                }
+
+                vertexCount += submesh.VertexCount;
+                indexCount += submesh.IndexCount;
+            }
         }
 
-        TraverseNodes(scene->mRootNode);
-
-        if (scene->HasMaterials())
+        // Pass 2: node traversal — assign world/local transforms to submeshes
+        for (size_t n = 0; n < data->nodes_count; n++)
         {
-            mMaterials.resize(scene->mNumMaterials);
-            for (Uint i = 0; i < scene->mNumMaterials; i++)
-            {
-                aiMaterial* assimpMaterial = scene->mMaterials[i];
-                const String& materialName = assimpMaterial->GetName().C_Str();
+            cgltf_node& node = data->nodes[n];
+            if (!node.mesh)
+                continue;
 
-                Ref<Material> material = Material::Create("PBR", materialName.empty() ? "NoName" : materialName);
+            float worldMat[16];
+            cgltf_node_transform_world(&node, worldMat);
+            glm::mat4 worldTransform = glm::make_mat4(worldMat);
+
+            float localMat[16];
+            cgltf_node_transform_local(&node, localMat);
+            glm::mat4 localTransform = glm::make_mat4(localMat);
+
+            size_t meshIdx = node.mesh - data->meshes;
+            Uint startSubmesh = meshSubmeshStart[meshIdx];
+
+            for (size_t p = 0; p < node.mesh->primitives_count; p++)
+            {
+                Submesh& submesh = mSubmeshes[startSubmesh + p];
+                submesh.NodeName = node.name ? node.name : "Unnamed";
+                submesh.Transform = worldTransform;
+                submesh.LocalTransform = localTransform;
+            }
+        }
+
+        // Materials
+        // glTF PBR metallic-roughness:
+        //   base_color_texture = AlbedoMap
+        //   normal_texture = NormalMap
+        //   metallic_roughness_texture = R = occlusion G = roughness B = metalness
+        if (data->materials_count > 0)
+        {
+            mMaterials.resize(data->materials_count);
+
+            for (size_t i = 0; i < data->materials_count; i++)
+            {
+                cgltf_material& mat = data->materials[i];
+                const String materialName = mat.name ? mat.name : "NoName";
+
+                Ref<Material> material = Material::Create("PBR", materialName);
                 mMaterials[i] = material;
 
-                SetValues(assimpMaterial, material);
-                LoadTexture<aiTextureType_DIFFUSE>(mPath, assimpMaterial, mMaterials[i], "AlbedoMap");
-                LoadTexture<aiTextureType_HEIGHT>(mPath, assimpMaterial, mMaterials[i], "NormalMap");
-                LoadTexture<aiTextureType_SHININESS>(mPath, assimpMaterial, mMaterials[i], "RoughnessMap");
-                LoadTexture<aiTextureType_SPECULAR>(mPath, assimpMaterial, mMaterials[i], "MetalnessMap");
+                if (mat.has_pbr_metallic_roughness)
+                {
+                    auto& pbr = mat.pbr_metallic_roughness;
+
+                    material->Set("Material.Albedo", glm::vec3(pbr.base_color_factor[0], pbr.base_color_factor[1], pbr.base_color_factor[2]));
+                    material->Set("Material.Roughness", pbr.roughness_factor);
+                    material->Set("Material.Metalness", pbr.metallic_factor);
+
+                    LoadTexture(mPath, pbr.base_color_texture, material, "AlbedoMap");
+                    // glTF packs roughness (G) and metalness (B) into one texture
+                    LoadTexture(mPath, pbr.metallic_roughness_texture, material, "MetalnessMap");
+                    LoadTexture(mPath, pbr.metallic_roughness_texture, material, "RoughnessMap");
+                }
+
+                LoadTexture(mPath, mat.normal_texture, material, "NormalMap");
             }
         }
 
         mVertexBuffer = VertexBuffer::Create(mVertices.data(), static_cast<Uint>(mVertices.size()) * sizeof(Vertex));
-        mIndexBuffer = IndexBuffer::Create(mIndices.data(), static_cast<Uint>(mIndices.size() * sizeof(Index)));
-    }
+        mIndexBuffer = IndexBuffer::Create(mIndices.data(), static_cast<Uint>(mIndices.size()) * sizeof(Index));
 
-    void Mesh::GetVertexData(const aiMesh* mesh, AABB& outAABB)
-    {
-        outAABB.Reset();
-        for (size_t i = 0; i < mesh->mNumVertices; i++)
-        {
-            Vertex vertex;
-            vertex.Position = {mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z};
-            vertex.Normal = {mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z};
-
-            outAABB.Min.x = glm::min(vertex.Position.x, outAABB.Min.x);
-            outAABB.Min.y = glm::min(vertex.Position.y, outAABB.Min.y);
-            outAABB.Min.z = glm::min(vertex.Position.z, outAABB.Min.z);
-            outAABB.Max.x = glm::max(vertex.Position.x, outAABB.Max.x);
-            outAABB.Max.y = glm::max(vertex.Position.y, outAABB.Max.y);
-            outAABB.Max.z = glm::max(vertex.Position.z, outAABB.Max.z);
-
-            if (mesh->HasTangentsAndBitangents())
-            {
-                vertex.Tangent = {mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z};
-                vertex.Bitangent = {mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z};
-            }
-
-            if (mesh->HasTextureCoords(0))
-                vertex.TexCoord = {mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y};
-            else
-                vertex.TexCoord = {0.0f, 0.0f};
-
-            mVertices.push_back(vertex);
-        }
-    }
-
-    void Mesh::GetIndexData(const aiMesh* mesh)
-    {
-        for (size_t i = 0; i < mesh->mNumFaces; i++)
-        {
-            SG_ASSERT(mesh->mFaces[i].mNumIndices == 3, "Mesh Must have 3 indices!");
-            Index index = {mesh->mFaces[i].mIndices[0], mesh->mFaces[i].mIndices[1], mesh->mFaces[i].mIndices[2]};
-            mIndices.push_back(index);
-        }
-    }
-
-    void Mesh::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, Uint level)
-    {
-        const glm::mat4 localTransform = AssimpMat4ToGlmMat4(node->mTransformation);
-        const glm::mat4 transform = parentTransform * localTransform;
-
-        for (Uint i = 0; i < node->mNumMeshes; i++)
-        {
-            const Uint mesh = node->mMeshes[i];
-            auto& submesh = mSubmeshes[mesh];
-            submesh.NodeName = node->mName.C_Str();
-            submesh.Transform = transform;
-            submesh.LocalTransform = localTransform;
-        }
-
-        for (Uint i = 0; i < node->mNumChildren; i++)
-            TraverseNodes(node->mChildren[i], transform, level + 1);
+        cgltf_free(data);
     }
 
 } // namespace Surge

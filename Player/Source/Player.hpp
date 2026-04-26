@@ -21,6 +21,8 @@ namespace Surge
         void Resize(Uint width, Uint height);
 
     private:
+        Entity mRotatingCube;
+        Entity mFloor;
         Renderer* mRenderer;
     };
 } // namespace Surge

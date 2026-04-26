@@ -7,18 +7,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 #check the compiler
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "ClangCL")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     # using Clang
-    set(CMAKE_CXX_FLAGS "-g3 -O0 -Wall -pedantic -Wextra -m64 -mfma -ffast-math -fno-rtti")
-    MESSAGE(STATUS "[Surge] Compiler id ${CMAKE_CXX_COMPILER_ID}")
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    # using GCC
-    set(CMAKE_CXX_FLAGS "-Wall -pedantic -Wextra -m64 -mfma -ffast-math -fno-rtti")
-    MESSAGE(STATUS "[Surge] Compiler id ${CMAKE_CXX_COMPILER_ID}")
+    string(APPEND CMAKE_CXX_FLAGS " -g3 -w -m64 -mfma -ffast-math -fno-rtti")
+    add_compile_options("/showFilenames")
+    MESSAGE(STATUS "[Surge] Compiler: Clang")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     # using Visual Studio C++
-    set(CMAKE_CXX_FLAGS "/W0 /fp:fast /GR- /MP /EHsc /wd4251") #C4251: Bad DLL warning
-    MESSAGE(STATUS "[Surge] Compiler id ${CMAKE_CXX_COMPILER_ID}(The best compiler)")
+    set(CMAKE_CXX_FLAGS "/W2 /fp:fast /GR- /MP /EHsc")
+    MESSAGE(STATUS "[Surge] Compiler: MSVC")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")    
+    message(FATAL_ERROR "Use Clang/MSVC")
 endif()
 
 add_subdirectory(Engine)

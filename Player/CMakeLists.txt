@@ -15,13 +15,6 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Binaries/shaderc_shared.dll
         ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIGURATION>
     )
-add_custom_command(
-    TARGET Player
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Binaries/assimp-vc142-mt.dll
-        ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIGURATION>
-    )
 
 add_custom_command(
     TARGET Player

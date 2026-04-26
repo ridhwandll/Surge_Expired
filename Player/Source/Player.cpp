@@ -15,8 +15,7 @@ namespace Surge
         Entity runtimeCamera;
         Entity dirLight;
         Entity pointLight;
-        Entity floor;
-        Entity cube;
+
         {
             mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
@@ -38,7 +37,7 @@ namespace Surge
         {
             mActiveScene->CreateEntity(pointLight, "Point Light");
             PointLightComponent& p = pointLight.AddComponent<PointLightComponent>();
-            p.Color = glm::vec3(0.8f, 0.0f, 1.0f);
+            p.Color = glm::vec3(0.9f, 0.0f, 0.0f);
             p.Intensity = 8;
             p.Radius = 5;
 
@@ -46,15 +45,20 @@ namespace Surge
             transform.Position = glm::vec3(-1, 1, 1);
         }
         {
-            mActiveScene->CreateEntity(floor, "Floor");
-            floor.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Cube.fbx");
-            TransformComponent& transform = floor.GetComponent<TransformComponent>();
+            mActiveScene->CreateEntity(mFloor, "Floor");
+            MeshComponent& meshCmp = mFloor.AddComponent<MeshComponent>();            
+            meshCmp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
+            TransformComponent& transform = mFloor.GetComponent<TransformComponent>();
             transform.Position = glm::vec3(0, -1, 0);
             transform.Scale = glm::vec3(10, 1, 10);
+
+            meshCmp.Mesh->GetMaterials()[0]->Set("Material.Albedo", glm::vec3(0.2f, 0.2f, 0.2f));
         }
         {
-            mActiveScene->CreateEntity(cube, "Cube");
-            cube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Cube.fbx");
+            mActiveScene->CreateEntity(mRotatingCube, "Cube");
+            mRotatingCube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
+            TransformComponent& transform = mRotatingCube.GetComponent<TransformComponent>();
+            transform.Position = glm::vec3(0, 1, 0);
         }
 
         glm::vec2 windowSize = Core::GetWindow()->GetSize();
@@ -63,6 +67,17 @@ namespace Surge
 
     void Player::OnUpdate()
     {
+        {
+            TransformComponent& transform = mRotatingCube.GetComponent<TransformComponent>();
+            transform.Rotation.x += 50.0f * Core::GetClock().GetSeconds();
+            transform.Rotation.y += 50.0f * Core::GetClock().GetSeconds();
+            transform.Rotation.z += 50.0f * Core::GetClock().GetSeconds();
+        }
+        {
+            TransformComponent& transform = mFloor.GetComponent<TransformComponent>();
+            transform.Rotation.y += 10.0f * Core::GetClock().GetSeconds();
+
+        }
         mActiveScene->Update();
     }
 

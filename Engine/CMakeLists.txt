@@ -3,7 +3,9 @@ include(${CMAKE_SOURCE_DIR}/scripts/CMakeUtils.cmake)
 file(GLOB_RECURSE SOURCE_FILES
     Source/*.cpp
     Source/*.hpp
+
     Vendor/stb/stb_image.cpp
+    Vendor/cgltf/cgltf.cpp
 )
 
 set(INCLUDE_DIRS
@@ -22,8 +24,8 @@ set(INCLUDE_DIRS
     Vendor/Optick/Include
     Vendor/entt/Include
     Vendor/json/Include
-    Vendor/assimp/Include
     Vendor/FontAwesome
+    Vendor/cgltf
 )
 
 set(LIB_LINKS
@@ -33,7 +35,6 @@ set(LIB_LINKS
     ImGui
     #Optick
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
-    ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Lib/assimp-vc142-mt.lib
 )
 
 add_library(Surge STATIC ${SOURCE_FILES})
@@ -79,7 +80,6 @@ CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/fmt/$<CONFIGURATION>/
 #CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/Optick/$<CONFIGURATION>/Optick.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/SPIRV-Cross/$<CONFIGURATION>/SPIRV-Cross.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/volk/$<CONFIGURATION>/volk.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_SOURCE_DIR}/Engine/Vendor/assimp/Lib/assimp-vc142-mt.lib Editor)
 CopyBinaryToExeDir(Surge ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib Editor)
 
 add_custom_command(

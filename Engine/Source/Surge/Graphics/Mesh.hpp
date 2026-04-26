@@ -7,9 +7,6 @@
 #include "Surge/Graphics/Material.hpp"
 #include <glm/glm.hpp>
 
-struct aiMesh;
-struct aiNode;
-
 namespace Surge
 {
     struct Vertex
@@ -59,11 +56,6 @@ namespace Surge
         FORCEINLINE const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }
 
         FORCEINLINE Vector<Ref<Material>>& GetMaterials() { return mMaterials; }
-
-    private:
-        void GetVertexData(const aiMesh* mesh, AABB& outAABB);
-        void GetIndexData(const aiMesh* mesh);
-        void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), Uint level = 0);
 
     private:
         Path mPath;

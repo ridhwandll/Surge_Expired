@@ -141,7 +141,7 @@ namespace Surge
                     selectedMatIndex = 0;
 
                 Ref<Material>& material = materials[selectedMatIndex];
-                if (ImGui::BeginTable("MatEditTable", 2, ImGuiTableFlags_Resizable))
+                if (ImGui::BeginTable("MatEditTable", 2, ImGuiTableFlags_Resizable) && material)
                 {
                     ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Albedo", &material->Get<glm::vec3>("Material.Albedo"));
                     ImGuiAux::TProperty<float>("Metalness", &material->Get<float>("Material.Metalness"), 0.0f, 1.0f);

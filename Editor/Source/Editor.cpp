@@ -65,14 +65,17 @@ namespace Surge
         }
         {
             mActiveScene->CreateEntity(floor, "Floor");
-            floor.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Cube.fbx");
+            MeshComponent& meshCmp = floor.AddComponent<MeshComponent>();
+            meshCmp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
             TransformComponent& transform = floor.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, -1, 0);            
-            transform.Scale = glm::vec3(10, 1, 10);            
+            transform.Position = glm::vec3(0, -1, 0);
+            transform.Scale = glm::vec3(10, 1, 10);
+
+            meshCmp.Mesh->GetMaterials()[0]->Set("Material.Albedo", glm::vec3(0.2f, 0.2f, 0.2f));       
         }
         {
             mActiveScene->CreateEntity(cube, "Cube");
-            cube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Cube.fbx");
+            cube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
         }
     }
 
