@@ -87,10 +87,10 @@
 #endif
 
 #define NODISCARD [[nodiscard]]
-#define MAKE_BIT_ENUM(type)                                                                                                    \
-    FORCEINLINE type operator|(type a, type b) { return static_cast<type>(static_cast<int>(a) | static_cast<int>(b)); }        \
-    FORCEINLINE type& operator|=(type& a, type b) { return a = static_cast<type>(static_cast<int>(a) | static_cast<int>(b)); } \
-    FORCEINLINE bool operator&(type a, type b) { return static_cast<bool>(static_cast<int>(a) & static_cast<int>(b)); }
+#define MAKE_BIT_ENUM(type, enumDeriveType)                                                                                                    \
+    FORCEINLINE type operator|(type a, type b) { return static_cast<type>(static_cast<enumDeriveType>(a) | static_cast<enumDeriveType>(b)); }        \
+    FORCEINLINE type& operator|=(type& a, type b) { return a = static_cast<type>(static_cast<enumDeriveType>(a) | static_cast<enumDeriveType>(b)); } \
+    FORCEINLINE bool operator&(type a, type b) { return static_cast<bool>(static_cast<enumDeriveType>(a) & static_cast<enumDeriveType>(b)); }
 
 #define SURGE_DISABLE_COPY(CLASS) \
 public:                           \

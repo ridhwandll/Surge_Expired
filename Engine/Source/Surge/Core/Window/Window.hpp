@@ -7,7 +7,7 @@
 
 namespace Surge
 {
-    enum class SURGE_API WindowFlags
+    enum class SURGE_API WindowFlags : Uint
     {
         // TODO: Add more flags
         Minimized = BIT(1),
@@ -15,7 +15,7 @@ namespace Surge
         CreateDefault = BIT(3),
         EditorAcceleration = BIT(4) //- Enables custom titlebar for the editor
     };
-    MAKE_BIT_ENUM(WindowFlags);
+    MAKE_BIT_ENUM(WindowFlags, Uint);
 
     enum class SURGE_API WindowState
     {
