@@ -3,8 +3,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanImage.hpp"
 
-// clang-format off
-#define FORCE_VALIDATION 0    
+#define FORCE_VALIDATION 1
 #if FORCE_VALIDATION == 1
 #define ENABLE_IF_VK_VALIDATION(x) { x; }
 #else
@@ -13,14 +12,20 @@
 #else
 #define ENABLE_IF_VK_VALIDATION(x)
 #endif // SURGE_DEBUG
-    #endif
-// clang-format on
+#endif
 
 namespace Surge
 {
     void VulkanRenderContext::Initialize(Window* window, bool enableImGui)
     {
         SURGE_PROFILE_FUNC("VulkanRenderContext::Initialize()");
+#ifdef SURGE_PLATFORM_ANDROID
+        // Point loader at APK's lib directory
+        const char* layerPath = "/data/app/com.surgetechnologies.surgeplayer/lib/arm64";
+        setenv("LD_LIBRARY_PATH", layerPath, 1);
+        setenv("VK_LAYER_PATH", layerPath, 1);
+#endif
+
         VK_CALL(volkInitialize());
         mImGuiEnabled = enableImGui;
 

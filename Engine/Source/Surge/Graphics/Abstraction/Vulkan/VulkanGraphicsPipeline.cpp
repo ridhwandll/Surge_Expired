@@ -5,6 +5,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanFramebuffer.hpp"
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Core/Logger/Logger.hpp"
 
 namespace Surge
 {
@@ -24,29 +25,37 @@ namespace Surge
     void VulkanGraphicsPipeline::Reload()
     {
         Clear();
+        LOGI("Pipeline Reload start: %s", mSpecification.DebugName.c_str());
 
         SCOPED_TIMER("VulkanGraphicsPipeline::Reload ({0})", mSpecification.DebugName);
         VulkanRenderContext* renderContext = nullptr;
         SURGE_GET_VULKAN_CONTEXT(renderContext);
         VkDevice logicalDevice = renderContext->GetDevice()->GetLogicalDevice();
+        LOGI("Got logical device: %p", logicalDevice);
 
         // Setting up all the shaders into a create info class SURGE_API
         HashMap<ShaderType, VkShaderModule> shaderModules = mSpecification.Shader.As<VulkanShader>()->GetVulkanShaderModules();
+
         Vector<VkPipelineShaderStageCreateInfo> shaderStages;
         for (const auto& shader : shaderModules)
         {
+            if (shader.first == ShaderType::Compute)
+                continue;
+
             VkPipelineShaderStageCreateInfo& shaderStageInfo = shaderStages.emplace_back();
             shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             shaderStageInfo.stage = VulkanUtils::GetVulkanShaderStage(shader.first);
             shaderStageInfo.module = shader.second;
             shaderStageInfo.pName = "main";
             shaderStageInfo.pSpecializationInfo = nullptr;
+            LOGI("Got shader: %p", shader.second);
         }
 
         const ShaderReflectionData& reflectedData = mSpecification.Shader->GetReflectionData();
 
         // We only need the stage input of vertex shader to generate the input layout
         const std::map<Uint, ShaderStageInput>& stageInputs = reflectedData.GetStageInputs().at(ShaderType::Vertex);
+        LOGI("Stage inputs map size: %zu", stageInputs.size());
 
         // Calculate the stride
         Uint stride = 0;
@@ -93,7 +102,7 @@ namespace Surge
         rasterizer.depthClampEnable = VK_FALSE;
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VulkanUtils::GetVulkanPolygonMode(mSpecification.PolygonMode);
-        rasterizer.lineWidth = mSpecification.LineWidth;
+        //rasterizer.lineWidth = mSpecification.LineWidth;
         rasterizer.cullMode = VulkanUtils::GetVulkanCullModeFlags(mSpecification.CullingMode);
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // TODO: Maybe add as an specification option?
         rasterizer.depthBiasEnable = VK_FALSE;
@@ -164,16 +173,17 @@ namespace Surge
         VkPipelineLayoutCreateInfo pipelineLayoutInfo {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         pipelineLayoutInfo.setLayoutCount = static_cast<Uint>(descriptorSetLayouts.size());
         pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
-        pipelineLayoutInfo.pushConstantRangeCount = static_cast<Uint>(pushConstants.size());
-        pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
+        //// TODO: Fix this hardcoded push constant count & array index!!!!!
+        pipelineLayoutInfo.pushConstantRangeCount = 1; // static_cast<Uint>(pushConstants.size());
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstants[0];
+        /////////////////////////////////////////////////////////////////
         VK_CALL(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &mPipelineLayout));
         SET_VK_OBJECT_DEBUGNAME(mPipelineLayout, VK_OBJECT_TYPE_PIPELINE_LAYOUT, "Graphics PipelineLayout");
 
         // Using dynamic pipeline states to avoid pipeline recreation when resizing
-        std::array<VkDynamicState, 3> dynamicStates;
+        std::array<VkDynamicState, 2> dynamicStates;
         dynamicStates[0] = VK_DYNAMIC_STATE_VIEWPORT;
         dynamicStates[1] = VK_DYNAMIC_STATE_SCISSOR;
-        dynamicStates[2] = VK_DYNAMIC_STATE_LINE_WIDTH;
         VkPipelineDynamicStateCreateInfo dynamicStatesCreateInfo {VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
         dynamicStatesCreateInfo.dynamicStateCount = static_cast<Uint>(dynamicStates.size());
         dynamicStatesCreateInfo.pDynamicStates = dynamicStates.data();
@@ -197,7 +207,24 @@ namespace Surge
             pipelineInfo.renderPass = renderContext->GetSwapChain()->GetVulkanRenderPass();
 
         pipelineInfo.subpass = 0;
+        LOGI("About to call vkCreateGraphicsPipelines");
+
+        // Log each vertex attribute format
+        for (Uint i = 0; i < vertexAttributeDescriptions.size(); i++)
+            LOGI("  attr[%u] location=%u format=%u offset=%u",
+                 i,
+                 vertexAttributeDescriptions[i].location,
+                 vertexAttributeDescriptions[i].format,
+                 vertexAttributeDescriptions[i].offset);
+
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(renderContext->GetDevice()->GetPhysicalDevice(), VK_FORMAT_R32G32B32_SFLOAT, &props);
+        LOGI("R32G32B32_SFLOAT bufferFeatures: %u", props.bufferFeatures);
+        for (const auto& [type, module] : shaderModules)
+            LOGI("  ShaderModule type=%d handle=%p", (int)type, (void*)module);
+        LOGI("colorBlending attachmentCount: %u", colorBlending.attachmentCount);
         VK_CALL(vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mPipeline));
+        LOGI("Pipeline created successfully");
         SET_VK_OBJECT_DEBUGNAME(mPipeline, VK_OBJECT_TYPE_PIPELINE, "Graphics Pipeline");
     }
 

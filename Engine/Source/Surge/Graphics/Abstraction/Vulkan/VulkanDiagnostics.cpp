@@ -9,12 +9,20 @@ namespace Surge
         switch (messageSeverity)
         {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+#ifdef SURGE_PLATFORM_WINDOWS
                 Log("[VulkanDiagnostics]");
                 Log<Severity::Warn>("{0}", pCallbackData->pMessage);
+#elif defined(SURGE_PLATFORM_ANDROID)
+                __android_log_print(ANDROID_LOG_WARN, "Vulkan", "%s", pCallbackData->pMessage);
+#endif
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+#ifdef SURGE_PLATFORM_WINDOWS
                 Log("[VulkanDiagnostics]");
                 Log<Severity::Error>("{0}", pCallbackData->pMessage);
+#elif defined(SURGE_PLATFORM_ANDROID)
+                __android_log_print(ANDROID_LOG_ERROR, "Vulkan", "%s", pCallbackData->pMessage);
+#endif
                 break;
         }
 
@@ -26,7 +34,10 @@ namespace Surge
     {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr)
+        {
+            Log<Severity::Info>("Creating VULKAN Debug Utils Messenger");
             return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+        }
         else
             return VK_ERROR_EXTENSION_NOT_PRESENT;
     }

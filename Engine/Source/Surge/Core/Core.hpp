@@ -6,6 +6,7 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/RenderContext.hpp"
 #include "Surge/Core/Time/Clock.hpp"
+#include <functional>
 
 namespace Surge::Core
 {   

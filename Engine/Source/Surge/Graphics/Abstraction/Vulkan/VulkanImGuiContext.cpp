@@ -85,10 +85,15 @@ namespace Surge
         initInfo.Allocator = VK_NULL_HANDLE;
         initInfo.PipelineCache = VK_NULL_HANDLE;
         initInfo.CheckVkResultFn = ImGuiCheckVkResult;
-        ImGui_ImplVulkan_Init(&initInfo, renderContext->mSwapChain.GetVulkanRenderPass());
 
+        LOGI("Initializing ImGui Vulkan Backend...");
+        ImGui_ImplVulkan_Init(&initInfo, renderContext->mSwapChain.GetVulkanRenderPass());
+        LOGI("Initialized ImGui Vulkan Backend...");
+
+        LOGI("ImGui_ImplVulkan_CreateFontsTexture");
         VkCommandBuffer cmd = nullptr;
         vulkanDevice->InstantSubmit(VulkanQueueType::Graphics, [&](VkCommandBuffer& cmd) { ImGui_ImplVulkan_CreateFontsTexture(cmd); });
+        LOGI("ImGui_ImplVulkan_CreateFontsTexture");
 
         ImGui_ImplVulkan_DestroyFontUploadObjects();
         SetDarkThemeColors();

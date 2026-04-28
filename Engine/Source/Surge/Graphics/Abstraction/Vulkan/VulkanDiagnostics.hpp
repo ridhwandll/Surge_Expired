@@ -3,6 +3,10 @@
 #include <volk.h>
 #include "Surge/Core/Defines.hpp"
 
+#ifdef SURGE_PLATFORM_ANDROID
+#include <android/log.h>
+#endif
+
 namespace Surge
 {
     inline const char* VKResultToString(VkResult result)
@@ -92,6 +96,18 @@ namespace Surge
     }
 
 #else
-#define VK_CALL(res) res
-#define VK_CHECK_WITHOUT_OUT_OF_DATE(res) res
+//#define VK_CALL(res) res
+//#define VK_CHECK_WITHOUT_OUT_OF_DATE(res) res
+#define VK_CALL(res)                                                                      \
+    if (res != VK_SUCCESS)                                                                \
+    {                                                                                     \
+        ::Surge::Log<Surge::Severity::Fatal>(("[Vulkan] Returned value: {0}", Surge::VKResultToString(res))); \
+        __android_log_assert("Vulkan Error", "SurgeEngine", "Returned value: %s", Surge::VKResultToString(res));\
+    }
+#define VK_CHECK_WITHOUT_OUT_OF_DATE(res)                                                                                        \
+    if (res != VK_SUCCESS && res != VK_ERROR_OUT_OF_DATE_KHR)                                                                    \
+    {                                                                                                                            \
+        ::Surge::Log<Surge::Severity::Fatal>(("[Vulkan] (VK_ERROR_OUT_OF_DATE_KHR not checked) Returned value: {0}", Surge::VKResultToString(res))); \
+        __android_log_assert("Vulkan Error", "SurgeEngine", "(VK_ERROR_OUT_OF_DATE_KHR not checked) Returned value: %s", Surge::VKResultToString(res));\
+    }
 #endif

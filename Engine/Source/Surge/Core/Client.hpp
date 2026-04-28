@@ -8,6 +8,7 @@ namespace Surge
 {
     struct ClientOptions
     {
+        void* AndroidApp = nullptr; // Android specific, used to pass the android; Ignore on Windows
         WindowDesc WindowDescription;
         bool EnableImGui = true;
     };

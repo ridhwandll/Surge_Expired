@@ -13,9 +13,10 @@ namespace Surge
         mRendererData = rendererData;
 
         FramebufferSpecification spec = {};
-        spec.AttachmentSpecs = {{{ImageFormat::RGBA16F, {}}, {ImageFormat::Depth32, {}}}};
+        spec.AttachmentSpecs = {{{ImageFormat::RGBA8, {}}, {ImageFormat::Depth32, {}}}};
         spec.Width = 1280;
         spec.Height = 720;
+        spec.ClearColor = {1, 0, 0, 1};
         mProcData.OutputFrambuffer = Framebuffer::Create(spec);
 
         Ref<Shader> mainPBRShader = mRendererData->ShaderSet.GetShader("PBR");
@@ -35,7 +36,6 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("GeometryProcedure::Update");
 
-        LightCullingProcedure::InternalData* lightCullingProcData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<LightCullingProcedure>();
         ShadowMapProcedure::InternalData* shadowProcData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<ShadowMapProcedure>();
         mProcData.GeometryPipeline->Bind(mRendererData->RenderCmdBuffer);
 

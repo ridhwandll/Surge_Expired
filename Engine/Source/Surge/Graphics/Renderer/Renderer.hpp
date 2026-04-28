@@ -7,7 +7,7 @@
 #include "Surge/Graphics/Shader/ShaderSet.hpp"
 #include "Surge/Graphics/Interface/DescriptorSet.hpp"
 
-#define FRAMES_IN_FLIGHT 3
+#define FRAMES_IN_FLIGHT 2
 #define BASE_SHADER_PATH "Engine/Assets/Shaders" //Sadkek, we don't have an asset manager yet
 
 namespace Surge
@@ -58,7 +58,7 @@ namespace Surge
         void Initialize();
         void Shutdown();
 
-        void BeginFrame(const Camera& camera, const glm::mat4& transform);
+        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
         void SetRenderArea(Uint width, Uint height);

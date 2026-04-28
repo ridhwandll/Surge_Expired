@@ -18,25 +18,29 @@ namespace Surge
 
     void LightCullingProcedure::Update()
     {
-        const Ref<Image2D>& preDepthImage = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<PreDepthProcedure>()->OutputFrambuffer->GetDepthAttachment();
-        Ref<RenderCommandBuffer>& cmd = mRendererData->RenderCmdBuffer;
-        mProcData.LightCullingPipeline->Bind(cmd);
+        auto preDepthData = Core::GetRenderer()->GetRenderProcManager()->GetRenderProcData<PreDepthProcedure>();
+        if (preDepthData)
+        {
+            const Ref<Image2D>& preDepthImage = preDepthData->OutputFrambuffer->GetDepthAttachment();
+            Ref<RenderCommandBuffer>& cmd = mRendererData->RenderCmdBuffer;
+            mProcData.LightCullingPipeline->Bind(cmd);
 
-        mRendererData->LightData.CameraPosition = mRendererData->CameraPosition;
-        mRendererData->LightData.PointLightCount = Uint(mRendererData->PointLights.size());
-        for (Uint i = 0; i < mRendererData->LightData.PointLightCount; i++)
-            mRendererData->LightData.PointLights[i] = mRendererData->PointLights[i];
-        mRendererData->LightData.DirLight = mRendererData->DirLight;
-        mRendererData->LightUniformBuffer->SetData(&mRendererData->LightData);
+            mRendererData->LightData.CameraPosition = mRendererData->CameraPosition;
+            mRendererData->LightData.PointLightCount = Uint(mRendererData->PointLights.size());
+            for (Uint i = 0; i < mRendererData->LightData.PointLightCount; i++)
+                mRendererData->LightData.PointLights[i] = mRendererData->PointLights[i];
+            mRendererData->LightData.DirLight = mRendererData->DirLight;
+            mRendererData->LightUniformBuffer->SetData(&mRendererData->LightData);
 
-        mRendererData->DescriptorSet0->SetBuffer(mRendererData->LightUniformBuffer, 2);
-        mRendererData->DescriptorSet0->SetBuffer(mProcData.LightListStorageBuffer, 3);
-        mRendererData->DescriptorSet0->SetImage2D(preDepthImage, 4);
-        mRendererData->DescriptorSet0->UpdateForRendering();
-        mRendererData->DescriptorSet0->Bind(cmd, mProcData.LightCullingPipeline);
+            mRendererData->DescriptorSet0->SetBuffer(mRendererData->LightUniformBuffer, 2);
+            mRendererData->DescriptorSet0->SetBuffer(mProcData.LightListStorageBuffer, 3);
+            mRendererData->DescriptorSet0->SetImage2D(preDepthImage, 4);
+            mRendererData->DescriptorSet0->UpdateForRendering();
+            mRendererData->DescriptorSet0->Bind(cmd, mProcData.LightCullingPipeline);
 
-        mProcData.LightCullingPipeline->SetPushConstantData(cmd, "uScreenData", &mScreenSize);
-        mProcData.LightCullingPipeline->Dispatch(cmd, mLightCullingWorkGroups.x, mLightCullingWorkGroups.y, mLightCullingWorkGroups.z);
+            mProcData.LightCullingPipeline->SetPushConstantData(cmd, "uScreenData", &mScreenSize);
+            mProcData.LightCullingPipeline->Dispatch(cmd, mLightCullingWorkGroups.x, mLightCullingWorkGroups.y, mLightCullingWorkGroups.z);
+        }
     }
 
     void LightCullingProcedure::Resize(Uint newWidth, Uint newHeight)

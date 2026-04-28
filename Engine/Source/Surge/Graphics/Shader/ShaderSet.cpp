@@ -9,8 +9,10 @@ namespace Surge
     void ShaderSet::Initialize(const String& baseShaderPath)
     {
         mBaseShaderPath = baseShaderPath;
+#ifdef SURGE_PLATFORM_WINDOWS
         std::filesystem::create_directory(TEMP_ASSET_PATH);
         std::filesystem::create_directory(SHADER_CACHE_PATH);
+#endif
     }
 
     void ShaderSet::AddShader(const String& shaderName)
@@ -36,8 +38,8 @@ namespace Surge
         SCOPED_TIMER("ShaderSet::LoadAll");
         for (Ref<Shader>& shader : mShaders)
         {
+#ifdef SURGE_PLATFORM_WINDOWS
             bool saveHash = false;
-
             const HashMap<ShaderType, String>& sources = shader->GetSources();
             HashMap<ShaderType, bool> compileStages;
 
@@ -68,6 +70,19 @@ namespace Surge
 
             if (saveHash)
                 WriteHashToFile(shader);
+#elif defined(SURGE_PLATFORM_ANDROID)
+            const HashMap<ShaderType, String>& sources = shader->GetSources();
+            HashMap<ShaderType, bool> compileStages;
+
+            // Load all & do not hash
+            for (auto& source : sources)
+            {
+                compileStages[source.first] = true;
+            }
+
+            // Load only required shader stages
+            shader->Load(compileStages);
+#endif
         }
     }
 
@@ -78,19 +93,22 @@ namespace Surge
 
     HashCode ShaderSet::GetHashCodeFromCache(const Ref<Shader>& shader, ShaderType type)
     {
+        HashCode result = 0;
+#ifdef SURGE_PLATFORM_WINDOWS
         String previousContents = Filesystem::ReadFile<String>(SHADER_HASH_CACHE_PATH);
         String name = GetCacheName(shader->GetPath(), type);
 
         nlohmann::json j = previousContents.empty() ? nlohmann::json() : nlohmann::json::parse(previousContents);
 
-        HashCode result = 0;
         if (j.contains(name))
             result = j[name];
+#endif
         return result;
     }
 
     void ShaderSet::CacheRequiredSPIRVs(const Ref<Shader>& shader, const HashMap<ShaderType, bool>& stagesToCache)
     {
+#ifdef SURGE_PLATFORM_WINDOWS
         for (auto& stage : stagesToCache)
         {
             if (!stage.second)
@@ -117,10 +135,12 @@ namespace Surge
                 Log<Severity::Info>("Cached Shader at: {0}", path);
             }
         }
+#endif
     }
 
     void ShaderSet::WriteHashToFile(const Ref<Shader>& shader)
     {
+#ifdef SURGE_PLATFORM_WINDOWS
         FILE* f = nullptr;
 
         // Create the file if it doesn't exist
@@ -147,6 +167,7 @@ namespace Surge
             fwrite(result.c_str(), sizeof(char), result.size(), f);
             fclose(f);
         }
+#endif
     }
 
     String ShaderSet::GetCachePath(const Path& shaderPath, const ShaderType& type) const
@@ -160,4 +181,5 @@ namespace Surge
         String name = fmt::format("{0}.{1}.spv", Filesystem::GetNameWithExtension(shaderPath), ShaderTypeToString(type));
         return name;
     }
+
 } // namespace Surge

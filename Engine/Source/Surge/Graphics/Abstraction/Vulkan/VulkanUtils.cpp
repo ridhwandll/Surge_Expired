@@ -4,6 +4,7 @@
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/native_window.h>
 #endif
+
 namespace Surge
 {
     ShaderType VulkanUtils::ShaderTypeFromString(const String& type)
@@ -28,19 +29,6 @@ namespace Surge
             case ShaderType::None: SG_ASSERT_INTERNAL("ShaderType::None is invalid in this case!");
         }
         return "";
-    }
-
-    shaderc_shader_kind VulkanUtils::ShadercShaderKindFromSurgeShaderType(const ShaderType& type)
-    {
-        switch (type)
-        {
-            case ShaderType::Vertex: return shaderc_glsl_vertex_shader;
-            case ShaderType::Pixel: return shaderc_glsl_fragment_shader;
-            case ShaderType::Compute: return shaderc_glsl_compute_shader;
-            case ShaderType::None: SG_ASSERT_INTERNAL("ShaderType::None is invalid in this case!");
-        }
-
-        return static_cast<shaderc_shader_kind>(-1);
     }
 
     VkPrimitiveTopology VulkanUtils::GetVulkanPrimitiveTopology(PrimitiveTopology primitive)

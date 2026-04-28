@@ -9,8 +9,9 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 #check the compiler
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    # using Clang
-    string(APPEND CMAKE_CXX_FLAGS " -g3 -w -m64 -mfma -ffast-math -fno-rtti")
+    # using Clang-CL
+    # Here the /MP flag is MSVC only, remove it in real Clang builds
+    string(APPEND CMAKE_CXX_FLAGS " -g3 -w -m64 -mfma -ffast-math -fno-rtti /MP")
     add_compile_options("/showFilenames")
     MESSAGE(STATUS "[Surge] Compiler: Clang")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

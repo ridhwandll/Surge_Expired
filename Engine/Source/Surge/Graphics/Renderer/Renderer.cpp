@@ -54,7 +54,7 @@ namespace Surge
         mProcManager.Sort<PreDepthProcedure, LightCullingProcedure, ShadowMapProcedure, GeometryProcedure>();
     }
 
-    void Renderer::BeginFrame(const Camera& camera, const glm::mat4& transform)
+    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
         mData->ViewMatrix = glm::inverse(transform);
@@ -67,7 +67,10 @@ namespace Surge
         GeometryProcedure::InternalData* geometryProcData = mProcManager.GetRenderProcData<GeometryProcedure>();
 
         UBufCameraData camData = {mData->ViewMatrix, mData->ProjectionMatrix, mData->ViewProjection};
-        UBufRendererData rendererData = {lightCullingProcData->TileCountX, lightCullingProcData->ShowLightComplexity, 0.0, 0.0};
+
+        UBufRendererData rendererData = {};
+        if (lightCullingProcData)
+            rendererData = {lightCullingProcData->TileCountX, lightCullingProcData->ShowLightComplexity, 0.0, 0.0};
 
         mData->CameraUniformBuffer->SetData(&camData);
         mData->RendererDataUniformBuffer->SetData(&rendererData);
@@ -92,7 +95,10 @@ namespace Surge
         GeometryProcedure::InternalData* geometryProcData = mProcManager.GetRenderProcData<GeometryProcedure>();
 
         UBufCameraData camData = {mData->ViewMatrix, mData->ProjectionMatrix, mData->ViewProjection};
-        UBufRendererData rendererData = {lightCullingProcData->TileCountX, lightCullingProcData->ShowLightComplexity, 0.0, 0.0};
+
+        UBufRendererData rendererData = {};
+        if (lightCullingProcData)
+            rendererData = {lightCullingProcData->TileCountX, lightCullingProcData->ShowLightComplexity, 0.0, 0.0};
 
         mData->CameraUniformBuffer->SetData(&camData);
         mData->RendererDataUniformBuffer->SetData(&rendererData);

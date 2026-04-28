@@ -53,14 +53,20 @@ namespace Surge
         vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, mSurface, &availableFormatCount, availableFormats.data());
 
         // Selecting the best swapchain format
-        VkSurfaceFormatKHR pickedFormat = availableFormats[0]; // Default one is `availableFormats[0]`
-        /*
-        for (const VkSurfaceFormatKHR& availableFormat : availableFormats)
-        {
-            if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-                pickedFormat = availableFormat;
-        }
-        */
+        VkSurfaceFormatKHR pickedFormat = availableFormats[0];
+         const std::vector<VkSurfaceFormatKHR> preferred = {
+            {VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},
+            //{VK_FORMAT_R8G8B8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},  // sRGB variant
+            //{VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},  // sRGB variant
+         };
+         for (const auto& pref : preferred)
+         {
+             for (const auto& avail : availableFormats)
+             {
+                 if (avail.format == pref.format && avail.colorSpace == pref.colorSpace)
+                     pickedFormat = avail;
+             }
+         }
 
         // Getting all swapchain presentModes
         Uint availablePresentModeCount = 0;
@@ -109,8 +115,10 @@ namespace Surge
         createInfo.presentMode = pickedPresentMode;
         createInfo.clipped = VK_TRUE;
         createInfo.oldSwapchain = mSwapChain ? mSwapChain : VK_NULL_HANDLE;
-
+        
+        Log<Severity::Error>("Creating... Swapchain");
         VK_CALL(vkCreateSwapchainKHR(device, &createInfo, nullptr, &mSwapChain));
+        Log<Severity::Error>("Created Swapchain");
 
         vkGetSwapchainImagesKHR(device, mSwapChain, &imageCount, nullptr);
         mSwapChainImages.resize(imageCount);
@@ -119,9 +127,7 @@ namespace Surge
         // Setting up the members
         mColorFormat = pickedFormat;
         mSwapChainExtent = swapChainExtent;
-        mImageCount = imageCount;
-
-        Log<Severity::Info>("Swapchain Image count {0}, Frames in flight {1}", mImageCount, FRAMES_IN_FLIGHT);        
+        mImageCount = imageCount;        
     }
 
     void VulkanSwapChain::CreateRenderPass()
@@ -417,7 +423,7 @@ namespace Surge
             blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             blitRegion.srcSubresource.layerCount = 1;
             blitRegion.srcOffsets[0] = {0, 0, 0};
-            blitRegion.srcOffsets[1] = {(int32_t)blitSrcExtent.width, (int32_t)blitSrcExtent.height, 1};
+            blitRegion.srcOffsets[1] = {(int32_t)blitSrcExtent.width, (int32_t)blitSrcExtent.height, 1};            
             blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             blitRegion.dstSubresource.layerCount = 1;
             blitRegion.dstOffsets[0] = {0, 0, 0};

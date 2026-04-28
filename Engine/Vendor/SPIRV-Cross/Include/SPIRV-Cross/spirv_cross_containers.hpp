@@ -20,7 +20,7 @@
  *  2. The MIT License, found at <http://opensource.org/licenses/MIT>.
  * SPDX-License-Identifier: Apache-2.0 OR MIT.
  */
-
+#include <exception>
 #ifndef SPIRV_CROSS_CONTAINERS_HPP
 #define SPIRV_CROSS_CONTAINERS_HPP
 

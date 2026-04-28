@@ -4,10 +4,16 @@
 #include <map>
 #include <filesystem>
 
+#ifdef SURGE_PLATFORM_ANDROID
+#include <android/asset_manager.h>
+#endif
+
 namespace Surge
 {
-    void AssetManager::Init()
+    Surge::String AssetManager::sAssetDirectoryName;
+    void AssetManager::Init(const String& assetsDirectory)
     {
+        sAssetDirectoryName = assetsDirectory;
         AssetLoader::Init();
         DeserializeRegistry();
     }

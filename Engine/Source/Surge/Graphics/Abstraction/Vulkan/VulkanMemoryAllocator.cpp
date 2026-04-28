@@ -9,11 +9,17 @@ namespace Surge
 {
     void VulkanMemoryAllocator::Initialize(VkInstance instance, VulkanDevice& device)
     {
+        VmaVulkanFunctions vulkanFunctions = {};
+        vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+        vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+
         VmaAllocatorCreateInfo allocatorInfo = {};
         allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
         allocatorInfo.physicalDevice = device.GetPhysicalDevice();
         allocatorInfo.device = device.GetLogicalDevice();
         allocatorInfo.instance = instance;
+        allocatorInfo.pVulkanFunctions = &vulkanFunctions;
+
         VK_CALL(vmaCreateAllocator(&allocatorInfo, &mAllocator));
     }
 
@@ -23,7 +29,33 @@ namespace Surge
     {
         VmaAllocationCreateInfo allocCreateInfo = {};
         allocCreateInfo.usage = usage;
-        allocCreateInfo.flags = allocationInfo ? VMA_ALLOCATION_CREATE_MAPPED_BIT : 0;
+        switch (usage)
+        {
+            case VMA_MEMORY_USAGE_GPU_ONLY:
+                allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+                allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+                allocCreateInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+                break;
+
+            case VMA_MEMORY_USAGE_CPU_ONLY:
+            case VMA_MEMORY_USAGE_CPU_TO_GPU:
+                allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+                allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+                break;
+
+            case VMA_MEMORY_USAGE_GPU_TO_CPU:
+                allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+                allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+                break;
+
+            default:
+                allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+                break;
+        }
+
+        if (allocationInfo)
+            allocCreateInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
 
         VmaAllocation allocation;
         vmaCreateBuffer(mAllocator, &bufferCreateInfo, &allocCreateInfo, &outBuffer, &allocation, allocationInfo);
@@ -70,11 +102,11 @@ namespace Surge
 
     GPUMemoryStats VulkanMemoryAllocator::GetStats() const
     {
-        VmaStats stats;
-        vmaCalculateStats(mAllocator, &stats);
+        VmaTotalStatistics stats;
+        vmaCalculateStatistics(mAllocator, &stats);
 
-        uint64_t usedMemory = stats.total.usedBytes;
-        uint64_t freeMemory = stats.total.unusedBytes;
+        uint64_t usedMemory = stats.total.statistics.allocationBytes;
+        uint64_t freeMemory = stats.total.statistics.blockBytes - stats.total.statistics.allocationBytes;
 
         return GPUMemoryStats(usedMemory, freeMemory);
     }
@@ -100,7 +132,7 @@ namespace Surge
     }
     SG_ASSERT_INTERNAL("Invalid GPUMemoryUsage!");
     return VMA_MEMORY_USAGE_UNKNOWN;
-}
+    }
 
 
 } // namespace Surge

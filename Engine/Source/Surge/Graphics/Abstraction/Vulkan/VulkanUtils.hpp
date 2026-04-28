@@ -4,13 +4,11 @@
 #include "Surge/Graphics/Interface/Image.hpp"
 #include "Surge/Graphics/Shader/ReflectionData.hpp"
 #include "Surge/Graphics/Shader/Shader.hpp"
-#include <shaderc/shaderc.h>
 
 namespace Surge::VulkanUtils
 {
     ShaderType ShaderTypeFromString(const String& type);
     String ShaderTypeToString(const ShaderType& type);
-    shaderc_shader_kind ShadercShaderKindFromSurgeShaderType(const ShaderType& type);
 
     VkCompareOp CompareOpToVkCompareOp(CompareOp op);
     VkPrimitiveTopology GetVulkanPrimitiveTopology(PrimitiveTopology primitive);

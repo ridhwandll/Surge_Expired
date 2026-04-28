@@ -3,6 +3,7 @@
 #include "Surge/Graphics/RenderProcedure/RenderProcedure.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
+#include <concepts>
 
 namespace Surge
 {
@@ -24,7 +25,8 @@ namespace Surge
             (mProcOrder.push_back(SurgeReflect::GetReflection<Procedures>()->GetHash()), ...);
         }
 
-        template <typename T> // TODO: Use C++20 "concept"s when we switch
+        template <typename T>
+        requires std::derived_from<T, RenderProcedure>
         FORCEINLINE T* AddProcedure()
         {
             static_assert(std::is_base_of<RenderProcedure, T>::value, "Class must derive from RenderProcedure");
@@ -37,7 +39,8 @@ namespace Surge
             return procInstance;
         }
 
-        template <typename T> // TODO: Use C++20 "concept"s when we switch
+        template <typename T>
+        requires std::derived_from<T, RenderProcedure>
         FORCEINLINE T* GetProcedure()
         {
             static_assert(std::is_base_of<RenderProcedure, T>::value, "Class must derive from RenderProcedure");
@@ -53,6 +56,7 @@ namespace Surge
         void UpdateAll();
 
         template <typename T>
+        requires std::derived_from<T, RenderProcedure>
         FORCEINLINE typename T::InternalData* GetRenderProcData()
         {
             static_assert(std::is_base_of<RenderProcedure, T>::value, "Class must derive from RenderProcedure");
@@ -65,18 +69,6 @@ namespace Surge
             return nullptr;
         }
 
-        template <typename T>
-        void RestartProcedure()
-        {
-            //Core::AddFrameEndCallback([this]() {
-            //    T* proc = GetProcedure<T>();
-            //    SG_ASSERT(proc, "Attempted to restart invalid Procedure!");
-            //
-            //    proc->Shutdown();
-            //    proc->Init(mRendererData);
-            //});
-        }
-
         FORCEINLINE void ResizeAll(Uint newWidth, Uint newHeight)
         {
             for (const SurgeReflect::ClassHash& hash : mProcOrder)
@@ -87,6 +79,7 @@ namespace Surge
         }
 
         template <typename T>
+        requires std::derived_from<T, RenderProcedure>
         void SetProcecureActive(bool disable)
         {
             const SurgeReflect::ClassHash& providedHash = GetProcHash<T>();
@@ -95,6 +88,7 @@ namespace Surge
         }
 
         template <typename T>
+        requires std::derived_from<T, RenderProcedure>
         const bool& IsProcecureActive() const
         {
             const SurgeReflect::ClassHash& providedHash = GetProcHash<T>();

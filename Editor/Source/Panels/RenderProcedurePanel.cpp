@@ -23,11 +23,6 @@ namespace Surge
                 bool isProcActive = renderProcManager->IsProcecureActive<T>();
                 if (ImGuiAux::TProperty<bool>("Active", &isProcActive))
                     renderProcManager->SetProcecureActive<T>(isProcActive);
-                if (isProcActive)
-                {
-                    if (ImGuiAux::TButton("RestartProcedure", "Restart"))
-                        renderProcManager->RestartProcedure<T>();
-                }
 
                 if (isProcActive)
                     uiFunction(proc, internaldata);

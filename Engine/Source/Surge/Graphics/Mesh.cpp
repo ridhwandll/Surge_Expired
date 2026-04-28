@@ -1,8 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Mesh.hpp"
+#include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <cgltf.h>
+
+#ifdef SURGE_PLATFORM_ANDROID
+#include <android_native_app_glue.h>
+#include <android/asset_manager.h>
+#include <android/log.h>
+#endif
 
 namespace Surge
 {
@@ -27,6 +34,44 @@ namespace Surge
         cgltf_options options = {};
         cgltf_data* data = nullptr;
 
+#ifdef SURGE_PLATFORM_ANDROID
+        auto clientOptions = Core::GetClient()->GeClientOptions();
+        android_app* app = static_cast<android_app*>(clientOptions.AndroidApp);
+        AAssetManager* assetManager = app->activity->assetManager;
+
+        options.file.user_data = assetManager;
+        options.file.read = [](const struct cgltf_memory_options* memory_options, const struct cgltf_file_options* file_options, const char* path, cgltf_size* size, void** data) -> cgltf_result
+        {
+            AAssetManager* mgr = (AAssetManager*)file_options->user_data;
+            AAsset* asset = AAssetManager_open(mgr, path, AASSET_MODE_BUFFER);
+            if (!asset) return cgltf_result_file_not_found;
+
+            *size = AAsset_getLength(asset);
+            *data = malloc(*size);
+            AAsset_read(asset, *data, *size);
+            AAsset_close(asset);
+            return cgltf_result_success;
+        };
+        options.file.release = [](const cgltf_memory_options*, const cgltf_file_options*, void* data, cgltf_size size)
+        {
+            free(data);
+        };
+
+
+        // Now both parse and load_buffers go through AAssetManager
+        if (cgltf_parse_file(&options, filepath.Str().c_str(), &data) != cgltf_result_success)
+        {
+            Log<Severity::Error>("Failed to parse glTF: {0}", filepath);
+            return;
+        }
+        if (cgltf_load_buffers(&options, data, filepath.Str().c_str()) != cgltf_result_success)
+        {
+            Log<Severity::Error>("Failed to load buffers: {0}", filepath);
+            cgltf_free(data);
+            return;
+        }
+
+#elif defined(SURGE_PLATFORM_WINDOWS)
         if (cgltf_parse_file(&options, filepath.Str().c_str(), &data) != cgltf_result_success)
         {
             Log<Severity::Error>("Failed to parse glTF file: {0}", filepath);
@@ -39,7 +84,7 @@ namespace Surge
             cgltf_free(data);
             return;
         }
-
+#endif
         // Map each mesh to its first submesh index
         // each primitive within a cgltf_mesh = one Submesh
         Vector<Uint> meshSubmeshStart(data->meshes_count);
@@ -217,7 +262,8 @@ namespace Surge
 
         mVertexBuffer = VertexBuffer::Create(mVertices.data(), static_cast<Uint>(mVertices.size()) * sizeof(Vertex));
         mIndexBuffer = IndexBuffer::Create(mIndices.data(), static_cast<Uint>(mIndices.size()) * sizeof(Index));
-
+        LOGI("Mesh vertex count: %zu", mVertices.size());
+        LOGI("Mesh index count: %zu", mIndices.size());
         cgltf_free(data);
     }
 

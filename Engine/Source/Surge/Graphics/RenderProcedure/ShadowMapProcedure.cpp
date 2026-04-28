@@ -125,7 +125,7 @@ namespace Surge
     void ShadowMapProcedure::SetCascadeCount(CascadeCount count)
     {
         mTotalCascades = count;
-        Surge::Core::AddFrameEndCallback([&]() {
+        Core::AddFrameEndCallback([&]() {
             Shutdown();
             Init(mRendererData);
         });

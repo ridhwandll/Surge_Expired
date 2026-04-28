@@ -29,7 +29,7 @@ file(GLOB_RECURSE ENGINE_SOURCES
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Windows/.*")
 
 # Vendor helper source (header-only library with a single .cpp)
-list(APPEND ENGINE_SOURCES "${VENDOR_ROOT}/stb/stb_image.cpp")
+list(APPEND ENGINE_SOURCES "${VENDOR_ROOT}/stb/stb_image.cpp" "${VENDOR_ROOT}/cgltf/cgltf.cpp")
 
 # -----------------------------------------------------------------------
 # Player sources
@@ -47,6 +47,10 @@ add_library(SurgePlayer SHARED
     "${APP_GLUE_DIR}/android_native_app_glue.c"
 )
 
+target_link_options(SurgePlayer PRIVATE
+        "-Wl,-z,max-page-size=16384"
+)
+
 # -----------------------------------------------------------------------
 # Include directories
 # -----------------------------------------------------------------------
@@ -62,13 +66,12 @@ target_include_directories(SurgePlayer PUBLIC
     "${VENDOR_ROOT}/volk"
     "${VENDOR_ROOT}/SPIRV-Cross/Include"
     "${VENDOR_ROOT}/stb"
+    "${VENDOR_ROOT}/cgltf"
     "${VENDOR_ROOT}/ImGui"
     "${VENDOR_ROOT}/Optick/Include"
     "${VENDOR_ROOT}/entt/Include"
     "${VENDOR_ROOT}/json/Include"
-    "${VENDOR_ROOT}/assimp/Include"
     "${VENDOR_ROOT}/FontAwesome"
-    "${VENDOR_ROOT}/shaderc/Include"
     "${APP_GLUE_DIR}"
     "${PLAYER_SRC_ROOT}"
 )
@@ -113,7 +116,6 @@ add_library(spirvcross_android STATIC ${SPIRVCROSS_SOURCES})
 target_include_directories(spirvcross_android PUBLIC "${VENDOR_ROOT}/SPIRV-Cross/Include/SPIRV-Cross")
 target_compile_options(spirvcross_android PRIVATE
     -w
-    -include exception    # ← force-includes <exception> into every TU
 )
 
 # ImGui (core only – no Win32/GLFW backend on Android)

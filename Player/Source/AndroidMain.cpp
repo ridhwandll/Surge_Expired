@@ -30,6 +30,7 @@ void android_main(android_app* app)
     }
 
     Surge::ClientOptions clientOptions;
+    clientOptions.AndroidApp = (void*)app;
     clientOptions.EnableImGui = false;
     clientOptions.WindowDescription = {
         static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window)),
@@ -39,10 +40,13 @@ void android_main(android_app* app)
 
     Surge::Player* playerApp = Surge::MakeClient<Surge::Player>();
     playerApp->SetOptions(clientOptions);
+    LOGI("Created client!");
 
     Surge::Core::Initialize(playerApp);
+    LOGI("Initialized core!");
     Surge::Core::Run();
     Surge::Core::Shutdown();
+    LOGI("Shutting down!");
 }
 
 #endif // SURGE_PLATFORM_ANDROID

@@ -5,13 +5,13 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
 #include "Surge/Utility/Platform.hpp"
+#include "Surge/AssetManager/AssetManager.hpp"
 #include <filesystem>
+
 
 #ifdef SURGE_PLATFORM_WINDOWS
 #include "Surge/Platform/Windows/WindowsWindow.hpp"
-#endif
-
-#ifdef SURGE_PLATFORM_ANDROID
+#elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #endif
 
@@ -62,6 +62,9 @@ namespace Surge::Core
 
         // Reflection Engine
         SurgeReflect::Registry::Initialize();
+
+        // Asset Manager
+        AssetManager::Init("Assets");
 
         GCoreData.Running = true;
 

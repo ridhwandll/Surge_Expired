@@ -5,8 +5,17 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Core/Defines.hpp"
-#include <shaderc/shaderc.hpp>
+#include "Surge/Core/Core.hpp"
 #include <filesystem>
+
+#ifdef SURGE_PLATFORM_WINDOWS
+#include <shaderc/shaderc.hpp>
+#elif defined(SURGE_PLATFORM_ANDROID)
+#include <android_native_app_glue.h>
+#include <android/asset_manager.h>
+#include <android/log.h>
+#endif
+
 
 #ifdef SURGE_DEBUG
 #define SHADER_LOG(...) Log<Severity::Debug>(__VA_ARGS__);
@@ -80,12 +89,28 @@ namespace Surge
         SG_ASSERT_INTERNAL("Invalid UUID!");
     }
 
+#ifdef SURGE_PLATFORM_WINDOWS
+    static shaderc_shader_kind ShadercShaderKindFromSurgeShaderType(const ShaderType& type)
+    {
+        switch (type)
+        {
+            case ShaderType::Vertex: return shaderc_glsl_vertex_shader;
+            case ShaderType::Pixel: return shaderc_glsl_fragment_shader;
+            case ShaderType::Compute: return shaderc_glsl_compute_shader;
+            case ShaderType::None: SG_ASSERT_INTERNAL("ShaderType::None is invalid in this case!");
+        }
+
+        return static_cast<shaderc_shader_kind>(-1);
+    }
+#endif
+
     void VulkanShader::Compile(const HashMap<ShaderType, bool>& compileStages)
     {
+
         VulkanRenderContext* renderContext = nullptr;
         SURGE_GET_VULKAN_CONTEXT(renderContext);
         VkDevice device = renderContext->GetDevice()->GetLogicalDevice();
-
+#ifdef SURGE_PLATFORM_WINDOWS
         shaderc::Compiler compiler;
         shaderc::CompileOptions options;
         options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
@@ -113,7 +138,7 @@ namespace Surge
             if (compile)
             {
                 // Compile, not present in cache
-                shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, VulkanUtils::ShadercShaderKindFromSurgeShaderType(stage), mPath, options);
+                shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), mPath, options);
                 if (result.GetCompilationStatus() != shaderc_compilation_status_success)
                 {
                     Log<Severity::Error>("{0} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage));
@@ -173,6 +198,58 @@ namespace Surge
                 SET_VK_OBJECT_DEBUGNAME(mVkShaderModules.at(shaderStage), VK_OBJECT_TYPE_SHADER_MODULE, "Vulkan Shader");
             }
         }
+#elif defined(SURGE_PLATFORM_ANDROID)
+        {
+            auto options = Core::GetClient()->GeClientOptions();
+            android_app* app = static_cast<android_app*>(options.AndroidApp);
+            AAssetManager* assetManager = app->activity->assetManager;
+            AAssetDir* assetDir = AAssetManager_openDir(assetManager, "Engine/Assets/Shaders"); // Path relative to assets folder
+            const char* filename = nullptr;
+            while ((filename = AAssetDir_getNextFileName(assetDir)) != nullptr)
+            {
+                LOGW(filename);
+                std::string fileNameStr(filename);
+
+                // 1. Filter for .spv extension
+                if (fileNameStr.find(".spv") == std::string::npos)
+                    continue;
+
+                // 2. Open the asset
+                std::string fullPath = "Engine/Assets/Shaders/" + fileNameStr;
+                AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);
+                if (!asset)
+                    continue;
+
+                // 3. Read the buffer
+                size_t size = AAsset_getLength(asset);
+                if (size % 4 != 0)
+                {
+                    //LOGE("Shader %s size is not a multiple of 4!", filename);
+                    AAsset_close(asset);
+                    continue;
+                }
+
+                Vector<Uint> spirvCode(size / sizeof(uint32_t));
+                AAsset_read(asset, spirvCode.data(), size);
+
+                AAsset_close(asset);
+
+                String shaderStageString = std::filesystem::path(Filesystem::RemoveExtension(fullPath)).extension().string().substr(1, std::string::npos);
+                ShaderType shaderStage = VulkanUtils::ShaderTypeFromString(shaderStageString + "]"); // TODO: remove this hack
+
+                SPIRVHandle spirvHandle;
+                spirvHandle.SPIRV = spirvCode;
+                spirvHandle.Type = shaderStage;
+                mShaderSPIRVs.push_back(spirvHandle);
+
+                VkShaderModuleCreateInfo createInfo {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+                createInfo.codeSize = spirvHandle.SPIRV.size() * sizeof(Uint);
+                createInfo.pCode = spirvHandle.SPIRV.data();
+                VK_CALL(vkCreateShaderModule(device, &createInfo, nullptr, &mVkShaderModules[shaderStage]));
+                SET_VK_OBJECT_DEBUGNAME(mVkShaderModules.at(shaderStage), VK_OBJECT_TYPE_SHADER_MODULE, "Vulkan Shader");
+            }
+        }
+#endif
         ShaderReflector reflector;
         mReflectionData = reflector.Reflect(mShaderSPIRVs);
     }
@@ -249,7 +326,11 @@ namespace Surge
             VkPushConstantRange& pushConstantRange = mPushConstants[pushConstant.BufferName];
             pushConstantRange.offset = 0;
             pushConstantRange.size = pushConstant.Size;
-            pushConstantRange.stageFlags = VulkanUtils::GetShaderStagesFlagsFromShaderTypes(pushConstant.ShaderStages);
+            //pushConstantRange.stageFlags = VulkanUtils::GetShaderStagesFlagsFromShaderTypes(pushConstant.ShaderStages);
+            // TODO: We want to specify the stage flags correctly, but currently we have some issues with shader 
+            // reflection that causes the stage flags to be incorrect on mobile, so for now we will just set it to all stages
+            pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL; 
+          
         }
     }
 

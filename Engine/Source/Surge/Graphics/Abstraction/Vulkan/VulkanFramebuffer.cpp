@@ -107,7 +107,8 @@ namespace Surge
             {
                 SG_ASSERT(!mDepthAttachmentImage, "Depth Attachment already exists!");
                 mDepthAttachmentImage = image;
-                VkAttachmentDescription& depthAttachment = attachmentDescriptions.emplace_back();
+                attachmentDescriptions.emplace_back();
+                VkAttachmentDescription& depthAttachment = attachmentDescriptions.back();
                 depthAttachment = {};
                 depthAttachment.format = VulkanUtils::GetImageFormat(spec.Format);
                 depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -123,7 +124,8 @@ namespace Surge
             else
             {
                 mColorAttachmentImages.push_back(image);
-                VkAttachmentDescription& colorAttachment = attachmentDescriptions.emplace_back();
+                attachmentDescriptions.emplace_back();
+                VkAttachmentDescription& colorAttachment = attachmentDescriptions.back();
                 colorAttachment = {};
                 colorAttachment.format = VulkanUtils::GetImageFormat(spec.Format);
                 colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -149,14 +151,22 @@ namespace Surge
         if (mDepthAttachmentImage)
             subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
 
+        VkSubpassDependency dependency = {};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+
         // Create the Framebuffer
         VkRenderPassCreateInfo renderPassInfo = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
         renderPassInfo.attachmentCount = static_cast<Uint>(attachmentDescriptions.size());
         renderPassInfo.pAttachments = attachmentDescriptions.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpassDescription;
-        renderPassInfo.dependencyCount = 0;     // https://stackoverflow.com/a/53005446/14349078
-        renderPassInfo.pDependencies = nullptr; // ^^ Says there is an implicit one provided, still should we add one explicitly?
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
         VK_CALL(vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &mRenderPass));
         SET_VK_OBJECT_DEBUGNAME(mRenderPass, VK_OBJECT_TYPE_RENDER_PASS, "RenderPass");
 

@@ -15,7 +15,9 @@ namespace Surge
         ~AssetManager() = default;
 
         // Initializes the AssetManager
-        static void Init();
+        // AssetsDirectory is situated on the same directory as .exe on Windows
+        // AssetsDirectory is relative to assets/ root on Android
+        static void Init(const String& assetsDirectory);
 
         // Shutdowns the AssetManager, clears all registry
         static void Shutdown();
@@ -116,6 +118,7 @@ namespace Surge
             return asset.As<T>();
         }
     private:
+        static String sAssetDirectoryName;
         static std::unordered_map<AssetHandle, Ref<Asset>> sLoadedAssets;
         static AssetRegistry sAssetRegistry;
     };

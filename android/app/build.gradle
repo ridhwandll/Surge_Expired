@@ -8,7 +8,6 @@ android {
     compileSdk = 33
 
     ndkVersion = "27.3.13750724" 
-    ndkPath = "C:/Android/ndk/android-ndk-r27d"
 
     defaultConfig {
         applicationId = "com.surgetechnologies.surgeplayer"
@@ -25,6 +24,8 @@ android {
             cmake {
                 cppFlags += "-std=c++23 -fexceptions -Wno-everything"
                 arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                arguments += "-DANDROID_STL=c++_static"
             }
         }
     }
