@@ -22,7 +22,6 @@ namespace Surge
         virtual void Shutdown() override;
         virtual void OnResize() override;
         virtual void RenderImGui() override;
-        virtual void SetBlitSourceImage(const Ref<Image2D>& image) override { mBlitSourceImage = image; }
 
         Uint GetFrameIndex() const override { return mSwapChain.GetCurrentFrameIndex(); }
         virtual GPUMemoryStats GetMemoryStatus() const override { return mMemoryAllocator.GetStats(); };
@@ -51,7 +50,6 @@ namespace Surge
         VulkanSwapChain mSwapChain {};
         VulkanMemoryAllocator mMemoryAllocator {};
         VulkanImGuiContext mImGuiContext;
-        Ref<Image2D> mBlitSourceImage;
         bool mImGuiEnabled;
 
         // Descriptor Pools

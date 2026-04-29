@@ -31,6 +31,7 @@ namespace Surge
     Mesh::Mesh(const Path& filepath)
         : mPath(filepath)
     {
+        return; // TODO(Rid): Temporary, until we have a proper Mobile Renderer is in place
         cgltf_options options = {};
         cgltf_data* data = nullptr;
 

@@ -96,17 +96,8 @@ namespace Surge
     void VulkanRenderContext::EndFrame()
     {
         SURGE_PROFILE_FUNC("VulkanRenderContext::EndFrame()");
-        VkImage blitSrcImage = VK_NULL_HANDLE;
-        VkExtent2D blitSrcExtent = {};
-        if (mBlitSourceImage)
-        {
-            Ref<VulkanImage2D> vkImage = mBlitSourceImage.As<VulkanImage2D>();
-            blitSrcImage = vkImage->GetVulkanImage();
-            blitSrcExtent = {vkImage->GetWidth(), vkImage->GetHeight()};
-            mBlitSourceImage = nullptr;
-        }
 
-        mSwapChain.EndFrame(blitSrcImage, blitSrcExtent); // Present
+        mSwapChain.EndFrame(); // Present
         if (mImGuiEnabled)
             mImGuiContext.EndFrame();
     }

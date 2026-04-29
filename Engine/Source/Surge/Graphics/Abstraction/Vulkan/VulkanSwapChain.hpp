@@ -20,7 +20,7 @@ namespace Surge
 
         void Initialize(Window* window);
         void BeginFrame();
-        void EndFrame(VkImage blitSrcImage = VK_NULL_HANDLE, VkExtent2D blitSrcExtent = {});
+        void EndFrame();
         void Resize();
         void Destroy();
         void BeginRenderPass();

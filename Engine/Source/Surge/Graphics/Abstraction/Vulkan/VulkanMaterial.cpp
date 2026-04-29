@@ -62,7 +62,7 @@ namespace Surge
         }
         for (auto& [binding, res] : mShaderResources)
         {
-            mTextures[binding] = Core::GetRenderer()->GetData()->WhiteTexture;
+            //mTextures[binding] = Core::GetRenderer()->GetData()->WhiteTexture;
             mUpdatePendingTextures.push_back({binding, mTextures.at(binding).Raw()});
         }
 

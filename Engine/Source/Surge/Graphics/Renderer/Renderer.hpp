@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Memory.hpp"
-#include "Surge/Graphics/RenderProcedure/RenderProcedureManager.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Lights.hpp"
 #include "Surge/Graphics/Shader/ShaderSet.hpp"
@@ -24,22 +23,9 @@ namespace Surge
     class SURGE_API Scene;
     struct RendererData
     {
-        Ref<RenderCommandBuffer> RenderCmdBuffer;
         Vector<DrawCommand> DrawList;
-        Surge::ShaderSet ShaderSet;
 
-        Ref<UniformBuffer> CameraUniformBuffer;
-        Ref<UniformBuffer> RendererDataUniformBuffer;
-        Ref<DescriptorSet> DescriptorSet0;
-
-        Ref<Texture2D> WhiteTexture;
         Scene* SceneContext;
-
-        // Lights
-        LightUniformBufferData LightData;
-        Ref<UniformBuffer> LightUniformBuffer;
-        Vector<PointLight> PointLights;
-        DirectionalLight DirLight;
 
         // Camera
         glm::vec3 CameraPosition;
@@ -67,15 +53,10 @@ namespace Surge
         void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
         void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction);
 
-
-        RenderProcedureManager* GetRenderProcManager() { return &mProcManager; }
         RendererData* GetData() { return mData.get(); }
-        Ref<Shader>& GetShader(const String& name);
-        Ref<Framebuffer>& GetFinalPassFramebuffer(); //TODO REMOVE: Have something like FramebufferSet(similar to ShaderSet)
         void SetSceneContext(Ref<Scene>& scene) { mData->SceneContext = scene.Raw(); }
 
     private:
-        RenderProcedureManager mProcManager;
         Scope<RendererData> mData;
     };
 } // namespace Surge

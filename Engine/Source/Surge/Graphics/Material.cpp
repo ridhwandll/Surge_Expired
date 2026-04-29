@@ -10,12 +10,12 @@ namespace Surge
 
     Ref<Material> Material::Create(const String& shaderName, const String& materialName)
     {
-        return Ref<VulkanMaterial>::Create(Core::GetRenderer()->GetShader(shaderName), materialName);
+        return Ref<VulkanMaterial>::Create(nullptr, materialName);
     }
 
     void Material::RemoveTexture(const String& name)
     {
-        Ref<Texture2D>& whiteTex = Core::GetRenderer()->GetData()->WhiteTexture;
+        Ref<Texture2D>& whiteTex = mDummyTexture;
         this->Set<Ref<Texture2D>>(name, whiteTex);
     }
 

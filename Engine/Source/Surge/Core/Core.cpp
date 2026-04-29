@@ -25,7 +25,11 @@ namespace Surge::Core
     {
         GCoreData.SurgeClient->OnEvent(e);
         Surge::EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e) { if (GetWindow()->GetWindowState() != WindowState::Minimized) GCoreData.SurgeRenderContext->OnResize(); });
+        dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e)
+            {
+                //if (GetWindow()->GetWindowState() != WindowState::Minimized)
+                //    GCoreData.SurgeRenderContext->OnResize(); 
+            });
         dispatcher.Dispatch<Surge::AppClosedEvent>([](Surge::AppClosedEvent& e) { GCoreData.Running = false; });
         dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
     }
@@ -53,8 +57,8 @@ namespace Surge::Core
         GCoreData.SurgeWindow->RegisterEventCallback(OnEvent);
 
         // Render Context
-        GCoreData.SurgeRenderContext = new VulkanRenderContext();
-        GCoreData.SurgeRenderContext->Initialize(GCoreData.SurgeWindow, clientOptions.EnableImGui);
+        //GCoreData.SurgeRenderContext = new VulkanRenderContext();
+        //GCoreData.SurgeRenderContext->Initialize(GCoreData.SurgeWindow, clientOptions.EnableImGui);
 
         // Renderer
         GCoreData.SurgeRenderer = new Renderer();
@@ -81,13 +85,13 @@ namespace Surge::Core
 
             if (GCoreData.SurgeWindow->GetWindowState() != WindowState::Minimized)
             {
-                GCoreData.SurgeRenderContext->BeginFrame();
+                //GCoreData.SurgeRenderContext->BeginFrame();
+
                 GCoreData.SurgeClient->OnUpdate();
-                if (!GCoreData.SurgeClient->GeClientOptions().EnableImGui)
-                    GCoreData.SurgeRenderContext->SetBlitSourceImage(GCoreData.SurgeRenderer->GetFinalPassFramebuffer()->GetColorAttachment(0));
                 if (GCoreData.SurgeClient->GeClientOptions().EnableImGui)
                     GCoreData.SurgeClient->OnImGuiRender();
-                GCoreData.SurgeRenderContext->EndFrame();
+
+                //GCoreData.SurgeRenderContext->EndFrame();
 
                 if (!GCoreData.FrameEndCallbacks.empty())
                 {
@@ -113,8 +117,8 @@ namespace Surge::Core
         delete GCoreData.SurgeRenderer;
 
         delete GCoreData.SurgeWindow;
-        GCoreData.SurgeRenderContext->Shutdown();
-        delete GCoreData.SurgeRenderContext;
+        //GCoreData.SurgeRenderContext->Shutdown();
+        //delete GCoreData.SurgeRenderContext;
         SurgeReflect::Registry::Shutdown();
     }
 
