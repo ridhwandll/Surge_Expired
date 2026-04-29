@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Core/Client.hpp"
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Window/Window.hpp"

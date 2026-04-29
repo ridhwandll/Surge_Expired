@@ -11,6 +11,9 @@ cmake-build-release
 android/local.properties  # machine-specific SDK path
 android/.gradle
 android/.idea
+android/local.properties
 android/app/build/ 
 android/app/.cxx/
 android/build/
+
+android/local.properties

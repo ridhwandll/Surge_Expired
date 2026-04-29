@@ -134,7 +134,7 @@ namespace Surge
         sci.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
         sci.window = static_cast<ANativeWindow*>(windowHandle->GetNativeWindowHandle());
 
-        VK_CALL(vkCreateAndroidSurfaceKHR(instance, &sci, nullptr, surface));
+        vkCreateAndroidSurfaceKHR(instance, &sci, nullptr, surface);
 #else
         SG_ASSERT_INTERNAL("Surge is currently Windows/Android Only! :(");
 #endif

@@ -11,7 +11,7 @@ namespace Surge
 
         //mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
         mActiveScene = Ref<Scene>::Create(false);
-        mRenderer->SetSceneContext(mActiveScene);
+        //mRenderer->SetSceneContext(mActiveScene);
         Entity runtimeCamera;
         //Entity dirLight;
         //Entity pointLight;
