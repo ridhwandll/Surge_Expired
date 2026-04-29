@@ -124,7 +124,7 @@ namespace Surge
         sci.hinstance = GetModuleHandle(nullptr);
         sci.hwnd = static_cast<HWND>(windowHandle->GetNativeWindowHandle());
 
-        VK_CALL(vkCreateWin32SurfaceKHR(instance, &sci, nullptr, surface));
+        vkCreateWin32SurfaceKHR(instance, &sci, nullptr, surface);
 #elif defined(SURGE_PLATFORM_ANDROID)
         PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR = (PFN_vkCreateAndroidSurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateAndroidSurfaceKHR");
         if (!vkCreateAndroidSurfaceKHR)

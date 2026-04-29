@@ -36,7 +36,7 @@
         }                               \
     } while (0)
 
-#define SURGE_DEBUG
+//#define SURGE_DEBUG
 #if defined(SURGE_DEBUG)
 /// @brief A debug callback used to report messages from the validation layers. See instance creation for details on how this is set up
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_type,
@@ -47,19 +47,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 
     if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
     {
-        LOGE("{} Validation Layer: Error: {}: {}", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
+        LOGE("%i Validation Layer: Error: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
     }
     else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
     {
-        LOGE("{} Validation Layer: Warning: {}: {}", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
+        LOGE("%i Validation Layer: Warning: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
     }
     else if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
     {
-        LOGI("{} Validation Layer: Performance warning: {}: {}", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
+        LOGI("%i Validation Layer: Performance warning: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
     }
     else
     {
-        LOGI("{} Validation Layer: Information: {}: {}", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
+        LOGI("%i Validation Layer: Information: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
     }
     return VK_FALSE;
 }
@@ -1111,7 +1111,7 @@ namespace Surge
 
         // Set clear color values.
         VkClearValue clear_value {
-            .color = {{0.01f, 0.01f, 0.033f, 1.0f}}};
+            .color = {{0.01f, 0.01f, 0.01f, 1.0f}}};
 
         // Begin the render pass.
         VkRenderPassBeginInfo rp_begin {
