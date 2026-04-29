@@ -68,7 +68,8 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
         if (ImGui::Begin(PanelCodeToString(mCode), show))
         {
-            const Ref<Image2D>& outputImage = Core::GetRenderer()->GetFinalPassFramebuffer()->GetColorAttachment(0);
+            //const Ref<Image2D>& outputImage = Core::GetRenderer()->GetFinalPassFramebuffer()->GetColorAttachment(0);
+            Ref<Image2D> outputImage = nullptr;
             mViewportSize = {ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y};
             ImGuiAux::Image(outputImage, mViewportSize);
 

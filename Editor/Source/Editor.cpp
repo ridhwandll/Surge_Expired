@@ -6,7 +6,6 @@
 #include "Panels/PerformancePanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
-#include "Panels/RenderProcedurePanel.hpp"
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -36,8 +35,7 @@ namespace Surge
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
         mPanelManager.PushPanel<PerformancePanel>();
         ViewportPanel* viewport = mPanelManager.PushPanel<ViewportPanel>();
-        mPanelManager.PushPanel<RenderProcedurePanel>();
-        mTitleBar.OnInit();
+         mTitleBar.OnInit();
 
         mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
         mActiveScene = Ref<Scene>::Create(false);
@@ -129,16 +127,16 @@ namespace Surge
 
     void Editor::Resize()
     {
-        ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
-        glm::vec2 viewportSize = viewportPanel->GetViewportSize();
-        Ref<Framebuffer> framebuffer = mRenderer->GetFinalPassFramebuffer();
-
-        if (FramebufferSpecification spec = framebuffer->GetSpecification(); viewportSize.x > 0.0f && viewportSize.y > 0.0f && (spec.Width != viewportSize.x || spec.Height != viewportSize.y))
-        {
-            mRenderer->SetRenderArea((Uint)viewportSize.x, (Uint)viewportSize.y);
-            mCamera.SetViewportSize(viewportSize);
-            mActiveScene->OnResize(viewportSize.x, viewportSize.y);
-        }
+//         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
+//         glm::vec2 viewportSize = viewportPanel->GetViewportSize();
+//         Ref<Framebuffer> framebuffer = mRenderer->GetFinalPassFramebuffer();
+// 
+//         if (FramebufferSpecification spec = framebuffer->GetSpecification(); viewportSize.x > 0.0f && viewportSize.y > 0.0f && (spec.Width != viewportSize.x || spec.Height != viewportSize.y))
+//         {
+//             mRenderer->SetRenderArea((Uint)viewportSize.x, (Uint)viewportSize.y);
+//             mCamera.SetViewportSize(viewportSize);
+//             mActiveScene->OnResize(viewportSize.x, viewportSize.y);
+//         }
     }
 
     void Editor::OnShutdown()
