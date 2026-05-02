@@ -24,7 +24,7 @@ set(APP_GLUE_DIR "${ANDROID_NDK}/sources/android/native_app_glue")
 # Collect engine sources – exclude all Windows-specific files
 # -----------------------------------------------------------------------
 file(GLOB_RECURSE ENGINE_SOURCES
-    "${ENGINE_SRC_ROOT}/*.cpp"
+    "${ENGINE_SRC_ROOT}/*.cpp" "${ENGINE_SRC_ROOT}/*.hpp"
 )
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Windows/.*")
 
@@ -85,7 +85,8 @@ target_compile_definitions(SurgePlayer PRIVATE
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_RADIANS
     _CRT_SECURE_NO_WARNINGS
-    SURGE_RELEASE
+#   SURGE_RELEASE
+    SURGE_DEBUG
     SURGE_EXPORT
 )
 

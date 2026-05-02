@@ -36,41 +36,14 @@
         }                               \
     } while (0)
 
-//#define SURGE_DEBUG
-#if defined(SURGE_DEBUG)
-/// @brief A debug callback used to report messages from the validation layers. See instance creation for details on how this is set up
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_type,
-                                                     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-                                                     void* user_data)
-{
-    (void)user_data;
-
-    if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-    {
-        LOGE("%i Validation Layer: Error: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
-    }
-    else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-    {
-        LOGE("%i Validation Layer: Warning: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
-    }
-    else if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
-    {
-        LOGI("%i Validation Layer: Performance warning: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
-    }
-    else
-    {
-        LOGI("%i Validation Layer: Information: %s: %s", callback_data->messageIdNumber, callback_data->pMessageIdName, callback_data->pMessage);
-    }
-    return VK_FALSE;
-}
-#endif
-
 namespace Surge
 {
     void Renderer::Initialize()
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
         mData = CreateScope<RendererData>();
+		mRHI = CreateScope<GraphicsRHI>();
+        mRHI->Initialize(Core::GetWindow());
         prepare();
     }
 
@@ -103,16 +76,16 @@ namespace Surge
     void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
-        // When destroying the application, we need to make sure the GPU is no longer accessing any resources
-        // This is done by doing a device wait idle, which blocks until the GPU signals
-        if (context.device != VK_NULL_HANDLE)
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
+
+        if (device != VK_NULL_HANDLE)
         {
-            vkDeviceWaitIdle(context.device);
+            vkDeviceWaitIdle(device);
         }
 
         for (auto& framebuffer : context.swapchain_framebuffers)
         {
-            vkDestroyFramebuffer(context.device, framebuffer, nullptr);
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
 
         for (auto& per_frame : context.per_frame)
@@ -124,75 +97,52 @@ namespace Surge
 
         for (auto semaphore : context.recycled_semaphores)
         {
-            vkDestroySemaphore(context.device, semaphore, nullptr);
+            vkDestroySemaphore(device, semaphore, nullptr);
         }
 
         if (context.pipeline != VK_NULL_HANDLE)
         {
-            vkDestroyPipeline(context.device, context.pipeline, nullptr);
+            vkDestroyPipeline(device, context.pipeline, nullptr);
         }
 
         if (context.pipeline_layout != VK_NULL_HANDLE)
         {
-            vkDestroyPipelineLayout(context.device, context.pipeline_layout, nullptr);
+            vkDestroyPipelineLayout(device, context.pipeline_layout, nullptr);
         }
 
         if (context.render_pass != VK_NULL_HANDLE)
         {
-            vkDestroyRenderPass(context.device, context.render_pass, nullptr);
+            vkDestroyRenderPass(device, context.render_pass, nullptr);
         }
 
         for (VkImageView image_view : context.swapchain_image_views)
         {
-            vkDestroyImageView(context.device, image_view, nullptr);
+            vkDestroyImageView(device, image_view, nullptr);
         }
 
         if (context.swapchain != VK_NULL_HANDLE)
         {
-            vkDestroySwapchainKHR(context.device, context.swapchain, nullptr);
+            vkDestroySwapchainKHR(device, context.swapchain, nullptr);
         }
 
-        if (context.surface != VK_NULL_HANDLE)
-        {
-            vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
-        }
-
+		VmaAllocator allocator = mRHI->GetBackendRHI().GetAllocator();
         if (vertex_buffer_allocation != VK_NULL_HANDLE)
         {
-            vmaDestroyBuffer(context.vma_allocator, vertex_buffer, vertex_buffer_allocation);
+            vmaDestroyBuffer(allocator, vertex_buffer, vertex_buffer_allocation);
         }
-
-        if (context.vma_allocator != VK_NULL_HANDLE)
-        {
-            vmaDestroyAllocator(context.vma_allocator);
-        }
-
-        if (context.device != VK_NULL_HANDLE)
-        {
-            vkDestroyDevice(context.device, nullptr);
-        }
-
-        if (context.debug_callback != VK_NULL_HANDLE)
-        {
-            vkDestroyDebugUtilsMessengerEXT(context.instance, context.debug_callback, nullptr);
-        }
+        mRHI->Shutdown();
     }
+
     void Renderer::SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position) {}
     void Renderer::SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction) {}
 
     void Renderer::prepare()
-    {
-        init_instance();
-
+    {        
         Window* window = Core::GetWindow();
-        VulkanUtils::CreateWindowSurface(context.instance, window, &context.surface);
         glm::vec2 extent = window->GetSize();
         context.swapchain_dimensions.width = extent.x;
         context.swapchain_dimensions.height = extent.y;
 
-        if (!context.surface) { throw std::runtime_error("Failed to create window surface."); }
-
-        init_device();
         init_vertex_buffer();
         init_swapchain();
 
@@ -217,7 +167,7 @@ namespace Surge
 
         if (res != VK_SUCCESS)
         {
-            vkQueueWaitIdle(context.queue);
+            vkQueueWaitIdle(mRHI->GetBackendRHI().GetQueue());
             return;
         }
 
@@ -237,13 +187,17 @@ namespace Surge
 
     bool Renderer::resize(const uint32_t width, const uint32_t height)
     {
-        if (context.device == VK_NULL_HANDLE)
+		VkDevice device = mRHI->GetBackendRHI().GetDevice();
+		VkPhysicalDevice gpu = mRHI->GetBackendRHI().GetGPU();
+        VkSurfaceKHR surface = mRHI->GetBackendRHI().GetSurface();
+
+        if (device == VK_NULL_HANDLE)
         {
             return false;
         }
 
         VkSurfaceCapabilitiesKHR surface_properties;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context.gpu, context.surface, &surface_properties));
+        VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &surface_properties));
 
         // Only rebuild the swapchain if the dimensions have changed
         if (surface_properties.currentExtent.width == context.swapchain_dimensions.width &&
@@ -252,297 +206,16 @@ namespace Surge
             return false;
         }
 
-        vkDeviceWaitIdle(context.device);
+        vkDeviceWaitIdle(device);
 
         for (auto& framebuffer : context.swapchain_framebuffers)
         {
-            vkDestroyFramebuffer(context.device, framebuffer, nullptr);
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
 
         init_swapchain();
         init_framebuffers();
         return true;
-    }
-
-    bool Renderer::validate_extensions(const std::vector<const char*>& required, const std::vector<VkExtensionProperties>& available)
-    {
-        for (auto extension : required)
-        {
-            bool found = false;
-            for (auto& available_extension : available)
-            {
-                if (strcmp(available_extension.extensionName, extension) == 0)
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    void Renderer::init_instance()
-    {
-        LOGI("Initializing vulkan instance.");
-
-        if (volkInitialize())
-        {
-            throw std::runtime_error("Failed to initialize volk.");
-        }
-
-        uint32_t instance_extension_count;
-        VK_CHECK(vkEnumerateInstanceExtensionProperties(nullptr, &instance_extension_count, nullptr));
-
-        std::vector<VkExtensionProperties> available_instance_extensions(instance_extension_count);
-        VK_CHECK(vkEnumerateInstanceExtensionProperties(nullptr, &instance_extension_count, available_instance_extensions.data()));
-
-        std::vector<const char*> required_instance_extensions {VK_KHR_SURFACE_EXTENSION_NAME};
-
-#if defined(SURGE_DEBUG)
-        // Validation layers help finding wrong api usage, we enable them when explicitly requested or in debug builds
-        // For this we use the debug utils extension if it is supported
-        bool has_debug_utils = false;
-        for (const auto& ext : available_instance_extensions)
-        {
-            if (strcmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0)
-            {
-                has_debug_utils = true;
-                required_instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-                break;
-            }
-        }
-        if (!has_debug_utils)
-        {
-            LOGW("{} not supported or available", VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-            LOGW("Make sure to compile the sample in debug mode and/or enable the validation layers");
-        }
-#endif
-
-#if (defined(VKB_ENABLE_PORTABILITY))
-        required_instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-        bool portability_enumeration_available = false;
-        if (std::ranges::any_of(available_instance_extensions,
-                                [](VkExtensionProperties const& extension) { return strcmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0; }))
-        {
-            required_instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-            portability_enumeration_available = true;
-        }
-#endif
-
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-        required_instance_extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-        required_instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_METAL_EXT)
-        required_instance_extensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-        required_instance_extensions.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_XLIB_KHR)
-        required_instance_extensions.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-        required_instance_extensions.push_back(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_DISPLAY_KHR)
-        required_instance_extensions.push_back(VK_KHR_DISPLAY_EXTENSION_NAME);
-#else
-#pragma error Platform not supported
-#endif
-
-        if (!validate_extensions(required_instance_extensions, available_instance_extensions))
-        {
-            throw std::runtime_error("Required instance extensions are missing.");
-        }
-
-        std::vector<const char*> requested_instance_layers {};
-
-#if defined(SURGE_DEBUG)
-        char const* validationLayer = "VK_LAYER_KHRONOS_validation";
-
-        uint32_t instance_layer_count;
-        VK_CHECK(vkEnumerateInstanceLayerProperties(&instance_layer_count, nullptr));
-
-        std::vector<VkLayerProperties> supported_instance_layers(instance_layer_count);
-        VK_CHECK(vkEnumerateInstanceLayerProperties(&instance_layer_count, supported_instance_layers.data()));
-
-        if (std::ranges::any_of(supported_instance_layers, [&validationLayer](auto const& lp) { return strcmp(lp.layerName, validationLayer) == 0; }))
-        {
-            requested_instance_layers.push_back(validationLayer);
-            LOGI("Enabled Validation Layer {}", validationLayer);
-        }
-        else
-        {
-            LOGW("Validation Layer {} is not available", validationLayer);
-        }
-#endif
-
-        VkApplicationInfo app {
-            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-            .pApplicationName = "Hello Triangle",
-            .pEngineName = "Vulkan Samples",
-            .apiVersion = VK_API_VERSION_1_1};
-
-        VkInstanceCreateInfo instance_info {
-            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            .pApplicationInfo = &app,
-            .enabledLayerCount = static_cast<uint32_t>(requested_instance_layers.size()),
-            .ppEnabledLayerNames = requested_instance_layers.data(),
-            .enabledExtensionCount = static_cast<uint32_t>(required_instance_extensions.size()),
-            .ppEnabledExtensionNames = required_instance_extensions.data()};
-
-#if defined(SURGE_DEBUG)
-        // Validation layers help finding wrong api usage, we enable them when explicitly requested or in debug builds
-        // For this we use the debug utils extension if it is supported
-        VkDebugUtilsMessengerCreateInfoEXT debug_utils_create_info = {.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
-        if (has_debug_utils)
-        {
-            debug_utils_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-            debug_utils_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-            debug_utils_create_info.pfnUserCallback = debug_callback;
-
-            instance_info.pNext = &debug_utils_create_info;
-        }
-#endif
-
-#if (defined(VKB_ENABLE_PORTABILITY))
-        if (portability_enumeration_available)
-        {
-            instance_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-        }
-#endif
-
-        // Create the Vulkan instance
-        VK_CHECK(vkCreateInstance(&instance_info, nullptr, &context.instance));
-
-        volkLoadInstance(context.instance);
-
-#if defined(SURGE_DEBUG)
-        if (has_debug_utils)
-        {
-            VK_CHECK(vkCreateDebugUtilsMessengerEXT(context.instance, &debug_utils_create_info, nullptr, &context.debug_callback));
-        }
-#endif
-    }
-
-    void Renderer::init_device()
-    {
-    LOGI("Initializing vulkan device.");
-
-    uint32_t gpu_count = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(context.instance, &gpu_count, nullptr));
-
-    if (gpu_count < 1)    
-        throw std::runtime_error("No physical device found.");
-    
-
-    // For simplicity, the sample selects the first gpu that has a graphics and present queue
-    std::vector<VkPhysicalDevice> gpus(gpu_count);
-    VK_CHECK(vkEnumeratePhysicalDevices(context.instance, &gpu_count, gpus.data()));
-
-    for (size_t i = 0; i < gpu_count && (context.graphics_queue_index < 0); i++)
-    {
-        context.gpu = gpus[i];
-
-        uint32_t queue_family_count;
-        vkGetPhysicalDeviceQueueFamilyProperties(context.gpu, &queue_family_count, nullptr);
-
-        if (queue_family_count < 1)
-        {
-            throw std::runtime_error("No queue family found.");
-        }
-
-        std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
-        vkGetPhysicalDeviceQueueFamilyProperties(context.gpu, &queue_family_count, queue_family_properties.data());
-
-        for (uint32_t i = 0; i < queue_family_count; i++)
-        {
-            VkBool32 supports_present;
-            vkGetPhysicalDeviceSurfaceSupportKHR(context.gpu, i, context.surface, &supports_present);
-
-            // Find a queue family which supports graphics and presentation.
-            if ((queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && supports_present)
-            {
-                context.graphics_queue_index = i;
-                break;
-            }
-        }
-    }
-
-    if (context.graphics_queue_index < 0)
-    {
-        throw std::runtime_error("Did not find suitable device with a queue that supports graphics and presentation.");
-    }
-
-    uint32_t device_extension_count;
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(context.gpu, nullptr, &device_extension_count, nullptr));
-    std::vector<VkExtensionProperties> device_extensions(device_extension_count);
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(context.gpu, nullptr, &device_extension_count, device_extensions.data()));
-
-    // Since this sample has visual output, the device needs to support the swapchain extension
-    std::vector<const char*> required_device_extensions {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-    // Shaders generated by Slang require a certain SPIR-V environment that can't be satisfied by Vulkan 1.0, so we need to expliclity up that to at least 1.1 and enable some required extensions
-    //if (get_shading_language() == vkb::ShadingLanguage::SLANG)
-    //{
-    //    required_device_extensions.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
-    //    required_device_extensions.push_back(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
-    //    required_device_extensions.push_back(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
-    //}
-
-    if (!validate_extensions(required_device_extensions, device_extensions))
-    {
-        throw std::runtime_error("Required device extensions are missing.");
-    }
-
-#if (defined(VKB_ENABLE_PORTABILITY))
-    // VK_KHR_portability_subset must be enabled if present in the implementation (e.g on macOS/iOS using MoltenVK with beta extensions enabled)
-    if (std::ranges::any_of(device_extensions,
-                            [](VkExtensionProperties const& extension) { return strcmp(extension.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME) == 0; }))
-    {
-        required_device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    }
-#endif
-
-    // The sample uses a single graphics queue
-    const float queue_priority = 0.5f;
-
-    VkDeviceQueueCreateInfo queue_info {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = static_cast<uint32_t>(context.graphics_queue_index),
-        .queueCount = 1,
-        .pQueuePriorities = &queue_priority};
-
-    VkDeviceCreateInfo device_info {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .queueCreateInfoCount = 1,
-        .pQueueCreateInfos = &queue_info,
-        .enabledExtensionCount = static_cast<uint32_t>(required_device_extensions.size()),
-        .ppEnabledExtensionNames = required_device_extensions.data()};
-
-    VK_CHECK(vkCreateDevice(context.gpu, &device_info, nullptr, &context.device));
-    volkLoadDevice(context.device);
-
-    vkGetDeviceQueue(context.device, context.graphics_queue_index, 0, &context.queue);
-
-    // This sample uses the Vulkan Memory Alloctor (VMA), which needs to be set up
-    VmaVulkanFunctions vma_vulkan_func {
-        .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
-        .vkGetDeviceProcAddr = vkGetDeviceProcAddr};
-
-    VmaAllocatorCreateInfo allocator_info {
-        .physicalDevice = context.gpu,
-        .device = context.device,
-        .pVulkanFunctions = &vma_vulkan_func,
-        .instance = context.instance};
-
-    VkResult result = vmaCreateAllocator(&allocator_info, &context.vma_allocator);
-    if (result != VK_SUCCESS)
-    {
-        throw std::runtime_error("Could not create allocator for VMA allocator");
-    }
     }
 
     void Renderer::init_vertex_buffer()
@@ -568,72 +241,75 @@ namespace Surge
             .usage = VMA_MEMORY_USAGE_AUTO,
             .requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
+		VmaAllocator allocator = mRHI->GetBackendRHI().GetAllocator();
         VmaAllocationInfo buffer_alloc_info {};
-        vmaCreateBuffer(context.vma_allocator, &buffer_info, &buffer_alloc_ci, &vertex_buffer, &vertex_buffer_allocation, &buffer_alloc_info);
-        if (buffer_alloc_info.pMappedData)
-        {
-            memcpy(buffer_alloc_info.pMappedData, vertices.data(), buffer_size);
-        }
-        else
-        {
+        vmaCreateBuffer(allocator, &buffer_info, &buffer_alloc_ci, &vertex_buffer, &vertex_buffer_allocation, &buffer_alloc_info);
+        if (buffer_alloc_info.pMappedData)        
+            memcpy(buffer_alloc_info.pMappedData, vertices.data(), buffer_size);        
+        else        
             throw std::runtime_error("Could not map vertex buffer.");
-        }
+        
     }
 
     void Renderer::init_per_frame(PerFrame& per_frame)
     {
+		VkDevice device = mRHI->GetBackendRHI().GetDevice();
+        int32_t graphicsQueueIndex = mRHI->GetBackendRHI().GetQueueIndex();
+
         VkFenceCreateInfo info {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
             .flags = VK_FENCE_CREATE_SIGNALED_BIT};
-        VK_CHECK(vkCreateFence(context.device, &info, nullptr, &per_frame.queue_submit_fence));
+        VK_CHECK(vkCreateFence(device, &info, nullptr, &per_frame.queue_submit_fence));
 
         VkCommandPoolCreateInfo cmd_pool_info {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-            .queueFamilyIndex = static_cast<uint32_t>(context.graphics_queue_index)};
-        VK_CHECK(vkCreateCommandPool(context.device, &cmd_pool_info, nullptr, &per_frame.primary_command_pool));
+            .queueFamilyIndex = static_cast<Uint>(graphicsQueueIndex)};
+        VK_CHECK(vkCreateCommandPool(device, &cmd_pool_info, nullptr, &per_frame.primary_command_pool));
 
         VkCommandBufferAllocateInfo cmd_buf_info {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .commandPool = per_frame.primary_command_pool,
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = 1};
-        VK_CHECK(vkAllocateCommandBuffers(context.device, &cmd_buf_info, &per_frame.primary_command_buffer));
+        VK_CHECK(vkAllocateCommandBuffers(device, &cmd_buf_info, &per_frame.primary_command_buffer));
     }
 
     void Renderer::teardown_per_frame(PerFrame& per_frame)
     {
+		VkDevice device = mRHI->GetBackendRHI().GetDevice();
+
         if (per_frame.queue_submit_fence != VK_NULL_HANDLE)
         {
-            vkDestroyFence(context.device, per_frame.queue_submit_fence, nullptr);
+            vkDestroyFence(device, per_frame.queue_submit_fence, nullptr);
 
             per_frame.queue_submit_fence = VK_NULL_HANDLE;
         }
 
         if (per_frame.primary_command_buffer != VK_NULL_HANDLE)
         {
-            vkFreeCommandBuffers(context.device, per_frame.primary_command_pool, 1, &per_frame.primary_command_buffer);
+            vkFreeCommandBuffers(device, per_frame.primary_command_pool, 1, &per_frame.primary_command_buffer);
 
             per_frame.primary_command_buffer = VK_NULL_HANDLE;
         }
 
         if (per_frame.primary_command_pool != VK_NULL_HANDLE)
         {
-            vkDestroyCommandPool(context.device, per_frame.primary_command_pool, nullptr);
+            vkDestroyCommandPool(device, per_frame.primary_command_pool, nullptr);
 
             per_frame.primary_command_pool = VK_NULL_HANDLE;
         }
 
         if (per_frame.swapchain_acquire_semaphore != VK_NULL_HANDLE)
         {
-            vkDestroySemaphore(context.device, per_frame.swapchain_acquire_semaphore, nullptr);
+            vkDestroySemaphore(device, per_frame.swapchain_acquire_semaphore, nullptr);
 
             per_frame.swapchain_acquire_semaphore = VK_NULL_HANDLE;
         }
 
         if (per_frame.swapchain_release_semaphore != VK_NULL_HANDLE)
         {
-            vkDestroySemaphore(context.device, per_frame.swapchain_release_semaphore, nullptr);
+            vkDestroySemaphore(device, per_frame.swapchain_release_semaphore, nullptr);
 
             per_frame.swapchain_release_semaphore = VK_NULL_HANDLE;
         }
@@ -659,10 +335,14 @@ namespace Surge
 
     void Renderer::init_swapchain()
     {
-        VkSurfaceCapabilitiesKHR surface_properties;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context.gpu, context.surface, &surface_properties));
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
+		VkPhysicalDevice gpu = mRHI->GetBackendRHI().GetGPU();
+		VkSurfaceKHR surface = mRHI->GetBackendRHI().GetSurface();
 
-        VkSurfaceFormatKHR format = select_surface_format(context.gpu, context.surface);
+        VkSurfaceCapabilitiesKHR surface_properties;
+        VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &surface_properties));
+
+        VkSurfaceFormatKHR format = select_surface_format(gpu, surface);
 
         VkExtent2D swapchain_size {};
         if (surface_properties.currentExtent.width == 0xFFFFFFFF)
@@ -722,7 +402,7 @@ namespace Surge
 
         VkSwapchainCreateInfoKHR info {
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            .surface = context.surface,
+            .surface = surface,
             .minImageCount = desired_swapchain_images,
             .imageFormat = format.format,
             .imageColorSpace = format.colorSpace,
@@ -736,13 +416,13 @@ namespace Surge
             .clipped = true,
             .oldSwapchain = old_swapchain};
 
-        VK_CHECK(vkCreateSwapchainKHR(context.device, &info, nullptr, &context.swapchain));
+        VK_CHECK(vkCreateSwapchainKHR(device, &info, nullptr, &context.swapchain));
 
         if (old_swapchain != VK_NULL_HANDLE)
         {
             for (VkImageView image_view : context.swapchain_image_views)
             {
-                vkDestroyImageView(context.device, image_view, nullptr);
+                vkDestroyImageView(device, image_view, nullptr);
             }
 
             for (auto& per_frame : context.per_frame)
@@ -752,17 +432,17 @@ namespace Surge
 
             context.swapchain_image_views.clear();
 
-            vkDestroySwapchainKHR(context.device, old_swapchain, nullptr);
+            vkDestroySwapchainKHR(device, old_swapchain, nullptr);
         }
 
         context.swapchain_dimensions = {swapchain_size.width, swapchain_size.height, format.format};
 
         uint32_t image_count;
-        VK_CHECK(vkGetSwapchainImagesKHR(context.device, context.swapchain, &image_count, nullptr));
+        VK_CHECK(vkGetSwapchainImagesKHR(device, context.swapchain, &image_count, nullptr));
 
         /// The swapchain images.
         std::vector<VkImage> swapchain_images(image_count);
-        VK_CHECK(vkGetSwapchainImagesKHR(context.device, context.swapchain, &image_count, swapchain_images.data()));
+        VK_CHECK(vkGetSwapchainImagesKHR(device, context.swapchain, &image_count, swapchain_images.data()));
 
         // Initialize per-frame resources.
         // Every swapchain image has its own command pool and fence manager.
@@ -786,7 +466,7 @@ namespace Surge
                 .subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1}};
 
             VkImageView image_view;
-            VK_CHECK(vkCreateImageView(context.device, &view_info, nullptr, &image_view));
+            VK_CHECK(vkCreateImageView(device, &view_info, nullptr, &image_view));
 
             context.swapchain_image_views.push_back(image_view);
         }
@@ -794,6 +474,7 @@ namespace Surge
 
     void Renderer::init_render_pass()
     {
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
         VkAttachmentDescription attachment {
             .format = context.swapchain_dimensions.format,      // Backbuffer format.
             .samples = VK_SAMPLE_COUNT_1_BIT,                   // Not multisampled.
@@ -845,17 +526,17 @@ namespace Surge
             .dependencyCount = 1,
             .pDependencies = &dependency};
 
-        VK_CHECK(vkCreateRenderPass(context.device, &rp_info, nullptr, &context.render_pass));
+        VK_CHECK(vkCreateRenderPass(device, &rp_info, nullptr, &context.render_pass));
     }
 
     void Renderer::init_pipeline()
     {
-
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
         // Create a blank pipeline layout.
         // We are not binding any resources to the pipeline in this first sample.
         VkPipelineLayoutCreateInfo layout_info {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-        VK_CHECK(vkCreatePipelineLayout(context.device, &layout_info, nullptr, &context.pipeline_layout));
+        VK_CHECK(vkCreatePipelineLayout(device, &layout_info, nullptr, &context.pipeline_layout));
 
         // The Vertex input properties define the interface between the vertex buffer and the vertex shader.
 
@@ -954,11 +635,12 @@ namespace Surge
             .renderPass = context.render_pass  // We need to specify the render pass up front
         };
 
-        VK_CHECK(vkCreateGraphicsPipelines(context.device, VK_NULL_HANDLE, 1, &pipe, nullptr, &context.pipeline));
+        VK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipe, nullptr, &context.pipeline));
 
         // Pipeline is baked, we can delete the shader modules now.
-        vkDestroyShaderModule(context.device, shader_stages[0].module, nullptr);
-        vkDestroyShaderModule(context.device, shader_stages[1].module, nullptr);
+        
+        vkDestroyShaderModule(device, shader_stages[0].module, nullptr);
+        vkDestroyShaderModule(device, shader_stages[1].module, nullptr);
     }
 #ifdef SURGE_PLATFORM_WINDOWS
     static shaderc_shader_kind ShadercShaderKindFromSurgeShaderType(const ShaderType& type)
@@ -981,7 +663,7 @@ namespace Surge
         String source = Filesystem::ReadFile<String>("Engine/Assets/Shaders/" + name);
         shaderc::Compiler compiler;
         shaderc::CompileOptions options;
-        options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
+        options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
         shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), name.c_str(), options);
         if (result.GetCompilationStatus() != shaderc_compilation_status_success)
         {
@@ -1028,25 +710,27 @@ namespace Surge
         }
 #endif
 
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
         VkShaderModuleCreateInfo module_info {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .codeSize = SPIRV.size() * sizeof(uint32_t),
             .pCode = SPIRV.data()};
 
         VkShaderModule shader_module;
-        VK_CHECK(vkCreateShaderModule(context.device, &module_info, nullptr, &shader_module));
+        VK_CHECK(vkCreateShaderModule(device, &module_info, nullptr, &shader_module));
 
         return shader_module;
     }
 
     VkResult Renderer::acquire_next_image(uint32_t* image)
     {
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
         VkSemaphore acquire_semaphore;
         if (context.recycled_semaphores.empty())
         {
             VkSemaphoreCreateInfo info = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-            VK_CHECK(vkCreateSemaphore(context.device, &info, nullptr, &acquire_semaphore));
+            VK_CHECK(vkCreateSemaphore(device, &info, nullptr, &acquire_semaphore));
         }
         else
         {
@@ -1054,8 +738,7 @@ namespace Surge
             context.recycled_semaphores.pop_back();
         }
 
-        VkResult res = vkAcquireNextImageKHR(context.device, context.swapchain, UINT64_MAX, acquire_semaphore, VK_NULL_HANDLE, image);
-
+        VkResult res = vkAcquireNextImageKHR(device, context.swapchain, UINT64_MAX, acquire_semaphore, VK_NULL_HANDLE, image);
         if (res != VK_SUCCESS)
         {
             context.recycled_semaphores.push_back(acquire_semaphore);
@@ -1072,13 +755,13 @@ namespace Surge
         // since we're waiting for old frames to have been completed, but just in case.
         if (context.per_frame[*image].queue_submit_fence != VK_NULL_HANDLE)
         {
-            vkWaitForFences(context.device, 1, &context.per_frame[*image].queue_submit_fence, true, UINT64_MAX);
-            vkResetFences(context.device, 1, &context.per_frame[*image].queue_submit_fence);
+            vkWaitForFences(device, 1, &context.per_frame[*image].queue_submit_fence, true, UINT64_MAX);
+            vkResetFences(device, 1, &context.per_frame[*image].queue_submit_fence);
         }
 
         if (context.per_frame[*image].primary_command_pool != VK_NULL_HANDLE)
         {
-            vkResetCommandPool(context.device, context.per_frame[*image].primary_command_pool, 0);
+            vkResetCommandPool(device, context.per_frame[*image].primary_command_pool, 0);
         }
 
         // Recycle the old semaphore back into the semaphore manager.
@@ -1096,6 +779,7 @@ namespace Surge
 
     void Renderer::render_triangle(uint32_t swapchain_index)
     {
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
         // Render to this framebuffer.
         VkFramebuffer framebuffer = context.swapchain_framebuffers[swapchain_index];
 
@@ -1158,11 +842,12 @@ namespace Surge
         {
             VkSemaphoreCreateInfo semaphore_info {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-            VK_CHECK(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &context.per_frame[swapchain_index].swapchain_release_semaphore));
+            VK_CHECK(vkCreateSemaphore(device, &semaphore_info, nullptr, &context.per_frame[swapchain_index].swapchain_release_semaphore));
         }
 
         VkPipelineStageFlags wait_stage {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
+        VkQueue queue = mRHI->GetBackendRHI().GetQueue();
         VkSubmitInfo info {
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .waitSemaphoreCount = 1,
@@ -1173,11 +858,12 @@ namespace Surge
             .signalSemaphoreCount = 1,
             .pSignalSemaphores = &context.per_frame[swapchain_index].swapchain_release_semaphore};
         // Submit command buffer to graphics queue
-        VK_CHECK(vkQueueSubmit(context.queue, 1, &info, context.per_frame[swapchain_index].queue_submit_fence));
+        VK_CHECK(vkQueueSubmit(queue, 1, &info, context.per_frame[swapchain_index].queue_submit_fence));
     }
 
     VkResult Renderer::present_image(uint32_t index)
     {
+        VkQueue queue = mRHI->GetBackendRHI().GetQueue();
         VkPresentInfoKHR present {
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .waitSemaphoreCount = 1,
@@ -1187,11 +873,12 @@ namespace Surge
             .pImageIndices = &index,
         };
         // Present swapchain image
-        return vkQueuePresentKHR(context.queue, &present);
+        return vkQueuePresentKHR(queue, &present);
     }
 
     void Renderer::init_framebuffers()
     {
+        VkDevice device = mRHI->GetBackendRHI().GetDevice();
         context.swapchain_framebuffers.clear();
 
         // Create framebuffer for each swapchain image view
@@ -1208,7 +895,7 @@ namespace Surge
                 .layers = 1};
 
             VkFramebuffer framebuffer;
-            VK_CHECK(vkCreateFramebuffer(context.device, &fb_info, nullptr, &framebuffer));
+            VK_CHECK(vkCreateFramebuffer(device, &fb_info, nullptr, &framebuffer));
 
             context.swapchain_framebuffers.push_back(framebuffer);
         }

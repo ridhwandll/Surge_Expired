@@ -3,7 +3,7 @@
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanDiagnostics.hpp"
 #include "Surge/Graphics/Abstraction/Vulkan/VulkanImage.hpp"
 
-#define FORCE_VALIDATION 1
+#define FORCE_VALIDATION 0
 #if FORCE_VALIDATION == 1
 #define ENABLE_IF_VK_VALIDATION(x) { x; }
 #else

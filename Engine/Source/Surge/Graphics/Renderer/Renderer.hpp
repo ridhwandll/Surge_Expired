@@ -5,6 +5,7 @@
 #include "Lights.hpp"
 #include "Surge/Graphics/Shader/ShaderSet.hpp"
 #include "Surge/Graphics/Interface/DescriptorSet.hpp"
+#include "Surge/Graphics/RHI/RHI.hpp"
 
 #define FRAMES_IN_FLIGHT 2
 #define BASE_SHADER_PATH "Engine/Assets/Shaders" //Sadkek, we don't have an asset manager yet
@@ -78,16 +79,8 @@ namespace Surge
         };
         struct Context
         {
-            VkInstance instance = VK_NULL_HANDLE;
-            VkPhysicalDevice gpu = VK_NULL_HANDLE;
-            VkDevice device = VK_NULL_HANDLE;
-
-            VkQueue queue = VK_NULL_HANDLE;
             VkSwapchainKHR swapchain = VK_NULL_HANDLE;
             SwapchainDimensions swapchain_dimensions;
-
-            VkSurfaceKHR surface = VK_NULL_HANDLE;
-            int32_t graphics_queue_index = -1;
 
             std::vector<VkImageView> swapchain_image_views;
             std::vector<VkFramebuffer> swapchain_framebuffers;
@@ -104,15 +97,11 @@ namespace Surge
              */
             VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 
-
-            VkDebugUtilsMessengerEXT debug_callback = VK_NULL_HANDLE;
-
             /// A set of semaphores that can be reused.
             std::vector<VkSemaphore> recycled_semaphores;
 
             /// A set of per-frame data.
             std::vector<PerFrame> per_frame;
-            VmaAllocator vma_allocator = VK_NULL_HANDLE;
         };
 
         struct Vertex
@@ -129,9 +118,6 @@ namespace Surge
         void update();
         bool resize(const uint32_t width, const uint32_t height);
 
-        bool validate_extensions(const std::vector<const char*>& required, const std::vector<VkExtensionProperties>& available);
-        void init_instance();
-        void init_device();
         void init_vertex_buffer();
         void init_per_frame(PerFrame& per_frame);
         void teardown_per_frame(PerFrame& per_frame);
@@ -149,6 +135,7 @@ namespace Surge
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     private:
         Context context;
+        Scope<GraphicsRHI> mRHI;
         Scope<RendererData> mData;
     };
 } // namespace Surge
