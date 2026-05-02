@@ -21,10 +21,6 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::TransformComponent)
     .AddFunction<&Surge::TransformComponent::GetTransform>("GetTransform")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::TransformComponent)
 
-SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::MeshComponent)
-    .AddVariable<&Surge::MeshComponent::Mesh>("Mesh")
-SURGE_REFLECT_CLASS_REGISTER_END(Surge::MeshComponent)
-
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CameraComponent)
     .AddVariable<&Surge::CameraComponent::Camera>("Camera")
     .AddVariable<&Surge::CameraComponent::Primary>("Primary")

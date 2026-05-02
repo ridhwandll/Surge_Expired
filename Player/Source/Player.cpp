@@ -1,7 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
-
+#include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include <iostream>
 
 namespace Surge
 {
@@ -63,6 +64,10 @@ namespace Surge
         //
         glm::vec2 windowSize = Core::GetWindow()->GetSize();
         mActiveScene->OnResize(windowSize.x, windowSize.y);
+
+
+		HandlePool<FramebufferHandle, int> pool;
+		pool.Allocate(5);
     }
 
     void Player::OnUpdate()

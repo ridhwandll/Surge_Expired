@@ -1,9 +1,13 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Window/Window.hpp"
-#include "VulkanDebugger.hpp"
+#include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
 #include <volk.h>
 #include <vk_mem_alloc.h>
+
 
 #define FORCE_VALIDATION 0
 #if FORCE_VALIDATION == 1
@@ -25,6 +29,14 @@ namespace Surge
 		~VulkanRHI() = default;
 		void Initialize(Window* window);
 		void Shutdown();
+
+		BufferHandle CreateBuffer(const BufferDesc& desc, const void* initialData = nullptr);		
+		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr);
+		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr);
+
+		void DestroyBuffer(BufferHandle buffer);
+		void DestroyTexture(TextureHandle texture);
+		void DestroyFramebuffer(FramebufferHandle framebuffer);
 
 		VkInstance GetInstance() const { return mInstance; }
 		VkSurfaceKHR GetSurface() const { return mSurface; }
@@ -52,6 +64,11 @@ namespace Surge
 		VmaAllocator mVmaAllocator = VK_NULL_HANDLE;
 
 		int32_t mGraphicsQueueIndex = -1;
+
+		//Pools
+		HandlePool<TextureHandle, TextureEntry> mTexturePool;
+		HandlePool<BufferHandle, BufferEntry> mBufferPool;
+		HandlePool<FramebufferHandle, FramebufferEntry> mFramebufferPool;
 	};
 
 }

@@ -5,7 +5,6 @@
 #include "Surge/Core/Client.hpp"
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Window/Window.hpp"
-#include "Surge/Graphics/RenderContext.hpp"
 #include "Surge/Core/Time/Clock.hpp"
 #include <functional>
 
@@ -17,7 +16,6 @@ namespace Surge::Core
 
         Clock SurgeClock;
         Window* SurgeWindow = nullptr;
-        RenderContext* SurgeRenderContext = nullptr;
         Renderer* SurgeRenderer = nullptr;
 
         bool Running = false;
@@ -35,7 +33,6 @@ namespace Surge::Core
     SURGE_API Clock& GetClock();
 
     // Part of renderer module
-    SURGE_API RenderContext* GetRenderContext();
     SURGE_API Renderer* GetRenderer();
 
     SURGE_API Client* GetClient();

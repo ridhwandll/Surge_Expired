@@ -1,9 +1,7 @@
 ﻿// Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Graphics/Interface/DescriptorSet.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanUtils.hpp"
 #include <exception>
 #include "Surge/Utility/Filesystem.hpp"
 #include <algorithm>

@@ -12,13 +12,6 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Core/Events/Event.hpp"
 
-#include "Surge/Graphics/Interface/GraphicsPipeline.hpp"
-#include "Surge/Graphics/Interface/IndexBuffer.hpp"
-#include "Surge/Graphics/Interface/Texture.hpp"
-#include "Surge/Graphics/Interface/VertexBuffer.hpp"
-#include "Surge/Graphics/RenderContext.hpp"
-#include "Surge/Graphics/Shader/Shader.hpp"
-
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
 

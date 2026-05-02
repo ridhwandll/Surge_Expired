@@ -28,6 +28,39 @@ namespace Surge
 		vkDestroyInstance(mInstance, nullptr);
 	}
 
+	BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc, const void* initialData /*= nullptr*/)
+	{
+		Log<Severity::Info>("Creating buffer of size {0} bytes with usage {1}", desc.Size, static_cast<Uint>(desc.Usage));
+		return BufferHandle::Invalid();
+	}
+
+	TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc, const void* initialData /*= nullptr*/)
+	{
+		Log<Severity::Info>("Creating texture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage));
+		return TextureHandle::Invalid();
+	}
+
+	FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc, const void* initialData /*= nullptr*/)
+	{
+		Log<Severity::Info>("Creating framebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
+		return FramebufferHandle::Invalid();
+	}
+
+	void VulkanRHI::DestroyBuffer(BufferHandle buffer)
+	{
+		Log<Severity::Info>("Destroying buffer with handle index {0} and generation {1}", buffer.Index, buffer.Generation);
+	}
+
+	void VulkanRHI::DestroyTexture(TextureHandle texture)
+	{
+		Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", texture.Index, texture.Generation);
+	}
+
+	void VulkanRHI::DestroyFramebuffer(FramebufferHandle framebuffer)
+	{
+		Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", framebuffer.Index, framebuffer.Generation);
+	}
+
 	static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
 	{
 		for (auto extension : required)
@@ -231,15 +264,16 @@ namespace Surge
 		vkGetDeviceQueue(mDevice, mGraphicsQueueIndex, 0, &mQueue);
 
 		//Vulkan Memory Alloctor (VMA)
-		VmaVulkanFunctions vmaVulkanFunc{
-			.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
-			.vkGetDeviceProcAddr = vkGetDeviceProcAddr };
+		VmaVulkanFunctions vmaVulkanFunc = {}; // Zero initialize everything else!
+		vmaVulkanFunc.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+		vmaVulkanFunc.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
 
-		VmaAllocatorCreateInfo allocatorInfo{
-			.physicalDevice = mGPU,
-			.device = mDevice,
-			.pVulkanFunctions = &vmaVulkanFunc,
-			.instance = mInstance };
+		VmaAllocatorCreateInfo allocatorInfo = {};
+		allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_1;
+		allocatorInfo.physicalDevice = mGPU;
+		allocatorInfo.device = mDevice;
+		allocatorInfo.instance = mInstance;
+		allocatorInfo.pVulkanFunctions = &vmaVulkanFunc;
 
 		VK_CALL(vmaCreateAllocator(&allocatorInfo, &mVmaAllocator));
 	}

@@ -3,8 +3,6 @@
 #include "Surge/Core/Memory.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Lights.hpp"
-#include "Surge/Graphics/Shader/ShaderSet.hpp"
-#include "Surge/Graphics/Interface/DescriptorSet.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 
 #define FRAMES_IN_FLIGHT 2
@@ -15,12 +13,21 @@
 
 namespace Surge
 {
+	enum class ShaderType
+	{
+		None = 0,
+		Vertex = BIT(0),
+		Pixel = BIT(1),
+		Compute = BIT(2)
+	};
+	MAKE_BIT_ENUM(ShaderType, uint16_t)
+
     struct DrawCommand
     {
-        DrawCommand(MeshComponent* meshComp, const glm::mat4& transform)
-            : MeshComp(meshComp), Transform(transform) {}
+		//DrawCommand(MeshComponent* meshComp, const glm::mat4& transform)
+		//    : MeshComp(meshComp), Transform(transform) {}
 
-        MeshComponent* MeshComp;
+        //MeshComponent* MeshComp;
         glm::mat4 Transform;
     };
 
@@ -52,7 +59,7 @@ namespace Surge
         void EndFrame();
         void SetRenderArea(Uint width, Uint height);
 
-        FORCEINLINE void SubmitMesh(MeshComponent& meshComp, const glm::mat4& transform) { mData->DrawList.push_back(DrawCommand(&meshComp, transform)); }
+        //FORCEINLINE void SubmitMesh(MeshComponent& meshComp, const glm::mat4& transform) { mData->DrawList.push_back(DrawCommand(&meshComp, transform)); }
         void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
         void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction);
 

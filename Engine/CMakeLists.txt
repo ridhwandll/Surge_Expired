@@ -33,7 +33,6 @@ set(LIB_LINKS
     volk
     SPIRV-Cross
     ImGui
-    #Optick
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 

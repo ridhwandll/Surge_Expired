@@ -2,8 +2,6 @@
 #pragma once
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
-#include "Surge/Graphics/Material.hpp"
-#include "Surge/Graphics/Mesh.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 #include <glm/glm.hpp>
@@ -53,17 +51,6 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API MeshComponent
-    {
-        MeshComponent() = default;
-        MeshComponent(const Ref<Mesh>& mesh)
-            : Mesh(mesh) {}
-
-        Ref<Surge::Mesh> Mesh;
-
-        SURGE_REFLECTION_ENABLE;
-    };
-
     struct SURGE_API CameraComponent
     {
         CameraComponent() = default;
@@ -106,7 +93,7 @@ namespace Surge
 
 //! NOTE: ALL THE MAJOR COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define ALL_MAJOR_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
-                             ::Surge::MeshComponent, ::Surge::CameraComponent, ::Surge::PointLightComponent, \
+                             ::Surge::CameraComponent, ::Surge::PointLightComponent, \
                              ::Surge::DirectionalLightComponent
 
 } // namespace Surge

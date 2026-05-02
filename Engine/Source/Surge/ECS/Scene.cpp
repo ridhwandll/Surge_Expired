@@ -37,15 +37,15 @@ namespace Surge
         Renderer* renderer = Core::GetRenderer();
         renderer->BeginFrame(camera);
         {
-            auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-            for (auto& entity : group)
-            {
-                auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                if (mesh.Mesh)
-                {
-                    renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                }
-            }
+            //auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+            //for (auto& entity : group)
+            //{
+            //    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+            //    if (mesh.Mesh)
+            //    {
+            //        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
+            //    }
+            //}
         }
         {
             auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
@@ -75,15 +75,15 @@ namespace Surge
             Renderer* renderer = Core::GetRenderer();
             renderer->BeginFrame(*camera.Data1, camera.Data2);
             {
-                auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-                for (auto& entity : group)
-                {
-                    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                    if (mesh.Mesh)
-                    {
-                        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                    }
-                }
+                //auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+                //for (auto& entity : group)
+                //{
+                //    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+                //    if (mesh.Mesh)
+                //    {
+                //        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
+                //    }
+                //}
             }
             {
                 auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
@@ -132,7 +132,7 @@ namespace Surge
 
         CopyComponent<NameComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<TransformComponent>(other->mRegistry, mRegistry, enttMap);
-        CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
+        //CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<PointLightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<DirectionalLightComponent>(other->mRegistry, mRegistry, enttMap);

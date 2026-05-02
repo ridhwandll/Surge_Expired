@@ -144,17 +144,17 @@ namespace Surge
                     offset += size;
                     continue;
                 }
-                else if (type.EqualTo<Ref<Mesh>>())
-                {
-                    const Ref<Mesh>* mesh = reinterpret_cast<const Ref<Mesh>*>(source);
-                    String path;
-                    if (*mesh)
-                        path = std::filesystem::relative((*mesh)->GetPath().Str()).string();
-
-                    out[name] = path;
-                    offset += size;
-                    continue;
-                }
+                //else if (type.EqualTo<Ref<Mesh>>())
+                //{
+                //    const Ref<Mesh>* mesh = reinterpret_cast<const Ref<Mesh>*>(source);
+                //    String path;
+                //    if (*mesh)
+                //        path = std::filesystem::relative((*mesh)->GetPath().Str()).string();
+                //
+                //    out[name] = path;
+                //    offset += size;
+                //    continue;
+                //}
                 Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
             }
         }
@@ -297,13 +297,12 @@ namespace Surge
                 cam.SetProjectionType(inJson["Projection"]);
                 std::memcpy(destination, &cam, size);
             }
-            else if (type.EqualTo<Ref<Mesh>>())
-            {
-                String path = inJson[name];
-
-                Ref<Mesh>& src = *reinterpret_cast<Ref<Mesh>*>(destination);
-                path.empty() ? src = nullptr : src = Ref<Mesh>::Create(path);
-            }
+            //else if (type.EqualTo<Ref<Mesh>>())
+            //{
+            //    String path = inJson[name];
+            //    Ref<Mesh>& src = *reinterpret_cast<Ref<Mesh>*>(destination);
+            //    path.empty() ? src = nullptr : src = Ref<Mesh>::Create(path);
+            //}
             else
                 Log<Severity::Warn>("Unhandled Variable of type: '{0}' while deserializing!", type.GetFullName());
 

@@ -3,7 +3,6 @@
 #include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
 #include "Surge/Utility/Platform.hpp"
 #include "Surge/AssetManager/AssetManager.hpp"
 #include <filesystem>
@@ -128,7 +127,6 @@ namespace Surge::Core
     }
 
     Window* GetWindow() { return GCoreData.SurgeWindow; }
-    RenderContext* GetRenderContext() { return GCoreData.SurgeRenderContext; }
     Renderer* GetRenderer() { return GCoreData.SurgeRenderer; }
     CoreData* GetData() { return &GCoreData; }
     Client* GetClient() { return GCoreData.SurgeClient; }
