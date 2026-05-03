@@ -68,6 +68,12 @@ namespace Surge
 
 		HandlePool<FramebufferHandle, int> pool;
 		pool.Allocate(5);
+		Log<Severity::Trace>("This is a Trace Logged");
+		Log<Severity::Info>("This is an Info Logged");
+        Log<Severity::Debug>("This is a Debug Logged");
+        Log<Severity::Warn>("This is a Warning Logged");
+        Log<Severity::Error>("This is an Error Logged");
+        Log<Severity::Fatal>("This is a Fatal Logged");
     }
 
     void Player::OnUpdate()

@@ -2,6 +2,7 @@
 #include "VulkanRHI.hpp"
 #include "VulkanDebugger.hpp"
 #include "VulkanBuffer.hpp"
+#include "VulkanPipeline.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
 
@@ -24,16 +25,25 @@ namespace Surge
 		CreateFramebuffers();
 	}
 
-	void VulkanRHI::Shutdown()
-	{		
-		vkDeviceWaitIdle(mDevice.GetDevice()); // When destroying the application, we need to make sure the GPU is no longer accessing any resources
+	void VulkanRHI::InitiateShutdown()
+	{
+		vkDeviceWaitIdle(mDevice.GetDevice());
+	}
 
-		// Clean up buffers if forgotten to be destroyed manually
+	void VulkanRHI::Shutdown()
+	{	
+		// Clean up VkObjects if forgot destroy manually
 		mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry)
-		{
-			VulkanBuffer::Destroy(*this, entry);
-			SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!");
-		});
+			{
+				VulkanBuffer::Destroy(*this, entry);
+				SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!");
+			});
+
+		mPipelinePool.ForEachAlive([&](const PipelineHandle& h, PipelineEntry& entry)
+			{
+				VulkanPipeline::Destroy(*this, entry);
+				SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!");
+			});
 
 		DestroyFramebuffers();
 		DestroyRenderpass();
@@ -177,7 +187,7 @@ namespace Surge
 
 	BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc)
 	{
-		Log<Severity::Trace>("\nVulkanRHI::CreateBuffer:\n Name: {0}\n Size {1} bytes\n", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size);
+		Log<Severity::Trace>("\nVulkanRHI::CreateBuffer:\n   Name: {0}\n   Size: {1} bytes\n", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size);
 		BufferEntry entry = VulkanBuffer::Create(*this, desc);
 		return mBufferPool.Allocate(std::move(entry));
 	}
@@ -210,7 +220,7 @@ namespace Surge
 		
 		Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Size);
 		VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
-		mBufferPool.Free(buffer); // returns slot to free list
+		mBufferPool.Free(buffer); // Return slot to free list
 	}
 
 	void VulkanRHI::DestroyTexture(TextureHandle texture)
@@ -221,6 +231,41 @@ namespace Surge
 	void VulkanRHI::DestroyFramebuffer(FramebufferHandle framebuffer)
 	{
 		Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", framebuffer.Index, framebuffer.Generation);
+	}
+
+	PipelineHandle VulkanRHI::CreatePipeline(const PipelineDesc& desc)
+	{
+		Log<Severity::Trace>("\nVulkanRHI::CreatePipeline:\n   Name: {0}\n   Vertex Shader: {1}\n   Fragment Shader: {2}", desc.DebugName ? desc.DebugName : "Unnamed", desc.VertShaderName, desc.FragShaderName);
+		PipelineEntry entry = VulkanPipeline::Create(*this, desc, mRenderPass);
+		return mPipelinePool.Allocate(std::move(entry));
+	}
+
+	void VulkanRHI::DestroyPipeline(PipelineHandle h)
+	{
+		PipelineEntry* entry = mPipelinePool.Get(h);
+		if (!entry)
+			return;
+
+		Log<Severity::Info>("Destroying pipeline with handle index {0} and generation {1}", h.Index, h.Generation);
+		VulkanPipeline::Destroy(*this, *entry);
+		mPipelinePool.Free(h);
+	}
+
+	void VulkanRHI::CmdBindPipeline(const FrameContext& ctx, PipelineHandle h)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		PipelineEntry* entry = mPipelinePool.Get(h);
+		SG_ASSERT(entry, "CmdBindPipeline: invalid handle");
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, entry->Pipeline);
+	}
+
+	void VulkanRHI::CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		PipelineEntry* entry = mPipelinePool.Get(h);
+		SG_ASSERT(entry, "CmdPushConstants: invalid handle");
+		SG_ASSERT(size <= entry->PushConstantSize, "CmdPushConstants: size exceeds range");
+		vkCmdPushConstants(cmd, entry->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, offset, size, data);
 	}
 
 	void VulkanRHI::CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance)

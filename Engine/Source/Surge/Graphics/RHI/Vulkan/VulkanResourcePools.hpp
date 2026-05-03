@@ -32,4 +32,12 @@ namespace Surge
 		Uint Width = 0;
 		Uint Height = 0;
 	};
+
+	struct PipelineEntry
+	{
+		VkPipeline Pipeline = VK_NULL_HANDLE;
+		VkPipelineLayout Layout = VK_NULL_HANDLE;
+		Uint PushConstantSize = 0;
+		Uint Generation = 0;
+	};
 }

@@ -12,7 +12,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     # using Clang-CL
     # Flags are ClangCL only, remove it in real Clang builds
     # string(APPEND CMAKE_CXX_FLAGS " -g3 -m64 -mfma -ffast-math -fno-rtti /MP")
-    set(CMAKE_CXX_FLAGS "/W2 /fp:fast /GR- /MP /EHsc")
+    set(CMAKE_CXX_FLAGS "/w /fp:fast /GR- /MP /EHsc")
     add_compile_options("/showFilenames")
     MESSAGE(STATUS "[Surge] Compiler: ClangCL")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

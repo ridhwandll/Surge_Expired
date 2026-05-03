@@ -78,4 +78,110 @@ namespace Surge
 		Uint Height = 0;
 		const char* DebugName = nullptr;
 	};
+
+	enum class ShaderType
+	{
+		NONE = 0,
+		VERTEX,
+		PIXEL,
+		COMPUTE
+	};
+
+	enum class VertexFormat
+	{
+		FLOAT,   // R32_SFLOAT
+		FLOAT2,  // R32G32_SFLOAT
+		FLOAT3,  // R32G32B32_SFLOAT
+		FLOAT4,  // R32G32B32A32_SFLOAT
+		INT,     // R32_SINT
+		INT2,    // R32G32_SINT
+		INT3,    // R32G32B32_SINT
+		INT4,    // R32G32B32A32_SINT
+	};
+
+	struct VertexAttribute
+	{
+		Uint Location = 0;
+		Uint Binding = 0;
+		VertexFormat Format = VertexFormat::FLOAT3;
+		Uint Offset = 0;
+	};
+
+	struct VertexBinding
+	{
+		Uint Binding = 0;
+		Uint Stride = 0;
+	};
+
+	enum class CullMode { NONE, FRONT, BACK };
+	enum class FrontFace { CLOCKWISE, COUNTER_CLOCKWISE };
+	enum class Topology { TRIANGLE_LIST, TRIANGLE_STRIP, LINE_LIST, POINT_LIST };
+	enum class PolygonMode { FILL, LINE, POINT };
+
+	struct RasterDesc
+	{
+		CullMode Cull = CullMode::BACK;
+		FrontFace Front = FrontFace::COUNTER_CLOCKWISE;
+		Topology Topo = Topology::TRIANGLE_LIST;
+		PolygonMode Polygon = PolygonMode::FILL;
+		float LineWidth = 1.0f;
+		bool DepthClamp = false;
+	};
+
+	enum class CompareOp
+	{
+		NEVER, LESS, EQUAL, LESS_OR_EQUAL,
+		GREATER, NOT_EQUAL, GREATER_OR_EQUAL, ALWAYS
+	};
+
+	struct DepthDesc
+	{
+		bool TestEnable = false;
+		bool WriteEnable = false;
+		CompareOp Op = CompareOp::LESS;
+	};
+
+	enum class BlendFactor
+	{
+		ZERO, ONE,
+		SRC_ALPHA, ONE_MINUS_SRC_ALPHA,
+		DST_ALPHA, ONE_MINUS_DST_ALPHA,
+	};
+
+	enum class BlendOp { ADD, SUBTRACT, REVERSE_SUBTRACT, MIN, MAX };
+
+	struct BlendDesc
+	{
+		bool Enable = false;
+		BlendFactor SrcColor = BlendFactor::SRC_ALPHA;
+		BlendFactor DstColor = BlendFactor::ONE_MINUS_SRC_ALPHA;
+		BlendOp ColorOp = BlendOp::ADD;
+		BlendFactor SrcAlpha = BlendFactor::ONE;
+		BlendFactor DstAlpha = BlendFactor::ZERO;
+		BlendOp AlphaOp = BlendOp::ADD;
+	};
+
+	struct PipelineDesc
+	{
+		// Shaders
+		const char* VertShaderName = nullptr;
+		const char* FragShaderName = nullptr;
+
+		// Vertex layout
+		std::array<VertexAttribute, 8> Attributes = {};
+		Uint AttributeCount = 0;
+		std::array<VertexBinding, 4> Bindings = {};
+		Uint BindingCount = 0;
+
+		// State
+		RasterDesc Raster = {};
+		DepthDesc  Depth = {};
+		BlendDesc  Blend = {};
+
+		// Push constants, one range, covers 99% of cases
+		Uint PushConstantSize = 0; // bytes, 0 = none
+
+		const char* DebugName = nullptr;
+	};
+
 }

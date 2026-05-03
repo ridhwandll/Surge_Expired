@@ -34,6 +34,7 @@ namespace Surge
 		VulkanRHI() = default;
 		~VulkanRHI() = default;
 		void Initialize(Window* window);
+		void InitiateShutdown();
 		void Shutdown();
 
 		void BeginFrame(FrameContext& outCtx);
@@ -53,9 +54,15 @@ namespace Surge
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr);
 		void DestroyFramebuffer(FramebufferHandle framebuffer);
 
+		// Pipeline
+		PipelineHandle CreatePipeline(const PipelineDesc& desc);
+		void DestroyPipeline(PipelineHandle h);
+
 		//Draw Commands
 		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance);
 		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance);
+		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h);
+		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset);
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
 
@@ -100,7 +107,7 @@ namespace Surge
 		VkSurfaceKHR mSurface { VK_NULL_HANDLE };
 
 		//Pools
-		HandlePool<TextureHandle, TextureEntry> mTexturePool;
+		HandlePool<PipelineHandle, PipelineEntry> mPipelinePool;
 		HandlePool<BufferHandle, BufferEntry> mBufferPool;
 		HandlePool<FramebufferHandle, FramebufferEntry> mFramebufferPool;
 	};

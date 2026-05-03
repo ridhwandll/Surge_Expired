@@ -36,33 +36,33 @@ namespace Surge
         camera.OnUpdate();
         Renderer* renderer = Core::GetRenderer();
         renderer->BeginFrame(camera);
-        {
-            //auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-            //for (auto& entity : group)
-            //{
-            //    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-            //    if (mesh.Mesh)
-            //    {
-            //        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-            //    }
-            //}
-        }
-        {
-            auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
-            for (auto& entity : group)
-            {
-                auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-                renderer->SubmitPointLight(pointLight, transformComponent.Position);
-            }
-        }
-        {
-            const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
-            for (auto& entity : view)
-            {
-                const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-                renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
-            }
-        }
+        //{
+        //    auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+        //    for (auto& entity : group)
+        //    {
+        //        auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+        //        if (mesh.Mesh)
+        //        {
+        //            renderer->SubmitMesh(mesh, transformComponent.GetTransform());
+        //        }
+        //    }
+        //}
+        //{
+        //    auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
+        //    for (auto& entity : group)
+        //    {
+        //        auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
+        //        renderer->SubmitPointLight(pointLight, transformComponent.Position);
+        //    }
+        //}
+        //{
+        //    const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
+        //    for (auto& entity : view)
+        //    {
+        //        const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
+        //        renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+        //    }
+        //}
         renderer->EndFrame();
     }
 
@@ -74,33 +74,33 @@ namespace Surge
         {
             Renderer* renderer = Core::GetRenderer();
             renderer->BeginFrame(*camera.Data1, camera.Data2);
-            {
-                //auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-                //for (auto& entity : group)
-                //{
-                //    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                //    if (mesh.Mesh)
-                //    {
-                //        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                //    }
-                //}
-            }
-            {
-                auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
-                for (auto& entity : group)
-                {
-                    auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-                    renderer->SubmitPointLight(pointLight, transformComponent.Position);
-                }
-            }
-            {
-                const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
-                for (auto& entity : view)
-                {
-                    const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-                    renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
-                }
-            }
+            //{
+            //    auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+            //    for (auto& entity : group)
+            //    {
+            //        auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+            //        if (mesh.Mesh)
+            //        {
+            //            renderer->SubmitMesh(mesh, transformComponent.GetTransform());
+            //        }
+            //    }
+            //}
+            //{
+            //    auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
+            //    for (auto& entity : group)
+            //    {
+            //        auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
+            //        renderer->SubmitPointLight(pointLight, transformComponent.Position);
+            //    }
+            //}
+            //{
+            //    const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
+            //    for (auto& entity : view)
+            //    {
+            //        const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
+            //        renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+            //    }
+            //}
             renderer->EndFrame();
         }
     }

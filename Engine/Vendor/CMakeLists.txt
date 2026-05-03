@@ -7,13 +7,11 @@ function(DisableTargetWarnings TARGET_NAME)
     endif()
 endfunction()
 
-add_subdirectory(fmt)
 add_subdirectory(volk)
 add_subdirectory(SPIRV-Cross)
 add_subdirectory(ImGui)
 #add_subdirectory(Optick)
 
-DisableTargetWarnings(fmt)
 DisableTargetWarnings(volk)
 DisableTargetWarnings(SPIRV-Cross)
 DisableTargetWarnings(ImGui)

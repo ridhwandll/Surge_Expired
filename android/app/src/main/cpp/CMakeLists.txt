@@ -90,7 +90,7 @@ target_compile_definitions(SurgePlayer PRIVATE
     SURGE_EXPORT
 )
 
-# ----------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # NDK system libraries
 # ----------------------------------------------------------------------
 find_library(log-lib log)
@@ -98,11 +98,6 @@ find_library(android-lib android)
 find_library(vulkan-lib vulkan)
 
 # Build vendored static libraries from source
-
-# fmt
-add_library(fmt_android INTERFACE)
-target_include_directories(fmt_android INTERFACE ${VENDOR_ROOT}/fmt/Include)
-target_compile_definitions(fmt_android INTERFACE FMT_HEADER_ONLY=1)
 
 # volk (single-header loader; compile it as a static lib)
 add_library(volk_android STATIC "${VENDOR_ROOT}/volk/volk.c")
@@ -131,11 +126,8 @@ add_library(imgui_android STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui_android PUBLIC "${VENDOR_ROOT}/ImGui" "${VENDOR_ROOT}/volk" "${VENDOR_ROOT}/Vulkan-Headers/Include" "${VENDOR_ROOT}/glm")
 target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR)
 
-# -----------------------------------------------------------------------
 # Link everything together
-# -----------------------------------------------------------------------
 target_link_libraries(SurgePlayer PRIVATE
-    fmt_android
     volk_android
     spirvcross_android
     imgui_android

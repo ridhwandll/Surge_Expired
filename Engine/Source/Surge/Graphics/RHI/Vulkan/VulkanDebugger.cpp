@@ -7,35 +7,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(VkDebugUtilsMessageSev
 {
 	if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 	{
-#if defined(SURGE_PLATFORM_ANDROID)
-		LOGE("%i Validation Layer: Error: %s: %s", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#elif defined(SURGE_PLATFORM_WINDOWS)
 		Surge::Log<Surge::Severity::Error>("{0} VulkanDebugger ERROR: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#endif
 	}
 	else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 	{
-#if defined(SURGE_PLATFORM_ANDROID)
-		LOGE("%i Validation Layer: Warning: %s: %s", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#elif defined(SURGE_PLATFORM_WINDOWS)
 		Surge::Log<Surge::Severity::Warn>("{0} VulkanDebugger WARNING: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#endif
 	}
 	else if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
 	{
-#if defined(SURGE_PLATFORM_ANDROID)
-		LOGI("%i Validation Layer: Performance warning: %s: %s", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#elif defined(SURGE_PLATFORM_WINDOWS)
 		Surge::Log<Surge::Severity::Warn>("{0} VulkanDebugger PERFORMANCE WARNING: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#endif
 	}
 	else
 	{
-#if defined(SURGE_PLATFORM_ANDROID)
-		LOGI("%i Validation Layer: Information: %s: %s", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#elif defined(SURGE_PLATFORM_WINDOWS)
-		//Surge::Log<Surge::Severity::Info>("{0} VulkanDebugger INFORMATION: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
-#endif
+		Surge::Log<Surge::Severity::Info>("{0} VulkanDebugger INFORMATION: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
 	}
 	return VK_FALSE;
 }
@@ -45,7 +29,7 @@ namespace Surge
 	void VulkanDebugger::Create(VkInstanceCreateInfo& vkInstanceCreateInfo)
 	{		
 		mDebugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		mDebugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		mDebugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		mDebugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		mDebugCreateInfo.pfnUserCallback = VulkanDebugCallback;
 		mDebugCreateInfo.pUserData = nullptr;

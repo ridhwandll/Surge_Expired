@@ -29,6 +29,9 @@ namespace Surge
 	struct BufferTag {};
 	using BufferHandle = RHIHandle<BufferTag>;
 
+	struct PipelineTag {};
+	using PipelineHandle = RHIHandle<PipelineTag>;
+
 	template<typename XHandle, typename T>
 	class HandlePool
 	{

@@ -30,12 +30,12 @@ namespace Surge
 		~GraphicsRHI() = default;
 
 		void Initialize(Window* window = nullptr) { mBackendRHI.Initialize(window); }
+		void InitiateShutdown() { mBackendRHI.InitiateShutdown(); }
 		void Shutdown() { mBackendRHI.Shutdown(); }
 
 		FrameContext BeginFrame() { FrameContext ctx; mBackendRHI.BeginFrame(ctx); return ctx; }
 		void EndFrame(const FrameContext& ctx) { mBackendRHI.EndFrame(ctx); }
 		void Resize(Uint width, Uint height) { mBackendRHI.Resize(width, height); }
-
 
 		// Buffer
 		BufferHandle CreateBuffer(const BufferDesc& desc) { return mBackendRHI.CreateBuffer(desc); }
@@ -53,15 +53,15 @@ namespace Surge
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr) { return mBackendRHI.CreateFramebuffer(desc, initialData); }
 		void DestroyFramebuffer(FramebufferHandle framebuffer) { mBackendRHI.DestroyFramebuffer(framebuffer); }
 
+		// Pipeline
+		PipelineHandle CreatePipeline(const PipelineDesc& desc) { return mBackendRHI.CreatePipeline(desc); }
+		void DestroyPipeline(PipelineHandle h) { mBackendRHI.DestroyPipeline(h); }
+
 		// DrawCommands
-		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount,Uint instanceCount,Uint firstIndex,int32_t vertexOffset, Uint firstInstance)
-		{
-			mBackendRHI.CmdDrawIndexed(ctx, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-		}
-		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance)
-		{
-			mBackendRHI.CmdDraw(ctx, vertexCount, instanceCount, firstVertex, firstInstance);
-		}
+		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount,Uint instanceCount,Uint firstIndex,int32_t vertexOffset, Uint firstInstance) { mBackendRHI.CmdDrawIndexed(ctx, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance); }
+		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance) { mBackendRHI.CmdDraw(ctx, vertexCount, instanceCount, firstVertex, firstInstance); }
+		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
+		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset) { mBackendRHI.CmdPushConstants(ctx, h, data, size, offset); }
 
 		// TODO: REMOVE
 		BackendRHI& GetBackendRHI() { return mBackendRHI; }

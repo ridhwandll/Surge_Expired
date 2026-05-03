@@ -68,13 +68,13 @@
         ::Surge::Log<Surge::Severity::Fatal>(__VA_ARGS__); \
         ASSERT();                                          \
     }
-#define SCOPED_TIMER(...) Timer tImEr(fmt::format(__VA_ARGS__), true)
+#define SCOPED_TIMER(...) Timer tImEr(std::format(__VA_ARGS__), true)
 #else
 #define ASSERT()
 #define SG_ASSERT(...)
 #define SG_ASSERT_NOMSG(...)
 #define SG_ASSERT_INTERNAL(...)
-#define SCOPED_TIMER(...) Timer tImEr(fmt::format(__VA_ARGS__), true)
+#define SCOPED_TIMER(...) Timer tImEr(std::format(__VA_ARGS__), true)
 #endif
 
 // Defines and stuff

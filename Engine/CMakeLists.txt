@@ -12,7 +12,6 @@ set(INCLUDE_DIRS
     Source
     Source/SurgeReflect/Include
     Vendor
-    Vendor/fmt/Include
     Vendor/glm
     Vendor/Vulkan-Headers/Include
     Vendor/VulkanMemoryAllocator/Include
@@ -29,7 +28,6 @@ set(INCLUDE_DIRS
 )
 
 set(LIB_LINKS
-    fmt
     volk
     SPIRV-Cross
     ImGui

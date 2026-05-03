@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/String.hpp"
-#include <fmt/format.h>
+#include <format>
 
 namespace Surge
 {
@@ -46,9 +46,9 @@ namespace Surge
         operator bool() const { return !mPathStr.empty(); }
 
         [[nodiscard]] friend bool operator==(const Path& left, const String& right) { return left.Str() == right; }
-        [[nodiscard]] friend Path operator/(const Path& left, const Path& right) { return fmt::format("{0}/{1}", left.Str(), right.Str()); }
-        [[nodiscard]] friend Path operator/(const Path& left, const String& right) { return fmt::format("{0}/{1}", left.Str(), right); }
-        [[nodiscard]] friend Path operator/(const Path& left, const char* right) { return fmt::format("{0}/{1}", left.Str(), right); }
+        [[nodiscard]] friend Path operator/(const Path& left, const Path& right) { return std::format("{0}/{1}", left.Str(), right.Str()); }
+        [[nodiscard]] friend Path operator/(const Path& left, const String& right) { return std::format("{0}/{1}", left.Str(), right); }
+        [[nodiscard]] friend Path operator/(const Path& left, const char* right) { return std::format("{0}/{1}", left.Str(), right); }
 
     private:
         String mPathStr;

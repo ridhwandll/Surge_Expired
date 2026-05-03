@@ -40,13 +40,13 @@ void android_main(android_app* app)
 
     Surge::Player* playerApp = Surge::MakeClient<Surge::Player>();
     playerApp->SetOptions(clientOptions);
-    LOGI("Created client!");
+    Surge::Log<Surge::Severity::Info>("Created client!");
 
     Surge::Core::Initialize(playerApp);
-    LOGI("Initialized core!");
+    Surge::Log<Surge::Severity::Info>("Initialized core!");
     Surge::Core::Run();
     Surge::Core::Shutdown();
-    LOGI("Shutting down!");
+    Surge::Log<Surge::Severity::Info>("Shutting down!");
 }
 
 #endif // SURGE_PLATFORM_ANDROID

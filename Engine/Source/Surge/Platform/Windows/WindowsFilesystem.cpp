@@ -58,7 +58,7 @@ namespace Surge
             fclose(f);
         }
         else
-            Log<Severity::Error>("[Filesystem::ReadFile] Cannot open path({0}) for reading!", path);
+            Log<Severity::Error>("[Filesystem::ReadFile] Cannot open path({0}) for reading!", path.Str());
         return result;
     }
 
