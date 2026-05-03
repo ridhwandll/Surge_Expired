@@ -3,9 +3,12 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDevice.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanFrame.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -24,6 +27,7 @@
 
 namespace Surge
 {
+	struct FrameContext;
 	class VulkanRHI
 	{
 	public:
@@ -32,8 +36,12 @@ namespace Surge
 		void Initialize(Window* window);
 		void Shutdown();
 
-		void CmdBindVertexBuffer(VkCommandBuffer cmdBuffer, BufferHandle h, Uint offset = 0);
-		void CmdBindIndexBuffer(VkCommandBuffer cmdBuffer, BufferHandle h, Uint offset = 0);
+		void BeginFrame(FrameContext& outCtx);
+		void EndFrame(const FrameContext& ctx);
+		void Resize(Uint width, Uint height);
+
+		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
+		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
 
 		BufferHandle CreateBuffer(const BufferDesc& desc);		
 		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset);
@@ -45,10 +53,19 @@ namespace Surge
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr);
 		void DestroyFramebuffer(FramebufferHandle framebuffer);
 
+		//Draw Commands
+		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance);
+		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance);
+
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
+
+		VulkanSwapchain& GetSwapchain() { return mSwapchain; }
+		VulkanFrame& GetFrame() { return mFrame; }
 
 		VkInstance GetInstance() const { return mInstance; }
 		VkSurfaceKHR GetSurface() const { return mSurface; }
+		VkFramebuffer GetSwapchainFramebuffer(Uint index) const { return mSwapchainFramebuffers[index]; }
+		VkRenderPass GetRenderPass() const { return mRenderPass; }
 		VkDevice GetDevice() const { return mDevice.GetDevice(); }
 		VkPhysicalDevice GetGPU() const { return mDevice.GetGPU(); }
 		VkQueue GetQueue() const { return mDevice.GetQueue(); }
@@ -59,12 +76,25 @@ namespace Surge
 		void CreateInstance();
 		void CreateSurface(Window* window);
 	
+		void CreateRenderpass();
+		void DestroyRenderpass();
+
+		void CreateFramebuffers();
+		void DestroyFramebuffers();
+
+		void ResizeInternal(Uint width, Uint height);
+
 		Vector<const char*> GetRequiredInstanceExtensions();
 		Vector<const char*> GetRequiredInstanceLayers();
 
 	private:
 		VulkanDevice mDevice;
 		VulkanDebugger mDebugger;
+		VulkanFrame mFrame;
+		VulkanSwapchain mSwapchain;
+
+		Vector<VkFramebuffer> mSwapchainFramebuffers;
+		VkRenderPass mRenderPass = VK_NULL_HANDLE;
 
 		VkInstance mInstance { VK_NULL_HANDLE };
 		VkSurfaceKHR mSurface { VK_NULL_HANDLE };

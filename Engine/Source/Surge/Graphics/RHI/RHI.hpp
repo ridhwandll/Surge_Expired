@@ -3,6 +3,7 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 
 #if defined(SURGE_PLATFORM_WINDOWS) || defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
@@ -31,10 +32,18 @@ namespace Surge
 		void Initialize(Window* window = nullptr) { mBackendRHI.Initialize(window); }
 		void Shutdown() { mBackendRHI.Shutdown(); }
 
+		FrameContext BeginFrame() { FrameContext ctx; mBackendRHI.BeginFrame(ctx); return ctx; }
+		void EndFrame(const FrameContext& ctx) { mBackendRHI.EndFrame(ctx); }
+		void Resize(Uint width, Uint height) { mBackendRHI.Resize(width, height); }
+
+
 		// Buffer
 		BufferHandle CreateBuffer(const BufferDesc& desc) { return mBackendRHI.CreateBuffer(desc); }
 		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset) { mBackendRHI.UploadBuffer(h, data, size, offset); }
 		void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
+
+		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }
+		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }
 
 		// Texture
 		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr) { return mBackendRHI.CreateTexture(desc, initialData); }
@@ -44,6 +53,15 @@ namespace Surge
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr) { return mBackendRHI.CreateFramebuffer(desc, initialData); }
 		void DestroyFramebuffer(FramebufferHandle framebuffer) { mBackendRHI.DestroyFramebuffer(framebuffer); }
 
+		// DrawCommands
+		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount,Uint instanceCount,Uint firstIndex,int32_t vertexOffset, Uint firstInstance)
+		{
+			mBackendRHI.CmdDrawIndexed(ctx, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+		}
+		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance)
+		{
+			mBackendRHI.CmdDraw(ctx, vertexCount, instanceCount, firstVertex, firstInstance);
+		}
 
 		// TODO: REMOVE
 		BackendRHI& GetBackendRHI() { return mBackendRHI; }

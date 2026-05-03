@@ -83,13 +83,7 @@ namespace Surge
     {                                                                                     \
         SG_ASSERT_INTERNAL("[Vulkan] Returned value: {0}", Surge::VKResultToStringyy(res)); \
     }
-#define VK_CHECK_WITHOUT_OUT_OF_DATE(res)                                                                                        \
-    if (res != VK_SUCCESS && res != VK_ERROR_OUT_OF_DATE_KHR)                                                                    \
-    {                                                                                                                            \
-        SG_ASSERT_INTERNAL("[Vulkan] (VK_ERROR_OUT_OF_DATE_KHR not checked) Returned value: {0}", Surge::VKResultToStringyy(res)); \
-    }
 
 #else
 #define VK_CALL(res) res
-#define VK_CHECK_WITHOUT_OUT_OF_DATE(res) res
 #endif

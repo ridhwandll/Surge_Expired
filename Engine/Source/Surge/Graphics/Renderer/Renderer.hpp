@@ -70,71 +70,30 @@ namespace Surge
         // RENDERER 2026
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     private:
-        struct SwapchainDimensions
-        {
-            uint32_t width = 0;
-            uint32_t height = 0;            
-            VkFormat format = VK_FORMAT_UNDEFINED; // Pixel format of the swapchain.
-        };
-        struct PerFrame
-        {
-            VkFence queue_submit_fence = VK_NULL_HANDLE;
-            VkCommandPool primary_command_pool = VK_NULL_HANDLE;
-            VkCommandBuffer primary_command_buffer = VK_NULL_HANDLE;
-            VkSemaphore swapchain_acquire_semaphore = VK_NULL_HANDLE;
-            VkSemaphore swapchain_release_semaphore = VK_NULL_HANDLE;
-        };
         struct Context
         {
-            VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-            SwapchainDimensions swapchain_dimensions;
-
-            std::vector<VkImageView> swapchain_image_views;
-            std::vector<VkFramebuffer> swapchain_framebuffers;
-
-            /// The renderpass description.
-            VkRenderPass render_pass = VK_NULL_HANDLE;
-
-            /// The graphics pipeline.
             VkPipeline pipeline = VK_NULL_HANDLE;
-
-            /**
-             * The pipeline layout for resources.
-             * Not used in this sample, but we still need to provide a dummy one.
-             */
             VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-
-            /// A set of semaphores that can be reused.
-            std::vector<VkSemaphore> recycled_semaphores;
-
-            /// A set of per-frame data.
-            std::vector<PerFrame> per_frame;
         };
 
-        struct Vertex
-        {
-            glm::vec3 position;
-            glm::vec3 color;
-        };
+    public:
+		struct Vertex
+		{
+			glm::vec3 position;
+			glm::vec3 color;
+		};
+    private:
 
         BufferHandle mVertexBuffer;        
         BufferHandle mIndexBuffer;
 
         void prepare();
         void update();
-        bool resize(const uint32_t width, const uint32_t height);
-
-        void init_per_frame(PerFrame& per_frame);
-        void teardown_per_frame(PerFrame& per_frame);
-        void init_swapchain();
-        void init_render_pass();
         void init_pipeline();
 
         VkShaderModule load_shader_module(const std::string& path, ShaderType stage);
-        VkResult acquire_next_image(uint32_t* image);
-        void render_triangle(uint32_t swapchain_index);
-        VkResult present_image(uint32_t index);
-        void init_framebuffers();
+
+        void render_triangle(const FrameContext& ctx, uint32_t swapchain_index);
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
