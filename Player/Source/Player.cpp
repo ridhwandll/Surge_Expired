@@ -2,93 +2,101 @@
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include <iostream>
+#include <random>
 
 namespace Surge
 {
+    static glm::vec3 HSVtoRGB(float h, float s, float v)
+    {
+        float c = v * s;
+        float x = c * (1.0f - fabs(fmod(h * 6.0f, 2.0f) - 1.0f));
+        float m = v - c;
+
+        glm::vec3 rgb;
+
+        if (h < 1.0f / 6.0f) rgb = { c, x, 0 };
+        else if (h < 2.0f / 6.0f) rgb = { x, c, 0 };
+        else if (h < 3.0f / 6.0f) rgb = { 0, c, x };
+        else if (h < 4.0f / 6.0f) rgb = { 0, x, c };
+        else if (h < 5.0f / 6.0f) rgb = { x, 0, c };
+        else rgb = { c, 0, x };
+
+        return rgb + glm::vec3(m);
+    }
     void Player::OnInitialize()
     {
         mRenderer = Core::GetRenderer();
-
-        //mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
         mActiveScene = Ref<Scene>::Create(false);
-        //mRenderer->SetSceneContext(mActiveScene);
         Entity runtimeCamera;
-        //Entity dirLight;
-        //Entity pointLight;
-        //
+
+        glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        float halfWidth = 0;
+        float halfHeight = 0;
+
         {
             mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
             cam.Primary = true;
             cam.FixedAspectRatio = true;
-            cam.Camera.SetPerspectiveFarClip(1000);
+
+            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
             TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-10, 6, 10);
-            transform.Rotation = glm::vec3(-30, -45, 0);
+            transform.Position = glm::vec3(0, 0, 0);
+            transform.Rotation = glm::vec3(0, 0, 0);
+
+            cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
+			float size = cam.Camera.GetOrthographicSize();
+			float aspect = cam.Camera.GetAspectRatio();
+			halfWidth = size * aspect * 0.5f;
+			halfHeight = size * 0.5f;
         }
-        //{
-        //    mActiveScene->CreateEntity(dirLight, "Directional Light");
-        //    DirectionalLightComponent& d = dirLight.AddComponent<DirectionalLightComponent>();
-        //    d.Intensity = 4;
-        //
-        //    TransformComponent& transform = dirLight.GetComponent<TransformComponent>();
-        //    transform.Rotation = glm::vec3(30, -60, -80);
-        //}
-        //{
-        //    mActiveScene->CreateEntity(pointLight, "Point Light");
-        //    PointLightComponent& p = pointLight.AddComponent<PointLightComponent>();
-        //    p.Color = glm::vec3(0.9f, 0.0f, 0.0f);
-        //    p.Intensity = 8;
-        //    p.Radius = 5;
-        //
-        //    TransformComponent& transform = pointLight.GetComponent<TransformComponent>();
-        //    transform.Position = glm::vec3(-1, 1, 1);
-        //}
-        //{
-        //    mActiveScene->CreateEntity(mFloor, "Floor");
-        //    MeshComponent& meshCmp = mFloor.AddComponent<MeshComponent>();            
-        //    meshCmp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-        //    TransformComponent& transform = mFloor.GetComponent<TransformComponent>();
-        //    transform.Position = glm::vec3(0, -1, 0);
-        //    transform.Scale = glm::vec3(10, 1, 10);
-        //
-        //    meshCmp.Mesh->GetMaterials()[0]->Set("Material.Albedo", glm::vec3(0.2f, 0.2f, 0.2f));
-        //}
-        //{
-        //    mActiveScene->CreateEntity(mRotatingCube, "Cube");
-        //    mRotatingCube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-        //    TransformComponent& transform = mRotatingCube.GetComponent<TransformComponent>();
-        //    transform.Position = glm::vec3(0, 1, 0);
-        //}
-        //
-        glm::vec2 windowSize = Core::GetWindow()->GetSize();
-        mActiveScene->OnResize(windowSize.x, windowSize.y);
 
+		// Stress test		
+		mQuads.resize(Renderer::MAX_QUADS);
 
-		HandlePool<FramebufferHandle, int> pool;
-		pool.Allocate(5);
-		Log<Severity::Trace>("This is a Trace Logged");
-		Log<Severity::Info>("This is an Info Logged");
-        Log<Severity::Debug>("This is a Debug Logged");
-        Log<Severity::Warn>("This is a Warning Logged");
-        Log<Severity::Error>("This is an Error Logged");
-        Log<Severity::Fatal>("This is a Fatal Logged");
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
+		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
+
+		for (Uint i = 0; i < Renderer::MAX_QUADS; i++)
+		{
+			float x = distX(gen);
+			float y = distY(gen);
+
+			mActiveScene->CreateEntity(mQuads[i], "StressQuad");
+
+			std::uniform_real_distribution<float> hueDist(0.0f, 1.0f);
+			float h = hueDist(gen);
+			float s = 1.0f;
+			float v = 1.0f;
+			glm::vec3 rgb = HSVtoRGB(h, s, v);
+			mQuads[i].AddComponent<SpriteRenderer>(rgb, 1.0f);
+
+			auto& t = mQuads[i].GetComponent<TransformComponent>();
+			t.Position = glm::vec3(x, y, 0.0f);
+			t.Scale = glm::vec3(0.05f, 0.05f, 1.0f);
+		}
+
+		mActiveScene->OnResize(windowSize.x, windowSize.y);
     }
 
     void Player::OnUpdate()
     {
-        //{
-        //    TransformComponent& transform = mRotatingCube.GetComponent<TransformComponent>();
-        //    transform.Rotation.x += 50.0f * Core::GetClock().GetSeconds();
-        //    transform.Rotation.y += 50.0f * Core::GetClock().GetSeconds();
-        //    transform.Rotation.z += 50.0f * Core::GetClock().GetSeconds();
-        //}
-        //{
-        //    TransformComponent& transform = mFloor.GetComponent<TransformComponent>();
-        //    transform.Rotation.y += 10.0f * Core::GetClock().GetSeconds();
-        //
-        //}
+		float time = Core::GetClock().GetSeconds();
+
+		for (Uint i = 0; i < Renderer::MAX_QUADS; i++)
+		{
+			TransformComponent& transform = mQuads[i].GetComponent<TransformComponent>();
+
+			float speed = 10.0f + (i % 15);
+			float dir = (i % 3 == 0) ? -1.0f : 1.0f;
+
+			transform.Rotation.z += dir * speed * time;
+
+			transform.Position.x += sin(time + i) * 0.001f;
+			transform.Position.y += cos(time + i * 0.5f) * 0.001f;
+		}
         mActiveScene->Update();
     }
 
@@ -108,7 +116,6 @@ namespace Surge
     {
         if (width != 0 && height != 0)
         {
-            mRenderer->SetRenderArea(width, height);
             mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));
         }
     }

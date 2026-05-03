@@ -16,8 +16,6 @@ namespace Surge
     class SURGE_API Scene;
     struct RendererData
     {
-        Scene* SceneContext;
-
         // Camera
         glm::vec3 CameraPosition;
         glm::mat4 ViewMatrix;
@@ -29,6 +27,23 @@ namespace Surge
     class SURGE_API Renderer
     {
     public:
+		static constexpr Uint MAX_QUADS = 10000;
+		static constexpr Uint MAX_VERTICES = MAX_QUADS * 4;
+		static constexpr Uint MAX_INDICES = MAX_QUADS * 6;
+
+		struct QuadVertex
+		{
+			glm::vec3 Position;
+			glm::vec4 Color;
+			glm::vec2 UV;
+		};
+
+		struct QuadPushConstants
+		{
+			glm::mat4 ViewProj;
+		};
+
+    public:
         Renderer() = default;
         ~Renderer() = default;
 
@@ -38,28 +53,18 @@ namespace Surge
         void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
-        void SetRenderArea(Uint width, Uint height);
+		void SubmitQuad(const glm::mat4& transform, const glm::vec4& color);
 
         RendererData* GetData() { return mData.get(); }
-        void SetSceneContext(Ref<Scene>& scene) { mData->SceneContext = scene.Raw(); }
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // RENDERER 2026
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public:
-		struct Vertex
-		{
-			glm::vec3 position;
-			glm::vec3 color;
-		};
     private:
-        PipelineHandle mPipelineHandle;
+		Vector<QuadVertex> mVertexData;
+		int mVertexCount = 0;
+        int mQuadCount = 0;
+
+        PipelineHandle mPipeline;
         BufferHandle mVertexBuffer;        
-        BufferHandle mIndexBuffer;
+        BufferHandle mIndexBuffer;   
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    private:
         Scope<GraphicsRHI> mRHI;
         Scope<RendererData> mData;
     };

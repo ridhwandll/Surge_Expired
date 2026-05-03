@@ -418,7 +418,7 @@ namespace Surge
 
 		// We have one subpass. This subpass has one color attachment.
 		// While executing this subpass, the attachment will be in attachment optimal layout.
-		VkAttachmentReference color_ref = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+		VkAttachmentReference colorRef = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
 		// We will end up with two transitions.
 		// The first one happens right before we start subpass #0, where
@@ -428,7 +428,7 @@ namespace Surge
 		VkSubpassDescription subpass{
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1,
-			.pColorAttachments = &color_ref,
+			.pColorAttachments = &colorRef,
 		};
 
 		// Create a dependency to external events.

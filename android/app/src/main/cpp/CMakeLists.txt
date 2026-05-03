@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 project(SurgePlayer)
-add_compile_options(-w)
-set(CMAKE_CXX_STANDARD 23)
+
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # -----------------------------------------------------------------------
@@ -85,8 +85,9 @@ target_compile_definitions(SurgePlayer PRIVATE
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_RADIANS
     _CRT_SECURE_NO_WARNINGS
-#   SURGE_RELEASE
-    SURGE_DEBUG
+    $<$<CONFIG:Debug>:SURGE_DEBUG>
+    $<$<CONFIG:Release>:SURGE_RELEASE>
+    $<$<CONFIG:RelWithDebInfo>:SURGE_RELEASE>
     SURGE_EXPORT
 )
 

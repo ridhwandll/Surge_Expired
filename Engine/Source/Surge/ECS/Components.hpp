@@ -51,6 +51,19 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+	struct SURGE_API SpriteRenderer
+	{
+        SpriteRenderer() = default;
+		SpriteRenderer(const glm::vec4& color)
+			: Color(color) {}
+		SpriteRenderer(const glm::vec3& color, float alpha)
+			: Color(glm::vec4(color, alpha)) {}
+
+        glm::vec4 Color;
+
+		SURGE_REFLECTION_ENABLE;
+	};
+
     struct SURGE_API CameraComponent
     {
         CameraComponent() = default;
@@ -93,7 +106,7 @@ namespace Surge
 
 //! NOTE: ALL THE MAJOR COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define ALL_MAJOR_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
-                             ::Surge::CameraComponent, ::Surge::PointLightComponent, \
+                             ::Surge::CameraComponent, ::Surge::PointLightComponent, ::Surge::SpriteRenderer,\
                              ::Surge::DirectionalLightComponent
 
 } // namespace Surge

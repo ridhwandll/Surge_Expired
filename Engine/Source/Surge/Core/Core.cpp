@@ -45,7 +45,7 @@ namespace Surge::Core
             Platform::SetEnvVariable(ENV_VAR_KEY, std::filesystem::current_path().string());
 
         GCoreData.SurgeClient = application;
-        const ClientOptions& clientOptions = GCoreData.SurgeClient->GeClientOptions();
+        const ClientOptions& clientOptions = GCoreData.SurgeClient->GetClientOptions();
 
         // Window
 #ifdef SURGE_PLATFORM_ANDROID
@@ -87,7 +87,7 @@ namespace Surge::Core
                 //GCoreData.SurgeRenderContext->BeginFrame();
 
                 GCoreData.SurgeClient->OnUpdate();
-                if (GCoreData.SurgeClient->GeClientOptions().EnableImGui)
+                if (GCoreData.SurgeClient->GetClientOptions().EnableImGui)
                     GCoreData.SurgeClient->OnImGuiRender();
 
                 //GCoreData.SurgeRenderContext->EndFrame();

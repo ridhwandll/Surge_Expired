@@ -39,7 +39,7 @@ namespace Surge
 
 		// Buffer
 		BufferHandle CreateBuffer(const BufferDesc& desc) { return mBackendRHI.CreateBuffer(desc); }
-		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset) { mBackendRHI.UploadBuffer(h, data, size, offset); }
+		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset = 0) { mBackendRHI.UploadBuffer(h, data, size, offset); }
 		void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
 
 		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }

@@ -2,10 +2,7 @@
 #ifdef SURGE_PLATFORM_ANDROID
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #include "Surge/Core/Core.hpp"
-#include <android/log.h>
 #include <android/input.h>
-
-#define SURGE_ANDROID_LOG_TAG "SurgeEngine"
 
 namespace Surge
 {
@@ -30,9 +27,7 @@ namespace Surge
             mWindowData.Width = static_cast<Uint>(ANativeWindow_getWidth(mNativeWindow));
             mWindowData.Height = static_cast<Uint>(ANativeWindow_getHeight(mNativeWindow));
         }
-
-        __android_log_print(ANDROID_LOG_INFO, SURGE_ANDROID_LOG_TAG,
-                            "AndroidWindow created (%ux%u)", mWindowData.Width, mWindowData.Height);
+        Log<Severity::Info>("AndroidWindow created ({}x{})", mWindowData.Width, mWindowData.Height);
     }
 
     void AndroidWindow::Update()

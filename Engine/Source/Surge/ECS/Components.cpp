@@ -21,6 +21,10 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::TransformComponent)
     .AddFunction<&Surge::TransformComponent::GetTransform>("GetTransform")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::TransformComponent)
 
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::SpriteRenderer)
+    .AddVariable<&Surge::SpriteRenderer::Color>("Color")
+SURGE_REFLECT_CLASS_REGISTER_END(Surge::SpriteRenderer)
+
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CameraComponent)
     .AddVariable<&Surge::CameraComponent::Camera>("Camera")
     .AddVariable<&Surge::CameraComponent::Primary>("Primary")

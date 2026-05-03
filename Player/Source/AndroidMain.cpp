@@ -30,7 +30,6 @@ void android_main(android_app* app)
     }
 
     Surge::ClientOptions clientOptions;
-    clientOptions.AndroidApp = (void*)app;
     clientOptions.EnableImGui = false;
     clientOptions.WindowDescription = {
         static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window)),

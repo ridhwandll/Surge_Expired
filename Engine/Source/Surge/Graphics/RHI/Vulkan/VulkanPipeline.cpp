@@ -6,9 +6,9 @@
 #ifdef SURGE_PLATFORM_WINDOWS
 #include <shaderc/shaderc.hpp>
 #elif defined(SURGE_PLATFORM_ANDROID)
+#include "Surge/Platform/Android/AndroidApp.hpp"
 #include <android_native_app_glue.h>
 #include <android/asset_manager.h>
-#include <android/log.h>
 #endif
 #include "Surge/Utility/Filesystem.hpp"
 
@@ -310,8 +310,8 @@ namespace Surge
 		shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), name.c_str(), options);
 		if (result.GetCompilationStatus() != shaderc_compilation_status_success)
 		{
-			Log<Severity::Error>("{0} Shader compilation failure!");
-			Log<Severity::Error>("{0} Error(s): \n{1}", result.GetNumErrors(), result.GetErrorMessage());
+			Log<Severity::Error>("Shader compilation failure!");
+			Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
 			SG_ASSERT_INTERNAL("Shader Compilation failure!");
 		}
 		else
@@ -329,8 +329,7 @@ namespace Surge
 
 #elif defined(SURGE_PLATFORM_ANDROID)
 		{
-			auto options = Core::GetClient()->GeClientOptions();
-			android_app* app = static_cast<android_app*>(options.AndroidApp);
+            android_app* app = Android::GAndroidApp;
 			AAssetManager* assetManager = app->activity->assetManager;
 			AAssetDir* assetDir = AAssetManager_openDir(assetManager, "Engine/Assets/Shaders"); // Path relative to assets folder
 

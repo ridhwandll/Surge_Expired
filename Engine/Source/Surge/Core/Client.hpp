@@ -8,7 +8,6 @@ namespace Surge
 {
     struct ClientOptions
     {
-        void* AndroidApp = nullptr; // Android specific, used to pass the android; Ignore on Windows
         WindowDesc WindowDescription;
         bool EnableImGui = true;
     };
@@ -27,7 +26,7 @@ namespace Surge
         Ref<Scene> GetActiveProject() const { return mActiveScene; }
 
         void SetOptions(const ClientOptions& appCreateInfo) { mClientOptions = appCreateInfo; }
-        const ClientOptions& GeClientOptions() const { return mClientOptions; }
+        const ClientOptions& GetClientOptions() const { return mClientOptions; }
 
     protected:
         Ref<Scene> mActiveScene;

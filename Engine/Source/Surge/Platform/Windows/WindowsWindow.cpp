@@ -16,7 +16,7 @@ namespace Surge
         WNDCLASSEX wc = {};
         wc.cbSize = sizeof(WNDCLASSEX);
 
-        const ClientOptions& options = Surge::Core::GetClient()->GeClientOptions();
+        const ClientOptions& options = Surge::Core::GetClient()->GetClientOptions();
         if (options.WindowDescription.Flags & WindowFlags::EditorAcceleration)
             wc.lpfnWndProc = WindowProcWithImgui;
         else

@@ -16,18 +16,6 @@
 
 namespace Surge
 {
-	static const std::vector<Renderer::Vertex> sVertices = {
-	{{ 0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}}, // 0 — top right,    red
-	{{ 0.5f,  0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}}, // 1 — bottom right, green
-	{{-0.5f,  0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}, // 2 — bottom left,  blue
-	{{-0.5f, -0.5f, 0.5f}, {1.0f, 1.0f, 0.0f}}, // 3 — top left,     yellow
-	};
-
-	static const std::vector<uint32_t> sIndices = {
-		0, 1, 2, // triangle 1
-		0, 2, 3  // triangle 2
-	};
-
     void Renderer::Initialize()
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
@@ -35,39 +23,52 @@ namespace Surge
 		mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
         
-		PipelineDesc desc = {};
-		desc.VertShaderName = "Triangle.vert";
-		desc.FragShaderName = "Triangle.frag";
-
-		// Must match struct Renderer::Vertex { glm::vec3 position; glm::vec3 color; }
-		desc.Bindings[0] = { .Binding = 0, .Stride = sizeof(Vertex) };
-		desc.BindingCount = 1;
-
-		// Must match struct Renderer::Vertex { glm::vec3 position; glm::vec3 color; }
-		desc.Attributes[0] = { .Location = 0, .Binding = 0, .Format = VertexFormat::FLOAT3, .Offset = offsetof(Vertex, position) };
-		desc.Attributes[1] = { .Location = 1, .Binding = 0, .Format = VertexFormat::FLOAT3, .Offset = offsetof(Vertex, color) };
-		desc.AttributeCount = 2;
-
-		desc.Raster.Cull = CullMode::NONE;
-		desc.Raster.Front = FrontFace::COUNTER_CLOCKWISE;
-		desc.DebugName = "TrianglePipeline";
-		mPipelineHandle = mRHI->CreatePipeline(desc);
-
-		BufferDesc vbDesc = {};
-		vbDesc.DebugName = "TriangleVB";
-		vbDesc.HostVisible = true;
-		vbDesc.Size = sizeof(sVertices[0]) * sVertices.size();
-		vbDesc.Usage = BufferUsage::VERTEX;
-		vbDesc.InitialData = sVertices.data();
-		mVertexBuffer = mRHI->CreateBuffer(vbDesc);
+		Vector<Uint> indices(MAX_INDICES);
+		Uint offset = 0;
+		for (Uint i = 0; i < MAX_INDICES; i += 6)
+		{
+			indices[i + 0] = offset + 0;
+			indices[i + 1] = offset + 1;
+			indices[i + 2] = offset + 2;
+			indices[i + 3] = offset + 0;
+			indices[i + 4] = offset + 2;
+			indices[i + 5] = offset + 3;
+			offset += 4;
+		}
 
 		BufferDesc ibDesc = {};
-		ibDesc.Size = sizeof(Uint) * sIndices.size();
+		ibDesc.Size = sizeof(uint32_t) * MAX_INDICES;
 		ibDesc.Usage = BufferUsage::INDEX;
 		ibDesc.HostVisible = true;
-		ibDesc.InitialData = sIndices.data();
-		ibDesc.DebugName = "TriangleIB";
+		ibDesc.InitialData = indices.data();
+		ibDesc.DebugName = "BatchIB";
 		mIndexBuffer = mRHI->CreateBuffer(ibDesc);
+
+		BufferDesc vbDesc = {};
+		vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
+		vbDesc.Usage = BufferUsage::VERTEX;
+		vbDesc.HostVisible = true;   // Persistently mapped — memcpy every frame
+		vbDesc.DebugName = "BatchVB";
+		mVertexBuffer = mRHI->CreateBuffer(vbDesc);
+
+		// CPU-side staging array fill this, then memcpy to GPU buffer
+		mVertexData.resize(MAX_VERTICES);
+		mVertexCount = 0;
+		mQuadCount = 0;
+
+		PipelineDesc desc = {};
+		desc.VertShaderName = "Quad.vert";
+		desc.FragShaderName = "Quad.frag";
+		desc.Bindings[0] = { 0, sizeof(QuadVertex) };
+		desc.BindingCount = 1;
+		desc.Attributes[0] = { 0, 0, VertexFormat::FLOAT3, offsetof(QuadVertex, Position) };
+		desc.Attributes[1] = { 1, 0, VertexFormat::FLOAT4, offsetof(QuadVertex, Color) };
+		desc.Attributes[2] = { 2, 0, VertexFormat::FLOAT2, offsetof(QuadVertex, UV) };
+		desc.AttributeCount = 3;
+		desc.Raster.Cull = CullMode::NONE;
+		desc.PushConstantSize = sizeof(QuadPushConstants);
+		desc.DebugName = "BatchPipeline";
+		mPipeline = mRHI->CreatePipeline(desc);
     }
 
     void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
@@ -77,6 +78,9 @@ namespace Surge
         mData->ProjectionMatrix = camera.GetProjectionMatrix();
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = transform[3];
+
+		mVertexCount = 0;
+		mQuadCount = 0;
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera)
@@ -91,21 +95,59 @@ namespace Surge
     void Renderer::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
-        
+		if (mQuadCount == 0)
+			return;
+
+		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);
+
         FrameContext ctx = mRHI->BeginFrame();
-		mRHI->CmdBindPipeline(ctx, mPipelineHandle);
+		mRHI->CmdBindPipeline(ctx, mPipeline);
 		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
 		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
-		mRHI->CmdDrawIndexed(ctx, sIndices.size(), 1, 0, 0, 0);
+
+		QuadPushConstants push = { .ViewProj = mData->ViewProjection };
+		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
+		mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
+
 		mRHI->EndFrame(ctx);
     }
 
-    void Renderer::SetRenderArea(Uint width, Uint height) {}
-    void Renderer::Shutdown()
+	void Renderer::SubmitQuad(const glm::mat4& transform, const glm::vec4& color)
+	{
+		SG_ASSERT(mQuadCount < MAX_QUADS, "BatchRenderer: exceeded MAX_QUADS");
+
+		// Unit quad positions transform applied per vertex on CPU
+		static constexpr glm::vec4 sLocalPositions[4] = {
+			{ 0.5f, -0.5f, 0.0f, 1.0f}, // top right
+			{ 0.5f,  0.5f, 0.0f, 1.0f}, // bottom right
+			{-0.5f,  0.5f, 0.0f, 1.0f}, // bottom left
+			{-0.5f, -0.5f, 0.0f, 1.0f}, // top left
+		};
+
+		static constexpr glm::vec2 sUVs[4] =
+		{
+			{1.0f, 0.0f}, // top right
+			{1.0f, 1.0f}, // bottom right
+			{0.0f, 1.0f}, // bottom left
+			{0.0f, 0.0f}, // top left
+		};
+
+		for (Uint i = 0; i < 4; i++)
+		{
+			QuadVertex& v = mVertexData[mVertexCount++];
+			v.Position = transform * sLocalPositions[i]; // CPU transform
+			v.Color = color;
+			v.UV = sUVs[i];
+		}
+
+		mQuadCount++;
+	}
+
+	void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         mRHI->InitiateShutdown();
-		mRHI->DestroyPipeline(mPipelineHandle);
+		mRHI->DestroyPipeline(mPipeline);
         mRHI->DestroyBuffer(mVertexBuffer);
         mRHI->DestroyBuffer(mIndexBuffer);
         mRHI->Shutdown();
