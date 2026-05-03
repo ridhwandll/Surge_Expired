@@ -42,6 +42,7 @@ namespace Surge
 	struct BufferDesc
 	{
 		Uint Size = 0;
+		const void* InitialData = nullptr;
 		BufferUsage Usage = BufferUsage::VERTEX;
 		bool HostVisible = false;
 		const char* DebugName = nullptr;

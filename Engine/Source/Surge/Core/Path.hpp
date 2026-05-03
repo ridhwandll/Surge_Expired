@@ -5,7 +5,7 @@
 
 namespace Surge
 {
-    class SURGE_API Path
+    class Path
     {
     public:
         Path() = default;

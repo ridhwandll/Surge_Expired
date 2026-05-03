@@ -53,6 +53,7 @@ namespace Surge
 		return nullptr;
 	}
 
+	class VulkanRHI;
 	class VulkanDebugger
 	{
 	public:
@@ -64,7 +65,7 @@ namespace Surge
 		{
 			outInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
-
+		void SetDebugName(const VulkanRHI& rhi, const VkDebugUtilsObjectNameInfoEXT& nameInfo) const;
         void StartDiagnostics(VkInstance& instance);
         void EndDiagnostics(VkInstance& instance);
 

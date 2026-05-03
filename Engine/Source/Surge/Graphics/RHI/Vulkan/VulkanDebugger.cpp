@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "VulkanDebugger.hpp"
+#include "VulkanRHI.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* callbackData, void* userData)
@@ -33,7 +34,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(VkDebugUtilsMessageSev
 #if defined(SURGE_PLATFORM_ANDROID)
 		LOGI("%i Validation Layer: Information: %s: %s", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
 #elif defined(SURGE_PLATFORM_WINDOWS)
-		Surge::Log<Surge::Severity::Info>("{0} VulkanDebugger INFORMATION: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
+		//Surge::Log<Surge::Severity::Info>("{0} VulkanDebugger INFORMATION: {1}: {2}", callbackData->messageIdNumber, callbackData->pMessageIdName, callbackData->pMessage);
 #endif
 	}
 	return VK_FALSE;
@@ -44,10 +45,8 @@ namespace Surge
 	void VulkanDebugger::Create(VkInstanceCreateInfo& vkInstanceCreateInfo)
 	{		
 		mDebugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		mDebugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		mDebugCreateInfo.messageType =
-			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		mDebugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		mDebugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		mDebugCreateInfo.pfnUserCallback = VulkanDebugCallback;
 		mDebugCreateInfo.pUserData = nullptr;
 
@@ -96,6 +95,11 @@ namespace Surge
 		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 		if (func != nullptr)
 			func(instance, debugMessenger, pAllocator);
+	}
+
+	void VulkanDebugger::SetDebugName(const VulkanRHI& rhi, const VkDebugUtilsObjectNameInfoEXT& nameInfo) const
+	{
+		vkSetDebugUtilsObjectNameEXT(rhi.GetDevice(), &nameInfo);
 	}
 
 	void VulkanDebugger::StartDiagnostics(VkInstance& instance)

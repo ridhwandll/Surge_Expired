@@ -12,7 +12,7 @@ get_filename_component(REPO_ROOT "${REPO_ROOT}" ABSOLUTE)
 
 set(ENGINE_ROOT "${REPO_ROOT}/Engine")
 set(ENGINE_SRC_ROOT "${REPO_ROOT}/Engine/Source")
-set(VENDOR_ROOT     "${REPO_ROOT}/Engine/Vendor")
+set(VENDOR_ROOT "${REPO_ROOT}/Engine/Vendor")
 set(PLAYER_SRC_ROOT "${REPO_ROOT}/Player/Source")
 
 # -----------------------------------------------------------------------
@@ -97,9 +97,7 @@ find_library(log-lib log)
 find_library(android-lib android)
 find_library(vulkan-lib vulkan)
 
-# -----------------------------------------------------------------------
 # Build vendored static libraries from source
-# -----------------------------------------------------------------------
 
 # fmt
 add_library(fmt_android INTERFACE)

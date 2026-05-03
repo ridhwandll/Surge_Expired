@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "VulkanRHI.hpp"
 #include "VulkanDebugger.hpp"
+#include "VulkanBuffer.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
 
 
@@ -14,41 +15,81 @@ namespace Surge
 	{
 		CreateInstance();
 		CreateSurface(window);
-		CreateDevice();
+		mDevice.Initialize(mInstance, mSurface);
 	}
 
 	void VulkanRHI::Shutdown()
 	{		
-		vkDeviceWaitIdle(mDevice); // When destroying the application, we need to make sure the GPU is no longer accessing any resources
+		vkDeviceWaitIdle(mDevice.GetDevice()); // When destroying the application, we need to make sure the GPU is no longer accessing any resources
 
+		// Clean up buffers if forgotten to be destroyed manually
+		mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry)
+		{
+			VulkanBuffer::Destroy(*this, entry);
+			SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!");
+		});	
+			
 		ENABLE_IF_VK_VALIDATION(mDebugger.EndDiagnostics(mInstance));
-		vmaDestroyAllocator(mVmaAllocator);
-		vkDestroyDevice(mDevice, nullptr);
+		mDevice.Destroy();
 		vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
 		vkDestroyInstance(mInstance, nullptr);
 	}
 
-	BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc, const void* initialData /*= nullptr*/)
+	void VulkanRHI::CmdBindVertexBuffer(VkCommandBuffer cmdBuffer, BufferHandle h, Uint offset /*= 0*/)
 	{
-		Log<Severity::Info>("Creating buffer of size {0} bytes with usage {1}", desc.Size, static_cast<Uint>(desc.Usage));
-		return BufferHandle::Invalid();
+		const BufferEntry* entry = mBufferPool.Get(h);
+		SG_ASSERT(entry != nullptr, "CmdBindVertexBuffer: Invalid BufferHandle");
+		SG_ASSERT(entry->Buffer != VK_NULL_HANDLE, "CmdBindVertexBuffer: null VkBuffer");
+
+		VkDeviceSize vkOffset = offset;
+		vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &entry->Buffer, &vkOffset);
+	}
+
+	void VulkanRHI::CmdBindIndexBuffer(VkCommandBuffer cmdBuffer, BufferHandle h, Uint offset /*= 0*/)
+	{
+		const BufferEntry* entry = mBufferPool.Get(h);
+		SG_ASSERT(entry != nullptr, "CmdBindIndexBuffer: Invalid BufferHandle");
+
+		// Index type is stored in the entry — set at creation time
+		vkCmdBindIndexBuffer(cmdBuffer, entry->Buffer, offset, VK_INDEX_TYPE_UINT32);
+	}
+
+	BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc)
+	{
+		Log<Severity::Trace>("VulkanRHI::CreateBuffer:\n Name: {0}\n Size {1} bytes\n", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size);
+		BufferEntry entry = VulkanBuffer::Create(*this, desc);
+		return mBufferPool.Allocate(std::move(entry));
 	}
 
 	TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc, const void* initialData /*= nullptr*/)
 	{
-		Log<Severity::Info>("Creating texture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage));
+		Log<Severity::Trace>("VulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage));
 		return TextureHandle::Invalid();
 	}
 
 	FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc, const void* initialData /*= nullptr*/)
 	{
-		Log<Severity::Info>("Creating framebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
+		Log<Severity::Trace>("VulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
 		return FramebufferHandle::Invalid();
+	}
+
+	void VulkanRHI::UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset)
+	{
+		BufferEntry* entry = mBufferPool.Get(h);
+		SG_ASSERT(entry != nullptr, "UploadBuffer: invalid handle!");
+
+		VulkanBuffer::Upload(*this, *entry, data, size, offset);
 	}
 
 	void VulkanRHI::DestroyBuffer(BufferHandle buffer)
 	{
-		Log<Severity::Info>("Destroying buffer with handle index {0} and generation {1}", buffer.Index, buffer.Generation);
+		BufferEntry* entry = mBufferPool.Get(buffer);
+		if (!entry)		
+			return;
+		
+		Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Size);
+		VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
+		mBufferPool.Free(buffer); // returns slot to free list
 	}
 
 	void VulkanRHI::DestroyTexture(TextureHandle texture)
@@ -180,101 +221,5 @@ namespace Surge
 #else
 		SG_ASSERT_INTERNAL("Surge is currently Windows/Android Only! :(");
 #endif
-	}
-
-	void VulkanRHI::CreateDevice()
-	{
-		Log<Severity::Info>("Initializing vulkan device...");
-
-		Uint gpuCount = 0;
-		VK_CALL(vkEnumeratePhysicalDevices(mInstance, &gpuCount, nullptr));		
-
-		if (gpuCount < 1)
-			throw std::runtime_error("No physical device found.");
-		else
-			Log<Severity::Info>("Found {0} GPU(s)", gpuCount);
-
-		Vector<VkPhysicalDevice> gpus(gpuCount);
-		VK_CALL(vkEnumeratePhysicalDevices(mInstance, &gpuCount, gpus.data()));
-
-
-		// Just grab the first GPU with a queue that supports graphics and presentation. A more robust implementation would rate each GPU and select the best one...
-		// TODO: Implement a more robust GPU selection algorithm that rates each GPU and selects the best one based on features, performance, etc.
-		for (size_t i = 0; i < gpuCount && (mGraphicsQueueIndex < 0); i++)
-		{
-			mGPU = gpus[i];
-
-			Uint queueFamilyCount;
-			vkGetPhysicalDeviceQueueFamilyProperties(mGPU, &queueFamilyCount, nullptr);
-
-			if (queueFamilyCount < 1)
-			{
-				throw std::runtime_error("No queue family found.");
-			}
-
-			Vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
-			vkGetPhysicalDeviceQueueFamilyProperties(mGPU, &queueFamilyCount, queueFamilyProperties.data());
-
-			for (Uint i = 0; i < queueFamilyCount; i++)
-			{
-				VkBool32 supportsPresent;
-				vkGetPhysicalDeviceSurfaceSupportKHR(mGPU, i, mSurface, &supportsPresent);
-
-				// Find a queue family which supports graphics and presentation
-				if ((queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && supportsPresent)
-				{
-					mGraphicsQueueIndex = i;
-					break;
-				}
-			}
-		}
-
-		if (mGraphicsQueueIndex < 0)		
-			throw std::runtime_error("Did not find suitable device with a queue that supports graphics and presentation.");
-		
-
-		Uint deviceExtensionCount;
-		VK_CALL(vkEnumerateDeviceExtensionProperties(mGPU, nullptr, &deviceExtensionCount, nullptr));
-		Vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
-		VK_CALL(vkEnumerateDeviceExtensionProperties(mGPU, nullptr, &deviceExtensionCount, deviceExtensions.data()));
-		
-		Vector<const char*> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-		
-		if (!ValidateExtensions(requiredDeviceExtensions, deviceExtensions))		
-			throw std::runtime_error("Required device extensions are missing!");
-		
-		// Uses a single graphics queue for now, but a more robust implementation would use separate queues for graphics, compute, and transfer operations if available
-		const float queuePriority = 0.5f;
-		VkDeviceQueueCreateInfo queueInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-			.queueFamilyIndex = static_cast<uint32_t>(mGraphicsQueueIndex),
-			.queueCount = 1,
-			.pQueuePriorities = &queuePriority };
-
-		VkDeviceCreateInfo deviceInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.queueCreateInfoCount = 1,
-			.pQueueCreateInfos = &queueInfo,
-			.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()),
-			.ppEnabledExtensionNames = requiredDeviceExtensions.data() };
-
-		VK_CALL(vkCreateDevice(mGPU, &deviceInfo, nullptr, &mDevice));
-		volkLoadDevice(mDevice);
-
-		vkGetDeviceQueue(mDevice, mGraphicsQueueIndex, 0, &mQueue);
-
-		//Vulkan Memory Alloctor (VMA)
-		VmaVulkanFunctions vmaVulkanFunc = {}; // Zero initialize everything else!
-		vmaVulkanFunc.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-		vmaVulkanFunc.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
-
-		VmaAllocatorCreateInfo allocatorInfo = {};
-		allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_1;
-		allocatorInfo.physicalDevice = mGPU;
-		allocatorInfo.device = mDevice;
-		allocatorInfo.instance = mInstance;
-		allocatorInfo.pVulkanFunctions = &vmaVulkanFunc;
-
-		VK_CALL(vmaCreateAllocator(&allocatorInfo, &mVmaAllocator));
 	}
 }

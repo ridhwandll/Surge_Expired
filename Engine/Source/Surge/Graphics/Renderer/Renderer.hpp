@@ -60,8 +60,8 @@ namespace Surge
         void SetRenderArea(Uint width, Uint height);
 
         //FORCEINLINE void SubmitMesh(MeshComponent& meshComp, const glm::mat4& transform) { mData->DrawList.push_back(DrawCommand(&meshComp, transform)); }
-        void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
-        void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction);
+        void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position) {}
+        void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction) {}
 
         RendererData* GetData() { return mData.get(); }
         void SetSceneContext(Ref<Scene>& scene) { mData->SceneContext = scene.Raw(); }
@@ -117,15 +117,13 @@ namespace Surge
             glm::vec3 color;
         };
 
-        VkBuffer vertex_buffer = VK_NULL_HANDLE;
-        VkDeviceMemory vertex_buffer_memory = VK_NULL_HANDLE;
-        VmaAllocation vertex_buffer_allocation = VK_NULL_HANDLE;
+        BufferHandle mVertexBuffer;        
+        BufferHandle mIndexBuffer;
 
         void prepare();
         void update();
         bool resize(const uint32_t width, const uint32_t height);
 
-        void init_vertex_buffer();
         void init_per_frame(PerFrame& per_frame);
         void teardown_per_frame(PerFrame& per_frame);
         void init_swapchain();

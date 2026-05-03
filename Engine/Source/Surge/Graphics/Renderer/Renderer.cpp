@@ -76,78 +76,83 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         VkDevice device = mRHI->GetBackendRHI().GetDevice();
 
-        if (device != VK_NULL_HANDLE)
-        {
-            vkDeviceWaitIdle(device);
-        }
+        vkDeviceWaitIdle(device);
 
         for (auto& framebuffer : context.swapchain_framebuffers)
-        {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
-        }
 
         for (auto& per_frame : context.per_frame)
-        {
             teardown_per_frame(per_frame);
-        }
 
         context.per_frame.clear();
 
-        for (auto semaphore : context.recycled_semaphores)
-        {
+        for (auto semaphore : context.recycled_semaphores)        
             vkDestroySemaphore(device, semaphore, nullptr);
-        }
-
-        if (context.pipeline != VK_NULL_HANDLE)
-        {
+        
+        if (context.pipeline != VK_NULL_HANDLE)        
             vkDestroyPipeline(device, context.pipeline, nullptr);
-        }
-
-        if (context.pipeline_layout != VK_NULL_HANDLE)
-        {
+        
+        if (context.pipeline_layout != VK_NULL_HANDLE)        
             vkDestroyPipelineLayout(device, context.pipeline_layout, nullptr);
-        }
+        
+        if (context.render_pass != VK_NULL_HANDLE)        
+            vkDestroyRenderPass(device, context.render_pass, nullptr);        
 
-        if (context.render_pass != VK_NULL_HANDLE)
-        {
-            vkDestroyRenderPass(device, context.render_pass, nullptr);
-        }
-
-        for (VkImageView image_view : context.swapchain_image_views)
-        {
+        for (VkImageView image_view : context.swapchain_image_views)       
             vkDestroyImageView(device, image_view, nullptr);
-        }
-
-        if (context.swapchain != VK_NULL_HANDLE)
-        {
+        
+        if (context.swapchain != VK_NULL_HANDLE)        
             vkDestroySwapchainKHR(device, context.swapchain, nullptr);
-        }
-
-		VmaAllocator allocator = mRHI->GetBackendRHI().GetAllocator();
-        if (vertex_buffer_allocation != VK_NULL_HANDLE)
-        {
-            vmaDestroyBuffer(allocator, vertex_buffer, vertex_buffer_allocation);
-        }
+        
+        mRHI->DestroyBuffer(mVertexBuffer);
+        mRHI->DestroyBuffer(mIndexBuffer);
         mRHI->Shutdown();
     }
-
-    void Renderer::SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position) {}
-    void Renderer::SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction) {}
 
     void Renderer::prepare()
     {        
         Window* window = Core::GetWindow();
         glm::vec2 extent = window->GetSize();
-        context.swapchain_dimensions.width = extent.x;
-        context.swapchain_dimensions.height = extent.y;
-
-        init_vertex_buffer();
+        context.swapchain_dimensions.width = (Uint)extent.x;
+        context.swapchain_dimensions.height = (Uint)extent.y;
         init_swapchain();
 
         // Create the necessary objects for rendering
         init_render_pass();
         init_pipeline();
         init_framebuffers();
+
+		// Init vertex buffer
+		const std::vector<Vertex> vertices =
+        {
+            // Vertex pos          // Color
+			{{ 0.3f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}}, // 0 — top right
+			{{ 0.4f,  0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}}, // 1 — bottom right
+			{{-0.5f,  0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}, // 2 — bottom left
+			{{-0.6f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}}, // 3 — top left
+		};
+
+		const std::vector<Uint> indices =
+        {
+	        0, 1, 2, // triangle 1
+	        0, 2, 3  // triangle 2
+		};
+
+		BufferDesc vbDesc = {};
+		vbDesc.DebugName = "TriangleVB";
+		vbDesc.HostVisible = true;
+		vbDesc.Size = sizeof(vertices[0]) * vertices.size();
+		vbDesc.Usage = BufferUsage::VERTEX;
+		vbDesc.InitialData = vertices.data();
+		mVertexBuffer = mRHI->CreateBuffer(vbDesc);
+
+		BufferDesc ibDesc = {};
+		ibDesc.Size = sizeof(Uint) * indices.size();
+		ibDesc.Usage = BufferUsage::INDEX;
+		ibDesc.HostVisible = true;
+		ibDesc.InitialData = indices.data();
+		ibDesc.DebugName = "TriangleIB";
+		mIndexBuffer = mRHI->CreateBuffer(ibDesc);
     }
 
     void Renderer::update()
@@ -214,39 +219,6 @@ namespace Surge
         init_swapchain();
         init_framebuffers();
         return true;
-    }
-
-    void Renderer::init_vertex_buffer()
-    {
-        // Vertex data for a single colored triangle
-        const std::vector<Vertex> vertices = {
-            {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
-
-        const VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
-
-        // Copy Vertex data to a buffer accessible by the device
-        VkBufferCreateInfo buffer_info {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = buffer_size,
-            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT};
-
-        // We use the Vulkan Memory Allocator to find a memory type that can be written and mapped from the host
-        // On most setups this will return a memory type that resides in VRAM and is accessible from the host
-        VmaAllocationCreateInfo buffer_alloc_ci {
-            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO,
-            .requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-
-		VmaAllocator allocator = mRHI->GetBackendRHI().GetAllocator();
-        VmaAllocationInfo buffer_alloc_info {};
-        vmaCreateBuffer(allocator, &buffer_info, &buffer_alloc_ci, &vertex_buffer, &vertex_buffer_allocation, &buffer_alloc_info);
-        if (buffer_alloc_info.pMappedData)        
-            memcpy(buffer_alloc_info.pMappedData, vertices.data(), buffer_size);        
-        else        
-            throw std::runtime_error("Could not map vertex buffer.");
-        
     }
 
     void Renderer::init_per_frame(PerFrame& per_frame)
@@ -823,11 +795,11 @@ namespace Surge
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
         // Bind the vertex buffer to source the draw calls from.
-        VkDeviceSize offset = {0};
-        vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
+		mRHI->GetBackendRHI().CmdBindVertexBuffer(cmd, mVertexBuffer, 0);
+        mRHI->GetBackendRHI().CmdBindIndexBuffer(cmd, mIndexBuffer, 0);
 
         // Draw three vertices with one instance from the currently bound vertex bound.
-        vkCmdDraw(cmd, 3, 1, 0, 0);
+        vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 
         // Complete render pass.
         vkCmdEndRenderPass(cmd);
