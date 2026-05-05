@@ -99,11 +99,9 @@ namespace Surge
 		if (mQuadCount == 0)
 			return;
 
-		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);
-
 		// Begins command buffer recording
 		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
-        FrameContext ctx = mRHI->BeginFrame();
+        const FrameContext& ctx = mRHI->BeginFrame();
 
 		// Off-screen passes go here
 
@@ -113,15 +111,17 @@ namespace Surge
 		// For now we render directly to the swapchain image
 
 		// Render directly to swapchain buffer, no offscreen renderpass or postprocessing yet
+
 		mRHI->CmdBindPipeline(ctx, mPipeline);
 		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
 		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
-
+		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);
 		QuadPushConstants push = { .ViewProj = mData->ViewProjection };
 		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
 		mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
 
 		mRHI->CmdEndSwapchainRenderpass(ctx);
+
 		mRHI->EndFrame(ctx); // Stops command buffer recording
     }
 
@@ -154,6 +154,11 @@ namespace Surge
 		}
 
 		mQuadCount++;
+	}
+
+	void Renderer::OnWindowResize(Uint width, Uint height)
+	{
+		Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
 	}
 
 	void Renderer::Shutdown()

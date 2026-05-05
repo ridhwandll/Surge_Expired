@@ -134,7 +134,7 @@ namespace Surge
 			.oldSwapchain = oldSwapchain };
 
 		VK_CALL(vkCreateSwapchainKHR(device, &info, nullptr, &mSwapchain));
-
+		Log<Severity::Debug>("VulkanSwapchain created with Width:{} Height:{}", swapchainSize.width, swapchainSize.height);
 
 		if (oldSwapchain != VK_NULL_HANDLE)
 		{

@@ -39,7 +39,6 @@ namespace Surge
 
 		void BeginFrame(FrameContext& outCtx);
 		void EndFrame(const FrameContext& ctx);
-		void Resize(Uint width, Uint height);
 
 		//Renderpass
 		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
@@ -93,7 +92,7 @@ namespace Surge
 		void CreateFramebuffers();
 		void DestroyFramebuffers();
 
-		void ResizeInternal(Uint width, Uint height);
+		void ResizeInternal();
 
 		Vector<const char*> GetRequiredInstanceExtensions();
 		Vector<const char*> GetRequiredInstanceLayers();

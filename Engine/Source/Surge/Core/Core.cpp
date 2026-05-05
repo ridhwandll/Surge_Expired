@@ -26,8 +26,8 @@ namespace Surge::Core
         Surge::EventDispatcher dispatcher(e);
         dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e)
             {
-                //if (GetWindow()->GetWindowState() != WindowState::Minimized)
-                //    GCoreData.SurgeRenderContext->OnResize(); 
+                if (GetWindow()->GetWindowState() != WindowState::Minimized)
+                    GCoreData.SurgeRenderer->OnWindowResize(e.GetWidth(), e.GetHeight());
             });
         dispatcher.Dispatch<Surge::AppClosedEvent>([](Surge::AppClosedEvent& e) { GCoreData.Running = false; });
         dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent& e) { GCoreData.Running = false; });

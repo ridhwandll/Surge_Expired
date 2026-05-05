@@ -38,7 +38,7 @@ namespace Surge
 		void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
 
 		void EndFrame(const FrameContext& ctx) { mBackendRHI.EndFrame(ctx); }
-		void Resize(Uint width, Uint height) { mBackendRHI.Resize(width, height); }
+		void Resize(Uint width, Uint height) { /*mBackendRHI.Resize(width, height);*/ }
 
 		// Buffer
 		BufferHandle CreateBuffer(const BufferDesc& desc) { return mBackendRHI.CreateBuffer(desc); }

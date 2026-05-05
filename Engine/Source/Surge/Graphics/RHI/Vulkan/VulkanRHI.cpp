@@ -75,12 +75,20 @@ namespace Surge
 		// AcquireSemaphore signals when the image is actually ready to write
 		Uint imageIndex = 0;
 		VkResult result = mSwapchain.AcquireNextImage(*this, frame.AcquireSemaphore, imageIndex);
-		if (result == VK_ERROR_OUT_OF_DATE_KHR)
+
+		outCtx.FrameIndex = mFrame.GetCurrentFrameIndex();
+		outCtx.SwapchainIndex = imageIndex;
+		outCtx.Width = swapchainWidth;
+		outCtx.Height = swapchainHeight;
+
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 		{
-			// Handle resize
-			glm::vec2 size = Core::GetWindow()->GetSize();
-			ResizeInternal(size.x, size.y);
+			// Handle resize 
+			// IS this good? Or I should get the window size from Core?
+			ResizeInternal();
 			result = mSwapchain.AcquireNextImage(*this, frame.AcquireSemaphore, imageIndex);
+			outCtx.Width = mSwapchain.GetWidth();
+			outCtx.Height = mSwapchain.GetHeight();
 		}
 		SG_ASSERT(result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR, "VulkanRHI: AcquireNextImage failed");
 
@@ -93,10 +101,6 @@ namespace Surge
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(frame.CmdBuffer, &beginInfo);
 
-		outCtx.FrameIndex = mFrame.GetCurrentFrameIndex();
-		outCtx.SwapchainIndex = imageIndex;
-		outCtx.Width = swapchainWidth;
-		outCtx.Height = swapchainHeight;
 	}
 
 	void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
@@ -104,10 +108,7 @@ namespace Surge
 		// Set clear color values
 		VkClearValue clearValue{ .color = {{0.01f, 0.01f, 0.01f, 1.0f}} };
 
-		// Begin the render pass.
-		// TODO: When RenderGraph is implemented, this will be moved to a separate RenderPass class and the info will be pulled from the RenderGraph's data instead of hardcoded here
-		// TODO: REMOVE Renderpass from here
-		VkRenderPassBeginInfo rp_begin{
+		VkRenderPassBeginInfo rpbegin{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass = mRenderPass,
 			.framebuffer = mSwapchainFramebuffers[ctx.SwapchainIndex],
@@ -116,7 +117,7 @@ namespace Surge
 			.pClearValues = &clearValue };
 
 		VkCommandBuffer cmd = mFrame.GetCurrentVkFrame().CmdBuffer;
-		vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
 
 		VkViewport vp{
 			.width = static_cast<float>(ctx.Width),
@@ -163,13 +164,6 @@ namespace Surge
 
 		// Advance SLOT index (completely independent of swapchain image index)
 		mFrame.AdvanceFrame();
-	}
-
-	void VulkanRHI::Resize(Uint width, Uint height)
-	{
-		DestroyFramebuffers();
-		mSwapchain.Resize(*this, width, height);
-		CreateFramebuffers();
 	}
 
 	void VulkanRHI::CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
@@ -352,7 +346,7 @@ namespace Surge
 #elif defined(SURGE_PLATFORM_APPLE)
 		requiredInstanceExtensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
 #else
-#pragma error Platform not supported
+#pragma error "Platform not supported"
 #endif
 		ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationExtensions(requiredInstanceExtensions));
 
@@ -504,13 +498,11 @@ namespace Surge
 		mSwapchainFramebuffers.clear();
 	}
 
-	void VulkanRHI::ResizeInternal(Uint width, Uint height)
+	void VulkanRHI::ResizeInternal()
 	{
-		VkDevice device = mDevice.GetDevice();
-
-		vkDeviceWaitIdle(device);
+		vkDeviceWaitIdle(mDevice);
 		DestroyFramebuffers();
-		mSwapchain.Resize(*this, width, height);
+		mSwapchain.Resize(*this, 0, 0);
 		CreateFramebuffers();
 	}
 

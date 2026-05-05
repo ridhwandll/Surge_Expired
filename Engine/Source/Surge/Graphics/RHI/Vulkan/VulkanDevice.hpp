@@ -22,6 +22,7 @@ namespace Surge
 		VmaAllocator GetAllocator() const { return mVmaAllocator; }
 		int32_t GetQueueIndex() const { return mGraphicsQueueIndex; }
 
+		operator VkDevice() const { return mDevice; }
 	private:
 		VkDevice mDevice = VK_NULL_HANDLE ;
 		VkPhysicalDevice mGPU = VK_NULL_HANDLE;

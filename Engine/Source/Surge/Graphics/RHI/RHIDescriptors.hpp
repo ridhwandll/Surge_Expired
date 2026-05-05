@@ -14,6 +14,7 @@ namespace Surge
 		STORAGE = BIT(3),
 		STAGING = BIT(4),
 	};
+	MAKE_BIT_ENUM(BufferUsage, Uint);
 
 	enum class TextureFormat
 	{
@@ -33,6 +34,7 @@ namespace Surge
 		TRANSIENT_ATTACHMENT = BIT(3),
 		STORAGE = BIT(4),
 	};
+	MAKE_BIT_ENUM(TextureUsage, Uint);
 
 	enum class LoadOp { CLEAR, LOAD, DONT_CARE };
 	enum class StoreOp { STORE, DONT_CARE };

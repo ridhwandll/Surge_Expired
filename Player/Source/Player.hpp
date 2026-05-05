@@ -21,6 +21,7 @@ namespace Surge
         void Resize(Uint width, Uint height);
 
     private:
+        Entity mQuad;
         Vector<Entity> mQuads;
         Renderer* mRenderer;
     };
