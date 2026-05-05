@@ -61,7 +61,9 @@ namespace Surge
 		VkDevice device = mDevice.GetDevice();
 
 		// Get current frame SLOT (round-robin, predictable)
-		PerFrame& frame = mFrame.GetCurrentFrame();
+		PerFrame& frame = mFrame.GetCurrentVkFrame();
+		Uint swapchainWidth = mSwapchain.GetWidth();
+		Uint swapchainHeight = mSwapchain.GetHeight();
 
 		// Wait for this SLOT's fence
 		// This slot was used N frames ago, wait until the GPU is done with it
@@ -91,11 +93,16 @@ namespace Surge
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(frame.CmdBuffer, &beginInfo);
 
+		outCtx.FrameIndex = mFrame.GetCurrentFrameIndex();
+		outCtx.SwapchainIndex = imageIndex;
+		outCtx.Width = swapchainWidth;
+		outCtx.Height = swapchainHeight;
+	}
+
+	void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
+	{
 		// Set clear color values
 		VkClearValue clearValue{ .color = {{0.01f, 0.01f, 0.01f, 1.0f}} };
-
-		Uint swapchainWidth = mSwapchain.GetWidth();
-		Uint swapchainHeight = mSwapchain.GetHeight();
 
 		// Begin the render pass.
 		// TODO: When RenderGraph is implemented, this will be moved to a separate RenderPass class and the info will be pulled from the RenderGraph's data instead of hardcoded here
@@ -103,36 +110,35 @@ namespace Surge
 		VkRenderPassBeginInfo rp_begin{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass = mRenderPass,
-			.framebuffer = mSwapchainFramebuffers[imageIndex],
-			.renderArea = {.extent = {.width = swapchainWidth, .height = swapchainHeight}},
+			.framebuffer = mSwapchainFramebuffers[ctx.SwapchainIndex],
+			.renderArea = {.extent = {.width = ctx.Width, .height = ctx.Height}},
 			.clearValueCount = 1,
 			.pClearValues = &clearValue };
 
-		// We will add draw commands in the same command buffer
-		vkCmdBeginRenderPass(frame.CmdBuffer, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+		VkCommandBuffer cmd = mFrame.GetCurrentVkFrame().CmdBuffer;
+		vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 
 		VkViewport vp{
-			.width = static_cast<float>(swapchainWidth),
-			.height = static_cast<float>(swapchainHeight),
+			.width = static_cast<float>(ctx.Width),
+			.height = static_cast<float>(ctx.Height),
 			.minDepth = 0.0f,
 			.maxDepth = 1.0f };
-		vkCmdSetViewport(frame.CmdBuffer, 0, 1, &vp); // Set viewport dynamically
+		vkCmdSetViewport(cmd, 0, 1, &vp); // Set viewport dynamically
+		VkRect2D scissor{ .extent = {.width = ctx.Width, .height = ctx.Height} };
+		vkCmdSetScissor(cmd, 0, 1, &scissor); // Set scissor dynamically
+	}
 
-		VkRect2D scissor{ .extent = {.width = swapchainWidth, .height = swapchainHeight} };
-		vkCmdSetScissor(frame.CmdBuffer, 0, 1, &scissor); // Set scissor dynamically
-
-		outCtx.FrameIndex = mFrame.GetCurrentFrameIndex();
-		outCtx.SwapchainIndex = imageIndex;
-		outCtx.Width = swapchainWidth;
-		outCtx.Height = swapchainHeight;
+	void VulkanRHI::CmdEndSwapchainRenderpass(const FrameContext& ctx)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		vkCmdEndRenderPass(cmd);
 	}
 
 	void VulkanRHI::EndFrame(const FrameContext& ctx)
 	{
-		PerFrame& frame = mFrame.GetCurrentFrame();
+		PerFrame& frame = mFrame.GetCurrentVkFrame();
 		VkSemaphore releaseSemaphore = mSwapchain.GetFrame(ctx.SwapchainIndex).ReleaseSemaphore;
 
-		vkCmdEndRenderPass(frame.CmdBuffer);
 		vkEndCommandBuffer(frame.CmdBuffer);
 
 		// Submit: frame slot semaphores sync with swapchain image

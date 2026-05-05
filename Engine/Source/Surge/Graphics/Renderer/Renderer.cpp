@@ -20,6 +20,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
         mData = CreateScope<RendererData>();
+
 		mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
         
@@ -100,7 +101,18 @@ namespace Surge
 
 		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);
 
+		// Begins command buffer recording
+		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
         FrameContext ctx = mRHI->BeginFrame();
+
+		// Off-screen passes go here
+
+		mRHI->CmdBeginSwapchainRenderpass(ctx);
+
+		// mRHI->BlitImage(sourceTexture); //In future when we have offscreen render targets, postprocessing, etc, we will need to blit or sample from those here.
+		// For now we render directly to the swapchain image
+
+		// Render directly to swapchain buffer, no offscreen renderpass or postprocessing yet
 		mRHI->CmdBindPipeline(ctx, mPipeline);
 		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
 		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
@@ -109,10 +121,11 @@ namespace Surge
 		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
 		mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
 
-		mRHI->EndFrame(ctx);
+		mRHI->CmdEndSwapchainRenderpass(ctx);
+		mRHI->EndFrame(ctx); // Stops command buffer recording
     }
 
-	void Renderer::SubmitQuad(const glm::mat4& transform, const glm::vec4& color)
+	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color)
 	{
 		SG_ASSERT(mQuadCount < MAX_QUADS, "BatchRenderer: exceeded MAX_QUADS");
 

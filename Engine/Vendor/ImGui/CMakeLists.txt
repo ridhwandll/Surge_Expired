@@ -13,8 +13,6 @@ add_library(ImGui
     "imconfig.h"
     "imgui.h"
     "imgui.cpp"
-    "imgui_stdlib.cpp"
-    "imgui_stdlib.h"
     "imgui_draw.cpp"
     "imgui_internal.h"
     "imgui_widgets.cpp"
@@ -23,8 +21,7 @@ add_library(ImGui
     "imstb_truetype.h"
     "imgui_demo.cpp"
     "imgui_tables.cpp"
-    "ImGuizmo.h"
-    "ImGuizmo.cpp"
+
     ${BACKENDS}
 )
 

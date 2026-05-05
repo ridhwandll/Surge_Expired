@@ -34,6 +34,9 @@ namespace Surge
 		void Shutdown() { mBackendRHI.Shutdown(); }
 
 		FrameContext BeginFrame() { FrameContext ctx; mBackendRHI.BeginFrame(ctx); return ctx; }
+		void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }
+		void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
+
 		void EndFrame(const FrameContext& ctx) { mBackendRHI.EndFrame(ctx); }
 		void Resize(Uint width, Uint height) { mBackendRHI.Resize(width, height); }
 

@@ -55,10 +55,6 @@ namespace Surge::Core
 #endif
         GCoreData.SurgeWindow->RegisterEventCallback(OnEvent);
 
-        // Render Context
-        //GCoreData.SurgeRenderContext = new VulkanRenderContext();
-        //GCoreData.SurgeRenderContext->Initialize(GCoreData.SurgeWindow, clientOptions.EnableImGui);
-
         // Renderer
         GCoreData.SurgeRenderer = new Renderer();
         GCoreData.SurgeRenderer->Initialize();
@@ -82,23 +78,20 @@ namespace Surge::Core
             GCoreData.SurgeClock.Update();
             GCoreData.SurgeWindow->Update();
 
-            if (GCoreData.SurgeWindow->GetWindowState() != WindowState::Minimized)
+            if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
+                return;
+
+			GCoreData.SurgeClient->OnUpdate();
+
+            if (GCoreData.SurgeClient->GetClientOptions().EnableImGui)
+                GCoreData.SurgeClient->OnImGuiRender();
+
+            if (!GCoreData.FrameEndCallbacks.empty())
             {
-                //GCoreData.SurgeRenderContext->BeginFrame();
+                for (std::function<void()>& function : GCoreData.FrameEndCallbacks)
+                    function();
 
-                GCoreData.SurgeClient->OnUpdate();
-                if (GCoreData.SurgeClient->GetClientOptions().EnableImGui)
-                    GCoreData.SurgeClient->OnImGuiRender();
-
-                //GCoreData.SurgeRenderContext->EndFrame();
-
-                if (!GCoreData.FrameEndCallbacks.empty())
-                {
-                    for (std::function<void()>& function : GCoreData.FrameEndCallbacks)
-                        function();
-
-                    GCoreData.FrameEndCallbacks.clear();
-                }
+                GCoreData.FrameEndCallbacks.clear();
             }
         }
     }
@@ -116,8 +109,7 @@ namespace Surge::Core
         delete GCoreData.SurgeRenderer;
 
         delete GCoreData.SurgeWindow;
-        //GCoreData.SurgeRenderContext->Shutdown();
-        //delete GCoreData.SurgeRenderContext;
+
         SurgeReflect::Registry::Shutdown();
     }
 

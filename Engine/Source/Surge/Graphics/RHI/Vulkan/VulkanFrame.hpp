@@ -21,7 +21,7 @@ namespace Surge
 		void Shutdown(const VulkanRHI& rhi);
 
 		// Called at the start of each frame advances the index
-		PerFrame& GetCurrentFrame() { return mFrames[mCurrentIndex]; }
+		PerFrame& GetCurrentVkFrame() { return mFrames[mCurrentIndex]; }
 		PerFrame& GetFrame(Uint index) { return mFrames[index]; }
 
 		void AdvanceFrame();

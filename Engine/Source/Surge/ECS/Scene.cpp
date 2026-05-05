@@ -79,7 +79,7 @@ namespace Surge
                 for (auto& entity : group)
                 {
                     auto [quad, transformComponent] = group.get<SpriteRenderer, TransformComponent>(entity);
-                    renderer->SubmitQuad(transformComponent.GetTransform(), quad.Color);
+                    renderer->Submit(transformComponent.GetTransform(), quad.Color);
                 }
             }
             renderer->EndFrame();

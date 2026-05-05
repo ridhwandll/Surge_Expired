@@ -41,6 +41,10 @@ namespace Surge
 		void EndFrame(const FrameContext& ctx);
 		void Resize(Uint width, Uint height);
 
+		//Renderpass
+		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
+		void CmdEndSwapchainRenderpass(const FrameContext& ctx);
+
 		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
 		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
 

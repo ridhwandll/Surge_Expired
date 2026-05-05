@@ -22,20 +22,19 @@ namespace Surge::Core
         Vector<std::function<void()>> FrameEndCallbacks;
     };
 
-    SURGE_API void Initialize(Client* application);
-    SURGE_API void Run();
-    SURGE_API void Shutdown();
+    void Initialize(Client* application);
+    void Run();
+    void Shutdown();
 
-    SURGE_API void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
+    void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
 
     // Window should be a part of core
-    SURGE_API Window* GetWindow();
-    SURGE_API Clock& GetClock();
+    Window* GetWindow();
+    Clock& GetClock();
 
-    // Part of renderer module
-    SURGE_API Renderer* GetRenderer();
+    Renderer* GetRenderer();
 
-    SURGE_API Client* GetClient();
-    SURGE_API CoreData* GetData();
+    Client* GetClient();
+    CoreData* GetData();
 
 } // namespace Surge::Core

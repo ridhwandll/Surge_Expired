@@ -53,7 +53,7 @@ namespace Surge
         void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
-		void SubmitQuad(const glm::mat4& transform, const glm::vec4& color);
+		void Submit(const glm::mat4& transform, const glm::vec4& color);
 
         RendererData* GetData() { return mData.get(); }
     private:
