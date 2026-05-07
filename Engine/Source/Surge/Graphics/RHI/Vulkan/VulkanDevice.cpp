@@ -5,6 +5,21 @@
 
 namespace Surge
 {
+
+	static void OnVmaAllocate(VmaAllocator allocator, Uint memoryType,VkDeviceMemory memory,VkDeviceSize size,void* userData)
+	{
+		GPUMemoryStats* stats = static_cast<GPUMemoryStats*>(userData);
+		stats->AllocatedBytes.fetch_add(size, std::memory_order_relaxed);
+		stats->AllocationCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	static void OnVmaFree(VmaAllocator allocator, Uint memoryType, VkDeviceMemory memory, VkDeviceSize size,void* userData)
+	{
+		GPUMemoryStats* stats = static_cast<GPUMemoryStats*>(userData);
+		stats->AllocatedBytes.fetch_sub(size, std::memory_order_relaxed);
+		stats->AllocationCount.fetch_sub(1, std::memory_order_relaxed);
+	}
+
 	static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
 	{
 		for (auto extension : required)
@@ -112,6 +127,11 @@ namespace Surge
 		vkGetDeviceQueue(mDevice, mGraphicsQueueIndex, 0, &mQueue);
 
 		//Vulkan Memory Alloctor (VMA)
+		VmaDeviceMemoryCallbacks memCallbacks = {};
+		memCallbacks.pfnAllocate = OnVmaAllocate;
+		memCallbacks.pfnFree = OnVmaFree;
+		memCallbacks.pUserData = &mGPUMemoryStats;
+
 		VmaVulkanFunctions vmaVulkanFunc = {}; // Zero initialize everything else!
 		vmaVulkanFunc.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
 		vmaVulkanFunc.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
@@ -122,10 +142,33 @@ namespace Surge
 		allocatorInfo.device = mDevice;
 		allocatorInfo.instance = instance;
 		allocatorInfo.pVulkanFunctions = &vmaVulkanFunc;
+		allocatorInfo.pDeviceMemoryCallbacks = &memCallbacks;
 
 		VK_CALL(vmaCreateAllocator(&allocatorInfo, &mVmaAllocator));
+
+		QueryBudget();
 	}
-	
+
+	void VulkanDevice::QueryBudget()
+	{
+		vkGetPhysicalDeviceMemoryProperties(mGPU, &mMemProps);
+		std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets = {};
+		vmaGetHeapBudgets(mVmaAllocator, budgets.data());
+
+		const auto& props = mMemProps;
+		for (Uint i = 0; i < props.memoryHeapCount; i++)
+		{
+			bool isDeviceLocal = props.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
+
+			// On UMA mobile memoryHeapCount may be 1 with no DEVICE_LOCAL
+			if (isDeviceLocal || props.memoryHeapCount == 1)
+			{
+				mGPUMemoryStats.BudgetBytes += budgets[i].budget;
+			}
+		}
+	}
+
+
 	void VulkanDevice::Destroy()
 	{
 		vkDeviceWaitIdle(mDevice);

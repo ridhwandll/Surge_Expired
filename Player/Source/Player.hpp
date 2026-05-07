@@ -14,14 +14,14 @@ namespace Surge
 
         virtual void OnInitialize() override;
         virtual void OnUpdate() override;
-        virtual void OnImGuiRender() override;
         virtual void OnEvent(Event& e) override;
         virtual void OnShutdown() override;
     private:
         void Resize(Uint width, Uint height);
-
+        void OnImGuiRender();
     private:
         Entity mQuad;
+        Uint mQuadCount;
         Vector<Entity> mQuads;
         Renderer* mRenderer;
     };

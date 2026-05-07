@@ -23,7 +23,7 @@ namespace Surge
 	class VulkanSwapchain
 	{
 	public:
-		void Init(const VulkanRHI& rhi, Uint width, Uint height);
+		void Initialize(const VulkanRHI& rhi, Uint width, Uint height);
 		void Resize(const VulkanRHI& rhi, Uint width, Uint height);
 		void Shutdown(const VulkanRHI& rhi);
 

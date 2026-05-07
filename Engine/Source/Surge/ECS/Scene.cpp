@@ -75,12 +75,16 @@ namespace Surge
             Renderer* renderer = Core::GetRenderer();
             renderer->BeginFrame(*camera.Data1, camera.Data2);
             {
-                auto group = mRegistry.group<SpriteRenderer>(entt::get<TransformComponent>);
-                for (auto& entity : group)
-                {
-                    auto [quad, transformComponent] = group.get<SpriteRenderer, TransformComponent>(entity);
-                    renderer->Submit(transformComponent.GetTransform(), quad.Color);
-                }
+				mRegistry.group<SpriteRenderer>(entt::get<TransformComponent>).each([&](auto& quad, auto& transformComponent)
+                    {
+					    renderer->Submit(transformComponent.GetTransform(), quad.Color);
+					});
+                //auto group = mRegistry.group<SpriteRenderer>(entt::get<TransformComponent>);
+                //for (auto& entity : group)
+                //{
+                //    auto [quad, transformComponent] = group.get<SpriteRenderer, TransformComponent>(entity);
+                //    renderer->Submit(transformComponent.GetTransform(), quad.Color);
+                //}
             }
             renderer->EndFrame();
         }

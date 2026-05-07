@@ -27,7 +27,7 @@ namespace Surge
     class SURGE_API Renderer
     {
     public:
-		static constexpr Uint MAX_QUADS = 10000;
+		static constexpr Uint MAX_QUADS = 50000; // Technically we can go upto 50K on high end mobile xD
 		static constexpr Uint MAX_VERTICES = MAX_QUADS * 4;
 		static constexpr Uint MAX_INDICES = MAX_QUADS * 6;
 
@@ -56,9 +56,18 @@ namespace Surge
 		void Submit(const glm::mat4& transform, const glm::vec4& color);
 		void OnWindowResize(Uint width, Uint height);
 
+		const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
+		void AddImGuiRenderCallback(std::function<void()> callback) { if (callback) { mImGuiRenderCallbacks.push_back(callback); } }
         RendererData* GetData() { return mData.get(); }
+
+        // Renderer 2D methods TODO: move this to Renderer2D class
+		int GetQuadCount() const { return mQuadCount; }
+		int GetvertexCount() const { return mVertexCount; }
     private:
+		Vector<std::function<void()>> mImGuiRenderCallbacks;
 		Vector<QuadVertex> mVertexData;
+
+		// Renderer 2D data TODO: move this to Renderer2D class
 		int mVertexCount = 0;
         int mQuadCount = 0;
 

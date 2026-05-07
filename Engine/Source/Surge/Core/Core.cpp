@@ -79,12 +79,9 @@ namespace Surge::Core
             GCoreData.SurgeWindow->Update();
 
             if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
-                return;
+                continue;
 
 			GCoreData.SurgeClient->OnUpdate();
-
-            if (GCoreData.SurgeClient->GetClientOptions().EnableImGui)
-                GCoreData.SurgeClient->OnImGuiRender();
 
             if (!GCoreData.FrameEndCallbacks.empty())
             {

@@ -113,7 +113,7 @@ target_compile_options(spirvcross_android PRIVATE
     -w
 )
 
-# ImGui (core only – no Win32/GLFW backend on Android)
+# ImGui -
 set(IMGUI_SOURCES
     "${VENDOR_ROOT}/ImGui/imgui.cpp"
     "${VENDOR_ROOT}/ImGui/imgui_demo.cpp"
@@ -121,11 +121,12 @@ set(IMGUI_SOURCES
     "${VENDOR_ROOT}/ImGui/imgui_tables.cpp"
     "${VENDOR_ROOT}/ImGui/imgui_widgets.cpp"
     "${VENDOR_ROOT}/ImGui/Backends/imgui_impl_vulkan.cpp"
-    "${VENDOR_ROOT}/ImGui/ImGuizmo.cpp"    
+    "${VENDOR_ROOT}/ImGui/Backends/imgui_impl_android.cpp"
+    "${APP_GLUE_DIR}"
 )
 add_library(imgui_android STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui_android PUBLIC "${VENDOR_ROOT}/ImGui" "${VENDOR_ROOT}/volk" "${VENDOR_ROOT}/Vulkan-Headers/Include" "${VENDOR_ROOT}/glm")
-target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR)
+target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR IMGUI_IMPL_VULKAN_USE_VOLK)
 
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE

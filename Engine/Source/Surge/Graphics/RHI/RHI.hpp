@@ -30,7 +30,7 @@ namespace Surge
 		~GraphicsRHI() = default;
 
 		void Initialize(Window* window = nullptr) { mBackendRHI.Initialize(window); }
-		void InitiateShutdown() { mBackendRHI.InitiateShutdown(); }
+		void WaitIdle() { mBackendRHI.WaitIdle(); }
 		void Shutdown() { mBackendRHI.Shutdown(); }
 
 		FrameContext BeginFrame() { FrameContext ctx; mBackendRHI.BeginFrame(ctx); return ctx; }
@@ -38,7 +38,8 @@ namespace Surge
 		void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
 
 		void EndFrame(const FrameContext& ctx) { mBackendRHI.EndFrame(ctx); }
-		void Resize(Uint width, Uint height) { /*mBackendRHI.Resize(width, height);*/ }
+		void Resize(Uint width, Uint height) { mBackendRHI.Resize(); }
+		const RHIStats& GetStats() { return mBackendRHI.GetStats(); }
 
 		// Buffer
 		BufferHandle CreateBuffer(const BufferDesc& desc) { return mBackendRHI.CreateBuffer(desc); }

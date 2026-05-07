@@ -9,9 +9,11 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanFrame.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
+
 
 
 #define FORCE_VALIDATION 0
@@ -34,11 +36,13 @@ namespace Surge
 		VulkanRHI() = default;
 		~VulkanRHI() = default;
 		void Initialize(Window* window);
-		void InitiateShutdown();
+		void WaitIdle();
 		void Shutdown();
 
 		void BeginFrame(FrameContext& outCtx);
 		void EndFrame(const FrameContext& ctx);
+		void Resize();
+		const RHIStats& GetStats();
 
 		//Renderpass
 		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
@@ -69,6 +73,7 @@ namespace Surge
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
 
+		const VulkanSwapchain& GetSwapchain() const { return mSwapchain; }
 		VulkanSwapchain& GetSwapchain() { return mSwapchain; }
 		VulkanFrame& GetFrame() { return mFrame; }
 
@@ -84,13 +89,16 @@ namespace Surge
 
 	private:
 		void CreateInstance();
+		void FillStats();
+
 		void CreateSurface(Window* window);
-	
+		void DestroySurface();
+
+		void CreateSwapchainFramebuffers();
+		void DestroySwapchainFramebuffers();
+
 		void CreateRenderpass();
 		void DestroyRenderpass();
-
-		void CreateFramebuffers();
-		void DestroyFramebuffers();
 
 		void ResizeInternal();
 
@@ -98,10 +106,13 @@ namespace Surge
 		Vector<const char*> GetRequiredInstanceLayers();
 
 	private:
+		RHIStats mStats;
+
 		VulkanDevice mDevice;
 		VulkanDebugger mDebugger;
 		VulkanFrame mFrame;
 		VulkanSwapchain mSwapchain;
+		VulkanImGuiContext mImGuiContext;
 
 		Vector<VkFramebuffer> mSwapchainFramebuffers;
 		VkRenderPass mRenderPass = VK_NULL_HANDLE;

@@ -6,7 +6,7 @@ namespace Surge
 {
 	std::vector<VkFramebuffer> swapchain_framebuffers;
 
-	void VulkanSwapchain::Init(const VulkanRHI& rhi, Uint width, Uint height)
+	void VulkanSwapchain::Initialize(const VulkanRHI& rhi, Uint width, Uint height)
 	{
 		Create(rhi, width, height);
 	}
@@ -78,11 +78,11 @@ namespace Surge
 		{
 			swapchainSize.width = width;
 			swapchainSize.height = height;
+			Log<Severity::Debug>("VulkanSwapchain: Using custom swapchain size Width:{} Height:{}", swapchainSize.width, swapchainSize.height);
 		}
-		else
-		{
+		else		
 			swapchainSize = surfaceProperties.currentExtent;
-		}
+		
 		
 		VkPresentModeKHR swapchainPresentMode = SelectPresentMode(gpu, surface);
 
@@ -205,10 +205,9 @@ namespace Surge
 		Vector<VkSurfaceFormatKHR> formats(count);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &count, formats.data());
 
-		// Prefer sRGB for correct gamma
 		for (auto& f : formats)
 		{
-			if ((f.format == VK_FORMAT_R8G8B8A8_SRGB || f.format == VK_FORMAT_B8G8R8A8_SRGB || f.format == VK_FORMAT_A8B8G8R8_SRGB_PACK32)
+			if ((f.format == VK_FORMAT_R8G8B8A8_UNORM || f.format == VK_FORMAT_B8G8R8A8_UNORM)
 				&&
 				f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 				return f;
@@ -227,7 +226,7 @@ namespace Surge
 		// MAILBOX gives lower latency but burns more power
 		for (auto& m : modes)
 		{
-			if (m == VK_PRESENT_MODE_FIFO_KHR) //VK_PRESENT_MODE_MAILBOX_KHR to non Vsync
+			if (m == VK_PRESENT_MODE_MAILBOX_KHR) //VK_PRESENT_MODE_MAILBOX_KHR to non Vsync
 				return m;
 		}
 

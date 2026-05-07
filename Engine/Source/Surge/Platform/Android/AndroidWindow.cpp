@@ -3,10 +3,12 @@
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #include "Surge/Core/Core.hpp"
 #include <android/input.h>
+#include <imgui.h>
+
+extern int32_t ImGui_ImplAndroid_HandleInputEvent(const AInputEvent *input_event);
 
 namespace Surge
 {
-    // Single instance pointer – set on construction, used by input helpers
     static AndroidWindow* sAndroidWindowInstance = nullptr;
 
     AndroidWindow::AndroidWindow(const WindowDesc& windowData)
@@ -78,8 +80,14 @@ namespace Surge
 
         switch (cmd)
         {
+		    case APP_CMD_SAVE_STATE:
+			    // OS is preparing to background the app
+                Log<Severity::Fatal>("App is saving state(APP_CMD_SAVE_STATE)");
+			    break;
             case APP_CMD_INIT_WINDOW:
             {
+				//Core::GetRenderer()->OnSurfaceCreated(self);
+
                 self->mNativeWindow = app->window;
                 self->mWindowState = WindowState::Normal;
                 if (self->mNativeWindow)
@@ -97,23 +105,32 @@ namespace Surge
             }
             case APP_CMD_TERM_WINDOW:
             {
+                //Core::GetRenderer()->OnSurfaceDestroyed();
+				Log<Severity::Fatal>("App is terminating window(APP_CMD_TERM_WINDOW)");
+				// CRITICAL: The window is gone. Stop all Vulkan work NOW.
+				//engine->SetRenderingActive(false);
+				//engine->GetRHI().CleanupSwapchain(); // Clean up old swapchain resources
                 self->mWindowState = WindowState::Minimized;
                 self->mNativeWindow = nullptr;
                 break;
             }
             case APP_CMD_GAINED_FOCUS:
             {
+				Log<Severity::Fatal>("App gained focus(APP_CMD_GAINED_FOCUS)");
                 self->mWindowState = WindowState::Normal;
                 break;
             }
             case APP_CMD_LOST_FOCUS:
             {
+                Log<Severity::Fatal>("App lost focus(APP_CMD_LOST_FOCUS)");
+                // Cap FPS to 10 or pause logic to save battery
                 self->mWindowState = WindowState::Minimized;
                 break;
             }
             case APP_CMD_WINDOW_RESIZED:
             case APP_CMD_CONFIG_CHANGED:
             {
+                Log<Severity::Fatal>("App configuration changed(APP_CMD_CONFIG_CHANGED)");
                 if (app->window)
                 {
                     Uint w = static_cast<Uint>(ANativeWindow_getWidth(app->window));
@@ -129,6 +146,7 @@ namespace Surge
             }
             case APP_CMD_DESTROY:
             {
+                Log<Severity::Fatal>("App is being destroyed(APP_CMD_DESTROY)");
                 AppClosedEvent e;
                 if (self->mEventCallback)
                     self->mEventCallback(e);
@@ -142,6 +160,9 @@ namespace Surge
     // Static callback for touch/key input events
     int32_t AndroidWindow::HandleInputEvent(android_app* app, AInputEvent* event)
     {
+        if (ImGui_ImplAndroid_HandleInputEvent(event))
+            return 1;
+
         AndroidWindow* self = static_cast<AndroidWindow*>(app->userData);
         if (!self)
             return 0;

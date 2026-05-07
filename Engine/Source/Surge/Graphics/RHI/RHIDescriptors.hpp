@@ -6,6 +6,23 @@
 
 namespace Surge
 {
+	struct RHIStats
+	{
+		String GPUName;
+		String RHIVersion;
+		String VendorName;
+		Uint DrawCalls = 0;
+
+		uint64_t AllocationCount;
+		uint64_t UsedGPUMemory;
+		uint64_t TotalAllowedGPUMemory;
+
+		void Reset()
+		{
+			DrawCalls = 0;
+		}
+	};
+
 	enum class BufferUsage : Uint
 	{
 		VERTEX = BIT(0),

@@ -50,14 +50,16 @@ namespace Surge
 			halfWidth = size * aspect * 0.5f;
 			halfHeight = size * 0.5f;
 		}
-
+	
 		// Stress test		
- 		mQuads.resize(Renderer::MAX_QUADS);
+		mQuadCount = Renderer::MAX_QUADS;
+		//mQuadCount = 100.0f;
+ 		mQuads.resize(mQuadCount);
  		std::random_device rd;
  		std::mt19937 gen(rd());
  		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
  		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
- 		for (Uint i = 0; i < Renderer::MAX_QUADS; i++)
+ 		for (Uint i = 0; i < mQuadCount; i++)
  		{
  			float x = distX(gen);
  			float y = distY(gen);
@@ -87,29 +89,58 @@ namespace Surge
 // 		}
 // 
 		mActiveScene->OnResize(windowSize.x, windowSize.y);
+
+		mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
 	}
 
 	void Player::OnUpdate()
 	{
-		float time = Core::GetClock().GetSeconds();
+		float dt = Core::GetClock().GetSeconds();
 
-		for (Uint i = 0; i < Renderer::MAX_QUADS; i++)
+
+		for (Uint i = 0; i < mQuadCount; i++)
 		{
 			TransformComponent& transform = mQuads[i].GetComponent<TransformComponent>();
 
-			float speed = 10.0f + (i % 15);
+			float rotSpeed = 10.0f + (i % 15);
+			float moveSpeed = 100.0f;
 			float dir = (i % 3 == 0) ? -1.0f : 1.0f;
 
-			transform.Rotation.z += dir * speed * time;
+			transform.Rotation.z += dir * rotSpeed * dt;
 
-			transform.Position.x += sin(time + i) * 0.001f;
-			transform.Position.y += cos(time + i * 0.5f) * 0.001f;
+			transform.Position.x += sin(dt + i) * 0.001f * dt * moveSpeed;
+			transform.Position.y += cos(dt + i * 0.5f) * 0.001f * dt * moveSpeed;
 		}
 		mActiveScene->Update();
 	}
 
 	void Player::OnImGuiRender()
-	{}
+	{
+		Clock& clock = Core::GetClock();
+		ImGuiID dockspace_id = ImGui::GetID("DockSpace");
+		ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
+		const RHIStats& stats = Core::GetRenderer()->GetRHI()->GetStats();
+		ImGui::Begin("Surge player");
+		ImGui::Text("Drawn %d quads\nVertices: %i\nFPS: %.1f", Core::GetRenderer()->GetQuadCount(), Core::GetRenderer()->GetvertexCount(), 1 / clock.GetSeconds());
+		ImGui::Text("Draw calls: %i", stats.DrawCalls);
+		ImGui::Text("GPU: %s", stats.GPUName.c_str());
+		ImGui::Text("Vendor: %s", stats.VendorName.c_str());
+		ImGui::Text("%s", stats.RHIVersion.c_str());
+		
+		float used = stats.UsedGPUMemory;
+		float total = stats.TotalAllowedGPUMemory;
+		float frac = (total > 0.0f) ? (used / total) : 0.0f;
+		ImGui::Text("GPU Memory");
+		ImGui::ProgressBar(frac, ImVec2(-1, 0));
+		ImGui::Text("%.1f MB / %.1f MB", used, total);
+
+		// Allocation count
+		ImGui::Text("Allocations: %llu", stats.AllocationCount);
+
+		ImGui::End();
+		ImGui::ShowMetricsWindow();
+	}
 
 	void Player::OnEvent(Event& e)
 	{

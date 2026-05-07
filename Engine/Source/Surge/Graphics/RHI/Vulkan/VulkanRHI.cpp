@@ -19,19 +19,23 @@ namespace Surge
 		CreateSurface(window);
 		mDevice.Initialize(mInstance, mSurface);
 		mFrame.Initialize(*this, 3);
-		mSwapchain.Init(*this, window->GetSize().x, window->GetSize().y);
+		mSwapchain.Initialize(*this, window->GetSize().x, window->GetSize().y);
 
 		CreateRenderpass();
-		CreateFramebuffers();
+		CreateSwapchainFramebuffers();
+
+		mImGuiContext.Init(*this);
+		FillStats();
 	}
 
-	void VulkanRHI::InitiateShutdown()
+	void VulkanRHI::WaitIdle()
 	{
 		vkDeviceWaitIdle(mDevice.GetDevice());
 	}
 
 	void VulkanRHI::Shutdown()
 	{	
+		mImGuiContext.Shutdown(*this);
 		// Clean up VkObjects if forgot destroy manually
 		mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry)
 			{
@@ -45,7 +49,7 @@ namespace Surge
 				SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!");
 			});
 
-		DestroyFramebuffers();
+		DestroySwapchainFramebuffers();
 		DestroyRenderpass();
 
 		mFrame.Shutdown(*this);
@@ -58,6 +62,8 @@ namespace Surge
 
 	void VulkanRHI::BeginFrame(FrameContext& outCtx)
 	{
+		mStats.Reset();
+		mImGuiContext.BeginFrame();
 		VkDevice device = mDevice.GetDevice();
 
 		// Get current frame SLOT (round-robin, predictable)
@@ -106,7 +112,7 @@ namespace Surge
 	void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
 	{
 		// Set clear color values
-		VkClearValue clearValue{ .color = {{0.01f, 0.01f, 0.01f, 1.0f}} };
+		VkClearValue clearValue{ .color = {{0.1f, 0.1f, 0.1f, 1.0f}} };
 
 		VkRenderPassBeginInfo rpbegin{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -132,6 +138,7 @@ namespace Surge
 	void VulkanRHI::CmdEndSwapchainRenderpass(const FrameContext& ctx)
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		mImGuiContext.EndFrame(cmd);
 		vkCmdEndRenderPass(cmd);
 	}
 
@@ -164,6 +171,28 @@ namespace Surge
 
 		// Advance SLOT index (completely independent of swapchain image index)
 		mFrame.AdvanceFrame();
+	}
+
+	void VulkanRHI::Resize()
+	{
+#ifdef SURGE_PLATFORM_ANDROID
+        //VulkanRHI& rhi = Core::GetRenderer()->GetRHI()->GetBackendRHI();
+		//vkDestroySurfaceKHR(rhi.GetInstance(), rhi.GetSurface(), nullptr);
+		//CreateSurface(Core::GetWindow());
+#endif		
+		ResizeInternal();
+	}
+
+	const RHIStats& VulkanRHI::GetStats()
+	{
+		// We need to write the memory stats every time RHI::GetStats() is called because GPU memory can change dynamically
+		const GPUMemoryStats& memStats = mDevice.GetMemoryStats();
+		uint64_t bytes = memStats.AllocatedBytes.load(std::memory_order_relaxed);
+		mStats.UsedGPUMemory = (float)bytes / (1024.0f * 1024.0f);
+		mStats.TotalAllowedGPUMemory = (float)memStats.BudgetBytes / (1024.0f * 1024.0f);
+		mStats.AllocationCount = memStats.AllocationCount.load(std::memory_order_relaxed);
+
+		return mStats;
 	}
 
 	void VulkanRHI::CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
@@ -272,12 +301,14 @@ namespace Surge
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
 		vkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+		mStats.DrawCalls++;
 	}
 
 	void VulkanRHI::CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance)
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
 		vkCmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
+		mStats.DrawCalls++;
 	}
 
 	static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
@@ -333,6 +364,34 @@ namespace Surge
 		volkLoadInstance(mInstance);
 
 		ENABLE_IF_VK_VALIDATION(mDebugger.StartDiagnostics(mInstance));
+	}
+
+	static String GetVendorName(Uint vendorID)
+	{
+		switch (vendorID) {
+		case 0x10DE: return "NVIDIA";
+		case 0x1002: return "AMD";
+		case 0x8086: return "INTEL";
+		case 0x13B5: return "ARM (Mali)";
+		case 0x5143: return "Qualcomm (Adreno)";
+		case 0x1010: return "ImgTec (PowerVR)";
+		default:     return "Unknown Vendor";
+		}
+	}
+
+	void VulkanRHI::FillStats()
+	{
+		VkPhysicalDeviceProperties props;
+		vkGetPhysicalDeviceProperties(mDevice.GetGPU(), &props);
+
+		mStats.GPUName = props.deviceName;
+
+		Uint major = VK_VERSION_MAJOR(props.apiVersion);
+		Uint minor = VK_VERSION_MINOR(props.apiVersion);
+		Uint patch = VK_VERSION_PATCH(props.apiVersion);
+		mStats.RHIVersion = std::format("Vulkan Version: {}.{}.{}", major, minor, patch);
+		
+		mStats.VendorName = GetVendorName(props.vendorID);
 	}
 
 	Vector<const char*> VulkanRHI::GetRequiredInstanceExtensions()
@@ -401,6 +460,16 @@ namespace Surge
 #endif
 	}
 
+	void VulkanRHI::DestroySurface()
+	{
+		if (mSurface != VK_NULL_HANDLE)
+		{
+			vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
+			mSurface = VK_NULL_HANDLE;
+		}
+
+	}
+
 	void VulkanRHI::CreateRenderpass()
 	{
 		VkDevice device = mDevice.GetDevice();		
@@ -465,7 +534,7 @@ namespace Surge
 			vkDestroyRenderPass(mDevice.GetDevice(), mRenderPass, nullptr);
 	}
 
-	void VulkanRHI::CreateFramebuffers()
+	void VulkanRHI::CreateSwapchainFramebuffers()
 	{
 		Uint imageCount = mSwapchain.GetImageCount();
 		mSwapchainFramebuffers.resize(imageCount);
@@ -488,7 +557,7 @@ namespace Surge
 		}
 	}
 
-	void VulkanRHI::DestroyFramebuffers()
+	void VulkanRHI::DestroySwapchainFramebuffers()
 	{
 		for (auto& fb : mSwapchainFramebuffers)
 		{
@@ -501,9 +570,9 @@ namespace Surge
 	void VulkanRHI::ResizeInternal()
 	{
 		vkDeviceWaitIdle(mDevice);
-		DestroyFramebuffers();
+		DestroySwapchainFramebuffers();
 		mSwapchain.Resize(*this, 0, 0);
-		CreateFramebuffers();
+		CreateSwapchainFramebuffers();
 	}
 
 }

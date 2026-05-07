@@ -30,7 +30,7 @@
         <activity
             android:name="android.app.NativeActivity"
             android:label="Surge Player"
-            android:screenOrientation="sensor"
+            android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustNothing"
             android:configChanges="orientation|keyboardHidden|screenSize|density"
             android:exported="true">

@@ -120,6 +120,10 @@ namespace Surge
 		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
 		mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
 
+		//ImGui Render
+		for (auto callback : mImGuiRenderCallbacks)
+			callback();
+
 		mRHI->CmdEndSwapchainRenderpass(ctx);
 
 		mRHI->EndFrame(ctx); // Stops command buffer recording
@@ -158,13 +162,14 @@ namespace Surge
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
 	{
+		mRHI->Resize(width, height);
 		Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
 	}
 
 	void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
-        mRHI->InitiateShutdown();
+        mRHI->WaitIdle();
 		mRHI->DestroyPipeline(mPipeline);
         mRHI->DestroyBuffer(mVertexBuffer);
         mRHI->DestroyBuffer(mIndexBuffer);

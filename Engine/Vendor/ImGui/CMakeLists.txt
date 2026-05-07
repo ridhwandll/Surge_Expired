@@ -1,13 +1,22 @@
 include(${CMAKE_SOURCE_DIR}/scripts/CMakeUtils.cmake)
 
 if(WIN32)
-set(BACKENDS
-    "Backends/imgui_impl_vulkan.cpp"
-    "Backends/imgui_impl_vulkan.h"
-    "Backends/imgui_impl_win32.cpp"
-    "Backends/imgui_impl_win32.h"
-)
+    set(BACKENDS
+        "Backends/imgui_impl_vulkan.cpp"
+        "Backends/imgui_impl_vulkan.h"
+        "Backends/imgui_impl_win32.cpp"
+        "Backends/imgui_impl_win32.h")
 endif(WIN32)
+
+if(ANDROID)
+    set(BACKENDS
+        "Backends/imgui_impl_vulkan.cpp"
+        "Backends/imgui_impl_vulkan.h"
+        "Backends/imgui_impl_android.cpp"
+        "Backends/imgui_impl_android.h")
+endif()
+
+
 
 add_library(ImGui
     "imconfig.h"
@@ -30,6 +39,11 @@ target_include_directories(ImGui PRIVATE
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/volk
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/glm
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/Vulkan-Headers/Include
+)
+
+target_compile_definitions(ImGui
+    PRIVATE
+    IMGUI_IMPL_VULKAN_USE_VOLK
 )
 
 set_target_properties(ImGui PROPERTIES FOLDER Dependencies)
