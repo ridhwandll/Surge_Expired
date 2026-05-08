@@ -13,8 +13,7 @@ namespace Surge
 		static TextureEntry Create(const VulkanRHI& rhi, const TextureDesc& desc);
 		static void Destroy(const VulkanRHI& rhi, TextureEntry& entry);
 
-		// Record a pipeline barrier that transitions the image layout
-		// Updates entry.Layout to newLayout after recording
+		// Record a pipeline barrier that transitions the image layout, Updates entry.Layout to newLayout after recording
 		static void TransitionLayout(VkCommandBuffer cmd, TextureEntry& entry, VkImageLayout newLayout);
 
 		static VkImageAspectFlags GetAspectFlags(TextureFormat format); 

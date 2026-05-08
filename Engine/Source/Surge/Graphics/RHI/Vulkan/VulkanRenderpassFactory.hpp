@@ -9,24 +9,25 @@ namespace Surge
 	// Two framebuffers with same formats + load/store ops share one VkRenderPass
 	struct RenderPassKey
 	{
-		VkFormat ColorFormats[8] = {};
-		uint32_t ColorCount = 0;
+		std::array<VkFormat, 8> ColorFormats = {};
+		Uint ColorCount = 0;
 		VkFormat DepthFormat = VK_FORMAT_UNDEFINED;
 
-		LoadOp ColorLoad[8] = {};
-		StoreOp ColorStore[8] = {};
+		std::array<LoadOp, 8> ColorLoad = {};
+		std::array<StoreOp, 8> ColorStore = {};
 		LoadOp DepthLoad = LoadOp::CLEAR;
 		StoreOp DepthStore = StoreOp::STORE;
 
 		bool operator==(const RenderPassKey& o) const
 		{
-			if (ColorCount != o.ColorCount) return false;
+			if (ColorCount != o.ColorCount)   return false;
 			if (DepthFormat != o.DepthFormat) return false;
+
 			for (Uint i = 0; i < ColorCount; i++)
 			{
 				if (ColorFormats[i] != o.ColorFormats[i]) return false;
-				if (ColorLoad[i] != o.ColorLoad[i])    return false;
-				if (ColorStore[i] != o.ColorStore[i])   return false;
+				if (ColorLoad[i] != o.ColorLoad[i])       return false;
+				if (ColorStore[i] != o.ColorStore[i])     return false;
 			}
 			return DepthLoad == o.DepthLoad && DepthStore == o.DepthStore;
 		}
@@ -41,6 +42,7 @@ namespace Surge
 				{
 					hash ^= v + 0x9e3779b9 + (hash << 6) + (hash >> 2);
 				};
+
 			for (Uint i = 0; i < k.ColorCount; i++)
 			{
 				combine(std::hash<int>{}(k.ColorFormats[i]));
@@ -55,7 +57,7 @@ namespace Surge
 	};
 
 	class VulkanRHI;
-	class VulkanRenderpassCache
+	class VulkanRenderpassFactory
 	{
 	public:
 		// Returns existing or creates new VkRenderPass for the given key

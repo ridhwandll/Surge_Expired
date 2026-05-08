@@ -8,6 +8,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace Surge
 {
+
     WindowsWindow::WindowsWindow(const WindowDesc& windowData)
     {
         mWindowData = windowData;
@@ -38,6 +39,14 @@ namespace Surge
         mWin32Window = CreateWindow(wc.lpszClassName, mWindowData.Title.c_str(),
                                     WS_OVERLAPPEDWINDOW, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
                                     mWindowData.Height, nullptr, NULL, wc.hInstance, this);
+
+        // Set the title bar & border color
+        #define DWMWA_CAPTION_COLOR_ 35
+		COLORREF titlebarColor = RGB(20, 20, 20);
+		DwmSetWindowAttribute(mWin32Window, DWMWA_CAPTION_COLOR_, &titlebarColor, sizeof(titlebarColor));
+        #define DWMWA_BORDER_COLOR_ 34
+		DwmSetWindowAttribute(mWin32Window, DWMWA_BORDER_COLOR_, &titlebarColor, sizeof(titlebarColor));
+
         SURGE_GET_WIN32_LAST_ERROR
         ApplyFlags();
         SG_ASSERT(mWin32Window, "WindowsWindow creation failure!");

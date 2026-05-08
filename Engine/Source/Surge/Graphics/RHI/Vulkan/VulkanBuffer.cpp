@@ -20,7 +20,6 @@ namespace Surge
 		SG_ASSERT(desc.Size > 0, "BufferDesc::Size must be > 0");
 
 		BufferEntry entry = {};
-		entry.Size = desc.Size;
 		entry.Desc = desc;
 
 		VkBufferCreateInfo bufferInfo = {};
@@ -84,18 +83,18 @@ namespace Surge
 			entry.Buffer = VK_NULL_HANDLE;
 			entry.Allocation = VK_NULL_HANDLE;
 			entry.MappedPtr = nullptr;
-			entry.Size = 0;
+			entry.Desc = {};
 		}
 	}
 
 	void VulkanBuffer::Upload(const VulkanRHI& rhi, BufferEntry& entry, const void* data, Uint size, Uint offset /*= 0*/)
 	{
 		SG_ASSERT(entry.Buffer != VK_NULL_HANDLE, "Uploading to a null buffer");
-		SG_ASSERT(offset + size <= entry.Size, "Upload out of buffer bounds");
+		SG_ASSERT(offset + size <= entry.Desc.Size, "Upload out of buffer bounds");
 		SG_ASSERT(entry.MappedPtr != nullptr, "Upload called on a non-host-visible buffer. Use a staging buffer for GPU-only resources.");
 
 		memcpy((uint8_t*)entry.MappedPtr + offset, data, size);
-		// No explicit flush needed — VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+		// No explicit flush needed, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 		// is required at allocation time for host visible buffers
 	}
 }

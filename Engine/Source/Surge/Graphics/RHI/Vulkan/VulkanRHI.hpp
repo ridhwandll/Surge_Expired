@@ -44,6 +44,7 @@ namespace Surge
 		void BeginFrame(FrameContext& outCtx);
 		void EndFrame(const FrameContext& ctx);
 		void Resize();
+
 		const RHIStats& GetStats();
 
 		BufferHandle CreateBuffer(const BufferDesc& desc);		
@@ -62,7 +63,7 @@ namespace Surge
 		PipelineHandle CreatePipeline(const PipelineDesc& desc);
 		void DestroyPipeline(PipelineHandle h);
 
-		//Draw Commands
+		// Commands
 		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance);
 		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance);
 
@@ -72,17 +73,17 @@ namespace Surge
 
 		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset);
 		void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle);
-		void CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout);
+		void CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout); // TODO: Expose to RHI
 
 		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
 		void CmdEndSwapchainRenderpass(const FrameContext& ctx);
 
-		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 0.0f, 1.0f });
+		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor);
 		void CmdEndRenderPass(const FrameContext& ctx);
-
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
 
+		// Getters for internal use by Vulkan* classes
 		const VulkanSwapchain& GetSwapchain() const { return mSwapchain; }
 		VulkanSwapchain& GetSwapchain() { return mSwapchain; }
 		VulkanFrame& GetFrame() { return mFrame; }
@@ -108,8 +109,8 @@ namespace Surge
 		void CreateSwapchainFramebuffers();
 		void DestroySwapchainFramebuffers();
 
-		void CreateRenderpass();
-		void DestroyRenderpass();
+		void CreateSwapchainRenderpass();
+		void DestroySwapchainRenderpass();
 
 		void ResizeInternal();
 
@@ -124,7 +125,7 @@ namespace Surge
 		VulkanFrame mFrame;
 		VulkanSwapchain mSwapchain;
 		VulkanImGuiContext mImGuiContext;
-		VulkanRenderpassCache mRenderPassCache;
+		VulkanRenderpassFactory mRenderPassCache;
 
 		Vector<VkFramebuffer> mSwapchainFramebuffers;
 		VkRenderPass mRenderPass = VK_NULL_HANDLE;

@@ -21,7 +21,12 @@ namespace Surge
 		SG_ASSERT(desc.Width > 0, "TextureDesc::Width must be > 0");
 		SG_ASSERT(desc.Height > 0, "TextureDesc::Height must be > 0");
 		SG_ASSERT(desc.Mips > 0, "TextureDesc::Mips must be > 0");
+		SG_ASSERT(desc.Layers > 0, "TextureDesc::Layers must be > 0");
 
+		// Transient attachments Tf are these?
+		// Transient attachments are images used for intermediate data that only exists during a single render pass.
+		// These textures are never meant to be stored in the device's main memory or read back by the CPU; they are created, used, and discarded entirely
+		// within the GPU's high-speed local cache (on-chip memory)
 		// Transient textures must not be sampled or transferred
 		if (desc.Transient)
 		{
@@ -30,28 +35,25 @@ namespace Surge
 		}
 
 		TextureEntry entry = {};
-		entry.Format = VulkanUtils::TextureFormatToVkFormat(desc.Format);
-		entry.Width = desc.Width;
-		entry.Height = desc.Height;
-		entry.Mips = desc.Mips;
 		entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		entry.Desc = desc;
-
-		VkFormat vkFormat = VulkanUtils::TextureFormatToVkFormat(desc.Format);
 		bool isDepth = VulkanUtils::IsDepthFormat(desc.Format);
 
 		// VkImage
 		VkImageCreateInfo imageInfo = {};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.format = vkFormat;
+		imageInfo.format = VulkanUtils::TextureFormatToVkFormat(desc.Format);
 		imageInfo.extent = { desc.Width, desc.Height, 1 };
 		imageInfo.mipLevels = desc.Mips;
 		imageInfo.arrayLayers = desc.Layers;
 		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageInfo.usage = VulkanUtils::ToVkImageUsage(desc.Usage, desc.Transient);
-		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		// VK_SHARING_MODE_EXCLUSIVE specifies that access to any range or image subresource of the object will be exclusive to a single queue family at a time	
+		// VK_SHARING_MODE_CONCURRENT may result in lower performance access to the buffer or image than VK_SHARING_MODE_EXCLUSIVE (Vulkan Docs)
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; 		
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		// VMA allocation
@@ -60,16 +62,16 @@ namespace Surge
 		if (desc.Transient)
 		{
 			// Mobile TBDR key optimization:
-			// GPU_LAZILY_ALLOCATED = physical memory only allocated if the GPU
-			// actually needs to flush the tile — on a perfect TBDR frame, zero bytes
+			// GPU_LAZILY_ALLOCATED = physical memory only allocated if the GPU actually needs to flush the tile on a perfect TBDR frame, zero bytes
 			// of real DRAM are used for transient attachments
 			allocInfo.usage = VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
 			allocInfo.requiredFlags = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
 		}
-		else
-		{
-			allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-		}
+		else		
+			allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; // Load on GPU
+		// VMA Docs:
+		// If you have a preference for putting the resource in GPU (device) memory or CPU (host) memory on systems with discrete graphics card that have
+		// the memories separate, you can use VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE or VMA_MEMORY_USAGE_AUTO_PREFER_HOST.
 
 		VK_CALL(vmaCreateImage(rhi.GetAllocator(), &imageInfo, &allocInfo, &entry.Image, &entry.Allocation, nullptr));
 
@@ -78,7 +80,7 @@ namespace Surge
 		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		viewInfo.image = entry.Image;
 		viewInfo.viewType = desc.Layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-		viewInfo.format = vkFormat;
+		viewInfo.format = VulkanUtils::TextureFormatToVkFormat(desc.Format);
 		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -128,9 +130,7 @@ namespace Surge
 		}
 
 		entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		entry.Width = 0;
-		entry.Height = 0;
-		entry.Mips = 0;
+		//entry.Desc = {}; //Don't clear the desc since it may be needed for resizing or other purposes after destruction
 	}
 
 	void VulkanTexture::TransitionLayout(VkCommandBuffer cmd, TextureEntry& entry, VkImageLayout newLayout)
@@ -150,7 +150,7 @@ namespace Surge
 			? VK_IMAGE_ASPECT_DEPTH_BIT
 			: VK_IMAGE_ASPECT_COLOR_BIT;
 		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = entry.Mips;
+		barrier.subresourceRange.levelCount = entry.Desc.Mips;
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = 1;
 

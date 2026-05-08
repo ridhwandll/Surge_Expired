@@ -1,37 +1,36 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/RHI/Vulkan/VulkanFramebuffer.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 
 namespace Surge
 {	
-	FramebufferEntry VulkanFramebuffer::Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassCache& cache, const HandlePool<TextureHandle, TextureEntry>& texPool)
+	FramebufferEntry VulkanFramebuffer::Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, const HandlePool<TextureHandle, TextureEntry>& texPool)
 	{
 		SG_ASSERT(desc.Width > 0, "FramebufferDesc: Width is 0");
 		SG_ASSERT(desc.Height > 0, "FramebufferDesc: Height is 0");
 		SG_ASSERT(desc.ColorAttachmentCount > 0 || desc.DepthAttachment.Handle.IsNull() == false, "FramebufferDesc: must have at least one attachment");
 
 		FramebufferEntry entry = {};
-		entry.Width = desc.Width;
-		entry.Height = desc.Height;
 		entry.Desc = desc;
 
-		// Build RenderPassKey to look up / create VkRenderPass
+		// Build RenderPassKey to look up/create VkRenderPass
 		RenderPassKey key = {};
-		VkImageView views[9] = {};
-		Uint viewCount = 0;
+		std::array<VkImageView, 9> views = {};
 
+		Uint viewCount = 0;
 		for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
 		{
 			const TextureEntry* tex = texPool.Get(desc.ColorAttachments[i].Handle);
 			SG_ASSERT(tex, "FramebufferDesc: invalid ColorAttachment handle!");
 
-			key.ColorFormats[i] = tex->Format;
+			key.ColorFormats[i] = VulkanUtils::TextureFormatToVkFormat(tex->Desc.Format);
 			key.ColorLoad[i] = desc.ColorAttachments[i].Load;
 			key.ColorStore[i] = desc.ColorAttachments[i].Store;
 			views[viewCount++] = tex->View;
 
-			// Default clear color per attachment
-			entry.ClearValues[i].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+			// Default clear color per attachment (Foof pink)
+			entry.ClearValues[i].color = { {1.0f, 0.0f, 1.0f, 1.0f} };
 			entry.ClearCount++;
 		}
 		key.ColorCount = desc.ColorAttachmentCount;
@@ -41,7 +40,7 @@ namespace Surge
 			const TextureEntry* depth = texPool.Get(desc.DepthAttachment.Handle);
 			SG_ASSERT(depth, "FramebufferDesc: invalid DepthAttachment handle");
 
-			key.DepthFormat = depth->Format;
+			key.DepthFormat = VulkanUtils::TextureFormatToVkFormat(depth->Desc.Format);
 			key.DepthLoad = desc.DepthAttachment.Load;
 			key.DepthStore = desc.DepthAttachment.Store;
 			views[viewCount++] = depth->View;
@@ -51,7 +50,7 @@ namespace Surge
 		}
 
 		// Get or create compatible VkRenderPass from cache
-		entry.RenderPass = cache.GetOrCreate(rhi, key);
+		entry.RenderPass = rpFactory.GetOrCreate(rhi, key);
 		SG_ASSERT(entry.RenderPass != VK_NULL_HANDLE, "VulkanFramebuffer: failed to get render pass from cache");
 
 		// Create VkFramebuffer
@@ -59,7 +58,7 @@ namespace Surge
 		fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		fbInfo.renderPass = entry.RenderPass;
 		fbInfo.attachmentCount = viewCount;
-		fbInfo.pAttachments = views;
+		fbInfo.pAttachments = views.data();
 		fbInfo.width = desc.Width;
 		fbInfo.height = desc.Height;
 		fbInfo.layers = 1;
@@ -91,5 +90,6 @@ namespace Surge
 
 		// entry.RenderPass intentionally NOT destroyed here
 		entry.RenderPass = VK_NULL_HANDLE;
+		// entry.Desc = {}; //Don't clear desc since caller may want to reuse it for resizing
 	}
 }

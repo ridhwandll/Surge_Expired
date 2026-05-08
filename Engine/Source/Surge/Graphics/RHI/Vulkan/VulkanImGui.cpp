@@ -91,7 +91,6 @@ namespace Surge
 		SG_ASSERT(window, "ImGuiLayer: ANativeWindow* is null");
 		io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 		ImGui_ImplAndroid_Init(static_cast<ANativeWindow*>(window));
 
 		// Mobile larger touch targets
@@ -101,7 +100,6 @@ namespace Surge
 #elif defined(SURGE_PLATFORM_WINDOWS)
 		SG_ASSERT(window, "ImGuiLayer: HWND is null");
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
 		ImGui_ImplWin32_Init(static_cast<HWND>(window));
 		ImGui::GetPlatformIO().Platform_CreateVkSurface = // Stolen from ImGui Vulkan example's main.cpp(we respect their naming convention):

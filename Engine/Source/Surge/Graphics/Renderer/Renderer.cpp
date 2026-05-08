@@ -62,8 +62,8 @@ namespace Surge
 		TextureDesc colorDesc = {};
 		colorDesc.Width = size.x;
 		colorDesc.Height = size.y;
-		colorDesc.Format = TextureFormat::RGBA8_SRGB;
-		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // needed for blit
+		colorDesc.Format = TextureFormat::RGBA8_UNORM;
+		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
 		colorDesc.DebugName = "Offscreen Color Texture";
 		mOffscreenColor = mRHI->CreateTexture(colorDesc);
 

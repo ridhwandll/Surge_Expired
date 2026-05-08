@@ -138,17 +138,11 @@ namespace Surge
 	void Player::OnImGuiRender()
 	{
 		Clock& clock = Core::GetClock();
-		ImGuiID dockspace_id = ImGui::GetID("DockSpace");
-		ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+		ImGuiID dockspaceID = ImGui::GetID("DockSpace");
+		ImGui::DockSpaceOverViewport(dockspaceID, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
-		const RHIStats& stats = Core::GetRenderer()->GetRHI()->GetStats();
 		ImGui::Begin("Control & Stats");
 		ImGui::Text("Total quads: %d\nVertices: %i\nFPS: %.1f", Core::GetRenderer()->GetQuadCount(), Core::GetRenderer()->GetvertexCount(), 1 / clock.GetSeconds());
-		ImGui::Text("Draw call(s): %i", stats.DrawCalls);
-		ImGui::Text("GPU: %s", stats.GPUName.c_str());
-		ImGui::Text("Vendor: %s", stats.VendorName.c_str());
-		ImGui::Text("%s", stats.RHIVersion.c_str());
-		ImGui::Separator();
 		ImGui::Text("Controls");
 		ImGui::Checkbox("Move quads", &mMoveEnabled);
 
@@ -193,16 +187,6 @@ namespace Surge
 				}
 			}
 		}
-
-
-		ImGui::Separator();
-		float used = stats.UsedGPUMemory;
-		float total = stats.TotalAllowedGPUMemory;
-		float frac = (total > 0.0f) ? (used / total) : 0.0f;
-		ImGui::Text("GPU Memory:");
-		ImGui::Text("Allocations: %llu", stats.AllocationCount);
-		ImGui::Text("%.1f MB / %.1f MB", used, total);
-		ImGui::ProgressBar(frac, ImVec2(-1, 0));
 		ImGui::End();
 	}
 
@@ -210,16 +194,14 @@ namespace Surge
 	{
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<WindowResizeEvent>([&](WindowResizeEvent& resizeEvent) {
-			Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
+				Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
 			});
 	}
 
 	void Player::Resize(Uint width, Uint height)
 	{
-		if (width != 0 && height != 0)
-		{
-			mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));
-		}
+		if (width != 0 && height != 0)		
+			mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));		
 	}
 
 	void Player::OnShutdown()

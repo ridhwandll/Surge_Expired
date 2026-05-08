@@ -62,7 +62,7 @@ namespace Surge
 
 	struct BufferDesc
 	{
-		Uint Size = 0;
+		uint64_t Size = 0;
 		const void* InitialData = nullptr;
 		BufferUsage Usage = BufferUsage::VERTEX;
 		bool HostVisible = false;
@@ -197,14 +197,14 @@ namespace Surge
 
 		// State
 		RasterDesc Raster = {};
-		DepthDesc  Depth = {};
-		BlendDesc  Blend = {};
+		DepthDesc Depth = {};
+		BlendDesc Blend = {};
 
 		// Push constants, one range, covers 99% of cases
 		Uint PushConstantSize = 0; // bytes, 0 = none
 
-		FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // offscreen
-		bool TargetSwapchain = false; // swapchain pass
+		FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // Offscreen
+		bool TargetSwapchain = false; // Swapchain pass
 
 		const char* DebugName = nullptr;
 	};

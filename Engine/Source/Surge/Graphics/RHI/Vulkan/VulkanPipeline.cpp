@@ -22,7 +22,6 @@ namespace Surge
 		SG_ASSERT(renderPass != VK_NULL_HANDLE, "PipelineDesc: renderPass is null");
 
 		PipelineEntry entry = {};
-		entry.PushConstantSize = desc.PushConstantSize;
 		entry.Desc = desc;
 
 		// Pipeline layout

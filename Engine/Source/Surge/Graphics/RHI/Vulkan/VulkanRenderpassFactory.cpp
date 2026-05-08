@@ -1,12 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/RHI/Vulkan/VulkanRenderpassCache.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanRenderpassFactory.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 #include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
-	VkRenderPass VulkanRenderpassCache::GetOrCreate(const VulkanRHI& rhi, const RenderPassKey& key)
+	VkRenderPass VulkanRenderpassFactory::GetOrCreate(const VulkanRHI& rhi, const RenderPassKey& key)
 	{
 		auto it = mCache.find(key);
 		if (it != mCache.end())
@@ -18,7 +18,7 @@ namespace Surge
 	}
 
 
-	void VulkanRenderpassCache::Shutdown(const VulkanRHI& rhi)
+	void VulkanRenderpassFactory::Shutdown(const VulkanRHI& rhi)
 	{
 		for (auto& [key, rp] : mCache)
 		{
@@ -28,7 +28,7 @@ namespace Surge
 		mCache.clear();
 	}
 
-	VkRenderPass VulkanRenderpassCache::Create(const VulkanRHI& rhi, const RenderPassKey& key)
+	VkRenderPass VulkanRenderpassFactory::Create(const VulkanRHI& rhi, const RenderPassKey& key)
 	{
 		Vector<VkAttachmentDescription> attachments;
 		Vector<VkAttachmentReference> colorRefs;
@@ -73,15 +73,22 @@ namespace Surge
 			depthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		}
 
-		// Subpass
+		// What is a Subpass?
+		// A Subpass is a logical phase of rendering within a single Render Pass. Instead of finishing one render pass and starting another
+		// (which forces the GPU to write data back to main system memory), subpasses let you perform multiple operations on the same set of
+		// pixels while keeping that data in fast, on-chip tile memory (Mobile? Maybe we should utilize this in future)
 		VkSubpassDescription subpass = {};
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = (Uint)colorRefs.size();
 		subpass.pColorAttachments = colorRefs.data();
 		subpass.pDepthStencilAttachment = hasDepth ? &depthRef : nullptr;
 
-		// Dependency
+		// What is a Subpass Dependency?
+		// Vulkan does not assume that one subpass must wait for the previous one to finish. A Subpass Dependency is a synchronization command
+		// (like a memory barrier) built into the Render Pass that tells the GPU exactly when it is safe for a destination subpass to read data written by a source subpass 
 		VkSubpassDependency dependency = {};
+
+		// Which subpasses are being synchronized (e.g. 0 to 1)
 		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 		dependency.dstSubpass = 0;
 
@@ -99,7 +106,7 @@ namespace Surge
 
 		VkRenderPassCreateInfo rpInfo = {};
 		rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		rpInfo.attachmentCount = (uint32_t)attachments.size();
+		rpInfo.attachmentCount = (Uint)attachments.size();
 		rpInfo.pAttachments = attachments.data();
 		rpInfo.subpassCount = 1;
 		rpInfo.pSubpasses = &subpass;

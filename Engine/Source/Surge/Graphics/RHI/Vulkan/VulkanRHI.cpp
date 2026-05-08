@@ -59,11 +59,11 @@ namespace Surge
 		mFrame.Initialize(*this, 3);
 		mSwapchain.Initialize(*this, window->GetSize().x, window->GetSize().y);
 
-		CreateRenderpass();
+		CreateSwapchainRenderpass();
 		CreateSwapchainFramebuffers();
 
 		mImGuiContext.Init(*this);
-		FillStats();		
+		FillStats();
 	}
 
 	void VulkanRHI::WaitIdle()
@@ -88,7 +88,6 @@ namespace Surge
 				SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!");
 			});
 
-		// Clean up VkObjects if forgot destroy manually
 		mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry)
 			{
 				VulkanBuffer::Destroy(*this, entry);
@@ -102,7 +101,7 @@ namespace Surge
 			});
 
 		DestroySwapchainFramebuffers();
-		DestroyRenderpass();
+		DestroySwapchainRenderpass();
 
 		mFrame.Shutdown(*this);
 		mSwapchain.Shutdown(*this);
@@ -237,7 +236,7 @@ namespace Surge
 		if (!entry)		
 			return;
 		
-		Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Size);
+		Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size);
 		VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
 		mBufferPool.Free(buffer); // Return slot to free list
 	}
@@ -277,7 +276,7 @@ namespace Surge
 		*entry = VulkanTexture::Create(*this, desc);
 	}
 
-	Surge::FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc)
+	FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc)
 	{
 		Log<Severity::Trace>("\nVulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
 		FramebufferEntry entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
@@ -309,8 +308,6 @@ namespace Surge
 		// Rebuild with new dimensions
 		// Caller must resize textures first via ResizeTexture()
 		FramebufferDesc desc = entry->Desc;
-		//desc.Width = mSwapchain.GetWidth();
-		//desc.Height = mSwapchain.GetHeight();
 		desc.Width = width;
 		desc.Height = height;
 
@@ -397,7 +394,7 @@ namespace Surge
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
 		PipelineEntry* entry = mPipelinePool.Get(h);
 		SG_ASSERT(entry, "CmdPushConstants: invalid handle");
-		SG_ASSERT(size <= entry->PushConstantSize, "CmdPushConstants: size exceeds range");
+		SG_ASSERT(size <= entry->Desc.PushConstantSize, "CmdPushConstants: size exceeds range");
 		vkCmdPushConstants(cmd, entry->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, offset, size, data);
 	}
 
@@ -516,14 +513,13 @@ namespace Surge
 		vkCmdEndRenderPass(cmd);
 	}
 
-	void VulkanRHI::CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor /*= { 1.0f, 0.0f, 0.0f, 1.0f }*/)
+	void VulkanRHI::CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor)
 	{
 		FramebufferEntry* entry = mFramebufferPool.Get(h);
 		SG_ASSERT(entry, "CmdBeginRenderPass: invalid FramebufferHandle");
 
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
 
-		// Override first color clear with provided color
 		if (entry->ClearCount > 0)
 			entry->ClearValues[0].color = { {clearColor.r, clearColor.g, clearColor.b, clearColor.a} };
 
@@ -531,21 +527,20 @@ namespace Surge
 		rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		rpInfo.renderPass = entry->RenderPass;
 		rpInfo.framebuffer = entry->Framebuffer;
-		rpInfo.renderArea.extent = { entry->Width, entry->Height };
+		rpInfo.renderArea.extent = { entry->Desc.Width, entry->Desc.Height };
 		rpInfo.clearValueCount = entry->ClearCount;
-		rpInfo.pClearValues = entry->ClearValues;
+		rpInfo.pClearValues = entry->ClearValues.data();
 		vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		// Set dynamic viewport + scissor to match framebuffer size
 		VkViewport vp = {};
-		vp.width = (float)entry->Width;
-		vp.height = (float)entry->Height;
+		vp.width = (float)entry->Desc.Width;
+		vp.height = (float)entry->Desc.Height;
 		vp.minDepth = 0.0f;
 		vp.maxDepth = 1.0f;
 		vkCmdSetViewport(cmd, 0, 1, &vp);
 
 		VkRect2D scissor = {};
-		scissor.extent = { entry->Width, entry->Height };
+		scissor.extent = { entry->Desc.Width, entry->Desc.Height };
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
 	}
 
@@ -557,9 +552,33 @@ namespace Surge
 
 	void VulkanRHI::ShowPoolDebugImGuiWindow()
 	{
-		ImGui::Begin("Vulkan RHI Pools");
+		ImGui::Begin("Vulkan RHI");
+		constexpr float boldFontSize = 18.0f;
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), 22.0f);
+		ImGui::Text("GPU Info");
+		ImGui::PopFont();		
+		ImGui::Text("GPU: %s", mStats.GPUName.c_str());
+		ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
+		ImGui::Text("%s", mStats.RHIVersion.c_str());
+		ImGui::Text("Draw call(s): %i", mStats.DrawCalls);
 
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		// We need to call GetStats() here to update the memory stats before displaying them
+		auto& memStats = GetStats();
+		float used = memStats.UsedGPUMemory;
+		float total = memStats.TotalAllowedGPUMemory;
+		float frac = (total > 0.0f) ? (used / total) : 0.0f;
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		ImGui::Text("GPU Memory");
+		ImGui::PopFont();
+		ImGui::Text("Allocations: %llu", memStats.AllocationCount);
+		ImGui::Text("%.1f MB / %.1f MB", used, total);
+		ImGui::ProgressBar(frac, ImVec2(-1, 0));
+		ImGui::Separator();
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), 22.0f);
+		ImGui::Text("RHI Pools");
+		ImGui::PopFont();
+
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
 		ImGui::Text("BufferPool");
 		ImGui::PopFont();
 		ImGui::Text("Alive objects: %d", mBufferPool.AliveObjCount());
@@ -569,7 +588,7 @@ namespace Surge
 			if (ImGui::TreeNode(bufText.c_str()))
 			{
 				ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-				ImGui::Text("Size: %llu bytes", entry.Size);
+				ImGui::Text("Size: %llu bytes", entry.Desc.Size);
 				ImGui::Text("Usage: %s", VulkanUtils::BufferUsageToString(entry.Desc.Usage));
 				ImGui::Text("Host Visible: %s", entry.Desc.HostVisible ? "Yes" : "No");
 				ImGui::TreePop();
@@ -577,7 +596,7 @@ namespace Surge
 		});
 
 		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
 		ImGui::Text("PipelinePool");
 		ImGui::PopFont();
 		ImGui::Text("Alive objects: %d", mPipelinePool.AliveObjCount());
@@ -587,7 +606,7 @@ namespace Surge
 				if (ImGui::TreeNode(pipeText.c_str()))
 				{
 					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-					ImGui::Text("PushConstantSize: %d", entry.PushConstantSize);
+					ImGui::Text("PushConstantSize: %d", entry.Desc.PushConstantSize);
 					ImGui::Text("Vertex Shader: %s", entry.Desc.VertShaderName);
 					ImGui::Text("Fragment Shader: %s", entry.Desc.FragShaderName);
 					ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
@@ -614,7 +633,7 @@ namespace Surge
 			});
 
 		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
 		ImGui::Text("FramebufferPool");
 		ImGui::PopFont();
 		ImGui::Text("Alive objects: %d", mFramebufferPool.AliveObjCount());
@@ -661,7 +680,7 @@ namespace Surge
 			});
 
 		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
 		ImGui::Text("TexturePool");
 		ImGui::PopFont();
 		ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
@@ -804,7 +823,7 @@ namespace Surge
 		mSwapchainFramebuffers.clear();
 	}
 
-	void VulkanRHI::CreateRenderpass()
+	void VulkanRHI::CreateSwapchainRenderpass()
 	{
 		VkDevice device = mDevice.GetDevice();		
 		// Proudly stolen from Sascha Willems' Vulkan examples:
@@ -864,7 +883,7 @@ namespace Surge
 		VK_CALL(vkCreateRenderPass(device, &rp_info, nullptr, &mRenderPass));
 	}
 
-	void VulkanRHI::DestroyRenderpass()
+	void VulkanRHI::DestroySwapchainRenderpass()
 	{
 		if (mRenderPass != VK_NULL_HANDLE)
 			vkDestroyRenderPass(mDevice.GetDevice(), mRenderPass, nullptr);
