@@ -48,7 +48,7 @@ namespace Surge
 		BufferDesc vbDesc = {};
 		vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
 		vbDesc.Usage = BufferUsage::VERTEX;
-		vbDesc.HostVisible = true;   // Persistently mapped — memcpy every frame
+		vbDesc.HostVisible = true;
 		vbDesc.DebugName = "BatchVB";
 		mVertexBuffer = mRHI->CreateBuffer(vbDesc);
 
@@ -56,6 +56,31 @@ namespace Surge
 		mVertexData.resize(MAX_VERTICES);
 		mVertexCount = 0;
 		mQuadCount = 0;
+
+		// Offscreen color texture
+		glm::vec2 size = Core::GetWindow()->GetSize();
+		TextureDesc colorDesc = {};
+		colorDesc.Width = size.x;
+		colorDesc.Height = size.y;
+		colorDesc.Format = TextureFormat::RGBA8_SRGB;
+		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // needed for blit
+		colorDesc.DebugName = "Offscreen Color Texture";
+		mOffscreenColor = mRHI->CreateTexture(colorDesc);
+
+		// Offscreen framebuffer
+		FramebufferAttachment colorAttachment = {};
+		colorAttachment.Handle = mOffscreenColor;
+		colorAttachment.Load = LoadOp::CLEAR;
+		colorAttachment.Store = StoreOp::STORE;
+
+		FramebufferDesc fbDesc = {};
+		fbDesc.ColorAttachments[0] = colorAttachment;
+		fbDesc.ColorAttachmentCount = 1;
+		fbDesc.Width = size.x;
+		fbDesc.Height = size.y;
+		fbDesc.DebugName = "Offscreen Framebuffer";
+
+		mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
 		PipelineDesc desc = {};
 		desc.VertShaderName = "Quad.vert";
@@ -68,7 +93,9 @@ namespace Surge
 		desc.AttributeCount = 3;
 		desc.Raster.Cull = CullMode::NONE;
 		desc.PushConstantSize = sizeof(QuadPushConstants);
-		desc.DebugName = "BatchPipeline";
+		desc.DebugName = "Quad Batch Pipeline";
+		desc.TargetFramebuffer = mOffscreenFramebuffer;
+		desc.TargetSwapchain = false;
 		mPipeline = mRHI->CreatePipeline(desc);
     }
 
@@ -79,7 +106,6 @@ namespace Surge
         mData->ProjectionMatrix = camera.GetProjectionMatrix();
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = transform[3];
-
 		mVertexCount = 0;
 		mQuadCount = 0;
     }
@@ -91,38 +117,42 @@ namespace Surge
         mData->ProjectionMatrix = camera.GetProjectionMatrix();
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
+		mVertexCount = 0;
+		mQuadCount = 0;
     }
 
     void Renderer::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
-		if (mQuadCount == 0)
-			return;
 
 		// Begins command buffer recording
 		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
         const FrameContext& ctx = mRHI->BeginFrame();
 
-		// Off-screen passes go here
+		// Off-screen passe
+
+		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);	
+		mRHI->CmdBeginRenderPass(ctx, mOffscreenFramebuffer, mClearColor);
+		if (mQuadCount > 0)
+		{
+			// Render directly to swapchain buffer, no offscreen renderpass or postprocessing yet
+			mRHI->CmdBindPipeline(ctx, mPipeline);
+			mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
+			mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
+			QuadPushConstants push = { .ViewProj = mData->ViewProjection };
+			mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
+			mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
+		}
+		mRHI->CmdEndRenderPass(ctx);
+		
+		mRHI->CmdBlitToSwapchain(ctx, mOffscreenColor); // Copy/blit offscreen color to swapchain backbuffer
 
 		mRHI->CmdBeginSwapchainRenderpass(ctx);
 
-		// mRHI->BlitImage(sourceTexture); //In future when we have offscreen render targets, postprocessing, etc, we will need to blit or sample from those here.
-		// For now we render directly to the swapchain image
-
-		// Render directly to swapchain buffer, no offscreen renderpass or postprocessing yet
-
-		mRHI->CmdBindPipeline(ctx, mPipeline);
-		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
-		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
-		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);
-		QuadPushConstants push = { .ViewProj = mData->ViewProjection };
-		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
-		mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
-
-		//ImGui Render
-		for (auto callback : mImGuiRenderCallbacks)
+		// ImGui Render
+		for (const auto& callback : mImGuiRenderCallbacks)
 			callback();
+		mRHI->ShowMetricsWindow(); //Shows internal metrics about the RHI resource pools
 
 		mRHI->CmdEndSwapchainRenderpass(ctx);
 
@@ -131,10 +161,14 @@ namespace Surge
 
 	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color)
 	{
-		SG_ASSERT(mQuadCount < MAX_QUADS, "BatchRenderer: exceeded MAX_QUADS");
-
+		if(mQuadCount > MAX_QUADS)
+		{ 
+			Log<Severity::Warn>("Max quad count exceeded! QuadCount: {0}/MaxQuadCount: {1}", mQuadCount, MAX_QUADS);
+			return;
+		}
 		// Unit quad positions transform applied per vertex on CPU
-		static constexpr glm::vec4 sLocalPositions[4] = {
+		static constexpr glm::vec4 sLocalPositions[4] =
+		{
 			{ 0.5f, -0.5f, 0.0f, 1.0f}, // top right
 			{ 0.5f,  0.5f, 0.0f, 1.0f}, // bottom right
 			{-0.5f,  0.5f, 0.0f, 1.0f}, // bottom left
@@ -162,7 +196,11 @@ namespace Surge
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
 	{
-		mRHI->Resize(width, height);
+		Core::AddFrameEndCallback([this, width, height]() {
+				mRHI->ResizeTexture(mOffscreenColor, width, height);
+				mRHI->ResizeFramebuffer(mOffscreenFramebuffer, width, height);
+			});
+		
 		Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
 	}
 
@@ -170,6 +208,8 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         mRHI->WaitIdle();
+		mRHI->DestroyFramebuffer(mOffscreenFramebuffer);
+		mRHI->DestroyTexture(mOffscreenColor);
 		mRHI->DestroyPipeline(mPipeline);
         mRHI->DestroyBuffer(mVertexBuffer);
         mRHI->DestroyBuffer(mIndexBuffer);

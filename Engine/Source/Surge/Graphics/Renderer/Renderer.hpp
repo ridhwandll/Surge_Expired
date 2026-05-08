@@ -27,7 +27,7 @@ namespace Surge
     class SURGE_API Renderer
     {
     public:
-		static constexpr Uint MAX_QUADS = 50000; // Technically we can go upto 50K on high end mobile xD
+		static constexpr Uint MAX_QUADS = 50000 * 2;
 		static constexpr Uint MAX_VERTICES = MAX_QUADS * 4;
 		static constexpr Uint MAX_INDICES = MAX_QUADS * 6;
 
@@ -74,6 +74,9 @@ namespace Surge
         PipelineHandle mPipeline;
         BufferHandle mVertexBuffer;        
         BufferHandle mIndexBuffer;   
+        TextureHandle mOffscreenColor;
+		FramebufferHandle mOffscreenFramebuffer;
+        glm::vec4 mClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
 
         Scope<GraphicsRHI> mRHI;
         Scope<RendererData> mData;

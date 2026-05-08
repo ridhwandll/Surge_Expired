@@ -3,6 +3,7 @@
 #include "VulkanDebugger.hpp"
 #include "VulkanBuffer.hpp"
 #include "VulkanPipeline.hpp"
+#include "VulkanUtils.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
 
@@ -10,9 +11,46 @@
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/native_window.h>
 #endif
+#include "VulkanTexture.hpp"
 
 namespace Surge
 {
+	static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
+	{
+		for (auto extension : required)
+		{
+			bool found = false;
+			for (auto& availableExtension : available)
+			{
+				if (strcmp(availableExtension.extensionName, extension) == 0)
+				{
+					found = true;
+					break;
+				}
+			}
+
+			if (!found)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	static String GetVendorName(Uint vendorID)
+	{
+		switch (vendorID) {
+		case 0x10DE: return "NVIDIA";
+		case 0x1002: return "AMD";
+		case 0x8086: return "INTEL";
+		case 0x13B5: return "ARM (Mali)";
+		case 0x5143: return "Qualcomm (Adreno)";
+		case 0x1010: return "ImgTec (PowerVR)";
+		default:     return "Unknown Vendor";
+		}
+	}
+
 	void VulkanRHI::Initialize(Window* window)
 	{
 		CreateInstance();
@@ -25,7 +63,7 @@ namespace Surge
 		CreateSwapchainFramebuffers();
 
 		mImGuiContext.Init(*this);
-		FillStats();
+		FillStats();		
 	}
 
 	void VulkanRHI::WaitIdle()
@@ -35,7 +73,21 @@ namespace Surge
 
 	void VulkanRHI::Shutdown()
 	{	
+		mRenderPassCache.Shutdown(*this);
 		mImGuiContext.Shutdown(*this);
+
+		mFramebufferPool.ForEachAlive([&](const FramebufferHandle& h, FramebufferEntry& entry)
+			{
+				VulkanFramebuffer::Destroy(*this, entry);
+				SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!");
+			});
+
+		mTexturePool.ForEachAlive([&](const TextureHandle& h, TextureEntry& entry)
+			{
+				VulkanTexture::Destroy(*this, entry);
+				SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!");
+			});
+
 		// Clean up VkObjects if forgot destroy manually
 		mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry)
 			{
@@ -109,39 +161,6 @@ namespace Surge
 
 	}
 
-	void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
-	{
-		// Set clear color values
-		VkClearValue clearValue{ .color = {{0.1f, 0.1f, 0.1f, 1.0f}} };
-
-		VkRenderPassBeginInfo rpbegin{
-			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass = mRenderPass,
-			.framebuffer = mSwapchainFramebuffers[ctx.SwapchainIndex],
-			.renderArea = {.extent = {.width = ctx.Width, .height = ctx.Height}},
-			.clearValueCount = 1,
-			.pClearValues = &clearValue };
-
-		VkCommandBuffer cmd = mFrame.GetCurrentVkFrame().CmdBuffer;
-		vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
-
-		VkViewport vp{
-			.width = static_cast<float>(ctx.Width),
-			.height = static_cast<float>(ctx.Height),
-			.minDepth = 0.0f,
-			.maxDepth = 1.0f };
-		vkCmdSetViewport(cmd, 0, 1, &vp); // Set viewport dynamically
-		VkRect2D scissor{ .extent = {.width = ctx.Width, .height = ctx.Height} };
-		vkCmdSetScissor(cmd, 0, 1, &scissor); // Set scissor dynamically
-	}
-
-	void VulkanRHI::CmdEndSwapchainRenderpass(const FrameContext& ctx)
-	{
-		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-		mImGuiContext.EndFrame(cmd);
-		vkCmdEndRenderPass(cmd);
-	}
-
 	void VulkanRHI::EndFrame(const FrameContext& ctx)
 	{
 		PerFrame& frame = mFrame.GetCurrentVkFrame();
@@ -180,7 +199,9 @@ namespace Surge
 		//vkDestroySurfaceKHR(rhi.GetInstance(), rhi.GetSurface(), nullptr);
 		//CreateSurface(Core::GetWindow());
 #endif		
-		ResizeInternal();
+		Core::AddFrameEndCallback([this]() {
+				ResizeInternal();
+			});
 	}
 
 	const RHIStats& VulkanRHI::GetStats()
@@ -195,42 +216,11 @@ namespace Surge
 		return mStats;
 	}
 
-	void VulkanRHI::CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
-	{
-		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-		const BufferEntry* entry = mBufferPool.Get(h);
-		SG_ASSERT(entry != nullptr, "CmdBindVertexBuffer: Invalid BufferHandle");
-		SG_ASSERT(entry->Buffer != VK_NULL_HANDLE, "CmdBindVertexBuffer: null VkBuffer");
-
-		VkDeviceSize vkOffset = offset;
-		vkCmdBindVertexBuffers(cmd, 0, 1, &entry->Buffer, &vkOffset);
-	}
-
-	void VulkanRHI::CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
-	{
-		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-		const BufferEntry* entry = mBufferPool.Get(h);
-		SG_ASSERT(entry != nullptr, "CmdBindIndexBuffer: Invalid BufferHandle");
-		vkCmdBindIndexBuffer(cmd, entry->Buffer, offset, VK_INDEX_TYPE_UINT32);
-	}
-
 	BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc)
 	{
 		Log<Severity::Trace>("\nVulkanRHI::CreateBuffer:\n   Name: {0}\n   Size: {1} bytes\n", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size);
 		BufferEntry entry = VulkanBuffer::Create(*this, desc);
 		return mBufferPool.Allocate(std::move(entry));
-	}
-
-	TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc, const void* initialData /*= nullptr*/)
-	{
-		Log<Severity::Trace>("\nVulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage));
-		return TextureHandle::Invalid();
-	}
-
-	FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc, const void* initialData /*= nullptr*/)
-	{
-		Log<Severity::Trace>("\nVulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
-		return FramebufferHandle::Invalid();
 	}
 
 	void VulkanRHI::UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset)
@@ -252,20 +242,101 @@ namespace Surge
 		mBufferPool.Free(buffer); // Return slot to free list
 	}
 
-	void VulkanRHI::DestroyTexture(TextureHandle texture)
+	TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc, const void* initialData /*= nullptr*/)
 	{
-		Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", texture.Index, texture.Generation);
+		Log<Severity::Trace>("\nVulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage));		
+		TextureEntry entry = VulkanTexture::Create(*this, desc);
+		return mTexturePool.Allocate(std::move(entry));		
 	}
 
-	void VulkanRHI::DestroyFramebuffer(FramebufferHandle framebuffer)
+	void VulkanRHI::DestroyTexture(TextureHandle h)
 	{
-		Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", framebuffer.Index, framebuffer.Generation);
+		Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation);
+		
+		TextureEntry* entry = mTexturePool.Get(h);
+		if (!entry)
+			return;
+
+		VulkanTexture::Destroy(*this, *entry);
+		mTexturePool.Free(h);		
+	}
+
+	void VulkanRHI::ResizeTexture(TextureHandle h, Uint width, Uint height)
+	{
+		vkDeviceWaitIdle(mDevice.GetDevice());
+
+		TextureEntry* entry = mTexturePool.Get(h);
+		if (!entry)
+			return;
+
+		VulkanTexture::Destroy(*this, *entry);
+		TextureDesc desc = entry->Desc;
+		desc.Width = width;
+		desc.Height = height;
+
+		*entry = VulkanTexture::Create(*this, desc);
+	}
+
+	Surge::FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc)
+	{
+		Log<Severity::Trace>("\nVulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
+		FramebufferEntry entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
+		return mFramebufferPool.Allocate(std::move(entry));
+	}
+
+	void VulkanRHI::DestroyFramebuffer(FramebufferHandle h)
+	{
+		Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", h.Index, h.Generation);		
+		FramebufferEntry* entry = mFramebufferPool.Get(h);
+		if (!entry)
+			return;
+
+		VulkanFramebuffer::Destroy(*this, *entry);
+		mFramebufferPool.Free(h);		
+	}
+
+	void VulkanRHI::ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height)
+	{
+		vkDeviceWaitIdle(mDevice.GetDevice());
+
+		FramebufferEntry* entry = mFramebufferPool.Get(h);
+		if (!entry)
+			return;
+
+		// Destroy old VkFramebuffer, textures still live
+		VulkanFramebuffer::Destroy(*this, *entry);
+
+		// Rebuild with new dimensions
+		// Caller must resize textures first via ResizeTexture()
+		FramebufferDesc desc = entry->Desc;
+		//desc.Width = mSwapchain.GetWidth();
+		//desc.Height = mSwapchain.GetHeight();
+		desc.Width = width;
+		desc.Height = height;
+
+		*entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
 	}
 
 	PipelineHandle VulkanRHI::CreatePipeline(const PipelineDesc& desc)
 	{
+		SG_ASSERT(!desc.TargetFramebuffer.IsNull() || desc.TargetSwapchain, "PipelineDesc: must set either TargetFramebuffer or TargetSwapchain");
+		SG_ASSERT(!((!desc.TargetFramebuffer.IsNull()) && desc.TargetSwapchain), "PipelineDesc: cannot set both TargetFramebuffer and TargetSwapchain");
+
 		Log<Severity::Trace>("\nVulkanRHI::CreatePipeline:\n   Name: {0}\n   Vertex Shader: {1}\n   Fragment Shader: {2}", desc.DebugName ? desc.DebugName : "Unnamed", desc.VertShaderName, desc.FragShaderName);
-		PipelineEntry entry = VulkanPipeline::Create(*this, desc, mRenderPass);
+
+		VkRenderPass renderPass = VK_NULL_HANDLE;
+
+		if (!desc.TargetFramebuffer.IsNull())
+		{
+			FramebufferEntry* fb = mFramebufferPool.Get(desc.TargetFramebuffer);
+			SG_ASSERT(fb, "CreatePipeline: invalid TargetFramebuffer handle");
+			renderPass = fb->RenderPass; // Borrowed from cache
+		}
+		else if (desc.TargetSwapchain)		
+			renderPass = mRenderPass;
+		
+		SG_ASSERT(renderPass != VK_NULL_HANDLE, "CreatePipeline: failed to resolve render pass");
+		PipelineEntry entry = VulkanPipeline::Create(*this, desc, renderPass);
 		return mPipelinePool.Allocate(std::move(entry));
 	}
 
@@ -278,6 +349,39 @@ namespace Surge
 		Log<Severity::Info>("Destroying pipeline with handle index {0} and generation {1}", h.Index, h.Generation);
 		VulkanPipeline::Destroy(*this, *entry);
 		mPipelinePool.Free(h);
+	}
+
+	void VulkanRHI::CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		vkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+		mStats.DrawCalls++;
+	}
+
+	void VulkanRHI::CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		vkCmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
+		mStats.DrawCalls++;
+	}
+
+	void VulkanRHI::CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		const BufferEntry* entry = mBufferPool.Get(h);
+		SG_ASSERT(entry != nullptr, "CmdBindVertexBuffer: Invalid BufferHandle");
+		SG_ASSERT(entry->Buffer != VK_NULL_HANDLE, "CmdBindVertexBuffer: null VkBuffer");
+
+		VkDeviceSize vkOffset = offset;
+		vkCmdBindVertexBuffers(cmd, 0, 1, &entry->Buffer, &vkOffset);
+	}
+
+	void VulkanRHI::CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		const BufferEntry* entry = mBufferPool.Get(h);
+		SG_ASSERT(entry != nullptr, "CmdBindIndexBuffer: Invalid BufferHandle");
+		vkCmdBindIndexBuffer(cmd, entry->Buffer, offset, VK_INDEX_TYPE_UINT32);
 	}
 
 	void VulkanRHI::CmdBindPipeline(const FrameContext& ctx, PipelineHandle h)
@@ -297,41 +401,285 @@ namespace Surge
 		vkCmdPushConstants(cmd, entry->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, offset, size, data);
 	}
 
-	void VulkanRHI::CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance)
+	void VulkanRHI::CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle)
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-		vkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-		mStats.DrawCalls++;
+		TextureEntry* src = mTexturePool.Get(srcHandle);
+		SG_ASSERT(src, "CmdBlitToSwapchain: invalid source TextureHandle");
+
+		VkImage swapchainImage = mSwapchain.GetFrame(ctx.SwapchainIndex).Image;
+		Uint w = mSwapchain.GetDimensions().Width;
+		Uint h = mSwapchain.GetDimensions().Height;
+
+		// Transition offscreen: COLOR_ATTACHMENT_OPTIMAL to TRANSFER_SRC
+		VkImageMemoryBarrier srcBarrier = {};
+		srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		srcBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		srcBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		srcBarrier.image = src->Image;
+		srcBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		srcBarrier.subresourceRange.levelCount = 1;
+		srcBarrier.subresourceRange.layerCount = 1;
+
+		// Transition swapchain: UNDEFINED to TRANSFER_DST
+		VkImageMemoryBarrier dstBarrier = {};
+		dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		dstBarrier.srcAccessMask = 0;
+		dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		dstBarrier.image = swapchainImage;
+		dstBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		dstBarrier.subresourceRange.levelCount = 1;
+		dstBarrier.subresourceRange.layerCount = 1;
+
+		VkImageMemoryBarrier preBlit[2] = { srcBarrier, dstBarrier };
+		vkCmdPipelineBarrier(cmd,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0, 0, nullptr, 0, nullptr,
+			2, preBlit);
+
+		// Blit
+		VkImageBlit region = {};
+		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.srcSubresource.layerCount = 1;
+		region.srcOffsets[0] = { 0, 0, 0 };
+		region.srcOffsets[1] = { (int32_t)w, (int32_t)h, 1 };
+		region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.dstSubresource.layerCount = 1;
+		region.dstOffsets[0] = { 0, 0, 0 };
+		region.dstOffsets[1] = { (int32_t)w, (int32_t)h, 1 };
+
+		vkCmdBlitImage(cmd, src->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST);
+
+		// Transition swapchain: TRANSFER_DST to COLOR_ATTACHMENT
+		// ImGui pass will render on top (needs COLOR_ATTACHMENT_OPTIMAL)
+		VkImageMemoryBarrier postBlit = {};
+		postBlit.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		postBlit.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		postBlit.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		postBlit.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		postBlit.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+		postBlit.image = swapchainImage;
+		postBlit.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		postBlit.subresourceRange.levelCount = 1;
+		postBlit.subresourceRange.layerCount = 1;
+
+		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &postBlit);
+
+		// Track layout for offscreen texture
+		src->Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	}
 
-	void VulkanRHI::CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance)
+	void VulkanRHI::CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout)
+	{
+		TextureEntry* entry = mTexturePool.Get(h);
+		SG_ASSERT(entry, "VulkanRHI::CmdTextureBarrier: invalid TextureHandle");
+
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		VulkanTexture::TransitionLayout(cmd, *entry, newLayout);
+	}
+
+	void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
+	{
+		// Set clear color values
+		VkClearValue clearValue{ .color = {{0.1f, 0.1f, 0.1f, 1.0f}} };
+
+		VkRenderPassBeginInfo rpbegin{
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+			.renderPass = mRenderPass,
+			.framebuffer = mSwapchainFramebuffers[ctx.SwapchainIndex],
+			.renderArea = {.extent = {.width = ctx.Width, .height = ctx.Height}},
+			.clearValueCount = 1,
+			.pClearValues = &clearValue };
+
+		VkCommandBuffer cmd = mFrame.GetCurrentVkFrame().CmdBuffer;
+		vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
+
+		VkViewport vp{
+			.width = static_cast<float>(ctx.Width),
+			.height = static_cast<float>(ctx.Height),
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f };
+		vkCmdSetViewport(cmd, 0, 1, &vp); // Set viewport dynamically
+		VkRect2D scissor{ .extent = {.width = ctx.Width, .height = ctx.Height} };
+		vkCmdSetScissor(cmd, 0, 1, &scissor); // Set scissor dynamically
+	}
+
+	void VulkanRHI::CmdEndSwapchainRenderpass(const FrameContext& ctx)
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-		vkCmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
-		mStats.DrawCalls++;
+		mImGuiContext.EndFrame(cmd);
+		vkCmdEndRenderPass(cmd);
 	}
 
-	static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
+	void VulkanRHI::CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor /*= { 1.0f, 0.0f, 0.0f, 1.0f }*/)
 	{
-		for (auto extension : required)
+		FramebufferEntry* entry = mFramebufferPool.Get(h);
+		SG_ASSERT(entry, "CmdBeginRenderPass: invalid FramebufferHandle");
+
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+
+		// Override first color clear with provided color
+		if (entry->ClearCount > 0)
+			entry->ClearValues[0].color = { {clearColor.r, clearColor.g, clearColor.b, clearColor.a} };
+
+		VkRenderPassBeginInfo rpInfo = {};
+		rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		rpInfo.renderPass = entry->RenderPass;
+		rpInfo.framebuffer = entry->Framebuffer;
+		rpInfo.renderArea.extent = { entry->Width, entry->Height };
+		rpInfo.clearValueCount = entry->ClearCount;
+		rpInfo.pClearValues = entry->ClearValues;
+		vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// Set dynamic viewport + scissor to match framebuffer size
+		VkViewport vp = {};
+		vp.width = (float)entry->Width;
+		vp.height = (float)entry->Height;
+		vp.minDepth = 0.0f;
+		vp.maxDepth = 1.0f;
+		vkCmdSetViewport(cmd, 0, 1, &vp);
+
+		VkRect2D scissor = {};
+		scissor.extent = { entry->Width, entry->Height };
+		vkCmdSetScissor(cmd, 0, 1, &scissor);
+	}
+
+	void VulkanRHI::CmdEndRenderPass(const FrameContext& ctx)
+	{
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+		vkCmdEndRenderPass(cmd);
+	}
+
+	void VulkanRHI::ShowPoolDebugImGuiWindow()
+	{
+		ImGui::Begin("Vulkan RHI Pools");
+
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::Text("BufferPool");
+		ImGui::PopFont();
+		ImGui::Text("Alive objects: %d", mBufferPool.AliveObjCount());
+		mBufferPool.ForEachAlive([](const BufferHandle& h, BufferEntry& entry)
 		{
-			bool found = false;
-			for (auto& availableExtension : available)
+			String bufText = std::format("BufferHandle ({}, {})", h.Index, h.Generation);
+			if (ImGui::TreeNode(bufText.c_str()))
 			{
-				if (strcmp(availableExtension.extensionName, extension) == 0)
+				ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+				ImGui::Text("Size: %llu bytes", entry.Size);
+				ImGui::Text("Usage: %s", VulkanUtils::BufferUsageToString(entry.Desc.Usage));
+				ImGui::Text("Host Visible: %s", entry.Desc.HostVisible ? "Yes" : "No");
+				ImGui::TreePop();
+			}
+		});
+
+		ImGui::Separator();
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::Text("PipelinePool");
+		ImGui::PopFont();
+		ImGui::Text("Alive objects: %d", mPipelinePool.AliveObjCount());
+		mPipelinePool.ForEachAlive([](const PipelineHandle& h, PipelineEntry& entry)
+			{
+				String pipeText = std::format("PipelineHandle ({}, {})", h.Index, h.Generation);
+				if (ImGui::TreeNode(pipeText.c_str()))
 				{
-					found = true;
-					break;
+					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+					ImGui::Text("PushConstantSize: %d", entry.PushConstantSize);
+					ImGui::Text("Vertex Shader: %s", entry.Desc.VertShaderName);
+					ImGui::Text("Fragment Shader: %s", entry.Desc.FragShaderName);
+					ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
+					if (ImGui::TreeNode("Vertex Binding"))
+					{
+						for (Uint i = 0; i < entry.Desc.BindingCount; i++)
+						{
+							const auto& binding = entry.Desc.Bindings[i];
+							ImGui::Text("%d: Binding %d, Stride %d", i, binding.Binding, binding.Stride);
+						}
+						ImGui::TreePop();
+					}
+					if (ImGui::TreeNode("Vertex Attribute"))
+					{
+						for (Uint i = 0; i < entry.Desc.AttributeCount; i++)
+						{
+							const auto& attr = entry.Desc.Attributes[i];
+							ImGui::Text("Location %d, Format %d, Offset %d", attr.Location, static_cast<Uint>(attr.Format), attr.Offset);
+						}
+						ImGui::TreePop();
+					}
+					ImGui::TreePop();
 				}
-			}
+			});
 
-			if (!found)
+		ImGui::Separator();
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::Text("FramebufferPool");
+		ImGui::PopFont();
+		ImGui::Text("Alive objects: %d", mFramebufferPool.AliveObjCount());
+		mFramebufferPool.ForEachAlive([this](const FramebufferHandle& h, FramebufferEntry& entry)
 			{
-				return false;
-			}
-		}
+				FramebufferDesc desc = entry.Desc;
+				String fbufText = std::format("FramebufferHandle ({}, {})", h.Index, h.Generation);
+				if (ImGui::TreeNode(fbufText.c_str()))
+				{
+					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+					ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
+					ImGui::Text("Color Attachment Count: %d", desc.ColorAttachmentCount);
+					if (desc.ColorAttachmentCount > 0)
+					{
+						if (ImGui::TreeNode("ColorAttachments"))
+						{
+							for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
+							{
+								TextureEntry* texEntry = mTexturePool.Get(desc.ColorAttachments[i].Handle);
+								TextureDesc tDesc = texEntry->Desc;
+								String texText = std::format("TextureHandle ({}, {})", h.Index, h.Generation);
+								if (ImGui::TreeNode(texText.c_str()))
+								{
+									ImGui::Text("Debug Name: %s", tDesc.DebugName);
+									ImGui::Text("Dimensions: %dx%d", tDesc.Width, tDesc.Height);
+									ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(tDesc.Format).c_str());
+									ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(tDesc.Usage));
+									ImGui::TreePop();
+								}
+							}
+							ImGui::TreePop();
+						}
+					}
 
-		return true;
+					ImGui::Text("Has Depth: %s", desc.HasDepth ? "Yes" : "No");
+					if (desc.HasDepth)
+					{
+						ImGui::Text("Depth Attachment:");
+						ImGui::Text("TextureHandle (%d, %d), LoadOp: %s, StoreOp: %s", desc.DepthAttachment.Handle.Index, desc.DepthAttachment.Handle.Generation,
+							VulkanUtils::LoadOpToString(desc.DepthAttachment.Load), VulkanUtils::StoreOpToString(desc.DepthAttachment.Store));
+					}
+					ImGui::TreePop();
+				}
+			});
+
+		ImGui::Separator();
+		ImGui::PushFont(mImGuiContext.GetBoldFont(), 18.0f);
+		ImGui::Text("TexturePool");
+		ImGui::PopFont();
+		ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
+		mTexturePool.ForEachAlive([](const TextureHandle& h, TextureEntry& entry)
+			{
+				TextureDesc desc = entry.Desc;
+				String texText = std::format("TextureHandle ({}, {})", h.Index, h.Generation);
+				if (ImGui::TreeNode(texText.c_str()))
+				{
+					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+					ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
+					ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
+					ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
+					ImGui::TreePop();
+				}
+			});
+
+		ImGui::End();
 	}
 
 	void VulkanRHI::CreateInstance()
@@ -366,19 +714,6 @@ namespace Surge
 		ENABLE_IF_VK_VALIDATION(mDebugger.StartDiagnostics(mInstance));
 	}
 
-	static String GetVendorName(Uint vendorID)
-	{
-		switch (vendorID) {
-		case 0x10DE: return "NVIDIA";
-		case 0x1002: return "AMD";
-		case 0x8086: return "INTEL";
-		case 0x13B5: return "ARM (Mali)";
-		case 0x5143: return "Qualcomm (Adreno)";
-		case 0x1010: return "ImgTec (PowerVR)";
-		default:     return "Unknown Vendor";
-		}
-	}
-
 	void VulkanRHI::FillStats()
 	{
 		VkPhysicalDeviceProperties props;
@@ -392,40 +727,6 @@ namespace Surge
 		mStats.RHIVersion = std::format("Vulkan Version: {}.{}.{}", major, minor, patch);
 		
 		mStats.VendorName = GetVendorName(props.vendorID);
-	}
-
-	Vector<const char*> VulkanRHI::GetRequiredInstanceExtensions()
-	{
-		Vector<const char*> requiredInstanceExtensions;
-		requiredInstanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-#if defined(SURGE_PLATFORM_ANDROID)
-		requiredInstanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
-#elif defined(SURGE_PLATFORM_WINDOWS)
-		requiredInstanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#elif defined(SURGE_PLATFORM_APPLE)
-		requiredInstanceExtensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
-#else
-#pragma error "Platform not supported"
-#endif
-		ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationExtensions(requiredInstanceExtensions));
-
-		Uint instanceExtensionCount = 0;
-		VK_CALL(vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr));
-		Vector<VkExtensionProperties> availableInstanceExtensions(instanceExtensionCount);
-		VK_CALL(vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableInstanceExtensions.data()));
-		if (!ValidateExtensions(requiredInstanceExtensions, availableInstanceExtensions))
-		{
-			throw std::runtime_error("Required instance extensions are missing!");
-		}
-
-		return requiredInstanceExtensions;
-	}
-
-	Vector<const char*> VulkanRHI::GetRequiredInstanceLayers()
-	{
-		Vector<const char*> instanceLayers;
-		ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationLayers(instanceLayers));
-		return instanceLayers;
 	}
 
 	void VulkanRHI::CreateSurface(Window* window)
@@ -470,19 +771,53 @@ namespace Surge
 
 	}
 
+	void VulkanRHI::CreateSwapchainFramebuffers()
+	{
+		Uint imageCount = mSwapchain.GetImageCount();
+		mSwapchainFramebuffers.resize(imageCount);
+
+		// Create framebuffer for each swapchain image view
+		for (Uint i = 0; i < imageCount; i++)
+		{
+			VkImageView attachment = mSwapchain.GetFrame(i).View;
+
+			VkFramebufferCreateInfo fbInfo = {};
+			fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			fbInfo.renderPass = mRenderPass;
+			fbInfo.attachmentCount = 1;
+			fbInfo.pAttachments = &attachment;
+			fbInfo.width = mSwapchain.GetWidth();
+			fbInfo.height = mSwapchain.GetHeight();
+			fbInfo.layers = 1;
+
+			VK_CALL(vkCreateFramebuffer(mDevice.GetDevice(), &fbInfo, nullptr, &mSwapchainFramebuffers[i]));		
+		}
+	}
+
+	void VulkanRHI::DestroySwapchainFramebuffers()
+	{
+		for (auto& fb : mSwapchainFramebuffers)
+		{
+			if (fb != VK_NULL_HANDLE)
+				vkDestroyFramebuffer(mDevice.GetDevice(), fb, nullptr);
+		}
+		mSwapchainFramebuffers.clear();
+	}
+
 	void VulkanRHI::CreateRenderpass()
 	{
 		VkDevice device = mDevice.GetDevice();		
-
-		VkAttachmentDescription attachment{
-			.format = mSwapchain.GetDimensions().Format,        // Backbuffer format.
-			.samples = VK_SAMPLE_COUNT_1_BIT,                   // Not multisampled.
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,              // When starting the frame, we want tiles to be cleared.
-			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,            // When ending the frame, we want tiles to be written out.
-			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,   // Don't care about stencil since we're not using it.
-			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE, // Don't care about stencil since we're not using it.
-			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,         // The image layout will be undefined when the render pass begins.
-			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR      // After the render pass is complete, we will transition to PRESENT_SRC_KHR layout.
+		// Proudly stolen from Sascha Willems' Vulkan examples:
+		VkAttachmentDescription attachment
+		{
+			.format = mSwapchain.GetDimensions().Format,               // Backbuffer format
+			.samples = VK_SAMPLE_COUNT_1_BIT,                          // Not multisampled
+			.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,                      // We blit, so LOAD_OP_LOAD to preserve the blit contents
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,                   // When ending the frame, we want tiles to be written out
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // Don't care about stencil since we're not using it
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,        // Don't care about stencil since we're not using it
+			.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // The image layout will be undefined when the render pass begins
+			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR             // After the render pass is complete, we will transition to PRESENT_SRC_KHR layout.
 		};
 
 		// We have one subpass. This subpass has one color attachment.
@@ -494,7 +829,8 @@ namespace Surge
 		// UNDEFINED is transitioned into COLOR_ATTACHMENT_OPTIMAL.
 		// The final layout in the render pass attachment states PRESENT_SRC_KHR, so we
 		// will get a final transition from COLOR_ATTACHMENT_OPTIMAL to PRESENT_SRC_KHR.
-		VkSubpassDescription subpass{
+		VkSubpassDescription subpass
+		{
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = &colorRef,
@@ -534,45 +870,46 @@ namespace Surge
 			vkDestroyRenderPass(mDevice.GetDevice(), mRenderPass, nullptr);
 	}
 
-	void VulkanRHI::CreateSwapchainFramebuffers()
-	{
-		Uint imageCount = mSwapchain.GetImageCount();
-		mSwapchainFramebuffers.resize(imageCount);
-
-		// Create framebuffer for each swapchain image view
-		for (Uint i = 0; i < imageCount; i++)
-		{
-			VkImageView attachment = mSwapchain.GetFrame(i).View;
-
-			VkFramebufferCreateInfo fbInfo = {};
-			fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			fbInfo.renderPass = mRenderPass;
-			fbInfo.attachmentCount = 1;
-			fbInfo.pAttachments = &attachment;
-			fbInfo.width = mSwapchain.GetWidth();
-			fbInfo.height = mSwapchain.GetHeight();
-			fbInfo.layers = 1;
-
-			VK_CALL(vkCreateFramebuffer(mDevice.GetDevice(), &fbInfo, nullptr, &mSwapchainFramebuffers[i]));		
-		}
-	}
-
-	void VulkanRHI::DestroySwapchainFramebuffers()
-	{
-		for (auto& fb : mSwapchainFramebuffers)
-		{
-			if (fb != VK_NULL_HANDLE)
-				vkDestroyFramebuffer(mDevice.GetDevice(), fb, nullptr);
-		}
-		mSwapchainFramebuffers.clear();
-	}
-
 	void VulkanRHI::ResizeInternal()
 	{
 		vkDeviceWaitIdle(mDevice);
 		DestroySwapchainFramebuffers();
 		mSwapchain.Resize(*this, 0, 0);
 		CreateSwapchainFramebuffers();
+	}
+
+	Vector<const char*> VulkanRHI::GetRequiredInstanceExtensions()
+	{
+		Vector<const char*> requiredInstanceExtensions;
+		requiredInstanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+#if defined(SURGE_PLATFORM_ANDROID)
+		requiredInstanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+#elif defined(SURGE_PLATFORM_WINDOWS)
+		requiredInstanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif defined(SURGE_PLATFORM_APPLE)
+		requiredInstanceExtensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
+#else
+#pragma error "Platform not supported"
+#endif
+		ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationExtensions(requiredInstanceExtensions));
+
+		Uint instanceExtensionCount = 0;
+		VK_CALL(vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr));
+		Vector<VkExtensionProperties> availableInstanceExtensions(instanceExtensionCount);
+		VK_CALL(vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableInstanceExtensions.data()));
+		if (!ValidateExtensions(requiredInstanceExtensions, availableInstanceExtensions))
+		{
+			throw std::runtime_error("Required instance extensions are missing!");
+		}
+
+		return requiredInstanceExtensions;
+	}
+
+	Vector<const char*> VulkanRHI::GetRequiredInstanceLayers()
+	{
+		Vector<const char*> instanceLayers;
+		ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationLayers(instanceLayers));
+		return instanceLayers;
 	}
 
 }

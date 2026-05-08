@@ -2,6 +2,7 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanPipeline.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 
 #ifdef SURGE_PLATFORM_WINDOWS
 #include <shaderc/shaderc.hpp>
@@ -14,98 +15,6 @@
 
 namespace Surge
 {
-	static VkFormat ToVkFormat(VertexFormat f)
-	{
-		switch (f)
-		{
-		case VertexFormat::FLOAT:  return VK_FORMAT_R32_SFLOAT;
-		case VertexFormat::FLOAT2: return VK_FORMAT_R32G32_SFLOAT;
-		case VertexFormat::FLOAT3: return VK_FORMAT_R32G32B32_SFLOAT;
-		case VertexFormat::FLOAT4: return VK_FORMAT_R32G32B32A32_SFLOAT;
-		case VertexFormat::INT:    return VK_FORMAT_R32_SINT;
-		case VertexFormat::INT2:   return VK_FORMAT_R32G32_SINT;
-		case VertexFormat::INT3:   return VK_FORMAT_R32G32B32_SINT;
-		case VertexFormat::INT4:   return VK_FORMAT_R32G32B32A32_SINT;
-		}
-		return VK_FORMAT_UNDEFINED;
-	}
-
-	static VkCullModeFlags ToVkCullMode(CullMode c)
-	{
-		switch (c)
-		{
-		case CullMode::NONE:  return VK_CULL_MODE_NONE;
-		case CullMode::FRONT: return VK_CULL_MODE_FRONT_BIT;
-		case CullMode::BACK:  return VK_CULL_MODE_BACK_BIT;
-		}
-		return VK_CULL_MODE_NONE;
-	}
-
-	static VkFrontFace ToVkFrontFace(FrontFace f)
-	{
-		switch (f)
-		{
-		case FrontFace::CLOCKWISE:         return VK_FRONT_FACE_CLOCKWISE;
-		case FrontFace::COUNTER_CLOCKWISE: return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		}
-		return VK_FRONT_FACE_CLOCKWISE;
-	}
-
-	static VkPrimitiveTopology ToVkTopology(Topology t)
-	{
-		switch (t)
-		{
-		case Topology::TRIANGLE_LIST:  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		case Topology::TRIANGLE_STRIP: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-		case Topology::LINE_LIST:      return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		case Topology::POINT_LIST:     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-		}
-		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	}
-
-	static VkCompareOp ToVkCompareOp(CompareOp op)
-	{
-		switch (op)
-		{
-		case CompareOp::NEVER:            return VK_COMPARE_OP_NEVER;
-		case CompareOp::LESS:             return VK_COMPARE_OP_LESS;
-		case CompareOp::EQUAL:            return VK_COMPARE_OP_EQUAL;
-		case CompareOp::LESS_OR_EQUAL:    return VK_COMPARE_OP_LESS_OR_EQUAL;
-		case CompareOp::GREATER:          return VK_COMPARE_OP_GREATER;
-		case CompareOp::NOT_EQUAL:        return VK_COMPARE_OP_NOT_EQUAL;
-		case CompareOp::GREATER_OR_EQUAL: return VK_COMPARE_OP_GREATER_OR_EQUAL;
-		case CompareOp::ALWAYS:           return VK_COMPARE_OP_ALWAYS;
-		}
-		return VK_COMPARE_OP_LESS;
-	}
-
-	static VkBlendFactor ToVkBlendFactor(BlendFactor f)
-	{
-		switch (f)
-		{
-		case BlendFactor::ZERO:                return VK_BLEND_FACTOR_ZERO;
-		case BlendFactor::ONE:                 return VK_BLEND_FACTOR_ONE;
-		case BlendFactor::SRC_ALPHA:           return VK_BLEND_FACTOR_SRC_ALPHA;
-		case BlendFactor::ONE_MINUS_SRC_ALPHA: return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		case BlendFactor::DST_ALPHA:           return VK_BLEND_FACTOR_DST_ALPHA;
-		case BlendFactor::ONE_MINUS_DST_ALPHA: return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-		}
-		return VK_BLEND_FACTOR_ZERO;
-	}
-
-	static VkBlendOp ToVkBlendOp(BlendOp op)
-	{
-		switch (op)
-		{
-		case BlendOp::ADD:              return VK_BLEND_OP_ADD;
-		case BlendOp::SUBTRACT:         return VK_BLEND_OP_SUBTRACT;
-		case BlendOp::REVERSE_SUBTRACT: return VK_BLEND_OP_REVERSE_SUBTRACT;
-		case BlendOp::MIN:              return VK_BLEND_OP_MIN;
-		case BlendOp::MAX:              return VK_BLEND_OP_MAX;
-		}
-		return VK_BLEND_OP_ADD;
-	}
-
 	PipelineEntry VulkanPipeline::Create(const VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass)
 	{
 		SG_ASSERT(desc.VertShaderName, "PipelineDesc: VertShaderName is null!");
@@ -114,6 +23,7 @@ namespace Surge
 
 		PipelineEntry entry = {};
 		entry.PushConstantSize = desc.PushConstantSize;
+		entry.Desc = desc;
 
 		// Pipeline layout
 		VkPipelineLayoutCreateInfo layoutInfo = {};
@@ -162,7 +72,7 @@ namespace Surge
 		{
 			vkAttributes[i].location = desc.Attributes[i].Location;
 			vkAttributes[i].binding = desc.Attributes[i].Binding;
-			vkAttributes[i].format = ToVkFormat(desc.Attributes[i].Format);
+			vkAttributes[i].format = VulkanUtils::ToVkVertexFormat(desc.Attributes[i].Format);
 			vkAttributes[i].offset = desc.Attributes[i].Offset;
 		}
 
@@ -176,14 +86,14 @@ namespace Surge
 		// Input assembly
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		inputAssembly.topology = ToVkTopology(desc.Raster.Topo);
+		inputAssembly.topology = VulkanUtils::ToVkTopology(desc.Raster.Topo);
 
 		// Rasterizer
 		VkPipelineRasterizationStateCreateInfo raster = {};
 		raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 		raster.polygonMode = VK_POLYGON_MODE_FILL;
-		raster.cullMode = ToVkCullMode(desc.Raster.Cull);
-		raster.frontFace = ToVkFrontFace(desc.Raster.Front);
+		raster.cullMode = VulkanUtils::ToVkCullMode(desc.Raster.Cull);
+		raster.frontFace = VulkanUtils::ToVkFrontFace(desc.Raster.Front);
 		raster.lineWidth = desc.Raster.LineWidth;
 		raster.depthClampEnable = desc.Raster.DepthClamp ? VK_TRUE : VK_FALSE;
 
@@ -192,18 +102,18 @@ namespace Surge
 		depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		depthStencil.depthTestEnable = desc.Depth.TestEnable ? VK_TRUE : VK_FALSE;
 		depthStencil.depthWriteEnable = desc.Depth.WriteEnable ? VK_TRUE : VK_FALSE;
-		depthStencil.depthCompareOp = ToVkCompareOp(desc.Depth.Op);
+		depthStencil.depthCompareOp = VulkanUtils::ToVkCompareOp(desc.Depth.Op);
 
 		// Blend
 		VkPipelineColorBlendAttachmentState blendAttachment = {};
-		blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |VK_COLOR_COMPONENT_G_BIT |VK_COLOR_COMPONENT_B_BIT |VK_COLOR_COMPONENT_A_BIT;
+		blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 		blendAttachment.blendEnable = desc.Blend.Enable ? VK_TRUE : VK_FALSE;
-		blendAttachment.srcColorBlendFactor = ToVkBlendFactor(desc.Blend.SrcColor);
-		blendAttachment.dstColorBlendFactor = ToVkBlendFactor(desc.Blend.DstColor);
-		blendAttachment.colorBlendOp = ToVkBlendOp(desc.Blend.ColorOp);
-		blendAttachment.srcAlphaBlendFactor = ToVkBlendFactor(desc.Blend.SrcAlpha);
-		blendAttachment.dstAlphaBlendFactor = ToVkBlendFactor(desc.Blend.DstAlpha);
-		blendAttachment.alphaBlendOp = ToVkBlendOp(desc.Blend.AlphaOp);
+		blendAttachment.srcColorBlendFactor = VulkanUtils::ToVkBlendFactor(desc.Blend.SrcColor);
+		blendAttachment.dstColorBlendFactor = VulkanUtils::ToVkBlendFactor(desc.Blend.DstColor);
+		blendAttachment.colorBlendOp = VulkanUtils::ToVkBlendOp(desc.Blend.ColorOp);
+		blendAttachment.srcAlphaBlendFactor = VulkanUtils::ToVkBlendFactor(desc.Blend.SrcAlpha);
+		blendAttachment.dstAlphaBlendFactor = VulkanUtils::ToVkBlendFactor(desc.Blend.DstAlpha);
+		blendAttachment.alphaBlendOp = VulkanUtils::ToVkBlendOp(desc.Blend.AlphaOp);
 
 		VkPipelineColorBlendStateCreateInfo blend = {};
 		blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;

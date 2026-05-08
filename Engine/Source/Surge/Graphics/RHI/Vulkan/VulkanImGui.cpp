@@ -90,7 +90,8 @@ namespace Surge
 #if defined(SURGE_PLATFORM_ANDROID)
 		SG_ASSERT(window, "ImGuiLayer: ANativeWindow* is null");
 		io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 		ImGui_ImplAndroid_Init(static_cast<ANativeWindow*>(window));
 
 		// Mobile larger touch targets
@@ -100,7 +101,7 @@ namespace Surge
 #elif defined(SURGE_PLATFORM_WINDOWS)
 		SG_ASSERT(window, "ImGuiLayer: HWND is null");
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
 		ImGui_ImplWin32_Init(static_cast<HWND>(window));
 		ImGui::GetPlatformIO().Platform_CreateVkSurface = // Stolen from ImGui Vulkan example's main.cpp(we respect their naming convention):
@@ -138,16 +139,16 @@ namespace Surge
 		ImGui_ImplVulkan_Init(&vkInfo);
 
 		// Load Fonts
-		style.FontSizeBase = 15.0f;
+		style.FontSizeBase = 17.0f;
 		
 #ifdef SURGE_PLATFORM_WINDOWS
 		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);
 		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
-		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);		
+		mBoldFont = io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
 #elif defined(SURGE_PLATFORM_ANDROID)
 		LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);
 		LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
-		LoadImGuiFont("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
+		mBoldFont = LoadImGuiFont("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
 #else
 		io.Fonts->AddFontDefault();
 #endif
@@ -208,11 +209,13 @@ namespace Surge
 		ImDrawData* drawData = ImGui::GetDrawData();
 		ImGui_ImplVulkan_RenderDrawData(drawData, cmd);
 
+#ifdef SURGE_PLATFORM_WINDOWS
 		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 		}
+#endif
 	}
 
 	void VulkanImGuiContext::SetDarkThemeColors()
@@ -269,5 +272,4 @@ namespace Surge
 		//colors[ImGuiCol_Separator] = colorFromBytes(10, 200, 10);
 		//colors[ImGuiCol_Border] = colorFromBytes(10, 200, 10);
 	}
-
 }

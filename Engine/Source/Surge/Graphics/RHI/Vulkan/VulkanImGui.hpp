@@ -21,12 +21,14 @@ namespace Surge
 		void EndFrame(VkCommandBuffer cmd);
 
 		bool IsInitialized() const { return mInitialized; }
+		ImFont* GetBoldFont() { return mBoldFont; }
+
 	private:
 		void SetDarkThemeColors();
-
 	private:
 		VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
 		bool mInitialized = false;
+		ImFont* mBoldFont = nullptr;
 	};
 
 }

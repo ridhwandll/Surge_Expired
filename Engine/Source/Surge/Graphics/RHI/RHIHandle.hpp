@@ -8,8 +8,8 @@ namespace Surge
 	struct RHIHandle
 	{
 		static constexpr Uint INVALID_INDEX = ~0u;
-
-		Uint Index = INVALID_INDEX;
+		
+		Uint Index = INVALID_INDEX; // Index into the pool's slot array. Generation is used to detect stale handles after a slot is freed and reallocated
 		Uint Generation = 0;
 
 		bool IsNull() const { return Index == INVALID_INDEX; }
@@ -64,8 +64,7 @@ namespace Surge
 			slot.Alive = true;
 
 			// Guard against generation wrapping back to 0
-			// (a stale handle with Generation=N would match a recycled slot
-			//  if the slot wrapped around to the same generation)
+			// (a stale handle with Generation = N would match a recycled slot if the slot wrapped around to the same generation)
 			slot.Generation = (slot.Generation == ~0u) ? 1 : slot.Generation + 1;
 
 			XHandle handle;
@@ -97,7 +96,8 @@ namespace Surge
 		// Get immutable data.
 		const T* Get(XHandle h) const
 		{
-			if (!IsValid(h)) return nullptr;
+			if (!IsValid(h))
+				return nullptr;
 			return &mSlots[h.Index].Data;
 		}
 
@@ -115,7 +115,7 @@ namespace Surge
 			mFreeList.push_back(h.Index);
 		}
 
-		// Iterate all currently live slots. Callback: void(XHandle, T&)
+		// Iterate all currently live slots. Callback: void(const XHandle& h, T& entry)
 		template<typename Fn>
 		void ForEachAlive(Fn&& fn)
 		{

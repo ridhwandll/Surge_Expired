@@ -125,7 +125,7 @@ namespace Surge
 			.imageColorSpace = format.colorSpace,
 			.imageExtent = swapchainSize,
 			.imageArrayLayers = 1,
-			.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, //VK_IMAGE_USAGE_TRANSFER_DST_BIT needed as we blit
 			.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
 			.preTransform = preTransform,
 			.compositeAlpha = composite,
@@ -173,7 +173,7 @@ namespace Surge
 			semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 			VK_CALL(vkCreateSemaphore(device, &semInfo, nullptr, &releaseSemaphore));
 
-			mFrames.push_back({ imageView, releaseSemaphore });
+			mFrames.push_back({ swapchainImages[i], imageView, releaseSemaphore });
 		}
 
 	}

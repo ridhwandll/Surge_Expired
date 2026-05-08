@@ -113,7 +113,7 @@ target_compile_options(spirvcross_android PRIVATE
     -w
 )
 
-# ImGui -
+# ImGui
 set(IMGUI_SOURCES
     "${VENDOR_ROOT}/ImGui/imgui.cpp"
     "${VENDOR_ROOT}/ImGui/imgui_demo.cpp"

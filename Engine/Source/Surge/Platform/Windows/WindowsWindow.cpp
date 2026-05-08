@@ -108,7 +108,7 @@ namespace Surge
     {
         RECT rect;
         glm::vec2 result;
-        if (GetWindowRect(mWin32Window, &rect))
+        if (GetClientRect(mWin32Window, &rect))
         {
             result.x = static_cast<float>(rect.right - rect.left);
             result.y = static_cast<float>(rect.bottom - rect.top);

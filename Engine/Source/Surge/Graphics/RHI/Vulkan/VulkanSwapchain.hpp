@@ -14,7 +14,7 @@ namespace Surge
 
 	struct SwapchainFrame
 	{
-		//VkImage Image = VK_NULL_HANDLE; 
+		VkImage Image = VK_NULL_HANDLE; 
 		VkImageView View = VK_NULL_HANDLE;
 		VkSemaphore ReleaseSemaphore = VK_NULL_HANDLE;
 	};

@@ -34,10 +34,8 @@ namespace Surge
 		void Shutdown() { mBackendRHI.Shutdown(); }
 
 		FrameContext BeginFrame() { FrameContext ctx; mBackendRHI.BeginFrame(ctx); return ctx; }
-		void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }
-		void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
-
 		void EndFrame(const FrameContext& ctx) { mBackendRHI.EndFrame(ctx); }
+
 		void Resize(Uint width, Uint height) { mBackendRHI.Resize(); }
 		const RHIStats& GetStats() { return mBackendRHI.GetStats(); }
 
@@ -46,27 +44,38 @@ namespace Surge
 		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset = 0) { mBackendRHI.UploadBuffer(h, data, size, offset); }
 		void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
 
-		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }
-		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }
-
 		// Texture
 		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr) { return mBackendRHI.CreateTexture(desc, initialData); }
 		void DestroyTexture(TextureHandle texture) { mBackendRHI.DestroyTexture(texture); }
+		void ResizeTexture(TextureHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeTexture(h, newWidth, newHeight); }
 
 		// Framebuffer
-		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr) { return mBackendRHI.CreateFramebuffer(desc, initialData); }
-		void DestroyFramebuffer(FramebufferHandle framebuffer) { mBackendRHI.DestroyFramebuffer(framebuffer); }
+		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }
+		void DestroyFramebuffer(FramebufferHandle h) { mBackendRHI.DestroyFramebuffer(h); }
+		void ResizeFramebuffer(FramebufferHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeFramebuffer(h, newWidth, newHeight); }
 
 		// Pipeline
 		PipelineHandle CreatePipeline(const PipelineDesc& desc) { return mBackendRHI.CreatePipeline(desc); }
 		void DestroyPipeline(PipelineHandle h) { mBackendRHI.DestroyPipeline(h); }
 
-		// DrawCommands
+		// Commands
 		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount,Uint instanceCount,Uint firstIndex,int32_t vertexOffset, Uint firstInstance) { mBackendRHI.CmdDrawIndexed(ctx, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance); }
 		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance) { mBackendRHI.CmdDraw(ctx, vertexCount, instanceCount, firstVertex, firstInstance); }
-		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
-		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset) { mBackendRHI.CmdPushConstants(ctx, h, data, size, offset); }
 
+		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }
+		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }
+		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
+
+		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset) { mBackendRHI.CmdPushConstants(ctx, h, data, size, offset); }
+		void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }
+
+		void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }
+		void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
+
+		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
+		void CmdEndRenderPass(const FrameContext& ctx) { mBackendRHI.CmdEndRenderPass(ctx); }
+
+		void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
 		// TODO: REMOVE
 		BackendRHI& GetBackendRHI() { return mBackendRHI; }
 

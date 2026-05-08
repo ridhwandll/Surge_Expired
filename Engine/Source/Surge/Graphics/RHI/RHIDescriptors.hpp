@@ -50,6 +50,8 @@ namespace Surge
 		DEPTH_ATTACHMENT = BIT(2),
 		TRANSIENT_ATTACHMENT = BIT(3),
 		STORAGE = BIT(4),
+		TRANSFER_SRC = BIT(5),
+		TRANSFER_DST = BIT(6)
 	};
 	MAKE_BIT_ENUM(TextureUsage, Uint);
 
@@ -95,6 +97,7 @@ namespace Surge
 		bool HasDepth = false;
 		Uint Width = 0;
 		Uint Height = 0;
+
 		const char* DebugName = nullptr;
 	};
 
@@ -199,6 +202,9 @@ namespace Surge
 
 		// Push constants, one range, covers 99% of cases
 		Uint PushConstantSize = 0; // bytes, 0 = none
+
+		FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // offscreen
+		bool TargetSwapchain = false; // swapchain pass
 
 		const char* DebugName = nullptr;
 	};

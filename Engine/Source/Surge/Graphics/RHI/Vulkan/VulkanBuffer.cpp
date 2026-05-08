@@ -21,6 +21,7 @@ namespace Surge
 
 		BufferEntry entry = {};
 		entry.Size = desc.Size;
+		entry.Desc = desc;
 
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

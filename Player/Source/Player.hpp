@@ -20,8 +20,9 @@ namespace Surge
         void Resize(Uint width, Uint height);
         void OnImGuiRender();
     private:
+        int mChangeQuadAmount = 10;
+        bool mMoveEnabled = true;
         Entity mQuad;
-        Uint mQuadCount;
         Vector<Entity> mQuads;
         Renderer* mRenderer;
     };

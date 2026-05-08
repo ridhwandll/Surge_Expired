@@ -9,7 +9,9 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanFrame.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanFramebuffer.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
+
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -44,22 +46,17 @@ namespace Surge
 		void Resize();
 		const RHIStats& GetStats();
 
-		//Renderpass
-		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
-		void CmdEndSwapchainRenderpass(const FrameContext& ctx);
-
-		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
-		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
-
 		BufferHandle CreateBuffer(const BufferDesc& desc);		
 		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset);
 		void DestroyBuffer(BufferHandle buffer);
 
 		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr);
-		void DestroyTexture(TextureHandle texture);
+		void DestroyTexture(TextureHandle h);
+		void ResizeTexture(TextureHandle h, Uint width, Uint height);
 
-		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc, const void* initialData = nullptr);
-		void DestroyFramebuffer(FramebufferHandle framebuffer);
+		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
+		void DestroyFramebuffer(FramebufferHandle h);
+		void ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height);
 
 		// Pipeline
 		PipelineHandle CreatePipeline(const PipelineDesc& desc);
@@ -68,8 +65,21 @@ namespace Surge
 		//Draw Commands
 		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance);
 		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance);
+
+		void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
+		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
 		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h);
+
 		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset);
+		void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle);
+		void CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout);
+
+		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
+		void CmdEndSwapchainRenderpass(const FrameContext& ctx);
+
+		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 0.0f, 1.0f });
+		void CmdEndRenderPass(const FrameContext& ctx);
+
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
 
@@ -87,6 +97,7 @@ namespace Surge
 		VmaAllocator GetAllocator() const { return mDevice.GetAllocator(); }
 		int32_t GetQueueIndex() const { return mDevice.GetQueueIndex(); }
 
+		void ShowPoolDebugImGuiWindow();
 	private:
 		void CreateInstance();
 		void FillStats();
@@ -113,6 +124,7 @@ namespace Surge
 		VulkanFrame mFrame;
 		VulkanSwapchain mSwapchain;
 		VulkanImGuiContext mImGuiContext;
+		VulkanRenderpassCache mRenderPassCache;
 
 		Vector<VkFramebuffer> mSwapchainFramebuffers;
 		VkRenderPass mRenderPass = VK_NULL_HANDLE;
@@ -124,6 +136,7 @@ namespace Surge
 		HandlePool<PipelineHandle, PipelineEntry> mPipelinePool;
 		HandlePool<BufferHandle, BufferEntry> mBufferPool;
 		HandlePool<FramebufferHandle, FramebufferEntry> mFramebufferPool;
+		HandlePool<TextureHandle, TextureEntry> mTexturePool;
 	};
 
 }

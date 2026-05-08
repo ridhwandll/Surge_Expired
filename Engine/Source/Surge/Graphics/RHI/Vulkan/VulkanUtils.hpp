@@ -1,0 +1,27 @@
+// Copyright (c) - SurgeTechnologies - All rights reserved
+#pragma once
+#include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include <volk.h>
+
+namespace Surge::VulkanUtils
+{
+	VkFormat ToVkVertexFormat(VertexFormat f);
+	VkCullModeFlags ToVkCullMode(CullMode c);
+	VkFrontFace ToVkFrontFace(FrontFace f);
+	VkPrimitiveTopology ToVkTopology(Topology t);
+	VkCompareOp ToVkCompareOp(CompareOp op);
+	VkBlendFactor ToVkBlendFactor(BlendFactor f);
+	VkBlendOp ToVkBlendOp(BlendOp op);
+	VkAttachmentLoadOp ToVkLoadOp(LoadOp op);
+	VkAttachmentStoreOp ToVkStoreOp(StoreOp op);
+
+	VkFormat TextureFormatToVkFormat(TextureFormat format);
+	bool IsDepthFormat(TextureFormat format);
+	VkImageUsageFlags ToVkImageUsage(TextureUsage usage, bool transient);
+
+	String TextureFormatToString(TextureFormat format);
+	const char* TextureUsageToString(TextureUsage usage);
+	const char* BufferUsageToString(BufferUsage usage);
+	const char* LoadOpToString(LoadOp op);
+	const char* StoreOpToString(StoreOp op);
+}
