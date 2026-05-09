@@ -11,6 +11,7 @@ namespace Surge
 	{
 		VkImage Image = VK_NULL_HANDLE;
 		VkImageView View = VK_NULL_HANDLE;
+		VkDeviceSize Size = 0; //bytes
 		VmaAllocation Allocation = VK_NULL_HANDLE;
 		VkImageLayout Layout = VK_IMAGE_LAYOUT_UNDEFINED;
 

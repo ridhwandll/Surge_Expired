@@ -16,6 +16,9 @@
 
 namespace Surge
 {
+	static constexpr Uint MAX_VERTICES = Renderer::MAX_QUADS_TOTAL * 4;
+	static constexpr Uint MAX_INDICES = Renderer::MAX_QUADS_PER_BATCH * 6; // IB of 1 batch, we reuse this
+
     void Renderer::Initialize()
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
@@ -24,6 +27,8 @@ namespace Surge
 		mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
         
+		// Create IB of 1 batch, we resue this for all batches, as the max indices per batch is fixed
+		// We fill this with quad index data, and it will reference vertices in the VB based on the current batchs vertex offset
 		Vector<Uint> indices(MAX_INDICES);
 		Uint offset = 0;
 		for (Uint i = 0; i < MAX_INDICES; i += 6)
@@ -36,15 +41,16 @@ namespace Surge
 			indices[i + 5] = offset + 3;
 			offset += 4;
 		}
-
 		BufferDesc ibDesc = {};
-		ibDesc.Size = sizeof(uint32_t) * MAX_INDICES;
+		ibDesc.Size = sizeof(Uint) * MAX_INDICES;
 		ibDesc.Usage = BufferUsage::INDEX;
 		ibDesc.HostVisible = true;
 		ibDesc.InitialData = indices.data();
 		ibDesc.DebugName = "BatchIB";
 		mIndexBuffer = mRHI->CreateBuffer(ibDesc);
 
+		// We allocate a large VB for max vertices across all batches, but we only fill and bind the portion
+		// needed for the current batch each frame. This is to avoid GPU buffer creation stalls when flushing mid-frame after each batch is submitted.
 		BufferDesc vbDesc = {};
 		vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
 		vbDesc.Usage = BufferUsage::VERTEX;
@@ -52,10 +58,9 @@ namespace Surge
 		vbDesc.DebugName = "BatchVB";
 		mVertexBuffer = mRHI->CreateBuffer(vbDesc);
 
-		// CPU-side staging array fill this, then memcpy to GPU buffer
-		mVertexData.resize(MAX_VERTICES);
-		mVertexCount = 0;
-		mQuadCount = 0;
+		// CPU side staging array fill this, then memcpy to GPU buffer
+		mVertexData.resize(MAX_QUADS_PER_BATCH * 4);
+		mCurrentBatch.Reset();
 
 		// Offscreen color texture
 		glm::vec2 size = Core::GetWindow()->GetSize();
@@ -99,17 +104,6 @@ namespace Surge
 		mPipeline = mRHI->CreatePipeline(desc);
     }
 
-    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
-    {
-        SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
-        mData->ViewMatrix = glm::inverse(transform);
-        mData->ProjectionMatrix = camera.GetProjectionMatrix();
-        mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
-        mData->CameraPosition = transform[3];
-		mVertexCount = 0;
-		mQuadCount = 0;
-    }
-
     void Renderer::BeginFrame(const EditorCamera& camera)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
@@ -117,55 +111,102 @@ namespace Surge
         mData->ProjectionMatrix = camera.GetProjectionMatrix();
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
-		mVertexCount = 0;
-		mQuadCount = 0;
+
+		mTotalVertexCount = 0;
+		mTotalQuadCount = 0;
+		mCurrentFrameVertexOffset = 0;
+
+		mCurrentFrameCtx = mRHI->BeginFrame();
+		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
     }
+
+	void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
+	{
+		SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
+		mData->ViewMatrix = glm::inverse(transform);
+		mData->ProjectionMatrix = camera.GetProjectionMatrix();
+		mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
+		mData->CameraPosition = transform[3];
+	
+		mTotalVertexCount = 0;
+		mTotalQuadCount = 0;
+		mCurrentFrameVertexOffset = 0;
+
+		// Begins command buffer recording (Off-screen pass)
+		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]	
+		mCurrentFrameCtx = mRHI->BeginFrame();
+		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
+	}
 
     void Renderer::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
 
-		// Begins command buffer recording
-		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
-        const FrameContext& ctx = mRHI->BeginFrame();
-
-		// Off-screen passe
-
-		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), sizeof(QuadVertex) * mVertexCount, 0);	
-		mRHI->CmdBeginRenderPass(ctx, mOffscreenFramebuffer, mClearColor);
-		if (mQuadCount > 0)
-		{
-			// Render directly to swapchain buffer, no offscreen renderpass or postprocessing yet
-			mRHI->CmdBindPipeline(ctx, mPipeline);
-			mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
-			mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
-			QuadPushConstants push = { .ViewProj = mData->ViewProjection };
-			mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
-			mRHI->CmdDrawIndexed(ctx, mQuadCount * 6, 1, 0, 0, 0);
-		}
-		mRHI->CmdEndRenderPass(ctx);
+		FlushBatch();
+		mRHI->CmdEndRenderPass(mCurrentFrameCtx);
 		
-		mRHI->CmdBlitToSwapchain(ctx, mOffscreenColor); // Copy/blit offscreen color to swapchain backbuffer
-
-		mRHI->CmdBeginSwapchainRenderpass(ctx);
+		mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mOffscreenColor); // Copy/blit offscreen color to swapchain backbuffer
+		mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);	
 
 		// ImGui Render
 		for (const auto& callback : mImGuiRenderCallbacks)
 			callback();
+
+		OnImGuiRender();;
+
 		mRHI->ShowMetricsWindow(); //Shows internal metrics about the RHI resource pools
 
-		mRHI->CmdEndSwapchainRenderpass(ctx);
-
-		mRHI->EndFrame(ctx); // Stops command buffer recording
+		mRHI->CmdEndSwapchainRenderpass(mCurrentFrameCtx);
+		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording
     }
+
+	void Renderer::OnImGuiRender()
+	{
+		ImGui::Begin("Renderer2D Memory");
+		ImGui::Text("Batches: %u / %u", (mTotalQuadCount + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH, (MAX_QUADS_TOTAL + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH);
+		ImGui::Separator();
+
+		if (mMaxQuadCountReached)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.25f, 1.0f), "Max quad count of Renderer2D reached!\nSome Quads were not rendered.");
+			ImGui::Separator();
+		}
+
+		float totalVerticesUsed = (float)mTotalVertexCount;
+		float maxVerticesPossible = (float)MAX_VERTICES;
+		float usageRatio = totalVerticesUsed / maxVerticesPossible;
+
+		float frameWeightMB = (sizeof(QuadVertex) * totalVerticesUsed) / 1024.0f / 1024.0f;
+		float totalWeightMB = (sizeof(QuadVertex) * maxVerticesPossible) / 1024.0f / 1024.0f;
+		ImGui::Text("GPU Vertex Buffer status: %.3f MB / %.3f MB", frameWeightMB, totalWeightMB);
+
+		ImVec4 barColor = ImVec4(0.0f, 0.7f, 0.0f, 1.0f); // Green
+		if (usageRatio > 0.65f) barColor = ImVec4(1.0f, 0.4f, 0.0f, 1.0f); // Orange
+		if (usageRatio > 0.95f) barColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+
+		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
+		ImGui::ProgressBar(usageRatio, ImVec2(-1.0f, 0.0f));
+		ImGui::Text("%u / %u Vertices", mTotalVertexCount, MAX_VERTICES);
+		ImGui::PopStyleColor();
+
+		ImGui::End();
+	}
 
 	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color)
 	{
-		if(mQuadCount > MAX_QUADS)
-		{ 
-			Log<Severity::Warn>("Max quad count exceeded! QuadCount: {0}/MaxQuadCount: {1}", mQuadCount, MAX_QUADS);
+		if (mCurrentBatch.QuadCount >= MAX_QUADS_PER_BATCH)
+			FlushBatch();
+		
+		if (mTotalQuadCount >= MAX_QUADS_TOTAL)
+		{
+			Log<Severity::Warn>("Max Quads per frame reached!");
+			mMaxQuadCountReached = true;
 			return;
 		}
+		else		
+			mMaxQuadCountReached = false;
+		
+
 		// Unit quad positions transform applied per vertex on CPU
 		static constexpr glm::vec4 sLocalPositions[4] =
 		{
@@ -185,13 +226,14 @@ namespace Surge
 
 		for (Uint i = 0; i < 4; i++)
 		{
-			QuadVertex& v = mVertexData[mVertexCount++];
+			QuadVertex& v = mVertexData[mCurrentBatch.VertexCount++];
 			v.Position = transform * sLocalPositions[i]; // CPU transform
 			v.Color = color;
 			v.UV = sUVs[i];
 		}
 
-		mQuadCount++;
+		mCurrentBatch.QuadCount++;
+		mTotalQuadCount++;
 	}
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
@@ -202,6 +244,32 @@ namespace Surge
 			});
 		
 		Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
+	}
+
+	void Renderer::FlushBatch()
+	{
+		if (mCurrentBatch.QuadCount == 0)
+			return;
+
+		const FrameContext& ctx = mCurrentFrameCtx;
+
+		// Upload current batch vertex data to GPU (only the portion needed for this batch, not the entire VB)
+		Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
+		Uint uploadSizeInBytes = mCurrentBatch.VertexCount * sizeof(QuadVertex);
+		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
+
+		mRHI->CmdBindPipeline(ctx, mPipeline);
+		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
+		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
+
+		QuadPushConstants push = { .ViewProj = mData->ViewProjection };
+		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
+		mRHI->CmdDrawIndexed(ctx, mCurrentBatch.QuadCount * 6, 1, 0, (int32_t)mCurrentFrameVertexOffset, 0);
+
+		mTotalVertexCount += mCurrentBatch.VertexCount;
+		mCurrentFrameVertexOffset += mCurrentBatch.VertexCount;
+
+		mCurrentBatch.Reset();
 	}
 
 	void Renderer::Shutdown()

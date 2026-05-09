@@ -26,10 +26,9 @@ namespace Surge
     class EditorCamera;
     class SURGE_API Renderer
     {
-    public:
-		static constexpr Uint MAX_QUADS = 50000 * 2;
-		static constexpr Uint MAX_VERTICES = MAX_QUADS * 4;
-		static constexpr Uint MAX_INDICES = MAX_QUADS * 6;
+    public:        
+		static constexpr Uint MAX_QUADS_TOTAL = 100000; // 100k quads total, across all batches
+		static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
 		struct QuadVertex
 		{
@@ -61,15 +60,34 @@ namespace Surge
         RendererData* GetData() { return mData.get(); }
 
         // Renderer 2D methods TODO: move this to Renderer2D class
-		int GetQuadCount() const { return mQuadCount; }
-		int GetvertexCount() const { return mVertexCount; }
+		int GetQuadCount() const { return mTotalQuadCount; }
+		int GetvertexCount() const { return mTotalVertexCount; }
     private:
+		void FlushBatch();
+        void OnImGuiRender();
+    private:
+        struct BatchData
+        {
+			Uint VertexCount = 0;
+			Uint QuadCount = 0;
+
+            void Reset()
+            {
+				VertexCount = 0;
+				QuadCount = 0;
+            }
+        };
+    private:
+        FrameContext mCurrentFrameCtx;
 		Vector<std::function<void()>> mImGuiRenderCallbacks;
 		Vector<QuadVertex> mVertexData;
 
 		// Renderer 2D data TODO: move this to Renderer2D class
-		int mVertexCount = 0;
-        int mQuadCount = 0;
+		BatchData mCurrentBatch;
+        Uint mTotalVertexCount = 0;
+        Uint mTotalQuadCount = 0;
+        Uint mCurrentFrameVertexOffset = 0;
+		bool mMaxQuadCountReached = false;
 
         PipelineHandle mPipeline;
         BufferHandle mVertexBuffer;        

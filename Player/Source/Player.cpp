@@ -3,6 +3,7 @@
 #include "Player.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include <random>
+#include <imgui_internal.h>
 
 namespace Surge
 {
@@ -71,9 +72,7 @@ namespace Surge
 		}
 	
 		// Stress test		
-		Uint initialQuadCount = Renderer::MAX_QUADS;
-		initialQuadCount = 20.0f;
- 		mQuads.resize(initialQuadCount);
+		Uint initialQuadCount = 200.0f;
  		std::random_device rd;
  		std::mt19937 gen(rd());
  		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
@@ -83,16 +82,17 @@ namespace Surge
  			float x = distX(gen);
  			float y = distY(gen);
  		
- 			mActiveScene->CreateEntity(mQuads[i], "StressQuad");
+			Entity& quad = mQuads.emplace_back();
+ 			mActiveScene->CreateEntity(quad, "StressQuad");
  		
  			std::uniform_real_distribution<float> hueDist(0.0f, 1.0f);
  			float h = hueDist(gen);
  			float s = 1.0f;
  			float v = 1.0f;
  			glm::vec3 rgb = HSVtoRGB(h, s, v);
- 			mQuads[i].AddComponent<SpriteRenderer>(rgb, 1.0f);
+			quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
  		
- 			auto& t = mQuads[i].GetComponent<TransformComponent>();
+ 			auto& t = quad.GetComponent<TransformComponent>();
  			t.Position = glm::vec3(x, y, 0.0f);
  			t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
  		}
@@ -116,22 +116,22 @@ namespace Surge
 	{
 		float dt = Core::GetClock().GetSeconds();
 
-		if (mMoveEnabled && mQuads.size() > 0)
-		{
-			for (Uint i = 0; i < mQuads.size(); i++)
-			{
-				TransformComponent& transform = mQuads[i].GetComponent<TransformComponent>();
-
-				float rotSpeed = 10.0f + (i % 15);
-				float moveSpeed = 100.0f;
-				float dir = (i % 3 == 0) ? -1.0f : 1.0f;
-
-				transform.Rotation.z += dir * rotSpeed * dt;
-
-				transform.Position.x += sin(dt + i) * 0.001f * dt * moveSpeed;
-				transform.Position.y += cos(dt + i * 0.5f) * 0.001f * dt * moveSpeed;
-			}
-		}
+		//if (mMoveEnabled && mQuads.size() > 0)
+		//{
+		//	for (Uint i = 0; i < mQuads.size(); i++)
+		//	{
+		//		TransformComponent& transform = mQuads[i].GetComponent<TransformComponent>();
+		//
+		//		float rotSpeed = 10.0f + (i % 15);
+		//		float moveSpeed = 100.0f;
+		//		float dir = (i % 3 == 0) ? -1.0f : 1.0f;
+		//
+		//		transform.Rotation.z += dir * rotSpeed * dt;
+		//
+		//		transform.Position.x += sin(dt + i) * 0.001f * dt * moveSpeed;
+		//		transform.Position.y += cos(dt + i * 0.5f) * 0.001f * dt * moveSpeed;
+		//	}
+		//}
 		mActiveScene->Update();
 	}
 
@@ -139,51 +139,86 @@ namespace Surge
 	{
 		Clock& clock = Core::GetClock();
 		ImGuiID dockspaceID = ImGui::GetID("DockSpace");
+		
+#ifdef SURGE_PLATFORM_ANDROID
+		// On mobile we need a padding, else docking/undocking becomes a nightmare
+		float padding = 3.0f;
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+		// Create a hidden background window that acts as the "Safe Zone"
+		ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + padding, viewport->WorkPos.y + padding));
+		ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - (padding * 2), viewport->WorkSize.y - (padding * 2)));
+
+		ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+			ImGuiWindowFlags_NoBackground;
+
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+		ImGui::Begin("SafeDockSpaceHost", nullptr, hostFlags);
+		ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+		ImGui::End();
+		ImGui::PopStyleColor();
+#elif defined(SURGE_PLATFORM_WINDOWS)
 		ImGui::DockSpaceOverViewport(dockspaceID, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+#endif
 
 		ImGui::Begin("Control & Stats");
-		ImGui::Text("Total quads: %d\nVertices: %i\nFPS: %.1f", Core::GetRenderer()->GetQuadCount(), Core::GetRenderer()->GetvertexCount(), 1 / clock.GetSeconds());
-		ImGui::Text("Controls");
-		ImGui::Checkbox("Move quads", &mMoveEnabled);
-
-		if (ImGui::SliderInt("Quad Count", &mChangeQuadAmount, 0, Renderer::MAX_QUADS))
 		{
-			RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
-			float size = cam->GetOrthographicSize();
-			float aspect = cam->GetAspectRatio();
-			float halfWidth = size * aspect * 0.5f;
-			float halfHeight = size * 0.5f;
+			if (ImGui::BeginMenuBar())
+			{
+				if (ImGui::Button("Undock"))
+				{
+					ImGuiContext& g = *GImGui;
+					ImGuiWindow* window = g.CurrentWindow;
 
-			Uint currentQuadCount = Core::GetRenderer()->GetQuadCount();
-			if (currentQuadCount > mChangeQuadAmount)
-			{
-				Uint toRemove = currentQuadCount - mChangeQuadAmount;
-				for (Uint i = 0; i < toRemove; i++)
-				{
-					mActiveScene->DestroyEntity(mQuads.back());
-					mQuads.pop_back();
+					if (window->DockNode != NULL || window->DockId != 0)
+						ImGui::SetWindowDock(window, 0, ImGuiCond_Always);
 				}
+				ImGui::EndMenuBar();
 			}
-			else if (currentQuadCount < mChangeQuadAmount)
+
+			ImGui::Text("Total quads: %d\nVertices: %i\n%.1fms (FPS: %.1f)", Core::GetRenderer()->GetQuadCount(), Core::GetRenderer()->GetvertexCount(), clock.GetMilliseconds(), 1 / clock.GetSeconds());
+			ImGui::Text("Controls");
+			ImGui::Checkbox("Move quads", &mMoveEnabled);
+
+			if (ImGui::SliderInt("Quad Count", &mChangeQuadAmount, 0, Renderer::MAX_QUADS_TOTAL + 1))
 			{
-				Uint toAdd = mChangeQuadAmount - currentQuadCount;
-				for (Uint i = 0; i < toAdd; i++)
+				RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
+				float size = cam->GetOrthographicSize();
+				float aspect = cam->GetAspectRatio();
+				float halfWidth = size * aspect * 0.5f;
+				float halfHeight = size * 0.5f;
+
+				Uint currentQuadCount = Core::GetRenderer()->GetQuadCount();
+				if (currentQuadCount > mChangeQuadAmount)
 				{
-					glm::vec2 pos = GenRandomPosition(halfWidth, halfHeight);
-					Entity quad;
-					mActiveScene->CreateEntity(quad, "StressQuad");
-			
-					std::uniform_real_distribution<float> hueDist(0.0f, 1.0f);
-					float h = GenRandomHue();
-					float s = 1.0f;
-					float v = 1.0f;
-					glm::vec3 rgb = HSVtoRGB(h, s, v);
-					quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
-			
-					auto& t = quad.GetComponent<TransformComponent>();
-					t.Position = glm::vec3(pos.x, pos.y, 0.0f);
-					t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
-					mQuads.push_back(quad);
+					Uint toRemove = currentQuadCount - mChangeQuadAmount;
+					for (Uint i = 0; i < toRemove; i++)
+					{
+						mActiveScene->DestroyEntity(mQuads.back());
+						mQuads.pop_back();
+					}
+				}
+				else if (currentQuadCount < mChangeQuadAmount)
+				{
+					Uint toAdd = mChangeQuadAmount - currentQuadCount;
+					for (Uint i = 0; i < toAdd; i++)
+					{
+						glm::vec2 pos = GenRandomPosition(halfWidth, halfHeight);
+						Entity& quad = mQuads.emplace_back();
+						mActiveScene->CreateEntity(quad, "StressQuad");
+
+						float h = GenRandomHue();
+						float s = 1.0f;
+						float v = 1.0f;
+						glm::vec3 rgb = HSVtoRGB(h, s, v);
+						quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
+
+						auto& t = quad.GetComponent<TransformComponent>();
+						t.Position = glm::vec3(pos.x, pos.y, 0.0f);
+						t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
+					}
 				}
 			}
 		}

@@ -18,7 +18,7 @@
 namespace Surge
 {
 #ifdef SURGE_PLATFORM_ANDROID
-	void LoadImGuiFont(const char* filename, int fontSize)
+	ImFont* LoadImGuiFont(const char* filename, int fontSize)
 	{
 		AAssetManager* assetManager = Android::GAndroidApp->activity->assetManager;
 		AAsset* asset = AAssetManager_open(assetManager, filename, AASSET_MODE_BUFFER);
@@ -30,8 +30,11 @@ namespace Surge
 			AAsset_close(asset);
 
 			auto& io = ImGui::GetIO();
-			io.Fonts->AddFontFromMemoryTTF(data, (int)size, fontSize);
+			ImFont* font = io.Fonts->AddFontFromMemoryTTF(data, (int)size, fontSize);
+            SG_ASSERT(font, "Font file not found!")
+            return font;
 		}
+        return nullptr;
 	}
 #endif
 
@@ -95,6 +98,7 @@ namespace Surge
 
 		// Mobile larger touch targets
 		io.FontGlobalScale = 2.0f;
+		ImGui::GetStyle().ScaleAllSizes(2.0f);
 		style.TouchExtraPadding = ImVec2(4.0f, 4.0f);
 
 #elif defined(SURGE_PLATFORM_WINDOWS)
@@ -222,6 +226,7 @@ namespace Surge
 		ImVec4 themeColor = colorFromBytes(32, 32, 32);
 
 		auto& style = ImGui::GetStyle();
+
 		ImVec4* colors = style.Colors;
 
 		style.TabRounding = 1.5f;

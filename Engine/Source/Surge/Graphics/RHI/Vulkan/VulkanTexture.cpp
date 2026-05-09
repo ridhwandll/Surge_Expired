@@ -57,23 +57,25 @@ namespace Surge
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		// VMA allocation
-		VmaAllocationCreateInfo allocInfo = {};
+		VmaAllocationCreateInfo allocCreateInfo = {};
 
 		if (desc.Transient)
 		{
 			// Mobile TBDR key optimization:
 			// GPU_LAZILY_ALLOCATED = physical memory only allocated if the GPU actually needs to flush the tile on a perfect TBDR frame, zero bytes
 			// of real DRAM are used for transient attachments
-			allocInfo.usage = VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
-			allocInfo.requiredFlags = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+			allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
+			allocCreateInfo.requiredFlags = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
 		}
 		else		
-			allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; // Load on GPU
+			allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; // Load on GPU
 		// VMA Docs:
 		// If you have a preference for putting the resource in GPU (device) memory or CPU (host) memory on systems with discrete graphics card that have
 		// the memories separate, you can use VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE or VMA_MEMORY_USAGE_AUTO_PREFER_HOST.
 
-		VK_CALL(vmaCreateImage(rhi.GetAllocator(), &imageInfo, &allocInfo, &entry.Image, &entry.Allocation, nullptr));
+		VmaAllocationInfo allocInfo;
+		VK_CALL(vmaCreateImage(rhi.GetAllocator(), &imageInfo, &allocCreateInfo, &entry.Image, &entry.Allocation, &allocInfo));
+		entry.Size = allocInfo.size;
 
 		// VkImageView
 		VkImageViewCreateInfo viewInfo = {};

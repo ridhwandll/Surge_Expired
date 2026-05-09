@@ -571,7 +571,7 @@ namespace Surge
 		ImGui::Text("GPU Memory");
 		ImGui::PopFont();
 		ImGui::Text("Allocations: %llu", memStats.AllocationCount);
-		ImGui::Text("%.1f MB / %.1f MB", used, total);
+		ImGui::Text("%.3f MB / %.3f MB", used, total);
 		ImGui::ProgressBar(frac, ImVec2(-1, 0));
 		ImGui::Separator();
 		ImGui::PushFont(mImGuiContext.GetBoldFont(), 22.0f);
@@ -588,7 +588,7 @@ namespace Surge
 			if (ImGui::TreeNode(bufText.c_str()))
 			{
 				ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-				ImGui::Text("Size: %llu bytes", entry.Desc.Size);
+				ImGui::Text("Size: %.3f MB", entry.Desc.Size / (1024.0f * 1024.0f));
 				ImGui::Text("Usage: %s", VulkanUtils::BufferUsageToString(entry.Desc.Usage));
 				ImGui::Text("Host Visible: %s", entry.Desc.HostVisible ? "Yes" : "No");
 				ImGui::TreePop();
@@ -661,6 +661,7 @@ namespace Surge
 									ImGui::Text("Dimensions: %dx%d", tDesc.Width, tDesc.Height);
 									ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(tDesc.Format).c_str());
 									ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(tDesc.Usage));
+									ImGui::Text("Size: %.3f MB", texEntry->Size / (1024.0f * 1024.0f));
 									ImGui::TreePop();
 								}
 							}
@@ -694,6 +695,7 @@ namespace Surge
 					ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
 					ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
 					ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
+					ImGui::Text("Size: %.3f MB", entry.Size / (1024.0f * 1024.0f));
 					ImGui::TreePop();
 				}
 			});
