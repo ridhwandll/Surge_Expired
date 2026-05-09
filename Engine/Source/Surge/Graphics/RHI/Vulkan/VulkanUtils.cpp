@@ -1,9 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
+#include "Surge/Graphics/Shader/Shader.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 
 namespace Surge::VulkanUtils
 {
-
 	VkFormat ToVkVertexFormat(VertexFormat f)
 	{
 		switch (f)
@@ -278,6 +278,77 @@ namespace Surge::VulkanUtils
 		case StoreOp::DONT_CARE: return "DONT_CARE";
 		}
 		return "Unknown";
+	}
+
+	String ShaderDataTypeToString(const ShaderDataType& type)
+	{
+		switch (type)
+		{
+		case ShaderDataType::INT: return "Int";
+		case ShaderDataType::UINT: return "UInt";
+		case ShaderDataType::FLOAT: return "Float";
+		case ShaderDataType::FLOAT2: return "Float2";
+		case ShaderDataType::FLOAT3: return "Float3";
+		case ShaderDataType::FLOAT4: return "Float4";
+		case ShaderDataType::MAT2: return "Mat2";
+		case ShaderDataType::MAT4: return "Mat4";
+		case ShaderDataType::MAT3: return "Mat3";
+		case ShaderDataType::BOOL: return "Bool";
+		case ShaderDataType::NONE: SG_ASSERT_INTERNAL("ShaderDataType::NONE is invalid in this case!");
+		default:
+			SG_ASSERT_INTERNAL("Tf?");
+		}
+		SG_ASSERT_INTERNAL("Unknown ShaderDataType!");
+		return "NONE";
+	}
+
+	Uint ShaderDataTypeSize(ShaderDataType type)
+	{
+		switch (type)
+		{
+		case ShaderDataType::FLOAT: return 4;
+		case ShaderDataType::FLOAT2: return 4 * 2;
+		case ShaderDataType::FLOAT3: return 4 * 3;
+		case ShaderDataType::FLOAT4: return 4 * 4;
+		case ShaderDataType::MAT3: return 4 * 3 * 3;
+		case ShaderDataType::MAT4: return 4 * 4 * 4;
+		case ShaderDataType::INT: return 4;
+		case ShaderDataType::UINT: return 4;
+		case ShaderDataType::BOOL: return 4;
+		case ShaderDataType::STRUCT: return -1;
+		default: SG_ASSERT_INTERNAL("Invalid case!");
+		}
+
+		SG_ASSERT_INTERNAL("Unknown ShaderDataType!");
+		return 0;
+	}
+
+	String ShaderTypeToString(const ShaderType& type)
+	{
+		switch (type)
+		{
+		case ShaderType::VERTEX: return "Vertex";
+		case ShaderType::FRAGMENT: return "Fragment";
+		case ShaderType::COMPUTE: return "Compute";
+		case ShaderType::NONE: SG_ASSERT_INTERNAL("ShaderType::NONE is invalid in this case!");
+		}
+		SG_ASSERT_INTERNAL("Unknown ShaderType!");
+		return "NONE";
+	}
+
+	ShaderType ShaderTypeFromString(const String& type)
+	{
+		
+		if (type == "None") return ShaderType::NONE;
+		else if (type == "Vertex") return ShaderType::VERTEX;
+		else if (type == "Pixel") return ShaderType::FRAGMENT; // Backwards compatibility
+		else if (type == "Fragment") return ShaderType::FRAGMENT;		
+		else if (type == "Compute") return ShaderType::COMPUTE;
+		else
+		{
+			 SG_ASSERT_INTERNAL("Unknown shader type string!");
+			 return ShaderType::NONE;
+		}		
 	}
 
 }

@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Surge/Graphics/Shader/Shader.hpp"
 #include <array>
 
 namespace Surge
@@ -101,14 +102,6 @@ namespace Surge
 		const char* DebugName = nullptr;
 	};
 
-	enum class ShaderType
-	{
-		NONE = 0,
-		VERTEX,
-		PIXEL,
-		COMPUTE
-	};
-
 	enum class VertexFormat
 	{
 		FLOAT,   // R32_SFLOAT
@@ -186,8 +179,7 @@ namespace Surge
 	struct PipelineDesc
 	{
 		// Shaders
-		const char* VertShaderName = nullptr;
-		const char* FragShaderName = nullptr;
+		Shader Shader_;
 
 		// Vertex layout
 		std::array<VertexAttribute, 8> Attributes = {};

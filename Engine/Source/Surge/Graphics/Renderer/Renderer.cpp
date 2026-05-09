@@ -87,9 +87,11 @@ namespace Surge
 
 		mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
+		Shader shader;
+		shader.Load("Renderer2D.shader", ShaderType::VERTEX | ShaderType::FRAGMENT);
+
 		PipelineDesc desc = {};
-		desc.VertShaderName = "Quad.vert";
-		desc.FragShaderName = "Quad.frag";
+		desc.Shader_ = shader;
 		desc.Bindings[0] = { 0, sizeof(QuadVertex) };
 		desc.BindingCount = 1;
 		desc.Attributes[0] = { 0, 0, VertexFormat::FLOAT3, offsetof(QuadVertex, Position) };

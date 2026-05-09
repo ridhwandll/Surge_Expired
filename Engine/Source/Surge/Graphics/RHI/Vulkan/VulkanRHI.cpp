@@ -319,7 +319,7 @@ namespace Surge
 		SG_ASSERT(!desc.TargetFramebuffer.IsNull() || desc.TargetSwapchain, "PipelineDesc: must set either TargetFramebuffer or TargetSwapchain");
 		SG_ASSERT(!((!desc.TargetFramebuffer.IsNull()) && desc.TargetSwapchain), "PipelineDesc: cannot set both TargetFramebuffer and TargetSwapchain");
 
-		Log<Severity::Trace>("\nVulkanRHI::CreatePipeline:\n   Name: {0}\n   Vertex Shader: {1}\n   Fragment Shader: {2}", desc.DebugName ? desc.DebugName : "Unnamed", desc.VertShaderName, desc.FragShaderName);
+		//Log<Severity::Trace>("\nVulkanRHI::CreatePipeline:\n   Name: {0}\n   Vertex Shader: {1}\n   Fragment Shader: {2}", desc.DebugName ? desc.DebugName : "Unnamed", desc.VertShaderName, desc.FragShaderName);
 
 		VkRenderPass renderPass = VK_NULL_HANDLE;
 
@@ -607,8 +607,8 @@ namespace Surge
 				{
 					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
 					ImGui::Text("PushConstantSize: %d", entry.Desc.PushConstantSize);
-					ImGui::Text("Vertex Shader: %s", entry.Desc.VertShaderName);
-					ImGui::Text("Fragment Shader: %s", entry.Desc.FragShaderName);
+					//ImGui::Text("Vertex Shader: %s", entry.Desc.VertShaderName);
+					//ImGui::Text("Fragment Shader: %s", entry.Desc.FragShaderName);
 					ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
 					if (ImGui::TreeNode("Vertex Binding"))
 					{

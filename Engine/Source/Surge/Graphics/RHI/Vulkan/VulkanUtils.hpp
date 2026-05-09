@@ -3,6 +3,7 @@
 #include "Surge/Graphics/RHI/RHIDescriptors.hpp"
 #include <volk.h>
 
+
 namespace Surge::VulkanUtils
 {
 	VkFormat ToVkVertexFormat(VertexFormat f);
@@ -24,4 +25,9 @@ namespace Surge::VulkanUtils
 	const char* BufferUsageToString(BufferUsage usage);
 	const char* LoadOpToString(LoadOp op);
 	const char* StoreOpToString(StoreOp op);
+
+	String ShaderDataTypeToString(const ShaderDataType& type);
+	Uint ShaderDataTypeSize(ShaderDataType type);
+	String ShaderTypeToString(const ShaderType& type);
+	ShaderType ShaderTypeFromString(const String& type);
 }

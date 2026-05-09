@@ -3,22 +3,12 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanPipeline.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
-
-#ifdef SURGE_PLATFORM_WINDOWS
-#include <shaderc/shaderc.hpp>
-#elif defined(SURGE_PLATFORM_ANDROID)
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <android_native_app_glue.h>
-#include <android/asset_manager.h>
-#endif
 #include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
 {
 	PipelineEntry VulkanPipeline::Create(const VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass)
 	{
-		SG_ASSERT(desc.VertShaderName, "PipelineDesc: VertShaderName is null!");
-		SG_ASSERT(desc.FragShaderName, "PipelineDesc: FragShaderName is null!");
 		SG_ASSERT(renderPass != VK_NULL_HANDLE, "PipelineDesc: renderPass is null");
 
 		PipelineEntry entry = {};
@@ -42,8 +32,28 @@ namespace Surge
 		VK_CALL(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &entry.Layout));
 
 		// Shaders
-		VkShaderModule vertModule = LoadShader(rhi, desc.VertShaderName, ShaderType::VERTEX);
-		VkShaderModule fragModule = LoadShader(rhi, desc.FragShaderName, ShaderType::PIXEL);
+		VkShaderModule vertModule = VK_NULL_HANDLE;
+		VkShaderModule fragModule = VK_NULL_HANDLE;
+		auto& spirvs = desc.Shader_.GetSPIRVs();
+		for (const auto& spirv : spirvs)
+		{
+			VkShaderModuleCreateInfo moduleInfo{};
+			moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			if (spirv.Type == ShaderType::VERTEX)
+			{								
+				moduleInfo.codeSize = spirv.SPIRV.size() * sizeof(Uint);
+				moduleInfo.pCode = spirv.SPIRV.data();
+				VK_CALL(vkCreateShaderModule(device, &moduleInfo, nullptr, &vertModule));
+			}
+			else if (spirv.Type == ShaderType::FRAGMENT)
+			{
+				moduleInfo.codeSize = spirv.SPIRV.size() * sizeof(Uint);
+				moduleInfo.pCode = spirv.SPIRV.data();
+				VK_CALL(vkCreateShaderModule(device, &moduleInfo, nullptr, &fragModule));
+			}
+		}
+		SG_ASSERT(vertModule, "Vertex shader module is null!");
+		SG_ASSERT(fragModule, "Fragment shader module is null!");
 
 		VkPipelineShaderStageCreateInfo stages[2] = {};
 		stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -193,82 +203,67 @@ namespace Surge
 		}
 	}
 
-#ifdef SURGE_PLATFORM_WINDOWS
-	static shaderc_shader_kind ShadercShaderKindFromSurgeShaderType(const ShaderType& type)
-	{
-		switch (type)
-		{
-		case ShaderType::VERTEX: return shaderc_glsl_vertex_shader;
-		case ShaderType::PIXEL: return shaderc_glsl_fragment_shader;
-		case ShaderType::COMPUTE: return shaderc_glsl_compute_shader;
-		case ShaderType::NONE: SG_ASSERT_INTERNAL("ShaderType::NONE is invalid in this case!");
-		}
-
-		return static_cast<shaderc_shader_kind>(-1);
-	}
-#endif
-
-	VkShaderModule VulkanPipeline::LoadShader(const VulkanRHI& rhi, const String& name, ShaderType stage)
-	{
-		Vector<Uint> SPIRV;
-#ifdef SURGE_PLATFORM_WINDOWS
-		String source = Filesystem::ReadFile<String>("Engine/Assets/Shaders/" + name);
-		shaderc::Compiler compiler;
-		shaderc::CompileOptions options;
-		options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
-		shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), name.c_str(), options);
-		if (result.GetCompilationStatus() != shaderc_compilation_status_success)
-		{
-			Log<Severity::Error>("Shader compilation failure!");
-			Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
-			SG_ASSERT_INTERNAL("Shader Compilation failure!");
-		}
-		else
-			SPIRV = Vector<Uint>(result.cbegin(), result.cend());
-
-		String path = "Engine/Assets/Shaders/" + name + ".spv";
-		FILE* f = nullptr;
-		f = fopen(path.c_str(), "wb");
-		if (f)
-		{
-			fwrite(SPIRV.data(), sizeof(Uint), SPIRV.size(), f);
-			fclose(f);
-			//Log<Severity::Info>("Cached Shader at: {0}", path);
-		}
-
-#elif defined(SURGE_PLATFORM_ANDROID)
-		{
-            android_app* app = Android::GAndroidApp;
-			AAssetManager* assetManager = app->activity->assetManager;
-			AAssetDir* assetDir = AAssetManager_openDir(assetManager, "Engine/Assets/Shaders"); // Path relative to assets folder
-
-			std::string fullPath = "Engine/Assets/Shaders/" + name + ".spv";
-			AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);
-
-			// Read the buffer
-			size_t size = AAsset_getLength(asset);
-			if (size % 4 != 0)
-			{
-				Log<Severity::Error>("Shader %s size is not a multiple of 4!", name);
-				AAsset_close(asset);
-			}
-
-			Vector<Uint> spirvCode(size / sizeof(Uint));
-			AAsset_read(asset, spirvCode.data(), size);
-			AAsset_close(asset);
-			SPIRV = spirvCode;
-
-		}
-#endif
-
-		VkDevice device = rhi.GetDevice();
-		VkShaderModuleCreateInfo module_info{
-			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-			.codeSize = SPIRV.size() * sizeof(Uint),
-			.pCode = SPIRV.data() };
-
-		VkShaderModule shaderModule;
-		VK_CALL(vkCreateShaderModule(device, &module_info, nullptr, &shaderModule));
-		return shaderModule;
-	}
+// 	VkShaderModule VulkanPipeline::LoadShader(const VulkanRHI& rhi, const String& name, ShaderType stage)
+// 	{
+// 		Vector<Uint> SPIRV;
+// #ifdef SURGE_PLATFORM_WINDOWS
+// 		String source = Filesystem::ReadFile<String>("Engine/Assets/Shaders/" + name);
+// 		shaderc::Compiler compiler;
+// 		shaderc::CompileOptions options;
+// 		options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
+// 		shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), name.c_str(), options);
+// 		if (result.GetCompilationStatus() != shaderc_compilation_status_success)
+// 		{
+// 			Log<Severity::Error>("Shader compilation failure!");
+// 			Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
+// 			SG_ASSERT_INTERNAL("Shader Compilation failure!");
+// 		}
+// 		else
+// 			SPIRV = Vector<Uint>(result.cbegin(), result.cend());
+// 
+// 		String path = "Engine/Assets/Shaders/" + name + ".spv";
+// 		FILE* f = nullptr;
+// 		f = fopen(path.c_str(), "wb");
+// 		if (f)
+// 		{
+// 			fwrite(SPIRV.data(), sizeof(Uint), SPIRV.size(), f);
+// 			fclose(f);
+// 			//Log<Severity::Info>("Cached Shader at: {0}", path);
+// 		}
+// 
+// #elif defined(SURGE_PLATFORM_ANDROID)
+// 		{
+//             android_app* app = Android::GAndroidApp;
+// 			AAssetManager* assetManager = app->activity->assetManager;
+// 			AAssetDir* assetDir = AAssetManager_openDir(assetManager, "Engine/Assets/Shaders"); // Path relative to assets folder
+// 
+// 			std::string fullPath = "Engine/Assets/Shaders/" + name + ".spv";
+// 			AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);
+// 
+// 			// Read the buffer
+// 			size_t size = AAsset_getLength(asset);
+// 			if (size % 4 != 0)
+// 			{
+// 				Log<Severity::Error>("Shader %s size is not a multiple of 4!", name);
+// 				AAsset_close(asset);
+// 			}
+// 
+// 			Vector<Uint> spirvCode(size / sizeof(Uint));
+// 			AAsset_read(asset, spirvCode.data(), size);
+// 			AAsset_close(asset);
+// 			SPIRV = spirvCode;
+// 
+// 		}
+// #endif
+// 
+// 		VkDevice device = rhi.GetDevice();
+// 		VkShaderModuleCreateInfo module_info{
+// 			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+// 			.codeSize = SPIRV.size() * sizeof(Uint),
+// 			.pCode = SPIRV.data() };
+// 
+// 		VkShaderModule shaderModule;
+// 		VK_CALL(vkCreateShaderModule(device, &module_info, nullptr, &shaderModule));
+// 		return shaderModule;
+// 	}
 }
