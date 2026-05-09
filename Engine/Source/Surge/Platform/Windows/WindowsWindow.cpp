@@ -31,12 +31,20 @@ namespace Surge
         wc.hIcon = nullptr;
         wc.hIconSm = wc.hIcon;
         wc.cbClsExtra = 0;
+        wc.style |= CS_HREDRAW | CS_VREDRAW;
 
         RegisterClassEx(&wc);
-        SURGE_GET_WIN32_LAST_ERROR
+        SURGE_GET_WIN32_LAST_ERROR;
 
+#ifdef SURGE_DEBUG
+        String config = "DEBUG";
+#elif defined(SURGE_RELEASE)
+        String config = "RELEASE";
+#endif
+
+		String windowTitle = std::format("{} <{}>", mWindowData.Title, config);
         glm::ivec2 screenSize = Platform::GetScreenSize();
-        mWin32Window = CreateWindow(wc.lpszClassName, mWindowData.Title.c_str(),
+        mWin32Window = CreateWindow(wc.lpszClassName, windowTitle.c_str(),
                                     WS_OVERLAPPEDWINDOW, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
                                     mWindowData.Height, nullptr, NULL, wc.hInstance, this);
 

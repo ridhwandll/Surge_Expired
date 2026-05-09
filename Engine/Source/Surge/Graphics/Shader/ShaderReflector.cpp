@@ -2,6 +2,8 @@
 #include "ShaderReflector.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 #include <SPIRV-Cross/spirv_glsl.hpp>
+#include "SPIRV-Cross/spirv_hlsl.hpp"
+#include "SPIRV-Cross/spirv_msl.hpp"
 
 
 namespace Surge
@@ -316,6 +318,22 @@ namespace Surge
                 pushConstant.ShaderStages |= handle.Type;
                 result.PushBufferPushConstant(pushConstant);
             }
+
+			// Cross compilation for example, we need them for Metal in future
+			//spirv_cross::CompilerGLSL glsl_compiler(handle.SPIRV);
+			//std::string glsl_code = glsl_compiler.compile();
+			//Log<Severity::Info>("GLSL Code:\n{0}", glsl_code);			
+			// 
+			//spirv_cross::CompilerHLSL hlsl_compiler(handle.SPIRV);
+			//spirv_cross::CompilerHLSL::Options hlsl_options;
+			//hlsl_options.shader_model = 50;
+			//hlsl_compiler.set_hlsl_options(hlsl_options);
+			//std::string hlsl_code = hlsl_compiler.compile();
+			//Log<Severity::Info>("HLSL Code:\n{0}", hlsl_code);
+			// 
+			//spirv_cross::CompilerMSL msl_compiler(handle.SPIRV);
+			//std::string msl_code = msl_compiler.compile();
+			//Log<Severity::Info>("MSL Code:\n{0}", msl_code);
         }
 
         result.ClearRepeatedMembers();

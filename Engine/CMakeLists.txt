@@ -65,6 +65,8 @@ target_compile_definitions(Surge
     ${PLATFORM_COMPILE_DEFS}
 
     $<$<CONFIG:Debug>:SURGE_DEBUG>
+    $<$<CONFIG:MinSizeRel>:SURGE_DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:SURGE_DEBUG>
     $<$<CONFIG:Release>:SURGE_RELEASE>
 
     PRIVATE

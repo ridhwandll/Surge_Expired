@@ -179,21 +179,12 @@ namespace Surge
 	struct PipelineDesc
 	{
 		// Shaders
-		Shader Shader_;
-
-		// Vertex layout
-		std::array<VertexAttribute, 8> Attributes = {};
-		Uint AttributeCount = 0;
-		std::array<VertexBinding, 4> Bindings = {};
-		Uint BindingCount = 0;
+		Shader Shader_; // Attributes and bindings are reflected from shader via SPIRV-Cross
 
 		// State
 		RasterDesc Raster = {};
 		DepthDesc Depth = {};
 		BlendDesc Blend = {};
-
-		// Push constants, one range, covers 99% of cases
-		Uint PushConstantSize = 0; // bytes, 0 = none
 
 		FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // Offscreen
 		bool TargetSwapchain = false; // Swapchain pass

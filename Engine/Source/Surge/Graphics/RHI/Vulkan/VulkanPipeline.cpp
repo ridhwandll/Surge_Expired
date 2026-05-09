@@ -6,7 +6,8 @@
 #include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
-{
+{ 
+
 	PipelineEntry VulkanPipeline::Create(const VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass)
 	{
 		SG_ASSERT(renderPass != VK_NULL_HANDLE, "PipelineDesc: renderPass is null");
@@ -18,15 +19,24 @@ namespace Surge
 		VkPipelineLayoutCreateInfo layoutInfo = {};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-		VkPushConstantRange pushRange = {};
-		if (desc.PushConstantSize > 0)
+		// TODO: Descriptor set layouts
+
+		// Push constants
+		const Vector<ShaderPushConstant>& pushConstants = desc.Shader_.GetReflectionData().GetPushConstantBuffers();
+		Vector<VkPushConstantRange> pushRanges(pushConstants.size());
+		for (size_t i = 0; i < pushConstants.size(); ++i)
 		{
-			pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			pushRange.offset = 0;
-			pushRange.size = desc.PushConstantSize;
-			layoutInfo.pushConstantRangeCount = 1;
-			layoutInfo.pPushConstantRanges = &pushRange;
+			const ShaderPushConstant& pushConstant = pushConstants[i];
+			SG_ASSERT(!(pushConstant.ShaderStages & ShaderType::COMPUTE), "Compute shader is not supported in VulkanPipeline yet!");
+
+			if (pushConstant.ShaderStages & ShaderType::VERTEX) pushRanges[i].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+			if (pushConstant.ShaderStages & ShaderType::FRAGMENT) pushRanges[i].stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			pushRanges[i].offset = 0;
+			pushRanges[i].size = pushConstant.Size;
 		}
+		layoutInfo.pushConstantRangeCount = pushRanges.size();
+		layoutInfo.pPushConstantRanges = pushRanges.data();
 
 		VkDevice device = rhi.GetDevice();
 		VK_CALL(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &entry.Layout));
@@ -34,6 +44,7 @@ namespace Surge
 		// Shaders
 		VkShaderModule vertModule = VK_NULL_HANDLE;
 		VkShaderModule fragModule = VK_NULL_HANDLE;
+		VkPipelineShaderStageCreateInfo stages[2] = {};
 		auto& spirvs = desc.Shader_.GetSPIRVs();
 		for (const auto& spirv : spirvs)
 		{
@@ -44,53 +55,57 @@ namespace Surge
 				moduleInfo.codeSize = spirv.SPIRV.size() * sizeof(Uint);
 				moduleInfo.pCode = spirv.SPIRV.data();
 				VK_CALL(vkCreateShaderModule(device, &moduleInfo, nullptr, &vertModule));
+
+				stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+				stages[0].module = vertModule;
+				stages[0].pName = "main";
 			}
 			else if (spirv.Type == ShaderType::FRAGMENT)
 			{
 				moduleInfo.codeSize = spirv.SPIRV.size() * sizeof(Uint);
 				moduleInfo.pCode = spirv.SPIRV.data();
 				VK_CALL(vkCreateShaderModule(device, &moduleInfo, nullptr, &fragModule));
+
+				stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+				stages[1].module = fragModule;
+				stages[1].pName = "main";
+			}
+			else if (spirv.Type == ShaderType::COMPUTE)
+			{
+				SG_ASSERT_INTERNAL("Compute shader is not supported in VulkanPipeline yet");
 			}
 		}
-		SG_ASSERT(vertModule, "Vertex shader module is null!");
-		SG_ASSERT(fragModule, "Fragment shader module is null!");
-
-		VkPipelineShaderStageCreateInfo stages[2] = {};
-		stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-		stages[0].module = vertModule;
-		stages[0].pName = "main";
-
-		stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		stages[1].module = fragModule;
-		stages[1].pName = "main";
 
 		// Vertex input
-		VkVertexInputBindingDescription vkBindings[4] = {};
-		VkVertexInputAttributeDescription vkAttributes[8] = {};
+		const ShaderReflectionData& reflectedData = desc.Shader_.GetReflectionData();
+		const std::map<Uint, ShaderStageInput>& stageInputs = reflectedData.GetStageInputs().at(ShaderType::VERTEX);
 
-		for (uint32_t i = 0; i < desc.BindingCount; i++)
+		Uint stride = 0;
+		for (const auto& [location, stageInput] : stageInputs)
+			stride += stageInput.Size;
+
+		VkVertexInputBindingDescription vertexBindingDescriptions;
+		vertexBindingDescriptions.binding = 0;
+		vertexBindingDescriptions.stride = stride;
+		vertexBindingDescriptions.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		Vector<VkVertexInputAttributeDescription> vertexAttributeDescriptions(stageInputs.size());
+		for (Uint i = 0; i < stageInputs.size(); i++)
 		{
-			vkBindings[i].binding = desc.Bindings[i].Binding;
-			vkBindings[i].stride = desc.Bindings[i].Stride;
-			vkBindings[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			const ShaderStageInput& input = stageInputs.at(i);
+			vertexAttributeDescriptions[i].binding = 0;
+			vertexAttributeDescriptions[i].location = i;
+			vertexAttributeDescriptions[i].format = VulkanUtils::ShaderDataTypeToVulkanFormat(input.DataType);
+			vertexAttributeDescriptions[i].offset = input.Offset;
 		}
 
-		for (uint32_t i = 0; i < desc.AttributeCount; i++)
-		{
-			vkAttributes[i].location = desc.Attributes[i].Location;
-			vkAttributes[i].binding = desc.Attributes[i].Binding;
-			vkAttributes[i].format = VulkanUtils::ToVkVertexFormat(desc.Attributes[i].Format);
-			vkAttributes[i].offset = desc.Attributes[i].Offset;
-		}
-
-		VkPipelineVertexInputStateCreateInfo vertexInput = {};
-		vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexInput.vertexBindingDescriptionCount = desc.BindingCount;
-		vertexInput.pVertexBindingDescriptions = vkBindings;
-		vertexInput.vertexAttributeDescriptionCount = desc.AttributeCount;
-		vertexInput.pVertexAttributeDescriptions = vkAttributes;
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<Uint>(vertexAttributeDescriptions.size());
+		vertexInputInfo.pVertexBindingDescriptions = &vertexBindingDescriptions;
+		vertexInputInfo.pVertexAttributeDescriptions = vertexAttributeDescriptions.data();
 
 		// Input assembly
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
@@ -135,7 +150,8 @@ namespace Surge
 		viewport.viewportCount = 1;
 		viewport.scissorCount = 1;
 
-		VkDynamicState dynamics[] = {
+		VkDynamicState dynamics[] =
+		{
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR
 		};
@@ -144,17 +160,16 @@ namespace Surge
 		dynamic.dynamicStateCount = 2;
 		dynamic.pDynamicStates = dynamics;
 
-		// Multisample (no MSAA on mobile)
+		// No MSAA on mobile
 		VkPipelineMultisampleStateCreateInfo multisample = {};
 		multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-		// Assemble
 		VkGraphicsPipelineCreateInfo pipelineInfo = {};
 		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineInfo.stageCount = 2;
 		pipelineInfo.pStages = stages;
-		pipelineInfo.pVertexInputState = &vertexInput;
+		pipelineInfo.pVertexInputState = &vertexInputInfo;
 		pipelineInfo.pInputAssemblyState = &inputAssembly;
 		pipelineInfo.pViewportState = &viewport;
 		pipelineInfo.pRasterizationState = &raster;
@@ -202,68 +217,4 @@ namespace Surge
 			entry.Layout = VK_NULL_HANDLE;
 		}
 	}
-
-// 	VkShaderModule VulkanPipeline::LoadShader(const VulkanRHI& rhi, const String& name, ShaderType stage)
-// 	{
-// 		Vector<Uint> SPIRV;
-// #ifdef SURGE_PLATFORM_WINDOWS
-// 		String source = Filesystem::ReadFile<String>("Engine/Assets/Shaders/" + name);
-// 		shaderc::Compiler compiler;
-// 		shaderc::CompileOptions options;
-// 		options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
-// 		shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), name.c_str(), options);
-// 		if (result.GetCompilationStatus() != shaderc_compilation_status_success)
-// 		{
-// 			Log<Severity::Error>("Shader compilation failure!");
-// 			Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
-// 			SG_ASSERT_INTERNAL("Shader Compilation failure!");
-// 		}
-// 		else
-// 			SPIRV = Vector<Uint>(result.cbegin(), result.cend());
-// 
-// 		String path = "Engine/Assets/Shaders/" + name + ".spv";
-// 		FILE* f = nullptr;
-// 		f = fopen(path.c_str(), "wb");
-// 		if (f)
-// 		{
-// 			fwrite(SPIRV.data(), sizeof(Uint), SPIRV.size(), f);
-// 			fclose(f);
-// 			//Log<Severity::Info>("Cached Shader at: {0}", path);
-// 		}
-// 
-// #elif defined(SURGE_PLATFORM_ANDROID)
-// 		{
-//             android_app* app = Android::GAndroidApp;
-// 			AAssetManager* assetManager = app->activity->assetManager;
-// 			AAssetDir* assetDir = AAssetManager_openDir(assetManager, "Engine/Assets/Shaders"); // Path relative to assets folder
-// 
-// 			std::string fullPath = "Engine/Assets/Shaders/" + name + ".spv";
-// 			AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);
-// 
-// 			// Read the buffer
-// 			size_t size = AAsset_getLength(asset);
-// 			if (size % 4 != 0)
-// 			{
-// 				Log<Severity::Error>("Shader %s size is not a multiple of 4!", name);
-// 				AAsset_close(asset);
-// 			}
-// 
-// 			Vector<Uint> spirvCode(size / sizeof(Uint));
-// 			AAsset_read(asset, spirvCode.data(), size);
-// 			AAsset_close(asset);
-// 			SPIRV = spirvCode;
-// 
-// 		}
-// #endif
-// 
-// 		VkDevice device = rhi.GetDevice();
-// 		VkShaderModuleCreateInfo module_info{
-// 			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-// 			.codeSize = SPIRV.size() * sizeof(Uint),
-// 			.pCode = SPIRV.data() };
-// 
-// 		VkShaderModule shaderModule;
-// 		VK_CALL(vkCreateShaderModule(device, &module_info, nullptr, &shaderModule));
-// 		return shaderModule;
-// 	}
 }

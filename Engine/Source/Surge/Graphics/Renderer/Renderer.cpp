@@ -92,14 +92,9 @@ namespace Surge
 
 		PipelineDesc desc = {};
 		desc.Shader_ = shader;
-		desc.Bindings[0] = { 0, sizeof(QuadVertex) };
-		desc.BindingCount = 1;
-		desc.Attributes[0] = { 0, 0, VertexFormat::FLOAT3, offsetof(QuadVertex, Position) };
-		desc.Attributes[1] = { 1, 0, VertexFormat::FLOAT4, offsetof(QuadVertex, Color) };
-		desc.Attributes[2] = { 2, 0, VertexFormat::FLOAT2, offsetof(QuadVertex, UV) };
-		desc.AttributeCount = 3;
+
 		desc.Raster.Cull = CullMode::NONE;
-		desc.PushConstantSize = sizeof(QuadPushConstants);
+
 		desc.DebugName = "Quad Batch Pipeline";
 		desc.TargetFramebuffer = mOffscreenFramebuffer;
 		desc.TargetSwapchain = false;
@@ -265,7 +260,7 @@ namespace Surge
 		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
 
 		QuadPushConstants push = { .ViewProj = mData->ViewProjection };
-		mRHI->CmdPushConstants(ctx, mPipeline, &push, sizeof(QuadPushConstants), 0);
+		mRHI->CmdPushConstants(ctx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &push);
 		mRHI->CmdDrawIndexed(ctx, mCurrentBatch.QuadCount * 6, 1, 0, (int32_t)mCurrentFrameVertexOffset, 0);
 
 		mTotalVertexCount += mCurrentBatch.VertexCount;

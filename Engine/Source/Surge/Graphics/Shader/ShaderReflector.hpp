@@ -49,7 +49,7 @@ namespace Surge
 		Uint Binding = 0;
 		String Name;
 		ShaderResource::Usage ShaderUsage;
-		ShaderType ShaderStages{}; // Specify what shader stages the resource is being used for
+		ShaderType ShaderStages{}; // Specifies what shader stages the resource is being used for
 	};
 
 	struct ShaderStageInput
@@ -84,7 +84,7 @@ namespace Surge
 		Uint Size = 0;
 		Vector<ShaderBufferMember> Members = {};
 		ShaderBuffer::Usage ShaderUsage;
-		ShaderType ShaderStages{}; // Specify what shader stages the buffer is being used for
+		ShaderType ShaderStages{}; // Specifies what shader stages the buffer is being used for
 
 		const ShaderBufferMember* GetMember(const String& name)
 		{
@@ -101,7 +101,7 @@ namespace Surge
 	{
 		String BufferName;
 		Uint Size = 0;
-		ShaderType ShaderStages{}; // Specify what shader stages the buffer is being used for
+		ShaderType ShaderStages{}; // Specifies what shader stages the buffer is being used for
 	};
 
 	class ShaderReflectionData
@@ -109,16 +109,6 @@ namespace Surge
 	public:
 		ShaderReflectionData() = default;
 		~ShaderReflectionData() = default;
-
-		void SetShaderName(const String& name) { mShaderName = name; }
-		void PushResource(const ShaderResource& res) { mShaderResources.push_back(res); }
-		void PushStageInput(const ShaderStageInput& input, const ShaderType& stage, Uint location) { mStageInputs[stage][location] = input; }
-		void PushBuffer(const ShaderBuffer& buffer)
-		{
-			SG_ASSERT(!buffer.BufferName.empty() || buffer.Members.size() != 0 || buffer.Size != 0, "ShaderBuffer is invalid!");
-			mShaderBuffers.push_back(buffer);
-		}
-		void PushBufferPushConstant(const ShaderPushConstant& pushConstant) { mPushConstants.push_back(pushConstant); }
 
 		const ShaderBuffer& GetBuffer(const String& name) const;
 		const Vector<ShaderBuffer>& GetBuffers() const { return mShaderBuffers; }
@@ -130,6 +120,15 @@ namespace Surge
 
 		void LogAll();
 	private:
+		void SetShaderName(const String& name) { mShaderName = name; }
+		void PushResource(const ShaderResource& res) { mShaderResources.push_back(res); }
+		void PushStageInput(const ShaderStageInput& input, const ShaderType& stage, Uint location) { mStageInputs[stage][location] = input; }
+		void PushBuffer(const ShaderBuffer& buffer)
+		{
+			SG_ASSERT(!buffer.BufferName.empty() || buffer.Members.size() != 0 || buffer.Size != 0, "ShaderBuffer is invalid!");
+			mShaderBuffers.push_back(buffer);
+		}
+		void PushBufferPushConstant(const ShaderPushConstant& pushConstant) { mPushConstants.push_back(pushConstant); }
 		void ClearRepeatedMembers();
 		void CalculateDescriptorSetCount();
 

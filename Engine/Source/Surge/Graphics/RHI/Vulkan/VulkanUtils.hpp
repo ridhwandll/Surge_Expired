@@ -30,4 +30,6 @@ namespace Surge::VulkanUtils
 	Uint ShaderDataTypeSize(ShaderDataType type);
 	String ShaderTypeToString(const ShaderType& type);
 	ShaderType ShaderTypeFromString(const String& type);
+	VkFormat ShaderDataTypeToVulkanFormat(ShaderDataType type);
+	VkShaderStageFlags ShaderTypeToVulkanShaderStage(ShaderType type);
 }

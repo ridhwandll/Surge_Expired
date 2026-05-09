@@ -129,22 +129,22 @@ namespace Surge::VulkanUtils
 	{
 		VkImageUsageFlags flags = 0;
 
-		if ((Uint)usage & (Uint)TextureUsage::SAMPLED)
+		if (usage & TextureUsage::SAMPLED)
 			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		if ((Uint)usage & (Uint)TextureUsage::COLOR_ATTACHMENT)
+		if (usage & TextureUsage::COLOR_ATTACHMENT)
 			flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-		if ((Uint)usage & (Uint)TextureUsage::DEPTH_ATTACHMENT)
+		if (usage & TextureUsage::DEPTH_ATTACHMENT)
 			flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-		if ((Uint)usage & (Uint)TextureUsage::STORAGE)
+		if (usage & TextureUsage::STORAGE)
 			flags |= VK_IMAGE_USAGE_STORAGE_BIT;
 
-		if ((Uint)usage & (Uint)TextureUsage::TRANSFER_SRC)
+		if (usage & TextureUsage::TRANSFER_SRC)
 			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-		if ((Uint)usage & (Uint)TextureUsage::TRANSFER_DST)
+		if (usage & TextureUsage::TRANSFER_DST)
 			flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		// Transient attachments on TBDR data lives on tile, never hits DRAM
@@ -349,6 +349,37 @@ namespace Surge::VulkanUtils
 			 SG_ASSERT_INTERNAL("Unknown shader type string!");
 			 return ShaderType::NONE;
 		}		
+	}
+
+	VkFormat VulkanUtils::ShaderDataTypeToVulkanFormat(ShaderDataType type)
+	{
+		switch (type)
+		{
+		case ShaderDataType::FLOAT: return VK_FORMAT_R32_SFLOAT;
+		case ShaderDataType::FLOAT2: return VK_FORMAT_R32G32_SFLOAT;
+		case ShaderDataType::FLOAT3: return VK_FORMAT_R32G32B32_SFLOAT;
+		case ShaderDataType::FLOAT4: return VK_FORMAT_R32G32B32A32_SFLOAT;
+		default: SG_ASSERT_INTERNAL("Undefined!");
+		}
+
+		SG_ASSERT_INTERNAL("No Surge::ShaderDataType maps to VkFormat!");
+		return VK_FORMAT_UNDEFINED;
+	}
+
+	VkShaderStageFlags ShaderTypeToVulkanShaderStage(ShaderType type)
+	{
+		VkShaderStageFlags flags = 0;
+
+		if (type & ShaderType::VERTEX)
+			flags |= VK_SHADER_STAGE_VERTEX_BIT;
+
+		if (type & ShaderType::FRAGMENT)
+			flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		if (type & ShaderType::COMPUTE)
+			flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+
+		return flags;
 	}
 
 }

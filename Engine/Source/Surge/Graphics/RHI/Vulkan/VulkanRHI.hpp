@@ -71,7 +71,7 @@ namespace Surge
 		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
 		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h);
 
-		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset);
+		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data);
 		void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle);
 		void CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout); // TODO: Expose to RHI
 

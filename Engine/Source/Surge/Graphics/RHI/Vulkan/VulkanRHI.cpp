@@ -389,13 +389,12 @@ namespace Surge
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, entry->Pipeline);
 	}
 
-	void VulkanRHI::CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset)
+	void VulkanRHI::CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data)
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
 		PipelineEntry* entry = mPipelinePool.Get(h);
 		SG_ASSERT(entry, "CmdPushConstants: invalid handle");
-		SG_ASSERT(size <= entry->Desc.PushConstantSize, "CmdPushConstants: size exceeds range");
-		vkCmdPushConstants(cmd, entry->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, offset, size, data);
+		vkCmdPushConstants(cmd, entry->Layout, VulkanUtils::ShaderTypeToVulkanShaderStage(shaderStage), offset, size, data);
 	}
 
 	void VulkanRHI::CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle)
@@ -606,28 +605,8 @@ namespace Surge
 				if (ImGui::TreeNode(pipeText.c_str()))
 				{
 					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-					ImGui::Text("PushConstantSize: %d", entry.Desc.PushConstantSize);
-					//ImGui::Text("Vertex Shader: %s", entry.Desc.VertShaderName);
-					//ImGui::Text("Fragment Shader: %s", entry.Desc.FragShaderName);
 					ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
-					if (ImGui::TreeNode("Vertex Binding"))
-					{
-						for (Uint i = 0; i < entry.Desc.BindingCount; i++)
-						{
-							const auto& binding = entry.Desc.Bindings[i];
-							ImGui::Text("%d: Binding %d, Stride %d", i, binding.Binding, binding.Stride);
-						}
-						ImGui::TreePop();
-					}
-					if (ImGui::TreeNode("Vertex Attribute"))
-					{
-						for (Uint i = 0; i < entry.Desc.AttributeCount; i++)
-						{
-							const auto& attr = entry.Desc.Attributes[i];
-							ImGui::Text("Location %d, Format %d, Offset %d", attr.Location, static_cast<Uint>(attr.Format), attr.Offset);
-						}
-						ImGui::TreePop();
-					}
+					ImGui::Text("Shader: %s", entry.Desc.Shader_.GetName().c_str());
 					ImGui::TreePop();
 				}
 			});

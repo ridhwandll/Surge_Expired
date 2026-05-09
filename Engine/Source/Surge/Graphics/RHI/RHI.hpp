@@ -66,7 +66,7 @@ namespace Surge
 		void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }
 		void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
 
-		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, const void* data, Uint size, Uint offset) { mBackendRHI.CmdPushConstants(ctx, h, data, size, offset); }
+		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data) { mBackendRHI.CmdPushConstants(ctx, h, shaderStage, offset, size, data); }
 		void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }
 
 		void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }
