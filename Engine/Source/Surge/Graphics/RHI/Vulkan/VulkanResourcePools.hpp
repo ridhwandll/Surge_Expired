@@ -1,9 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include <volk.h>
 #include <vk_mem_alloc.h>
-#include "../RHIDescriptors.hpp"
 
 namespace Surge
 {
@@ -11,6 +11,8 @@ namespace Surge
 	{
 		VkImage Image = VK_NULL_HANDLE;
 		VkImageView View = VK_NULL_HANDLE;
+		Uint BindlessIndex = UINT32_MAX;
+
 		VkDeviceSize Size = 0; //bytes
 		VmaAllocation Allocation = VK_NULL_HANDLE;
 		VkImageLayout Layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -32,6 +34,7 @@ namespace Surge
 		VkPipeline Pipeline = VK_NULL_HANDLE;
 		VkPipelineLayout Layout = VK_NULL_HANDLE;
 
+		DescriptorLayoutHandle DescriptorSetLayout = {};
 		PipelineDesc Desc = {};
 	};
 
@@ -45,5 +48,34 @@ namespace Surge
 		Uint ClearCount = 0;
 
 		FramebufferDesc Desc = {};
+	};
+
+	struct SamplerEntry
+	{
+		VkSampler Sampler = VK_NULL_HANDLE;
+
+		SamplerDesc Desc = {};
+	};
+
+	struct DescriptorLayoutEntry
+	{
+		VkDescriptorSetLayout Layout = VK_NULL_HANDLE;		
+		DescriptorLayoutDesc Desc = {};
+	};
+
+	enum class DescriptorUpdateFrequency
+	{
+		STATIC,  // set once, never updated, skybox, font atlas, LUTs
+		DYNAMIC, // updated per frame. per-object params, animated materials
+	};
+
+	//class GraphicsRHI;
+	struct DescriptorSetEntry
+	{
+		VkDescriptorSet Sets[3] = {};
+		VkDescriptorPool Pool = VK_NULL_HANDLE; // owns its own pool
+		DescriptorLayoutHandle Layout = DescriptorLayoutHandle::Invalid();
+	    DescriptorUpdateFrequency Frequency = DescriptorUpdateFrequency::STATIC;
+		Uint Count = 1; // 1 if Static, FRAMES_IN_FLIGHT if Dynamic
 	};
 }

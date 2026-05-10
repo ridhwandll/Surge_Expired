@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include <volk.h>
 
 
@@ -32,4 +32,9 @@ namespace Surge::VulkanUtils
 	ShaderType ShaderTypeFromString(const String& type);
 	VkFormat ShaderDataTypeToVulkanFormat(ShaderDataType type);
 	VkShaderStageFlags ShaderTypeToVulkanShaderStage(ShaderType type);
+
+	VkFilter ToVkFilter(FilterMode m);
+	VkSamplerAddressMode ToVkWrap(WrapMode m);
+
+	VkDescriptorType ToVkDescriptorType(DescriptorType type);
 }

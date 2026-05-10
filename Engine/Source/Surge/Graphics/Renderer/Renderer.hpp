@@ -5,7 +5,6 @@
 #include "Lights.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 
-#define FRAMES_IN_FLIGHT 2
 #define BASE_SHADER_PATH "Engine/Assets/Shaders" //Sadkek, we don't have an asset manager yet
 
 #include <volk.h>
@@ -27,6 +26,7 @@ namespace Surge
     class SURGE_API Renderer
     {
     public:        
+        static constexpr Uint MAX_TEXTURE_SLOTS = 16;
 		static constexpr Uint MAX_QUADS_TOTAL = 100000; // 100k quads total, across all batches
 		static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
@@ -35,6 +35,7 @@ namespace Surge
 			glm::vec3 Position;
 			glm::vec4 Color;
 			glm::vec2 UV;
+			Uint TextureIndex; // Bindless index
 		};
 
 		struct QuadPushConstants
@@ -52,6 +53,7 @@ namespace Surge
         void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
+		void Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture);
 		void Submit(const glm::mat4& transform, const glm::vec4& color);
 		void OnWindowResize(Uint width, Uint height);
 
@@ -83,6 +85,8 @@ namespace Surge
 		Vector<QuadVertex> mVertexData;
 
 		// Renderer 2D data TODO: move this to Renderer2D class
+		TextureHandle mWhiteTexture;
+		SamplerHandle mQuadSampler;
 		BatchData mCurrentBatch;
         Uint mTotalVertexCount = 0;
         Uint mTotalQuadCount = 0;

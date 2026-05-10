@@ -96,13 +96,13 @@ namespace Surge
 
 		// Debug name
 #if defined(SURGE_DEBUG)
-		if (desc.DebugName)
+		if (!desc.DebugName.empty())
 		{
 			VkDebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 			nameInfo.objectType = VK_OBJECT_TYPE_IMAGE;
 			nameInfo.objectHandle = (uint64_t)entry.Image;
-			nameInfo.pObjectName = desc.DebugName;
+			nameInfo.pObjectName = desc.DebugName.c_str();
 			rhi.SetDebugName(nameInfo);
 
 			// Name the view too
@@ -133,6 +133,52 @@ namespace Surge
 
 		entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		//entry.Desc = {}; //Don't clear the desc since it may be needed for resizing or other purposes after destruction
+	}
+
+	void VulkanTexture::UploadData(VulkanRHI& rhi, TextureHandle h, const void* data, Uint size)
+	{
+		TextureEntry* entry = rhi.mTexturePool.Get(h);
+		SG_ASSERT(entry, "UploadTextureData: invalid TextureHandle");
+		SG_ASSERT(data && size > 0, "UploadTextureData: data is null or size is 0");
+
+		// Staging buffer
+		BufferDesc stagingDesc = {};
+		stagingDesc.Size = size;
+		stagingDesc.Usage = BufferUsage::STAGING;
+		stagingDesc.HostVisible = true;
+		stagingDesc.InitialData = data;
+		stagingDesc.DebugName = "TextureUploadStaging";
+		BufferHandle stagingHandle = rhi.CreateBuffer(stagingDesc);
+		BufferEntry* staging = rhi.mBufferPool.Get(stagingHandle);
+
+		// One-time command buffer
+		VkCommandBuffer cmd = rhi.BeginOneTimeCommands();
+
+		// Transition: UNDEFINED to TRANSFER_DST
+		TransitionLayout(cmd, *entry, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+		// Copy staging buffer to image, one region per mip 0
+		VkBufferImageCopy region = {};
+		region.bufferOffset = 0;
+		region.bufferRowLength = 0;// tightly packed
+		region.bufferImageHeight = 0;
+		region.imageSubresource.aspectMask = VulkanTexture::GetAspectFlags(entry->Desc.Format);
+		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.baseArrayLayer = 0;
+		region.imageSubresource.layerCount = 1;
+		region.imageOffset = { 0, 0, 0 };
+		region.imageExtent = { entry->Desc.Width, entry->Desc.Height, 1 };
+
+		vkCmdCopyBufferToImage(cmd, staging->Buffer, entry->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+		// Transition: TRANSFER_DST to SHADER_READ_ONLY
+		TransitionLayout(cmd, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		rhi.EndOneTimeCommands(cmd);
+
+		// Cleanup staging buffer
+		vkQueueWaitIdle(rhi.GetQueue());
+		rhi.DestroyBuffer(stagingHandle);
 	}
 
 	void VulkanTexture::TransitionLayout(VkCommandBuffer cmd, TextureEntry& entry, VkImageLayout newLayout)

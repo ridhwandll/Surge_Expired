@@ -4,6 +4,7 @@
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include <random>
 #include <imgui_internal.h>
+#include "stb_image.h"
 
 namespace Surge
 {
@@ -43,6 +44,44 @@ namespace Surge
 		return h;
 	}
 
+	void Player::FillTextures()
+	{
+		stbi_set_flip_vertically_on_load(1);
+		for (int i = 0; i < Renderer::MAX_TEXTURE_SLOTS + 300; i++)
+		{
+			String path = "Engine/Assets/Textures/RidWhite.png";
+			int width, height, channels;
+			stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+			if (data)
+			{
+				TextureDesc desc = {};
+				desc.Width = width;
+				desc.Height = height;
+				desc.Format = TextureFormat::RGBA8_SRGB;
+				desc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
+				desc.DebugName = String("QuadTexture_" + std::to_string(i) + ".png");
+				desc.InitialData = data;
+				desc.DataSize = width * height * 4;
+				desc.Sampler = mQuadSampler;
+				TextureHandle texture = mRenderer->GetRHI()->CreateTexture(desc);
+				mTextures.push_back(texture);
+
+				//if (i >= 1)
+				//	mTextures.push_back(mTextures[0]);
+				//else
+				//{
+				//	TextureHandle texture = mRenderer->GetRHI()->CreateTexture(desc);
+				//	mTextures.push_back(texture);
+				//}
+				stbi_image_free(data);
+			}
+			else
+			{
+				Log<Severity::Error>("Failed to load texture at path: {0}", path);
+			}
+		}
+	}
+
 	void Player::OnInitialize()
 	{
 		mRenderer = Core::GetRenderer();
@@ -70,42 +109,32 @@ namespace Surge
 			halfWidth = size * aspect * 0.5f;
 			halfHeight = size * 0.5f;
 		}
-	
-		// Stress test		
-		Uint initialQuadCount = 200.0f;
- 		std::random_device rd;
- 		std::mt19937 gen(rd());
- 		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
- 		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
- 		for (Uint i = 0; i < initialQuadCount; i++)
- 		{
- 			float x = distX(gen);
- 			float y = distY(gen);
- 		
-			Entity& quad = mQuads.emplace_back();
- 			mActiveScene->CreateEntity(quad, "StressQuad");
- 		
- 			std::uniform_real_distribution<float> hueDist(0.0f, 1.0f);
- 			float h = hueDist(gen);
- 			float s = 1.0f;
- 			float v = 1.0f;
- 			glm::vec3 rgb = HSVtoRGB(h, s, v);
-			quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
- 		
- 			auto& t = quad.GetComponent<TransformComponent>();
- 			t.Position = glm::vec3(x, y, 0.0f);
- 			t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
- 		}
 
- 		//{
- 		//	mActiveScene->CreateEntity(mQuad, "Quad");
- 		//
- 		//	mQuad.AddComponent<SpriteRenderer>(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
- 		//	auto& t = mQuad.GetComponent<TransformComponent>();
- 		//	t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
- 		//	t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
- 		//
- 		//}
+		SamplerDesc samplerDesc = {};
+		mQuadSampler = mRenderer->GetRHI()->CreateSampler(samplerDesc);
+
+		FillTextures();
+
+		Uint initialQuadCount = 200.0f;
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
+		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
+		for (Uint i = 0; i < initialQuadCount; i++)
+		{
+			float x = distX(gen);
+			float y = distY(gen);
+
+			Entity& quad = mQuads.emplace_back();
+			mActiveScene->CreateEntity(quad, "StressQuad");
+
+			quad.AddComponent<SpriteRenderer>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), mTextures[i]);
+
+			auto& t = quad.GetComponent<TransformComponent>();
+			t.Position = glm::vec3(x, y, 0.0f);
+			t.Scale = glm::vec3(0.3f, 0.3f, 1.0f);
+		}
+
  
 		mActiveScene->OnResize(windowSize.x, windowSize.y);
 
@@ -115,23 +144,6 @@ namespace Surge
 	void Player::OnUpdate()
 	{
 		float dt = Core::GetClock().GetSeconds();
-
-		//if (mMoveEnabled && mQuads.size() > 0)
-		//{
-		//	for (Uint i = 0; i < mQuads.size(); i++)
-		//	{
-		//		TransformComponent& transform = mQuads[i].GetComponent<TransformComponent>();
-		//
-		//		float rotSpeed = 10.0f + (i % 15);
-		//		float moveSpeed = 100.0f;
-		//		float dir = (i % 3 == 0) ? -1.0f : 1.0f;
-		//
-		//		transform.Rotation.z += dir * rotSpeed * dt;
-		//
-		//		transform.Position.x += sin(dt + i) * 0.001f * dt * moveSpeed;
-		//		transform.Position.y += cos(dt + i * 0.5f) * 0.001f * dt * moveSpeed;
-		//	}
-		//}
 		mActiveScene->Update();
 	}
 
@@ -179,48 +191,6 @@ namespace Surge
 			}
 
 			ImGui::Text("Total quads: %d\nVertices: %i\n%.1fms (FPS: %.1f)", Core::GetRenderer()->GetQuadCount(), Core::GetRenderer()->GetvertexCount(), clock.GetMilliseconds(), 1 / clock.GetSeconds());
-			ImGui::Text("Controls");
-			ImGui::Checkbox("Move quads", &mMoveEnabled);
-
-			if (ImGui::SliderInt("Quad Count", &mChangeQuadAmount, 0, Renderer::MAX_QUADS_TOTAL + 1))
-			{
-				RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
-				float size = cam->GetOrthographicSize();
-				float aspect = cam->GetAspectRatio();
-				float halfWidth = size * aspect * 0.5f;
-				float halfHeight = size * 0.5f;
-
-				Uint currentQuadCount = Core::GetRenderer()->GetQuadCount();
-				if (currentQuadCount > mChangeQuadAmount)
-				{
-					Uint toRemove = currentQuadCount - mChangeQuadAmount;
-					for (Uint i = 0; i < toRemove; i++)
-					{
-						mActiveScene->DestroyEntity(mQuads.back());
-						mQuads.pop_back();
-					}
-				}
-				else if (currentQuadCount < mChangeQuadAmount)
-				{
-					Uint toAdd = mChangeQuadAmount - currentQuadCount;
-					for (Uint i = 0; i < toAdd; i++)
-					{
-						glm::vec2 pos = GenRandomPosition(halfWidth, halfHeight);
-						Entity& quad = mQuads.emplace_back();
-						mActiveScene->CreateEntity(quad, "StressQuad");
-
-						float h = GenRandomHue();
-						float s = 1.0f;
-						float v = 1.0f;
-						glm::vec3 rgb = HSVtoRGB(h, s, v);
-						quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
-
-						auto& t = quad.GetComponent<TransformComponent>();
-						t.Position = glm::vec3(pos.x, pos.y, 0.0f);
-						t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
-					}
-				}
-			}
 		}
 		ImGui::End();
 	}
@@ -240,7 +210,10 @@ namespace Surge
 	}
 
 	void Player::OnShutdown()
-	{}
+	{
+		for (auto& texture : mTextures)
+			mRenderer->GetRHI()->DestroyTexture(texture);
+	}
 
 } // namespace Surge
 

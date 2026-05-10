@@ -19,10 +19,12 @@ namespace Surge
     private:
         void Resize(Uint width, Uint height);
         void OnImGuiRender();
-    private:
+        void FillTextures();
+	private:
+		SamplerHandle mQuadSampler;
+        Vector<TextureHandle> mTextures;
         int mChangeQuadAmount = 10;
         bool mMoveEnabled = true;
-        Entity mQuad;
         Vector<Entity> mQuads;
         Renderer* mRenderer;
     };

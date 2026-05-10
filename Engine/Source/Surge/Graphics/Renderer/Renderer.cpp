@@ -13,6 +13,7 @@
 #include <android/asset_manager.h>
 #include <android/log.h>
 #endif
+#include "stb_image.h"
 
 namespace Surge
 {
@@ -62,6 +63,9 @@ namespace Surge
 		mVertexData.resize(MAX_QUADS_PER_BATCH * 4);
 		mCurrentBatch.Reset();
 
+		SamplerDesc samplerDesc = {};
+		mQuadSampler = mRHI->CreateSampler(samplerDesc);
+
 		// Offscreen color texture
 		glm::vec2 size = Core::GetWindow()->GetSize();
 		TextureDesc colorDesc = {};
@@ -70,6 +74,7 @@ namespace Surge
 		colorDesc.Format = TextureFormat::RGBA8_UNORM;
 		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
 		colorDesc.DebugName = "Offscreen Color Texture";
+		colorDesc.Sampler = mQuadSampler;
 		mOffscreenColor = mRHI->CreateTexture(colorDesc);
 
 		// Offscreen framebuffer
@@ -86,19 +91,30 @@ namespace Surge
 		fbDesc.DebugName = "Offscreen Framebuffer";
 
 		mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
-
+	
 		Shader shader;
 		shader.Load("Renderer2D.shader", ShaderType::VERTEX | ShaderType::FRAGMENT);
 
 		PipelineDesc desc = {};
 		desc.Shader_ = shader;
-
 		desc.Raster.Cull = CullMode::NONE;
-
 		desc.DebugName = "Quad Batch Pipeline";
 		desc.TargetFramebuffer = mOffscreenFramebuffer;
 		desc.TargetSwapchain = false;
+		desc.Blend.Enable = true;
 		mPipeline = mRHI->CreatePipeline(desc);
+
+		uint8_t whitePixel[] = { 255, 255, 255, 255 };			
+		TextureDesc texDesc = {};
+		texDesc.Width = 1;
+		texDesc.Height = 1;
+		texDesc.Format = TextureFormat::RGBA8_UNORM ;
+		texDesc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
+		texDesc.DebugName = "WhiteTexture";
+		texDesc.InitialData = whitePixel;
+		texDesc.DataSize = sizeof(whitePixel);
+		texDesc.Sampler = mQuadSampler;
+		mWhiteTexture = mRHI->CreateTexture(texDesc);
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera)
@@ -112,7 +128,6 @@ namespace Surge
 		mTotalVertexCount = 0;
 		mTotalQuadCount = 0;
 		mCurrentFrameVertexOffset = 0;
-
 		mCurrentFrameCtx = mRHI->BeginFrame();
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
     }
@@ -131,6 +146,7 @@ namespace Surge
 
 		// Begins command buffer recording (Off-screen pass)
 		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]	
+
 		mCurrentFrameCtx = mRHI->BeginFrame();
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
 	}
@@ -141,7 +157,7 @@ namespace Surge
 
 		FlushBatch();
 		mRHI->CmdEndRenderPass(mCurrentFrameCtx);
-		
+
 		mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mOffscreenColor); // Copy/blit offscreen color to swapchain backbuffer
 		mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);	
 
@@ -191,42 +207,44 @@ namespace Surge
 
 	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color)
 	{
+		Submit(transform, color, TextureHandle::Invalid());
+	}
+
+	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
+	{
 		if (mCurrentBatch.QuadCount >= MAX_QUADS_PER_BATCH)
 			FlushBatch();
-		
+
 		if (mTotalQuadCount >= MAX_QUADS_TOTAL)
 		{
 			Log<Severity::Warn>("Max Quads per frame reached!");
 			mMaxQuadCountReached = true;
 			return;
 		}
-		else		
-			mMaxQuadCountReached = false;
-		
+		mMaxQuadCountReached = false;
 
-		// Unit quad positions transform applied per vertex on CPU
-		static constexpr glm::vec4 sLocalPositions[4] =
-		{
-			{ 0.5f, -0.5f, 0.0f, 1.0f}, // top right
-			{ 0.5f,  0.5f, 0.0f, 1.0f}, // bottom right
-			{-0.5f,  0.5f, 0.0f, 1.0f}, // bottom left
-			{-0.5f, -0.5f, 0.0f, 1.0f}, // top left
+		if (texture.IsNull())
+			texture = mWhiteTexture;
+
+		Uint texIndex = mRHI->GetBindlessIndex(texture);
+
+		static constexpr glm::vec4 sLocalPositions[4] = {
+			{ 0.5f, -0.5f, 0.0f, 1.0f},
+			{ 0.5f,  0.5f, 0.0f, 1.0f},
+			{-0.5f,  0.5f, 0.0f, 1.0f},
+			{-0.5f, -0.5f, 0.0f, 1.0f},
 		};
-
-		static constexpr glm::vec2 sUVs[4] =
-		{
-			{1.0f, 0.0f}, // top right
-			{1.0f, 1.0f}, // bottom right
-			{0.0f, 1.0f}, // bottom left
-			{0.0f, 0.0f}, // top left
+		static constexpr glm::vec2 sUVs[4] = {
+			{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}
 		};
 
 		for (Uint i = 0; i < 4; i++)
 		{
 			QuadVertex& v = mVertexData[mCurrentBatch.VertexCount++];
-			v.Position = transform * sLocalPositions[i]; // CPU transform
+			v.Position = transform * sLocalPositions[i];
 			v.Color = color;
 			v.UV = sUVs[i];
+			v.TextureIndex = texIndex;
 		}
 
 		mCurrentBatch.QuadCount++;
@@ -254,7 +272,7 @@ namespace Surge
 		Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
 		Uint uploadSizeInBytes = mCurrentBatch.VertexCount * sizeof(QuadVertex);
 		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
-
+		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
 		mRHI->CmdBindPipeline(ctx, mPipeline);
 		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
 		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
@@ -274,6 +292,8 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         mRHI->WaitIdle();
 		mRHI->DestroyFramebuffer(mOffscreenFramebuffer);
+		mRHI->DestroySampler(mQuadSampler);
+		mRHI->DestroyTexture(mWhiteTexture);
 		mRHI->DestroyTexture(mOffscreenColor);
 		mRHI->DestroyPipeline(mPipeline);
         mRHI->DestroyBuffer(mVertexBuffer);

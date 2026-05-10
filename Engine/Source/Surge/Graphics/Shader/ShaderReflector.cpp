@@ -79,7 +79,7 @@ namespace Surge
 		for(const ShaderBuffer& buffer : mShaderBuffers)
 		{
 			Log<Severity::Info>("Buffer: {0}, Set: {1}, Binding: {2}, Size: {3}, Usage: {4}, Stages: {5}", buffer.BufferName, buffer.Set, buffer.Binding, buffer.Size,
-				buffer.ShaderUsage == ShaderBuffer::Usage::Storage ? "Storage" : "Uniform", VulkanUtils::ShaderTypeToString(buffer.ShaderStages));
+				buffer.ShaderUsage == ShaderBuffer::Usage::STORAGE ? "Storage" : "Uniform", VulkanUtils::ShaderTypeToString(buffer.ShaderStages));
 			for (const ShaderBufferMember& member : buffer.Members)
 			{
 				Log<Severity::Info>("\tMember: {0}, Offset: {1}, Size: {2}, Type: {3}", member.Name, member.MemoryOffset, member.Size, VulkanUtils::ShaderDataTypeToString(member.DataType));
@@ -88,7 +88,7 @@ namespace Surge
 		for (const ShaderResource& res : mShaderResources)
 		{
 			Log<Severity::Info>("Resource: {0}, Set: {1}, Binding: {2}, Usage: {3}, Stages: {4}", res.Name, res.Set, res.Binding,
-				res.ShaderUsage == ShaderResource::Usage::Sampled ? "Sampled" : "Storage", VulkanUtils::ShaderTypeToString(res.ShaderStages));
+				res.ShaderUsage == ShaderResource::Usage::SAMPLED ? "Sampled" : "Storage", VulkanUtils::ShaderTypeToString(res.ShaderStages));
 		}
 		for (const ShaderPushConstant& pushConstant : mPushConstants)
 		{
@@ -203,24 +203,37 @@ namespace Surge
             // Fetch the sampled textures
             for (const spirv_cross::Resource& resource : resources.sampled_images)
             {
+				const spirv_cross::SPIRType& type = compiler.get_type(resource.type_id);
+				uint32_t arrayCount = 1;
+				if (!type.array.empty())				
+					arrayCount = type.array[0];
+				
                 ShaderResource res;
                 res.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
                 res.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
                 res.Name = resource.name;
                 res.ShaderStages |= handle.Type;
-                res.ShaderUsage = ShaderResource::Usage::Sampled;
+                res.ShaderUsage = ShaderResource::Usage::SAMPLED;
+				res.ArraySize = arrayCount;
                 result.PushResource(res);
+
             }
 
             // Fetch the storage textures
             for (const spirv_cross::Resource& resource : resources.storage_images)
             {
+				const spirv_cross::SPIRType& type = compiler.get_type(resource.type_id);
+				uint32_t arrayCount = 1;
+				if (!type.array.empty())
+					arrayCount = type.array[0];
+
                 ShaderResource res;
                 res.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
                 res.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
                 res.Name = resource.name;
                 res.ShaderStages |= handle.Type;
-                res.ShaderUsage = ShaderResource::Usage::Storage;
+                res.ShaderUsage = ShaderResource::Usage::STORAGE;
+				res.ArraySize = arrayCount;
                 result.PushResource(res);
             }
 
@@ -235,7 +248,7 @@ namespace Surge
                 buffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
                 buffer.BufferName = resource.name;
                 buffer.ShaderStages |= handle.Type;
-                buffer.ShaderUsage = ShaderBuffer::Usage::Uniform;
+                buffer.ShaderUsage = ShaderBuffer::Usage::UNIFORM;
 
                 for (Uint i = 0; i < bufferType.member_types.size(); i++)
                 {
@@ -262,7 +275,7 @@ namespace Surge
                 buffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
                 buffer.BufferName = resource.name;
                 buffer.ShaderStages |= handle.Type;
-                buffer.ShaderUsage = ShaderBuffer::Usage::Storage;
+                buffer.ShaderUsage = ShaderBuffer::Usage::STORAGE;
 
                 for (Uint i = 0; i < bufferType.member_types.size(); i++)
                 {

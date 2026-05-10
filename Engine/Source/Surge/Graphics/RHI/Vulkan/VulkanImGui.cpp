@@ -56,22 +56,26 @@ namespace Surge
 		SG_ASSERT(!mInitialized, "ImGuiLayer::Init called twice");
 		SG_ASSERT(swapchainRenderPass != VK_NULL_HANDLE, "ImGuiLayer: swapchainRenderPass is null, must be created before ImGui init");
 
-		// ImGui needs its own pool — font texture + any user textures
 		VkDescriptorPoolSize poolSizes[] =
-		{
-			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE },
-			{ VK_DESCRIPTOR_TYPE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_SAMPLER_POOL_SIZE },
-		};
-		VkDescriptorPoolCreateInfo pi = {};
-		pi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		pi.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		pi.maxSets = 0;
-		for (VkDescriptorPoolSize& poolSize : poolSizes)
-			pi.maxSets += poolSize.descriptorCount;
+		{ {VK_DESCRIPTOR_TYPE_SAMPLER, 100},
+		 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100},
+		 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
+		 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
+		 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100},
+		 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100},
+		 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
+		 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100},
+		 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100},
+		 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100},
+		 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100} };
 
-		pi.poolSizeCount = (uint32_t)IM_COUNTOF(poolSizes);
-		pi.pPoolSizes = poolSizes;
-		VK_CALL(vkCreateDescriptorPool(device, &pi, nullptr, &mDescriptorPool));
+		VkDescriptorPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		poolInfo.maxSets = 100 * IM_ARRAYSIZE(poolSizes);
+		poolInfo.poolSizeCount = (Uint)IM_ARRAYSIZE(poolSizes);
+		poolInfo.pPoolSizes = poolSizes;
+		VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &mDescriptorPool));
+
 		vkDeviceWaitIdle(device);
 
 		// ImGui context
@@ -201,6 +205,13 @@ namespace Surge
 		ImGui::NewFrame();
 	}
 
+	ImTextureID VulkanImGuiContext::AddImage(VkImageView view)
+	{
+		auto id = ImGui_ImplVulkan_AddTexture(nullptr, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		mImageTextureIDs.push_back((ImTextureID)id);
+		return (ImTextureID)id;
+	}
+
 	void VulkanImGuiContext::EndFrame(VkCommandBuffer cmd)
 	{
 		SG_ASSERT(mInitialized, "ImGuiLayer: EndFrame called before Init");
@@ -218,6 +229,10 @@ namespace Surge
 			ImGui::RenderPlatformWindowsDefault();
 		}
 #endif
+		for (ImTextureID id : mImageTextureIDs)	
+			ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)id);
+		
+		mImageTextureIDs.clear();
 	}
 
 	void VulkanImGuiContext::SetDarkThemeColors()

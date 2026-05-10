@@ -98,8 +98,17 @@ namespace Surge
 		VK_CALL(vkEnumerateDeviceExtensionProperties(mGPU, nullptr, &deviceExtensionCount, nullptr));
 		Vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
 		VK_CALL(vkEnumerateDeviceExtensionProperties(mGPU, nullptr, &deviceExtensionCount, deviceExtensions.data()));
-
+			
 		Vector<const char*> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+		VkDeviceCreateInfo deviceInfo{ .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+
+		// Query and enable bindless features if supported
+		VkPhysicalDeviceDescriptorIndexingFeaturesEXT bindlessFeatures = {};
+		if (SetupBindlessVulkan(requiredDeviceExtensions, bindlessFeatures))
+			deviceInfo.pNext = &bindlessFeatures;		
+		else
+			Log<Severity::Error>("Bindless Vulkan is not supported in this device! Graphics features are compromised!");		
 
 		if (!ValidateExtensions(requiredDeviceExtensions, deviceExtensions))
 			throw std::runtime_error("Required device extensions are missing!");
@@ -112,13 +121,10 @@ namespace Surge
 			.queueCount = 1,
 			.pQueuePriorities = &queuePriority };
 
-		VkDeviceCreateInfo deviceInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.queueCreateInfoCount = 1,
-			.pQueueCreateInfos = &queueInfo,
-			.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()),
-			.ppEnabledExtensionNames = requiredDeviceExtensions.data() };
-
+		deviceInfo.queueCreateInfoCount = 1;
+	    deviceInfo.pQueueCreateInfos = &queueInfo;
+	    deviceInfo.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size());
+	    deviceInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 		VK_CALL(vkCreateDevice(mGPU, &deviceInfo, nullptr, &mDevice));
 		volkLoadDevice(mDevice);
 
@@ -149,6 +155,12 @@ namespace Surge
 		QueryBudget();
 	}
 
+	void VulkanDevice::Destroy()
+	{
+		vkDeviceWaitIdle(mDevice);
+		vmaDestroyAllocator(mVmaAllocator);
+		vkDestroyDevice(mDevice, nullptr);
+	}
 	void VulkanDevice::QueryBudget()
 	{
 		vkGetPhysicalDeviceMemoryProperties(mGPU, &mMemProps);
@@ -168,11 +180,30 @@ namespace Surge
 		}
 	}
 
-
-	void VulkanDevice::Destroy()
+	bool VulkanDevice::SetupBindlessVulkan(Vector<const char*>& outExtensions, VkPhysicalDeviceDescriptorIndexingFeaturesEXT& outIndexingFeatures)
 	{
-		vkDeviceWaitIdle(mDevice);
-		vmaDestroyAllocator(mVmaAllocator);
-		vkDestroyDevice(mDevice, nullptr);
+		outIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+		outIndexingFeatures.pNext = nullptr;
+
+		VkPhysicalDeviceFeatures2 features2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+		features2.pNext = &outIndexingFeatures;
+		vkGetPhysicalDeviceFeatures2(mGPU, &features2);
+
+		bool bindlessSupported = outIndexingFeatures.descriptorBindingPartiallyBound &&
+			outIndexingFeatures.runtimeDescriptorArray &&
+			outIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind;
+
+		if (bindlessSupported)
+		{
+			// Essential extensions for bindless in 1.1
+			outExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+			outExtensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME); // Required dependency for indexing
+
+			outIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+
+			return true;
+		}
+
+		return false;
 	}
 }

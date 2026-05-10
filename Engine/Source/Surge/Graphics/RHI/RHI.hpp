@@ -2,7 +2,7 @@
 #pragma once
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 
 #if defined(SURGE_PLATFORM_WINDOWS) || defined(SURGE_PLATFORM_ANDROID)
@@ -25,6 +25,8 @@ namespace Surge
 {
 	class GraphicsRHI
 	{
+	public:
+		constexpr static Uint FRAMES_IN_FLIGHT = 3; // TODO: Expose this to user in case they want to change it, but for now we can just hardcode it
 	public:
 		GraphicsRHI() = default;
 		~GraphicsRHI() = default;
@@ -58,6 +60,21 @@ namespace Surge
 		PipelineHandle CreatePipeline(const PipelineDesc& desc) { return mBackendRHI.CreatePipeline(desc); }
 		void DestroyPipeline(PipelineHandle h) { mBackendRHI.DestroyPipeline(h); }
 
+		// Samplers
+		SamplerHandle CreateSampler(const SamplerDesc& desc) { return mBackendRHI.CreateSampler(desc); }
+		void DestroySampler(SamplerHandle h) { mBackendRHI.DestroySampler(h); }
+
+		DescriptorLayoutHandle CreateDescriptorLayout(const DescriptorLayoutDesc& desc) { return mBackendRHI.CreateDescriptorLayout(desc); }
+		DescriptorLayoutHandle GetDescriptorLayout(PipelineHandle h) const { return mBackendRHI.GetDescriptorLayout(h); }
+		void DestroyDescriptorLayout(DescriptorLayoutHandle h) { mBackendRHI.DestroyDescriptorLayout(h); }
+
+		void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline) { mBackendRHI.BindBindlessSet(ctx, pipeline); }
+
+		Uint GetBindlessIndex(TextureHandle h) { return mBackendRHI.GetBindlessIndex(h); }
+		DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(layoutHandle, frequency, debugName); }
+		void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount) { mBackendRHI.UpdateDescriptorSet(setHandle, writes, writeCount); }
+		void DestroyDescriptorSet(DescriptorSetHandle h) { mBackendRHI.DestroyDescriptorSet(h); }
+
 		// Commands
 		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount,Uint instanceCount,Uint firstIndex,int32_t vertexOffset, Uint firstInstance) { mBackendRHI.CmdDrawIndexed(ctx, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance); }
 		void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance) { mBackendRHI.CmdDraw(ctx, vertexCount, instanceCount, firstVertex, firstInstance); }
@@ -74,6 +91,9 @@ namespace Surge
 
 		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
 		void CmdEndRenderPass(const FrameContext& ctx) { mBackendRHI.CmdEndRenderPass(ctx); }
+
+		// setIndex maps to layout(set = N) in GLSL
+		void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
 
 		void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
 		// TODO: REMOVE

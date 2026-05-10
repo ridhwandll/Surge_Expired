@@ -7,10 +7,33 @@
 
 namespace Surge
 { 
+	static VkDescriptorType ShaderImageUsageToVulkan(ShaderResource::Usage type)
+	{
+		switch (type)
+		{
+		case ShaderResource::Usage::SAMPLED: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		case ShaderResource::Usage::STORAGE: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		}
+		SG_ASSERT(false, "ShaderResource::Usage is invalid");
+		return VkDescriptorType();
+	}
 
-	PipelineEntry VulkanPipeline::Create(const VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass)
+	static VkDescriptorType ShaderBufferTypeS(ShaderBuffer::Usage type)
+	{
+		switch (type)
+		{
+		case ShaderBuffer::Usage::STORAGE: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		case ShaderBuffer::Usage::UNIFORM: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		}
+		SG_ASSERT(false, "ShaderBuffer::Usage is invalid");
+		return VkDescriptorType();
+	}
+
+	PipelineEntry VulkanPipeline::Create(VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass)
 	{
 		SG_ASSERT(renderPass != VK_NULL_HANDLE, "PipelineDesc: renderPass is null");
+
+		const ShaderReflectionData& reflectedData = desc.Shader_.GetReflectionData();
 
 		PipelineEntry entry = {};
 		entry.Desc = desc;
@@ -19,10 +42,40 @@ namespace Surge
 		VkPipelineLayoutCreateInfo layoutInfo = {};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-		// TODO: Descriptor set layouts
+		VkDescriptorSetLayout bindlessLayout = rhi.mBindlessRegistry.GetLayout();
+		SG_ASSERT(bindlessLayout != VK_NULL_HANDLE, "VulkanPipeline: BindlessLayout not set");
 
+		// WIP: Descriptor set layouts 
+		//DescriptorLayoutDesc layoutDesc = {};
+		//Uint descriptorSetCount = 1;
+		//layoutDesc.BindingCount = 1;
+		//for (const ShaderBuffer& buffer : reflectedData.GetBuffers())
+		//{
+		//	DescriptorBinding dsc{				
+		//		.Slot = 0,
+		//		.Type = DescriptorType::UNIFORM_BUFFER,
+		//		.Count = 1,
+		//		.Stage = buffer.ShaderStages,
+		//		.Partial = false
+		//	};
+		//	layoutDesc.Bindings[buffer.Binding] = dsc;
+		//}
+		//
+		//for (const ShaderResource& texture : reflectedData.GetResources())
+		//{
+		//	DescriptorBinding dsc{
+		//		.Slot = 0,
+		//		.Type = DescriptorType::TEXTURE,
+		//		.Count = texture.ArraySize,
+		//		.Stage = texture.ShaderStages,
+		//		.Partial = false
+		//	};
+		//	layoutDesc.Bindings[texture.Binding] = dsc;
+		//}
+		//entry.DescriptorSetLayout = rhi.CreateDescriptorLayout(layoutDesc);		
+		
 		// Push constants
-		const Vector<ShaderPushConstant>& pushConstants = desc.Shader_.GetReflectionData().GetPushConstantBuffers();
+		const Vector<ShaderPushConstant>& pushConstants = reflectedData.GetPushConstantBuffers();
 		Vector<VkPushConstantRange> pushRanges(pushConstants.size());
 		for (size_t i = 0; i < pushConstants.size(); ++i)
 		{
@@ -35,6 +88,11 @@ namespace Surge
 			pushRanges[i].offset = 0;
 			pushRanges[i].size = pushConstant.Size;
 		}
+
+		//auto vklayout = rhi.mDescriptorLayoutPool.Get(entry.DescriptorSetLayout)->Layout;
+		auto vkLayout = bindlessLayout;
+		layoutInfo.pSetLayouts = &vkLayout;
+		layoutInfo.setLayoutCount = 1;
 		layoutInfo.pushConstantRangeCount = pushRanges.size();
 		layoutInfo.pPushConstantRanges = pushRanges.data();
 
@@ -79,7 +137,6 @@ namespace Surge
 		}
 
 		// Vertex input
-		const ShaderReflectionData& reflectedData = desc.Shader_.GetReflectionData();
 		const std::map<Uint, ShaderStageInput>& stageInputs = reflectedData.GetStageInputs().at(ShaderType::VERTEX);
 
 		Uint stride = 0;
@@ -202,7 +259,7 @@ namespace Surge
 		return entry;
 	}
 
-	void VulkanPipeline::Destroy(const VulkanRHI& rhi, PipelineEntry& entry)
+	void VulkanPipeline::Destroy(VulkanRHI& rhi, PipelineEntry& entry)
 	{
 		VkDevice device = rhi.GetDevice();
 		if (entry.Pipeline != VK_NULL_HANDLE)
@@ -215,6 +272,11 @@ namespace Surge
 		{
 			vkDestroyPipelineLayout(device, entry.Layout, nullptr);
 			entry.Layout = VK_NULL_HANDLE;
+		}
+		if (entry.DescriptorSetLayout != DescriptorLayoutHandle::Invalid())
+		{
+			rhi.DestroyDescriptorLayout(entry.DescriptorSetLayout);
+			entry.DescriptorSetLayout = DescriptorLayoutHandle::Invalid();
 		}
 	}
 }
