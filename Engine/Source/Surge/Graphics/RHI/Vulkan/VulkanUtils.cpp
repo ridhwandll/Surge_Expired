@@ -351,10 +351,11 @@ namespace Surge::VulkanUtils
 		}		
 	}
 
-	VkFormat VulkanUtils::ShaderDataTypeToVulkanFormat(ShaderDataType type)
+	VkFormat ShaderDataTypeToVulkanFormat(ShaderDataType type)
 	{
-		switch (type)
+		switch (type)		
 		{
+		case ShaderDataType::UINT: return VK_FORMAT_R32_UINT;
 		case ShaderDataType::FLOAT: return VK_FORMAT_R32_SFLOAT;
 		case ShaderDataType::FLOAT2: return VK_FORMAT_R32G32_SFLOAT;
 		case ShaderDataType::FLOAT3: return VK_FORMAT_R32G32B32_SFLOAT;
@@ -370,16 +371,51 @@ namespace Surge::VulkanUtils
 	{
 		VkShaderStageFlags flags = 0;
 
-		if (type & ShaderType::VERTEX)
-			flags |= VK_SHADER_STAGE_VERTEX_BIT;
-
-		if (type & ShaderType::FRAGMENT)
-			flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		if (type & ShaderType::COMPUTE)
-			flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+		if (type & ShaderType::VERTEX)   flags |= VK_SHADER_STAGE_VERTEX_BIT;
+		if (type & ShaderType::FRAGMENT) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+		if (type & ShaderType::COMPUTE)  flags |= VK_SHADER_STAGE_COMPUTE_BIT;
 
 		return flags;
 	}
 
+	VkFilter ToVkFilter(FilterMode m)
+	{
+		return m == FilterMode::LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+	}
+
+	VkSamplerAddressMode ToVkWrap(WrapMode m)
+	{
+		switch (m)
+		{
+		case WrapMode::REPEAT:          return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		case WrapMode::CLAMP:           return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		case WrapMode::MIRRORED_REPEAT: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+		}
+		return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	}
+
+	VkDescriptorType ToVkDescriptorType(DescriptorType type)
+	{
+		switch (type)
+		{
+		case DescriptorType::TEXTURE:         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		case DescriptorType::STORAGE_TEXTURE: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		case DescriptorType::UNIFORM_BUFFER:  return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		case DescriptorType::STORAGE_BUFFER:  return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		case DescriptorType::SAMPLER:         return VK_DESCRIPTOR_TYPE_SAMPLER;
+		}
+
+		SG_ASSERT_INTERNAL("Unknown DescriptorType!");
+		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	}
+
+	VkShaderStageFlags ToVkShaderStage(ShaderType shaderType)
+	{
+		VkShaderStageFlags flags = 0;
+		if ((Uint)shaderType & (Uint)ShaderType::VERTEX)   flags |= VK_SHADER_STAGE_VERTEX_BIT;
+		if ((Uint)shaderType & (Uint)ShaderType::FRAGMENT)  flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+		if ((Uint)shaderType & (Uint)ShaderType::COMPUTE)   flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+		return flags;
+
+	}
 }

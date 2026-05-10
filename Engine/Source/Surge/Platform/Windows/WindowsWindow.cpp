@@ -31,7 +31,6 @@ namespace Surge
         wc.hIcon = nullptr;
         wc.hIconSm = wc.hIcon;
         wc.cbClsExtra = 0;
-        wc.style |= CS_HREDRAW | CS_VREDRAW;
 
         RegisterClassEx(&wc);
         SURGE_GET_WIN32_LAST_ERROR;

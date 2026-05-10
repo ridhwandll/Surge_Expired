@@ -2,7 +2,7 @@
 #pragma once
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/RHI/RHIDescriptors.hpp"
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDevice.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
@@ -15,6 +15,7 @@
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
+#include "VulkanBindlessRegistry.hpp"
 
 
 
@@ -53,15 +54,28 @@ namespace Surge
 
 		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr);
 		void DestroyTexture(TextureHandle h);
+		void UploadTextureData(TextureHandle h, const void* data, Uint size);
 		void ResizeTexture(TextureHandle h, Uint width, Uint height);
 
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
 		void DestroyFramebuffer(FramebufferHandle h);
 		void ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height);
 
-		// Pipeline
 		PipelineHandle CreatePipeline(const PipelineDesc& desc);
 		void DestroyPipeline(PipelineHandle h);
+
+		SamplerHandle CreateSampler(const SamplerDesc& desc);
+		void DestroySampler(SamplerHandle h);
+
+		DescriptorLayoutHandle CreateDescriptorLayout(const DescriptorLayoutDesc& desc);
+		DescriptorLayoutHandle GetDescriptorLayout(PipelineHandle h) const;
+		void DestroyDescriptorLayout(DescriptorLayoutHandle h);
+
+		Uint GetBindlessIndex(TextureHandle h);
+		void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline);
+		DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
+		void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount);
+		void DestroyDescriptorSet(DescriptorSetHandle h);
 
 		// Commands
 		void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance);
@@ -80,6 +94,12 @@ namespace Surge
 
 		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor);
 		void CmdEndRenderPass(const FrameContext& ctx);
+
+		// setIndex maps to layout(set = N) in GLSL
+		void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex);
+
+		VkCommandBuffer BeginOneTimeCommands();
+		void EndOneTimeCommands(VkCommandBuffer cmd);
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
 
@@ -126,6 +146,7 @@ namespace Surge
 		VulkanSwapchain mSwapchain;
 		VulkanImGuiContext mImGuiContext;
 		VulkanRenderpassFactory mRenderPassCache;
+		VulkanBindlessRegistry mBindlessRegistry;
 
 		Vector<VkFramebuffer> mSwapchainFramebuffers;
 		VkRenderPass mRenderPass = VK_NULL_HANDLE;
@@ -138,6 +159,12 @@ namespace Surge
 		HandlePool<BufferHandle, BufferEntry> mBufferPool;
 		HandlePool<FramebufferHandle, FramebufferEntry> mFramebufferPool;
 		HandlePool<TextureHandle, TextureEntry> mTexturePool;
+		HandlePool<SamplerHandle, SamplerEntry> mSamplerPool;
+		HandlePool<DescriptorLayoutHandle, DescriptorLayoutEntry> mDescriptorLayoutPool;
+		HandlePool<DescriptorSetHandle, DescriptorSetEntry> mDescriptorSetPool;
+
+		friend class VulkanPipeline;
+		friend class VulkanTexture;
 	};
 
 }

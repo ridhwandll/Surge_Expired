@@ -79,7 +79,14 @@ namespace Surge
 		TextureFormat Format = TextureFormat::RGBA8_SRGB;
 		TextureUsage Usage = TextureUsage::SAMPLED;
 		bool Transient = false;
-		const char* DebugName = nullptr;
+		SamplerHandle Sampler = {};
+
+		// Optional, if set, pixel data is uploaded to GPU immediately after creation
+		// Usage must include TRANSFER_DST if InitialData is provided
+		const void* InitialData = nullptr;
+		Uint DataSize = 0; // total bytes of InitialData
+
+		String DebugName = "TextureHandle";
 	};
 
 	struct FramebufferAttachment
@@ -192,4 +199,58 @@ namespace Surge
 		const char* DebugName = nullptr;
 	};
 
+	enum class FilterMode { NEAREST, LINEAR };
+	enum class WrapMode { REPEAT, CLAMP, MIRRORED_REPEAT };
+	enum class MipmapMode { NEAREST, LINEAR };
+
+	struct SamplerDesc
+	{
+		FilterMode Min = FilterMode::LINEAR;
+		FilterMode Mag = FilterMode::LINEAR;
+		MipmapMode Mip = MipmapMode::LINEAR;
+		WrapMode WrapU = WrapMode::REPEAT;
+		WrapMode WrapV = WrapMode::REPEAT;
+		float MipBias = 0.0f;
+		float MaxAniso = 1.0f;
+		bool Anisotropy = false;
+		const char* DebugName = nullptr;
+	};
+
+	enum class DescriptorType : Uint
+	{
+		TEXTURE,         // combined image + sampler
+		STORAGE_TEXTURE, // read/write image
+		UNIFORM_BUFFER,  // small read-only buffer
+		STORAGE_BUFFER,  // large read/write buffer
+		SAMPLER,         // separate sampler
+	};
+
+	struct DescriptorBinding
+	{
+		Uint Slot = 0;
+		DescriptorType Type = DescriptorType::TEXTURE;
+		Uint Count = 1; // >1 for arrays
+		ShaderType Stage = ShaderType::FRAGMENT;
+		bool Partial = false; // allow partially bound arrays
+	};
+
+	struct DescriptorLayoutDesc
+	{
+		DescriptorBinding Bindings[16] = {};
+		Uint BindingCount = 0;
+		const char* DebugName = nullptr;
+	};
+
+	struct DescriptorWrite
+	{
+		Uint Slot = 0;
+		Uint ArrayIndex = 0; // for array bindings
+		DescriptorType Type = DescriptorType::TEXTURE;
+
+		TextureHandle Texture = TextureHandle::Invalid();
+		SamplerHandle Sampler = SamplerHandle::Invalid();
+		BufferHandle Buffer = BufferHandle::Invalid();
+		uint64_t BufferOffset = 0;
+		uint64_t BufferRange = 0;  // 0 = whole buffer
+	};
 }

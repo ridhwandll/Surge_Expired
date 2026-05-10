@@ -32,6 +32,15 @@ namespace Surge
 	struct PipelineTag {};
 	using PipelineHandle = RHIHandle<PipelineTag>;
 
+	struct SamplerTag {};
+	using SamplerHandle = RHIHandle<SamplerTag>;
+
+	struct DescriptorLayoutTag {};
+	using DescriptorLayoutHandle = RHIHandle<DescriptorLayoutTag>;
+
+	struct DescriptorSetTag {};
+	using DescriptorSetHandle = RHIHandle<DescriptorSetTag>;
+
 	template<typename XHandle, typename T>
 	class HandlePool
 	{

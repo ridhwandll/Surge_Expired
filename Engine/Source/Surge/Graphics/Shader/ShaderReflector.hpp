@@ -41,12 +41,13 @@ namespace Surge
 	{
 		enum class Usage
 		{
-			Sampled,
-			Storage
+			SAMPLED,
+			STORAGE
 		};
 
 		Uint Set = 0;
 		Uint Binding = 0;
+		Uint ArraySize = 1;
 		String Name;
 		ShaderResource::Usage ShaderUsage;
 		ShaderType ShaderStages{}; // Specifies what shader stages the resource is being used for
@@ -74,8 +75,8 @@ namespace Surge
 	{
 		enum class SURGE_API Usage
 		{
-			Storage,
-			Uniform
+			STORAGE,
+			UNIFORM
 		};
 
 		Uint Set = 0;

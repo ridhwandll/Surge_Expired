@@ -33,6 +33,7 @@ namespace Surge
 		operator VkDevice() const { return mDevice; }
 	private:
 		void QueryBudget();
+		bool SetupBindlessVulkan(Vector<const char*>& outExtensions, VkPhysicalDeviceDescriptorIndexingFeaturesEXT& outIndexingFeatures);
 	private:
 
 		VkDevice mDevice = VK_NULL_HANDLE ;

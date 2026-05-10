@@ -77,7 +77,7 @@ namespace Surge
             {
 				mRegistry.group<SpriteRenderer>(entt::get<TransformComponent>).each([&](auto& quad, auto& transformComponent)
                     {
-					    renderer->Submit(transformComponent.GetTransform(), quad.Color);
+					    renderer->Submit(transformComponent.GetTransform(), quad.Color, quad.Texture);
 					});
             }
             renderer->EndFrame();

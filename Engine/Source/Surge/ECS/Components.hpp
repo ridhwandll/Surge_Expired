@@ -6,6 +6,7 @@
 #include "SurgeReflect/SurgeReflect.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include "../Graphics/RHI/RHIHandle.hpp"
 
 namespace Surge
 {
@@ -55,11 +56,14 @@ namespace Surge
 	{
         SpriteRenderer() = default;
 		SpriteRenderer(const glm::vec4& color)
-			: Color(color) {}
+			: Color(color), Texture(TextureHandle::Invalid()) {}
 		SpriteRenderer(const glm::vec3& color, float alpha)
-			: Color(glm::vec4(color, alpha)) {}
+			: Color(glm::vec4(color, alpha)), Texture(TextureHandle::Invalid()) {}
+		SpriteRenderer(const glm::vec4& colorTint, TextureHandle texture)
+			: Color(colorTint), Texture(texture) {}
 
         glm::vec4 Color;
+		TextureHandle Texture = TextureHandle::Invalid();
 
 		SURGE_REFLECTION_ENABLE;
 	};
