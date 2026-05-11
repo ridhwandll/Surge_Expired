@@ -185,13 +185,6 @@ namespace Surge
                 data->mEventCallback(event);
                 break;
             }
-            case WM_QUIT:
-            {
-                WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                AppClosedEvent event;
-                data->mEventCallback(event);
-                break;
-            }
             case WM_SIZE:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));

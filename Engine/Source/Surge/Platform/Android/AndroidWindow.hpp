@@ -4,13 +4,21 @@
 
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Platform/Android/AndroidApp.hpp"
+
 #include <android/native_window.h>
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <game-activity/GameActivityEvents.h>
 
 namespace Surge
 {
-	class SURGE_API AndroidWindow : public Window
+    namespace Android
+    {
+        float GetTouchX();
+        float GetTouchY();
+        bool IsTouchDown();
+    }
+
+    class AndroidWindow : public Window
 	{
 	public:
 		explicit AndroidWindow(const WindowDesc& windowData);
@@ -46,8 +54,8 @@ namespace Surge
 	private:
 		std::function<void(Event&)> mEventCallback;
 		ANativeWindow* mNativeWindow = nullptr;
-		WindowState    mWindowState = WindowState::Normal;
-		bool           mDestroyFired = false;
+		WindowState mWindowState = WindowState::Normal;
+		bool mDestroyFired = false;
 
 		// Touch state for input polling
 
@@ -55,15 +63,12 @@ namespace Surge
 		float mTouchY = 0.0f;
 		bool  mTouchDown = false;
 
-		friend float AndroidGetTouchX();
-		friend float AndroidGetTouchY();
-		friend bool  AndroidIsTouchDown();
+		friend float Android::GetTouchX();
+		friend float Android::GetTouchY();
+		friend bool  Android::IsTouchDown();
 	};
 
 	// Accessors used by AndroidInput.cpp
-	float AndroidGetTouchX();
-	float AndroidGetTouchY();
-	bool  AndroidIsTouchDown();
 
 } // namespace Surge
 

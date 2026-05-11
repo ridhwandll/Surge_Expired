@@ -20,7 +20,7 @@ namespace Surge
 
         virtual void OnInitialize() {};
         virtual void OnUpdate() {};
-        virtual void OnEvent(Event& e) {};
+        virtual void OnEvent(Event& e) { (void)e; };
         virtual void OnShutdown() {};
         Ref<Scene> GetActiveProject() const { return mActiveScene; }
 

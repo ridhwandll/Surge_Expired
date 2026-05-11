@@ -69,7 +69,9 @@ namespace Surge
 		 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100},
 		 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100} };
 
-		VkDescriptorPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+		VkDescriptorPoolCreateInfo poolInfo = {};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.pNext = nullptr;
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		poolInfo.maxSets = 100 * IM_ARRAYSIZE(poolSizes);
 		poolInfo.poolSizeCount = (Uint)IM_ARRAYSIZE(poolSizes);
@@ -141,7 +143,9 @@ namespace Surge
 		vkInfo.PipelineInfoMain.RenderPass = swapchainRenderPass;
 		vkInfo.PipelineInfoMain.Subpass = 0;
 		vkInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+#ifdef SURGE_DEBUG
 		vkInfo.CheckVkResultFn = ImGuiCheckVkResult;
+#endif
 		ImGui_ImplVulkan_Init(&vkInfo);
 
 		// Load Fonts

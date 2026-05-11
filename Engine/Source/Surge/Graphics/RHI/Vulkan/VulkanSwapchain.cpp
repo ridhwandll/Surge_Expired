@@ -32,6 +32,7 @@ namespace Surge
 		VkQueue queue = rhi.GetQueue();
 		VkPresentInfoKHR present{
 			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+			.pNext = nullptr,
 			.waitSemaphoreCount = 1,
 			.pWaitSemaphores = &releaseSemaphore,
 			.swapchainCount = 1,
@@ -119,6 +120,7 @@ namespace Surge
 		
 		VkSwapchainCreateInfoKHR info{
 			.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+			.pNext = nullptr,
 			.surface = surface,
 			.minImageCount = desiredSwapchainImages,
 			.imageFormat = format.format,
@@ -160,6 +162,7 @@ namespace Surge
 			// Create an image view which we can render into
 			VkImageViewCreateInfo view_info{
 				.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+				.pNext = nullptr,
 				.image = swapchainImages[i],
 				.viewType = VK_IMAGE_VIEW_TYPE_2D,
 				.format = mDimensions.Format,

@@ -6,29 +6,7 @@
 #include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
-{ 
-	static VkDescriptorType ShaderImageUsageToVulkan(ShaderResource::Usage type)
-	{
-		switch (type)
-		{
-		case ShaderResource::Usage::SAMPLED: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		case ShaderResource::Usage::STORAGE: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		}
-		SG_ASSERT(false, "ShaderResource::Usage is invalid");
-		return VkDescriptorType();
-	}
-
-	static VkDescriptorType ShaderBufferTypeS(ShaderBuffer::Usage type)
-	{
-		switch (type)
-		{
-		case ShaderBuffer::Usage::STORAGE: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		case ShaderBuffer::Usage::UNIFORM: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		}
-		SG_ASSERT(false, "ShaderBuffer::Usage is invalid");
-		return VkDescriptorType();
-	}
-
+{
 	PipelineEntry VulkanPipeline::Create(VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass)
 	{
 		SG_ASSERT(renderPass != VK_NULL_HANDLE, "PipelineDesc: renderPass is null");
@@ -158,7 +136,9 @@ namespace Surge
 			vertexAttributeDescriptions[i].offset = input.Offset;
 		}
 
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo;{};
+		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputInfo.pNext = nullptr;
 		vertexInputInfo.vertexBindingDescriptionCount = 1;
 		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<Uint>(vertexAttributeDescriptions.size());
 		vertexInputInfo.pVertexBindingDescriptions = &vertexBindingDescriptions;
@@ -181,6 +161,7 @@ namespace Surge
 		// Depth stencil
 		VkPipelineDepthStencilStateCreateInfo depthStencil = {};
 		depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depthStencil.pNext = nullptr;
 		depthStencil.depthTestEnable = desc.Depth.TestEnable ? VK_TRUE : VK_FALSE;
 		depthStencil.depthWriteEnable = desc.Depth.WriteEnable ? VK_TRUE : VK_FALSE;
 		depthStencil.depthCompareOp = VulkanUtils::ToVkCompareOp(desc.Depth.Op);
