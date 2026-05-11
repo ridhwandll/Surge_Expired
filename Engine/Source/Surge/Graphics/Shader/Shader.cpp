@@ -66,8 +66,8 @@ namespace Surge
 		shaderc::CompileOptions options;
 		options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
 		// NOTE(Rid - AC3R) If we enable optimization, it removes the name :kekCry:
-		options.SetOptimizationLevel(shaderc_optimization_level_performance);
-		options.SetGenerateDebugInfo();
+		//options.SetOptimizationLevel(shaderc_optimization_level_performance);
+		//options.SetGenerateDebugInfo();
 
 		for (auto&& [stage, source] : mShaderSources)
 		{
@@ -78,7 +78,7 @@ namespace Surge
 			if (result.GetCompilationStatus() != shaderc_compilation_status_success)
 			{
 				Log<Severity::Error>("{} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage));
-				Log<Severity::Error>("{} Error(s): \n{1}", result.GetNumErrors(), result.GetErrorMessage());
+				Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
 				SG_ASSERT_INTERNAL("Shader Compilation failure!");
 			}
 			else

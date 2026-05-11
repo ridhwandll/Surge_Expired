@@ -27,9 +27,12 @@ namespace Surge
 		bufferInfo.size = desc.Size;
 		bufferInfo.usage = ToVkBufferUsage(desc.Usage);
 
-		// Staging buffers also need to be transfer sources
-		if ((Uint)desc.Usage & (Uint)BufferUsage::STAGING)
+		bool isStaging = desc.Usage & BufferUsage::STAGING;
+		if (isStaging)
 			bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+		if (!desc.HostVisible && !isStaging)
+			bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 		VmaAllocationCreateInfo allocInfo = {};
 		allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -39,6 +42,7 @@ namespace Surge
 			// Persistent mapping: valid on mobile UMA, free to keep mapped forever
 			allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 			allocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+			allocInfo.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		}
 
 		VmaAllocator allocator = rhi.GetAllocator();
@@ -52,15 +56,42 @@ namespace Surge
 			entry.MappedPtr = vmaAllocInfo.pMappedData;
 		}
 
-		if (desc.InitialData != nullptr)
+		if (desc.InitialData != nullptr && desc.HostVisible)
 		{
-			SG_ASSERT(desc.HostVisible, "VulkanBuffer: InitialData provided but buffer is not HostVisible. Either set HostVisible = true, or upload manually via a staging buffer.");
-			SG_ASSERT(entry.MappedPtr != nullptr, "VulkanBuffer: InitialData provided but MappedPtr is null.");
 			memcpy(entry.MappedPtr, desc.InitialData, desc.Size);
+		}
+		else if (desc.InitialData != nullptr && !desc.HostVisible)
+		{
+			VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+			stagingInfo.size = desc.Size;
+			stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+			VmaAllocationCreateInfo stagingAllocInfo = {};
+			stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+			stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+			VkBuffer stagingBuffer;
+			VmaAllocation stagingAllocation;
+			VmaAllocationInfo stagingResultInfo;
+			stagingAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+			VK_CALL(vmaCreateBuffer(allocator, &stagingInfo, &stagingAllocInfo, &stagingBuffer, &stagingAllocation, &stagingResultInfo));
+			SG_ASSERT(stagingResultInfo.pMappedData != nullptr, "Staging buffer failed to map");
+
+			memcpy(stagingResultInfo.pMappedData, desc.InitialData, desc.Size);
+
+			const VkCommandBuffer cb = rhi.BeginOneTimeCommands();
+
+			VkBufferCopy copyRegion = {};
+			copyRegion.size = desc.Size;
+			vkCmdCopyBuffer(cb, stagingBuffer, entry.Buffer, 1, &copyRegion);
+
+			rhi.EndOneTimeCommands(cb);
+
+			vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
 		}
 
 
-//TODO
 #if defined(SURGE_DEBUG)
 		if (desc.DebugName)
 		{
@@ -70,6 +101,7 @@ namespace Surge
 			nameInfo.objectHandle = (uint64_t)entry.Buffer;
 			nameInfo.pObjectName = desc.DebugName; 
 			rhi.SetDebugName(nameInfo);
+			vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName);
 		}
 #endif
 		return entry;
@@ -87,7 +119,7 @@ namespace Surge
 		}
 	}
 
-	void VulkanBuffer::Upload(const VulkanRHI& rhi, BufferEntry& entry, const void* data, Uint size, Uint offset /*= 0*/)
+	void VulkanBuffer::Upload(BufferEntry& entry, const void* data, Uint size, Uint offset /*= 0*/)
 	{
 		SG_ASSERT(entry.Buffer != VK_NULL_HANDLE, "Uploading to a null buffer");
 		SG_ASSERT(offset + size <= entry.Desc.Size, "Upload out of buffer bounds");

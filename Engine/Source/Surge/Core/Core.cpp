@@ -25,6 +25,7 @@ namespace Surge::Core
         GCoreData.SurgeClient->OnEvent(e);
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
+        dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e) { GCoreData.SurgeRenderer->OnWindowResize(e.GetWidth(), e.GetHeight()); });
     }
 
     void Initialize(Client* application)

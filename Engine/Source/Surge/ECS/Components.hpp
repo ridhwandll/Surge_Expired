@@ -32,25 +32,39 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API TransformComponent
-    {
-        TransformComponent() = default;
-        TransformComponent(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
-            : Position(position), Rotation(rotation), Scale(scale) {}
+	struct SURGE_API TransformComponent
+	{
+		TransformComponent() = default;
+		TransformComponent(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
+			: Position(position), Rotation(rotation), Scale(scale) {}
 
-        glm::vec3 Position = glm::vec3(0.0f, 0.0f, 0.0f);
-        glm::vec3 Rotation = glm::vec3(0.0f, 0.0f, 0.0f);
-        glm::vec3 Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+		glm::vec3 Position = glm::vec3(0.0f);
+		glm::vec3 Rotation = glm::vec3(0.0f); // Degrees
+		glm::vec3 Scale = glm::vec3(1.0f);
 
-        glm::mat4 GetTransform()
-        {
-            const glm::mat4 rot = glm::toMat4(glm::quat(glm::radians(Rotation)));
-            glm::mat4 result = glm::translate(glm::mat4(1.0f), Position) * rot * glm::scale(glm::mat4(1.0f), Scale);
-            return result;
-        }
+		// Call transform changed (e.g. after physics)
+		void MarkDirty() { mDirty = true; }
 
-        SURGE_REFLECTION_ENABLE;
-    };
+		const glm::mat4& GetTransform() const
+		{
+			if (mDirty)
+			{
+				mCachedTransform = glm::translate(glm::mat4(1.0f), Position)
+					* glm::mat4_cast(glm::quat(glm::radians(Rotation)))
+					* glm::scale(glm::mat4(1.0f), Scale);
+
+				mDirty = false;
+			}
+			return mCachedTransform;
+		}
+
+		SURGE_REFLECTION_ENABLE;
+
+	private:
+		mutable glm::mat4 mCachedTransform{ 1.0f };
+		mutable bool mDirty = true;
+	};
+
 
 	struct SURGE_API SpriteRenderer
 	{

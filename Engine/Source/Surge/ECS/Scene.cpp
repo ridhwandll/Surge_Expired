@@ -68,6 +68,8 @@ namespace Surge
 
     void Scene::Update()
     {
+		SURGE_PROFILE_FUNC("Scene::Update()");
+		//Timer timer("Scene::Update()", true);
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
         if (camera.Data1)
@@ -75,10 +77,11 @@ namespace Surge
             Renderer* renderer = Core::GetRenderer();
             renderer->BeginFrame(*camera.Data1, camera.Data2);
             {
-				mRegistry.group<SpriteRenderer>(entt::get<TransformComponent>).each([&](auto& quad, auto& transformComponent)
-                    {
-					    renderer->Submit(transformComponent.GetTransform(), quad.Color, quad.Texture);
-					});
+				auto view = mRegistry.view<SpriteRenderer, TransformComponent>();
+				for (auto [entity, sprite, transform] : view.each())
+				{
+					renderer->Submit(transform.GetTransform(), sprite.Color, sprite.Texture);
+				}
             }
             renderer->EndFrame();
         }
