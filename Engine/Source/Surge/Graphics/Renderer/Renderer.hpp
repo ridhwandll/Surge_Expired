@@ -25,9 +25,8 @@ namespace Surge
     class EditorCamera;
     class SURGE_API Renderer
     {
-    public:        
-        static constexpr Uint MAX_TEXTURE_SLOTS = 16;
-		static constexpr Uint MAX_QUADS_TOTAL = 100000; // 100k quads total, across all batches
+    public:               
+		static constexpr Uint MAX_QUADS_TOTAL = 100000; // 100k quads total, across all(10) batches
 		static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
 		struct QuadVertex
@@ -53,8 +52,7 @@ namespace Surge
         void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
-		void Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture);
-		void Submit(const glm::mat4& transform, const glm::vec4& color);
+		void Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture = TextureHandle::Invalid());
 		void OnWindowResize(Uint width, Uint height);
 
 		const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }

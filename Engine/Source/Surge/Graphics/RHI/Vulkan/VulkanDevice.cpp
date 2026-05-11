@@ -193,6 +193,7 @@ namespace Surge
 			outIndexingFeatures.runtimeDescriptorArray &&
 			outIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind;
 
+		
 		if (bindlessSupported)
 		{
 			// Essential extensions for bindless in 1.1
@@ -201,9 +202,19 @@ namespace Surge
 
 			outIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 
-			return true;
+			VkPhysicalDeviceDescriptorIndexingProperties indexingProps{};
+			indexingProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
+			indexingProps.pNext = nullptr;
+
+			VkPhysicalDeviceProperties2 deviceProps{};
+			deviceProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+			deviceProps.pNext = &indexingProps;
+			vkGetPhysicalDeviceProperties2(mGPU, &deviceProps);
+
+			uint32_t maxBindlessTextures = indexingProps.maxDescriptorSetUpdateAfterBindSampledImages;
+			Log<Severity::Info>("Max Bindless Textures: {}", maxBindlessTextures);
 		}
 
-		return false;
+		return bindlessSupported;
 	}
 }

@@ -79,13 +79,13 @@ namespace Surge
 		mRenderPassCache.Shutdown(*this);
 		mImGuiContext.Shutdown(*this);
 
-		//mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry& entry) { DestroyDescriptorSet(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
-		//mDescriptorLayoutPool.ForEachAlive([&](const DescriptorLayoutHandle& h, DescriptorLayoutEntry& entry) { DestroyDescriptorLayout(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
-		//mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry& entry){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
-		//mFramebufferPool.ForEachAlive([&](const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
-		//mTexturePool.ForEachAlive([&](const TextureHandle& h, TextureEntry& entry) { VulkanTexture::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
-		//mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!"); });
-		//mPipelinePool.ForEachAlive([&](const PipelineHandle& h, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!"); });
+		mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry& entry) { DestroyDescriptorSet(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
+		mDescriptorLayoutPool.ForEachAlive([&](const DescriptorLayoutHandle& h, DescriptorLayoutEntry& entry) { DestroyDescriptorLayout(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
+		mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry& entry){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
+		mFramebufferPool.ForEachAlive([&](const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
+		mTexturePool.ForEachAlive([&](const TextureHandle& h, TextureEntry& entry) { VulkanTexture::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
+		mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!"); });
+		mPipelinePool.ForEachAlive([&](const PipelineHandle& h, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!"); });
 
 		DestroySwapchainFramebuffers();
 		DestroySwapchainRenderpass();
@@ -238,10 +238,9 @@ namespace Surge
 
 		SamplerEntry* samplerEntry = mSamplerPool.Get(desc.Sampler);
 		SG_ASSERT(samplerEntry, "Null sampler, please provide a valid Sampler Handle in TextureDesc");
-
-		{
-			mTexturePool.Get(h)->BindlessIndex = mBindlessRegistry.RegisterTexture(*this, entry.View, samplerEntry->Sampler);
-		}
+	
+		//if (!(desc.Usage & TextureUsage::COLOR_ATTACHMENT))
+		mTexturePool.Get(h)->BindlessIndex = mBindlessRegistry.RegisterTexture(*this, entry.View, samplerEntry->Sampler);		
 
 		if (desc.InitialData && desc.DataSize > 0)
 			UploadTextureData(h, desc.InitialData, desc.DataSize);

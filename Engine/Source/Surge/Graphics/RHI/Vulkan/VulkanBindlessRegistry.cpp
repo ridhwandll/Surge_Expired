@@ -61,7 +61,13 @@ namespace Surge
 
 	void VulkanBindlessRegistry::Shutdown(const VulkanRHI& rhi)
 	{
+		if (mLayout)
+			vkDestroyDescriptorSetLayout(rhi.GetDevice(), mLayout, nullptr);
+		if (mPool)
+			vkDestroyDescriptorPool(rhi.GetDevice(), mPool, nullptr);
 
+		mLayout = VK_NULL_HANDLE;
+		mPool = VK_NULL_HANDLE;
 	}
 
 	Uint VulkanBindlessRegistry::RegisterTexture(const VulkanRHI& rhi, VkImageView view, VkSampler sampler)

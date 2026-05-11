@@ -9,7 +9,7 @@
 #ifdef SURGE_PLATFORM_WINDOWS
 #include <shaderc/shaderc.hpp>
 #elif defined(SURGE_PLATFORM_ANDROID)
-#include <android_native_app_glue.h>
+#include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <android/asset_manager.h>
 #include <android/log.h>
 #endif
@@ -149,6 +149,7 @@ namespace Surge
 
 		mCurrentFrameCtx = mRHI->BeginFrame();
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
+		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
 	}
 
     void Renderer::EndFrame()
@@ -205,11 +206,6 @@ namespace Surge
 		ImGui::End();
 	}
 
-	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color)
-	{
-		Submit(transform, color, TextureHandle::Invalid());
-	}
-
 	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
 	{
 		if (mCurrentBatch.QuadCount >= MAX_QUADS_PER_BATCH)
@@ -222,11 +218,7 @@ namespace Surge
 			return;
 		}
 		mMaxQuadCountReached = false;
-
-		if (texture.IsNull())
-			texture = mWhiteTexture;
-
-		Uint texIndex = mRHI->GetBindlessIndex(texture);
+		Uint texIndex = mRHI->GetBindlessIndex(texture.IsNull() ? mWhiteTexture : texture);
 
 		static constexpr glm::vec4 sLocalPositions[4] = {
 			{ 0.5f, -0.5f, 0.0f, 1.0f},
@@ -272,7 +264,7 @@ namespace Surge
 		Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
 		Uint uploadSizeInBytes = mCurrentBatch.VertexCount * sizeof(QuadVertex);
 		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
-		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
+
 		mRHI->CmdBindPipeline(ctx, mPipeline);
 		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
 		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
