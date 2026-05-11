@@ -10,11 +10,11 @@
 namespace Surge::Android
 {
     android_app* GAndroidApp = nullptr;
+
 } // namespace Surge::Android
 
 void android_main(android_app* app)
 {
-    // Make GAndroidApp available to platform and window code before Core::Initialize()
     Surge::Android::GAndroidApp = app;
 
     // Block until the native window is ready
@@ -31,21 +31,20 @@ void android_main(android_app* app)
 
     Surge::ClientOptions clientOptions;
     clientOptions.EnableImGui = false;
-    clientOptions.WindowDescription = {
-        static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window)),
-        static_cast<Surge::Uint>(ANativeWindow_getHeight(app->window)),
-        "Player",
-        Surge::WindowFlags::CreateDefault};
+    Surge::WindowDesc desc;
+    desc.Width = static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window));
+    desc.Height = static_cast<Surge::Uint>(ANativeWindow_getHeight(app->window));
+    desc.Title = "SurgePlayer";
+    desc.Flags = Surge::WindowFlags::CreateDefault;
+    clientOptions.WindowDescription = desc;
 
-    Surge::Player* playerApp = Surge::MakeClient<Surge::Player>();
+    auto* playerApp = Surge::MakeClient<Surge::Player>();
     playerApp->SetOptions(clientOptions);
-    Surge::Log<Surge::Severity::Info>("Created client!");
 
     Surge::Core::Initialize(playerApp);
-    Surge::Log<Surge::Severity::Info>("Initialized core!");
     Surge::Core::Run();
     Surge::Core::Shutdown();
-    Surge::Log<Surge::Severity::Info>("Shutting down!");
+    Surge::Log<Surge::Severity::Info>("Shutting down");
 }
 
 #endif // SURGE_PLATFORM_ANDROID

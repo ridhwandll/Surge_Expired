@@ -11,13 +11,10 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanFramebuffer.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
-
+#include "Surge/Graphics/RHI/Vulkan/VulkanBindlessRegistry.hpp"
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
-#include "VulkanBindlessRegistry.hpp"
-
-
 
 #define FORCE_VALIDATION 0
 #if FORCE_VALIDATION == 1

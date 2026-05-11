@@ -891,110 +891,149 @@ namespace Surge
 		ImGui::Text("RHI Pools");
 		ImGui::PopFont();
 
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
-		ImGui::Text("BufferPool");
-		ImGui::PopFont();
-		ImGui::Text("Alive objects: %d", mBufferPool.AliveObjCount());
-		mBufferPool.ForEachAlive([](const BufferHandle& h, BufferEntry& entry)
+		//ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		if (ImGui::TreeNode("BufferPool"))
 		{
-			String bufText = std::format("BufferHandle ({}, {})", h.Index, h.Generation);
-			if (ImGui::TreeNode(bufText.c_str()))
-			{
-				ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-				ImGui::Text("Size: %.3f MB", entry.Desc.Size / (1024.0f * 1024.0f));
-				ImGui::Text("Usage: %s", VulkanUtils::BufferUsageToString(entry.Desc.Usage));
-				ImGui::Text("Host Visible: %s", entry.Desc.HostVisible ? "Yes" : "No");
-				ImGui::TreePop();
-			}
-		});
-
-		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
-		ImGui::Text("PipelinePool");
-		ImGui::PopFont();
-		ImGui::Text("Alive objects: %d", mPipelinePool.AliveObjCount());
-		mPipelinePool.ForEachAlive([](const PipelineHandle& h, PipelineEntry& entry)
-			{
-				String pipeText = std::format("PipelineHandle ({}, {})", h.Index, h.Generation);
-				if (ImGui::TreeNode(pipeText.c_str()))
+			//ImGui::PopFont();
+			ImGui::Text("Alive objects: %d", mBufferPool.AliveObjCount());
+			mBufferPool.ForEachAlive([](const BufferHandle& h, BufferEntry& entry)
 				{
-					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-					ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
-					ImGui::Text("Shader: %s", entry.Desc.Shader_.GetName().c_str());
-					ImGui::TreePop();
-				}
-			});
-
-		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
-		ImGui::Text("FramebufferPool");
-		ImGui::PopFont();
-		ImGui::Text("Alive objects: %d", mFramebufferPool.AliveObjCount());
-		mFramebufferPool.ForEachAlive([this](const FramebufferHandle& h, FramebufferEntry& entry)
-			{
-				FramebufferDesc desc = entry.Desc;
-				String fbufText = std::format("FramebufferHandle ({}, {})", h.Index, h.Generation);
-				if (ImGui::TreeNode(fbufText.c_str()))
-				{
-					ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
-					ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
-					ImGui::Text("Color Attachment Count: %d", desc.ColorAttachmentCount);
-					if (desc.ColorAttachmentCount > 0)
+					String bufText = std::format("BufferHandle ({}, {})", h.Index, h.Generation);
+					if (ImGui::TreeNode(bufText.c_str()))
 					{
-						if (ImGui::TreeNode("ColorAttachments"))
+						ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+						ImGui::Text("Size: %.3f MB", entry.Desc.Size / (1024.0f * 1024.0f));
+						ImGui::Text("Usage: %s", VulkanUtils::BufferUsageToString(entry.Desc.Usage));
+						ImGui::Text("Host Visible: %s", entry.Desc.HostVisible ? "Yes" : "No");
+						ImGui::TreePop();
+					}
+				});
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+		//ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		if (ImGui::TreeNode("PipelinePool"))
+		{
+			//ImGui::PopFont();
+			ImGui::Text("Alive objects: %d", mPipelinePool.AliveObjCount());
+			mPipelinePool.ForEachAlive([](const PipelineHandle& h, PipelineEntry& entry)
+				{
+					String pipeText = std::format("PipelineHandle ({}, {})", h.Index, h.Generation);
+					if (ImGui::TreeNode(pipeText.c_str()))
+					{
+						ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+						ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
+						ImGui::Text("Shader: %s", entry.Desc.Shader_.GetName().c_str());
+						ImGui::TreePop();
+					}
+				});
+			ImGui::TreePop();
+		}
+		ImGui::Separator();
+		//ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		if (ImGui::TreeNode("FramebufferPool"))
+		{
+			//ImGui::PopFont();
+			ImGui::Text("Alive objects: %d", mFramebufferPool.AliveObjCount());
+			mFramebufferPool.ForEachAlive([this](const FramebufferHandle& h, FramebufferEntry& entry)
+				{
+					FramebufferDesc desc = entry.Desc;
+					String fbufText = std::format("FramebufferHandle ({}, {})", h.Index, h.Generation);
+					if (ImGui::TreeNode(fbufText.c_str()))
+					{
+						ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+						ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
+						ImGui::Text("Color Attachment Count: %d", desc.ColorAttachmentCount);
+						if (desc.ColorAttachmentCount > 0)
 						{
-							for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
+							if (ImGui::TreeNode("ColorAttachments"))
 							{
-								TextureEntry* texEntry = mTexturePool.Get(desc.ColorAttachments[i].Handle);
-								TextureDesc tDesc = texEntry->Desc;
-								String texText = std::format("TextureHandle ({}, {})", h.Index, h.Generation);
-								if (ImGui::TreeNode(texText.c_str()))
+								for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
 								{
-									ImGui::Text("Debug Name: %s", tDesc.DebugName.c_str());
-									ImGui::Text("Dimensions: %dx%d", tDesc.Width, tDesc.Height);
-									ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(tDesc.Format).c_str());
-									ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(tDesc.Usage));
-									ImGui::Text("Size: %.3f MB", texEntry->Size / (1024.0f * 1024.0f));
-									ImGui::TreePop();
+									TextureEntry* texEntry = mTexturePool.Get(desc.ColorAttachments[i].Handle);
+									TextureDesc tDesc = texEntry->Desc;
+									String texText = std::format("TextureHandle ({}, {})", h.Index, h.Generation);
+									if (ImGui::TreeNode(texText.c_str()))
+									{
+										ImGui::Text("Debug Name: %s", tDesc.DebugName.c_str());
+										ImGui::Text("Dimensions: %dx%d", tDesc.Width, tDesc.Height);
+										ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(tDesc.Format).c_str());
+										ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(tDesc.Usage));
+										ImGui::Text("Size: %.3f MB", texEntry->Size / (1024.0f * 1024.0f));
+										ImGui::TreePop();
+									}
 								}
+								ImGui::TreePop();
 							}
-							ImGui::TreePop();
 						}
-					}
 
-					ImGui::Text("Has Depth: %s", desc.HasDepth ? "Yes" : "No");
-					if (desc.HasDepth)
-					{
-						ImGui::Text("Depth Attachment:");
-						ImGui::Text("TextureHandle (%d, %d), LoadOp: %s, StoreOp: %s", desc.DepthAttachment.Handle.Index, desc.DepthAttachment.Handle.Generation,
-							VulkanUtils::LoadOpToString(desc.DepthAttachment.Load), VulkanUtils::StoreOpToString(desc.DepthAttachment.Store));
+						ImGui::Text("Has Depth: %s", desc.HasDepth ? "Yes" : "No");
+						if (desc.HasDepth)
+						{
+							ImGui::Text("Depth Attachment:");
+							ImGui::Text("TextureHandle (%d, %d), LoadOp: %s, StoreOp: %s", desc.DepthAttachment.Handle.Index, desc.DepthAttachment.Handle.Generation,
+								VulkanUtils::LoadOpToString(desc.DepthAttachment.Load), VulkanUtils::StoreOpToString(desc.DepthAttachment.Store));
+						}
+						ImGui::TreePop();
 					}
-					ImGui::TreePop();
-				}
-			});
+				});
+			ImGui::TreePop();
+		}
 
 		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
-		ImGui::Text("TexturePool");
-		ImGui::PopFont();
-		ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
-		mTexturePool.ForEachAlive([](const TextureHandle& h, TextureEntry& entry)
-			{
-				TextureDesc desc = entry.Desc;
-				String texText = std::format("{} ({}, {})", desc.DebugName, h.Index, h.Generation);
-				if (ImGui::TreeNode(texText.c_str()))
+		//ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		if (ImGui::TreeNode("SamplerPool"))
+		{
+			//ImGui::PopFont();
+			ImGui::Text("Alive objects: %d", mSamplerPool.AliveObjCount());
+			mSamplerPool.ForEachAlive([](const SamplerHandle& h, SamplerEntry& entry)
 				{
-					ImGui::Text("Debug Name: %s", desc.DebugName.c_str());
-					ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
-					ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
-					ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
-					ImGui::Text("Size: %.5f MB", entry.Size / (1024.0f * 1024.0f));
-					//ImTextureID id = mImGuiContext.AddImage(entry.View);
-					//ImGui::Image(id, ImVec2(desc.Width, desc.Height));
-					ImGui::TreePop();
-				}
-			});
-
+					SamplerDesc desc = entry.Desc;
+					String texText = std::format("{} ({}, {})", desc.DebugName, h.Index, h.Generation);
+					if (ImGui::TreeNode(texText.c_str()))
+					{
+						ImGui::Text("Debug Name: %s", desc.DebugName.c_str());
+						ImGui::Text("Anisotropy:");
+						ImGui::Text("Enabled: %s", desc.Anisotropy ? "Yes" : "No");
+						ImGui::Text("Max Anisotropy: %.1f", desc.MaxAniso);
+						ImGui::Text("Filter Mode:");
+						ImGui::Text("Min Filter: %s", desc.Min == FilterMode::LINEAR ? "LINEAR" : "NEAREST");
+						ImGui::Text("Mag Filter: %s", desc.Mag == FilterMode::LINEAR ? "LINEAR" : "NEAREST");
+						ImGui::Text("Mipmap Mode: %s", desc.Mip == MipmapMode::LINEAR ? "LINEAR" : "NEAREST");
+						ImGui::Text("Wrap Mode:");
+						ImGui::Text("U: %s", desc.WrapU == WrapMode::REPEAT ? "REPEAT" : "CLAMP/MIRRORED_REPEAT");
+						ImGui::Text("V: %s", desc.WrapV == WrapMode::REPEAT ? "REPEAT" : "CLAMP/MIRRORED_REPEAT");
+						ImGui::Text("Mip Bias: %.2f", desc.MipBias);
+						ImGui::TreePop();
+					}
+				});
+			ImGui::TreePop();
+		}
+		ImGui::Separator();
+		//ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		if (ImGui::TreeNode("TexturePool"))
+		{
+			//ImGui::PopFont();
+			ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
+			mTexturePool.ForEachAlive([](const TextureHandle& h, TextureEntry& entry)
+				{
+					TextureDesc desc = entry.Desc;
+					String texText = std::format("{} ({}, {})", desc.DebugName, h.Index, h.Generation);
+					if (ImGui::TreeNode(texText.c_str()))
+					{
+						ImGui::Text("Debug Name: %s", desc.DebugName.c_str());
+						ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
+						ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
+						ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
+						ImGui::Text("Size: %.5f MB", entry.Size / (1024.0f * 1024.0f));
+						//ImTextureID id = mImGuiContext.AddImage(entry.View);
+						//ImGui::Image(id, ImVec2(desc.Width, desc.Height));
+						ImGui::TreePop();
+					}
+				});
+			ImGui::TreePop();
+		}
 		ImGui::End();
 	}
 

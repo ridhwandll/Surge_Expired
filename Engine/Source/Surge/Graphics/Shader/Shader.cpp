@@ -109,7 +109,6 @@ namespace Surge
 
 			android_app* app = Android::GAndroidApp;
 			AAssetManager* assetManager = app->activity->assetManager;
-			AAssetDir* assetDir = AAssetManager_openDir(assetManager, ENGINE_SHADER_PATH); // Path relative to assets folder
 
             String fullPath = GetShaderCachePath(spirvHandle.Type);
 			AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);

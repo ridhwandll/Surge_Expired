@@ -213,7 +213,7 @@ namespace Surge
 		float MipBias = 0.0f;
 		float MaxAniso = 1.0f;
 		bool Anisotropy = false;
-		const char* DebugName = nullptr;
+		String DebugName = "Sampler";
 	};
 
 	enum class DescriptorType : Uint

@@ -13,7 +13,6 @@
 #include <android/asset_manager.h>
 #include <android/log.h>
 #endif
-#include "stb_image.h"
 
 namespace Surge
 {

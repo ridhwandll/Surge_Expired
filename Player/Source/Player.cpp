@@ -126,6 +126,7 @@ namespace Surge
 		}
 
 		SamplerDesc samplerDesc = {};
+		samplerDesc.DebugName = "PlayerTexture sampler";
 		mQuadSampler = mRenderer->GetRHI()->CreateSampler(samplerDesc);
 
 		mTexturedQuadCount = 500.0f;
@@ -141,7 +142,7 @@ namespace Surge
 			float y = distY(gen);
 		
 			Entity quad;
-			mActiveScene->CreateEntity(quad, "StressQuad");		
+			mActiveScene->CreateEntity(quad, "StressQuad");
 			quad.AddComponent<SpriteRenderer>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), mTextures[i]);
 		
 			auto& t = quad.GetComponent<TransformComponent>();
@@ -149,7 +150,7 @@ namespace Surge
 			t.Scale = glm::vec3(0.3f, 0.3f, 1.0f);
 		}
 		
-		Uint basicQuadCount = 40000.0f;
+		Uint basicQuadCount = 500;
 		for (Uint i = 0; i < basicQuadCount; i++)
 		{
 			float x = distX(gen);
@@ -196,18 +197,11 @@ namespace Surge
 		
 #ifdef SURGE_PLATFORM_ANDROID
 		// On mobile we need a padding, else docking/undocking becomes a nightmare
-		float padding = 3.0f;
+		float padding = 2.0f;
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
-
-		// Create a hidden background window that acts as the "Safe Zone"
 		ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + padding, viewport->WorkPos.y + padding));
 		ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - (padding * 2), viewport->WorkSize.y - (padding * 2)));
-
-		ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-			ImGuiWindowFlags_NoBackground;
-
+		ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
 		ImGui::Begin("SafeDockSpaceHost", nullptr, hostFlags);
 		ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
@@ -226,7 +220,7 @@ namespace Surge
 					ImGuiContext& g = *GImGui;
 					ImGuiWindow* window = g.CurrentWindow;
 
-					if (window->DockNode != NULL || window->DockId != 0)
+					if (window->DockNode != nullptr || window->DockId != 0)
 						ImGui::SetWindowDock(window, 0, ImGuiCond_Always);
 				}
 				ImGui::EndMenuBar();
@@ -288,6 +282,27 @@ namespace Surge
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<WindowResizeEvent>([&](WindowResizeEvent& resizeEvent) {
 				Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
+			});
+		dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& e) {
+				Log<Severity::Debug>(e.ToString());
+			});
+		dispatcher.Dispatch<KeyReleasedEvent>([&](KeyReleasedEvent& e) {
+				Log<Severity::Debug>(e.ToString());
+			});
+		dispatcher.Dispatch<KeyTypedEvent>([&](KeyTypedEvent& e) {
+				Log<Severity::Debug>(e.ToString());
+			});
+		dispatcher.Dispatch<MouseButtonPressedEvent>([&](MouseButtonPressedEvent& e) {
+				Log<Severity::Debug>(e.ToString());
+			});
+		dispatcher.Dispatch<MouseButtonReleasedEvent>([&](MouseButtonReleasedEvent& e) {
+				Log<Severity::Debug>(e.ToString());
+			});
+		dispatcher.Dispatch<MouseMovedEvent>([&](MouseMovedEvent& e) {
+				Log<Severity::Debug>(e.ToString());
+			});
+		dispatcher.Dispatch<MouseScrolledEvent>([&](MouseScrolledEvent& e) {
+				Log<Severity::Debug>(e.ToString());
 			});
 	}
 
