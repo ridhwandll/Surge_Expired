@@ -16,9 +16,9 @@ set(VENDOR_ROOT "${REPO_ROOT}/Engine/Vendor")
 set(PLAYER_SRC_ROOT "${REPO_ROOT}/Player/Source")
 
 # -----------------------------------------------------------------------
-# android_native_app_glue (shipped with the NDK)
+# GameActivity (provided via Prefab)
 # -----------------------------------------------------------------------
-set(APP_GLUE_DIR "${ANDROID_NDK}/sources/android/native_app_glue")
+find_package(game-activity REQUIRED CONFIG)
 
 # -----------------------------------------------------------------------
 # Collect engine sources – exclude all Windows-specific files
@@ -44,7 +44,6 @@ file(GLOB PLAYER_SOURCES
 add_library(SurgePlayer SHARED
     ${ENGINE_SOURCES}
     ${PLAYER_SOURCES}
-    "${APP_GLUE_DIR}/android_native_app_glue.c"
 )
 
 target_link_options(SurgePlayer PRIVATE
@@ -72,8 +71,8 @@ target_include_directories(SurgePlayer PUBLIC
     "${VENDOR_ROOT}/entt/Include"
     "${VENDOR_ROOT}/json/Include"
     "${VENDOR_ROOT}/FontAwesome"
-    "${APP_GLUE_DIR}"
     "${PLAYER_SRC_ROOT}"
+    "${game-activity_NATIVE_SRCS}"
 )
 
 # -----------------------------------------------------------------------
@@ -130,6 +129,7 @@ target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR IMGU
 
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE
+    game-activity::game-activity_static
     volk_android
     spirvcross_android
     imgui_android

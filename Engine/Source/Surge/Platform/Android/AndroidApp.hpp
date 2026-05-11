@@ -2,7 +2,7 @@
 #pragma once
 #ifdef SURGE_PLATFORM_ANDROID
 
-#include <android_native_app_glue.h>
+#include <game-activity/native_app_glue/android_native_app_glue.h>
 
 namespace Surge::Android
 {

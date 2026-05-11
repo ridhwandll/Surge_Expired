@@ -19,16 +19,17 @@
 
     <application
         android:label="Surge Player"
-        android:hasCode="false"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+        android:hasCode="true"
+        android:theme="@style/SurgeGameTheme">
 
         <!--
-          NativeActivity hosts the engine main loop.
-          android:name points to the system NativeActivity class which loads
-          the shared library named in meta-data below.
+          GameActivity hosts the engine main loop.
+          android:name points to the GameActivity class which loads the
+          shared library named in meta-data below.
         -->
         <activity
-            android:name="android.app.NativeActivity"
+            android:name="com.google.androidgamesdk.GameActivity"
+            android:theme="@style/SurgeGameTheme"
             android:label="Surge Player"
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustNothing"

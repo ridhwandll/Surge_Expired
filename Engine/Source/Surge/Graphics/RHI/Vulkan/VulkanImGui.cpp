@@ -7,7 +7,7 @@
 #if defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidApp.hpp"
 #include <Backends/imgui_impl_android.h>
-#include <android_native_app_glue.h>
+#include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <android/asset_manager.h>
 #elif defined(SURGE_PLATFORM_WINDOWS)
 #include <Backends/imgui_impl_win32.h>
