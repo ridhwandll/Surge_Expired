@@ -121,7 +121,7 @@ namespace Surge
 		for (const auto& [location, stageInput] : stageInputs)
 			stride += stageInput.Size;
 
-		VkVertexInputBindingDescription vertexBindingDescriptions;
+		VkVertexInputBindingDescription vertexBindingDescriptions{};
 		vertexBindingDescriptions.binding = 0;
 		vertexBindingDescriptions.stride = stride;
 		vertexBindingDescriptions.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -136,7 +136,7 @@ namespace Surge
 			vertexAttributeDescriptions[i].offset = input.Offset;
 		}
 
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo;{};
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vertexInputInfo.pNext = nullptr;
 		vertexInputInfo.vertexBindingDescriptionCount = 1;

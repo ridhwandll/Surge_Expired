@@ -95,8 +95,8 @@ namespace Surge
 		// setIndex maps to layout(set = N) in GLSL
 		void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex);
 
-		VkCommandBuffer BeginOneTimeCommands();
-		void EndOneTimeCommands(VkCommandBuffer cmd);
+		VkCommandBuffer BeginOneTimeCommands() const;
+		void EndOneTimeCommands(VkCommandBuffer cmd) const;
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
 

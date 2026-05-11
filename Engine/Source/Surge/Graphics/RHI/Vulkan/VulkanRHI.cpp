@@ -14,6 +14,13 @@
 #include "VulkanTexture.hpp"
 #include "Backends/imgui_impl_vulkan.h"
 
+#define LOG_OBJ_CREATION_DELETION 0
+#if LOG_OBJ_CREATION_DELETION
+#define VK_RHI_LOG(x) x
+#else
+#define VK_RHI_LOG(x)
+#endif
+
 namespace Surge
 {
 	static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
@@ -105,14 +112,13 @@ namespace Surge
 		VkDevice device = mDevice.GetDevice();
 
 		// Get current frame SLOT (round-robin, predictable)
-		PerFrame& frame = mFrame.GetCurrentVkFrame();
+		const PerFrame& frame = mFrame.GetCurrentVkFrame();
 		Uint swapchainWidth = mSwapchain.GetWidth();
 		Uint swapchainHeight = mSwapchain.GetHeight();
 
 		// Wait for this SLOT's fence
 		// This slot was used N frames ago, wait until the GPU is done with it
 		vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
-
 
 		// Ask swapchain which IMAGE is available
 		// This is unpredictable, diver may return any index
@@ -149,7 +155,7 @@ namespace Surge
 
 	void VulkanRHI::EndFrame(const FrameContext& ctx)
 	{
-		PerFrame& frame = mFrame.GetCurrentVkFrame();
+		const PerFrame& frame = mFrame.GetCurrentVkFrame();
 		VkSemaphore releaseSemaphore = mSwapchain.GetFrame(ctx.SwapchainIndex).ReleaseSemaphore;
 
 		vkEndCommandBuffer(frame.CmdBuffer);
@@ -204,7 +210,7 @@ namespace Surge
 
 	BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc)
 	{
-		Log<Severity::Trace>("VulkanRHI::CreateBuffer: Name: {0} Size: {1} bytes", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size);
+		VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateBuffer: Name: {0} Size: {1} bytes", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size));
 		BufferEntry entry = VulkanBuffer::Create(*this, desc);
 		return mBufferPool.Allocate(std::move(entry));
 	}
@@ -214,7 +220,7 @@ namespace Surge
 		BufferEntry* entry = mBufferPool.Get(h);
 		SG_ASSERT(entry != nullptr, "UploadBuffer: invalid handle!");
 
-		VulkanBuffer::Upload(*this, *entry, data, size, offset);
+		VulkanBuffer::Upload(*entry, data, size, offset);
 	}
 
 	void VulkanRHI::DestroyBuffer(BufferHandle buffer)
@@ -223,7 +229,7 @@ namespace Surge
 		if (!entry)		
 			return;
 		
-		Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size);
+		VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));
 		VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
 		mBufferPool.Free(buffer); // Return slot to free list
 	}
@@ -245,7 +251,7 @@ namespace Surge
 		if (desc.InitialData && desc.DataSize > 0)
 			UploadTextureData(h, desc.InitialData, desc.DataSize);
 
-		Log<Severity::Trace>("VulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage));
+		VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage)));
 		return h;
 	}
 
@@ -255,7 +261,7 @@ namespace Surge
 		if (!entry)
 			return;
 
-		Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation);
+		VK_RHI_LOG(Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation));
 		mBindlessRegistry.UnregisterTexture(entry->BindlessIndex);
 		VulkanTexture::Destroy(*this, *entry);
 		mTexturePool.Free(h);		
@@ -285,7 +291,7 @@ namespace Surge
 
 	FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc)
 	{
-		Log<Severity::Trace>("VulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth);
+		VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth));
 		FramebufferEntry entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
 		return mFramebufferPool.Allocate(std::move(entry));
 	}
@@ -296,7 +302,7 @@ namespace Surge
 		if (!entry)
 			return;
 
-		Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", h.Index, h.Generation);
+		VK_RHI_LOG(Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", h.Index, h.Generation));
 		VulkanFramebuffer::Destroy(*this, *entry);
 		mFramebufferPool.Free(h);		
 	}
@@ -326,7 +332,7 @@ namespace Surge
 		SG_ASSERT(!desc.TargetFramebuffer.IsNull() || desc.TargetSwapchain, "PipelineDesc: must set either TargetFramebuffer or TargetSwapchain");
 		SG_ASSERT(!((!desc.TargetFramebuffer.IsNull()) && desc.TargetSwapchain), "PipelineDesc: cannot set both TargetFramebuffer and TargetSwapchain");
 
-		//Log<Severity::Trace>("\nVulkanRHI::CreatePipeline:\n   Name: {0}\n   Vertex Shader: {1}\n   Fragment Shader: {2}", desc.DebugName ? desc.DebugName : "Unnamed", desc.VertShaderName, desc.FragShaderName);
+		VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreatePipeline: Name: {0}", desc.DebugName ? desc.DebugName : "Unnamed"));
 
 		VkRenderPass renderPass = VK_NULL_HANDLE;
 
@@ -350,7 +356,7 @@ namespace Surge
 		if (!entry)
 			return;
 
-		Log<Severity::Info>("Destroying pipeline with handle index {0} and generation {1}", h.Index, h.Generation);
+		VK_RHI_LOG(Log<Severity::Info>("Destroying pipeline with handle index {0} and generation {1}", h.Index, h.Generation));
 		VulkanPipeline::Destroy(*this, *entry);
 		mPipelinePool.Free(h);
 	}
@@ -373,13 +379,16 @@ namespace Surge
 		SamplerEntry entry = {};
 		entry.Desc = desc;
 
+		VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateSampler: MagFilter: {0}, MinFilter: {1}, MipMode: {2}, WrapU: {3}, WrapV: {4}, MipBias: {5}, Anisotropy: {6}, MaxAniso: {7}",
+			desc.Mag, desc.Min, desc.Mip, desc.WrapU, desc.WrapV, desc.MipBias, desc.Anisotropy, desc.MaxAniso));
+
 		VK_CALL(vkCreateSampler(mDevice, &info, nullptr, &entry.Sampler));
 		return mSamplerPool.Allocate(std::move(entry));
 	}
 
 	void VulkanRHI::DestroySampler(SamplerHandle h)
 	{
-		Log<Severity::Info>("Destroying sampler with handle index {0} and generation {1}", h.Index, h.Generation);
+		VK_RHI_LOG(Log<Severity::Info>("Destroying sampler with handle index {0} and generation {1}", h.Index, h.Generation));
 		SamplerEntry* entry = mSamplerPool.Get(h);
 		if (!entry)
 			return;
@@ -435,7 +444,7 @@ namespace Surge
 
 	void VulkanRHI::DestroyDescriptorLayout(DescriptorLayoutHandle h)
 	{
-		Log<Severity::Info>("Destroying descriptor layout with handle index {0} and generation {1}", h.Index, h.Generation);
+		VK_RHI_LOG(Log<Severity::Info>("Destroying descriptor layout with handle index {0} and generation {1}", h.Index, h.Generation));
 		DescriptorLayoutEntry* entry = mDescriptorLayoutPool.Get(h);
 		if (!entry)
 			return;
@@ -600,7 +609,7 @@ namespace Surge
 
 	void VulkanRHI::DestroyDescriptorSet(DescriptorSetHandle h)
 	{
-		Log<Severity::Info>("Destroying descriptor set with handle index {0} and generation {1}", h.Index, h.Generation);
+		VK_RHI_LOG(Log<Severity::Info>("Destroying descriptor set with handle index {0} and generation {1}", h.Index, h.Generation));
 		DescriptorSetEntry* entry = mDescriptorSetPool.Get(h);
 		if (!entry)
 			return;
@@ -831,7 +840,7 @@ namespace Surge
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->Layout, setIndex, 1, &targetSet, 0, nullptr);
 	}
 
-	VkCommandBuffer VulkanRHI::BeginOneTimeCommands()
+	VkCommandBuffer VulkanRHI::BeginOneTimeCommands() const
 	{
 		VkCommandBufferAllocateInfo allocInfo = {};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -849,7 +858,7 @@ namespace Surge
 		return cmd;
 	}
 
-	void VulkanRHI::EndOneTimeCommands(VkCommandBuffer cmd)
+	void VulkanRHI::EndOneTimeCommands(VkCommandBuffer cmd) const
 	{
 		vkEndCommandBuffer(cmd);
 

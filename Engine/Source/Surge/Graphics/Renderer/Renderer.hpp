@@ -12,7 +12,7 @@
 
 namespace Surge
 {
-    class SURGE_API Scene;
+    class Scene;
     struct RendererData
     {
         // Camera
@@ -23,16 +23,17 @@ namespace Surge
     };
 
     class EditorCamera;
-    class SURGE_API Renderer
+    class Renderer
     {
-    public:               
+    public:
+        static constexpr Uint FRAMES_IN_FLIGHT = 3;
 		static constexpr Uint MAX_QUADS_TOTAL = 100000; // 100k quads total, across all(10) batches
 		static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
 		struct QuadVertex
 		{
 			glm::vec3 Position;
-			glm::vec4 Color;
+            Uint Color;
 			glm::vec2 UV;
 			Uint TextureIndex; // Bindless index
 		};
@@ -92,7 +93,7 @@ namespace Surge
 		bool mMaxQuadCountReached = false;
 
         PipelineHandle mPipeline;
-        BufferHandle mVertexBuffer;        
+        BufferHandle mVertexBuffers[FRAMES_IN_FLIGHT];
         BufferHandle mIndexBuffer;   
         TextureHandle mOffscreenColor;
 		FramebufferHandle mOffscreenFramebuffer;

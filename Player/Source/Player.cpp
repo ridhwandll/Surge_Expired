@@ -129,13 +129,14 @@ namespace Surge
 		samplerDesc.DebugName = "PlayerTexture sampler";
 		mQuadSampler = mRenderer->GetRHI()->CreateSampler(samplerDesc);
 
-		mTexturedQuadCount = 500.0f;
-		mChangeQuadAmount = mTexturedQuadCount;
-		FillTextures(mTexturedQuadCount);
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
 		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
+
+		mTexturedQuadCount = 500.0f;
+		mChangeQuadAmount = mTexturedQuadCount;
+		FillTextures(mTexturedQuadCount);
 		for (Uint i = 0; i < mTexturedQuadCount; i++)
 		{
 			float x = distX(gen);
@@ -161,6 +162,7 @@ namespace Surge
 			auto& t = quad.GetComponent<TransformComponent>();
 			t.Position = glm::vec3(x, y, 0.0f);
 			t.Scale = glm::vec3(0.02f, 0.02f, 1.0f);
+			t.MarkDirty();
 		} 
 		mActiveScene->OnResize(windowSize.x, windowSize.y);
 		mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
@@ -184,6 +186,7 @@ namespace Surge
 		
 				transform.Position.x += sin(dt + i) * 0.001f * dt * moveSpeed;
 				transform.Position.y += cos(dt + i * 0.5f) * 0.001f * dt * moveSpeed;
+				transform.MarkDirty();
 			}
 		}
 
@@ -282,27 +285,6 @@ namespace Surge
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<WindowResizeEvent>([&](WindowResizeEvent& resizeEvent) {
 				Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
-			});
-		dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& e) {
-				Log<Severity::Debug>(e.ToString());
-			});
-		dispatcher.Dispatch<KeyReleasedEvent>([&](KeyReleasedEvent& e) {
-				Log<Severity::Debug>(e.ToString());
-			});
-		dispatcher.Dispatch<KeyTypedEvent>([&](KeyTypedEvent& e) {
-				Log<Severity::Debug>(e.ToString());
-			});
-		dispatcher.Dispatch<MouseButtonPressedEvent>([&](MouseButtonPressedEvent& e) {
-				Log<Severity::Debug>(e.ToString());
-			});
-		dispatcher.Dispatch<MouseButtonReleasedEvent>([&](MouseButtonReleasedEvent& e) {
-				Log<Severity::Debug>(e.ToString());
-			});
-		dispatcher.Dispatch<MouseMovedEvent>([&](MouseMovedEvent& e) {
-				Log<Severity::Debug>(e.ToString());
-			});
-		dispatcher.Dispatch<MouseScrolledEvent>([&](MouseScrolledEvent& e) {
-				Log<Severity::Debug>(e.ToString());
 			});
 	}
 

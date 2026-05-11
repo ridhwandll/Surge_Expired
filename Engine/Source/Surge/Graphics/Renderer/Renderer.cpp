@@ -44,7 +44,7 @@ namespace Surge
 		BufferDesc ibDesc = {};
 		ibDesc.Size = sizeof(Uint) * MAX_INDICES;
 		ibDesc.Usage = BufferUsage::INDEX;
-		ibDesc.HostVisible = true;
+		ibDesc.HostVisible = false;
 		ibDesc.InitialData = indices.data();
 		ibDesc.DebugName = "BatchIB";
 		mIndexBuffer = mRHI->CreateBuffer(ibDesc);
@@ -55,8 +55,9 @@ namespace Surge
 		vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
 		vbDesc.Usage = BufferUsage::VERTEX;
 		vbDesc.HostVisible = true;
-		vbDesc.DebugName = "BatchVB";
-		mVertexBuffer = mRHI->CreateBuffer(vbDesc);
+		vbDesc.DebugName = "BatchVB";		
+		for (Uint i = 0; i < FRAMES_IN_FLIGHT; i++)
+			mVertexBuffers[i] = mRHI->CreateBuffer(vbDesc);
 
 		// CPU side staging array fill this, then memcpy to GPU buffer
 		mVertexData.resize(MAX_QUADS_PER_BATCH * 4);
@@ -126,9 +127,15 @@ namespace Surge
 
 		mTotalVertexCount = 0;
 		mTotalQuadCount = 0;
+
+		mCurrentFrameCtx = mRHI->BeginFrame();		
 		mCurrentFrameVertexOffset = 0;
-		mCurrentFrameCtx = mRHI->BeginFrame();
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
+		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
+		mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
+		mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
+		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &mData->ViewProjection);
+		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
     }
 
 	void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
@@ -141,13 +148,17 @@ namespace Surge
 	
 		mTotalVertexCount = 0;
 		mTotalQuadCount = 0;
-		mCurrentFrameVertexOffset = 0;
 
 		// Begins command buffer recording (Off-screen pass)
 		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]	
 
 		mCurrentFrameCtx = mRHI->BeginFrame();
+		mCurrentFrameVertexOffset = 0;
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
+		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
+		mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
+		mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
+		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &mData->ViewProjection);
 		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
 	}
 
@@ -172,7 +183,7 @@ namespace Surge
 		mRHI->CmdEndSwapchainRenderpass(mCurrentFrameCtx);
 		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording
     }
-
+		
 	void Renderer::OnImGuiRender()
 	{
 		ImGui::Begin("Renderer2D Memory");
@@ -233,7 +244,7 @@ namespace Surge
 		{
 			QuadVertex& v = mVertexData[mCurrentBatch.VertexCount++];
 			v.Position = transform * sLocalPositions[i];
-			v.Color = color;
+			v.Color = glm::packUnorm4x8(color);
 			v.UV = sUVs[i];
 			v.TextureIndex = texIndex;
 		}
@@ -262,14 +273,7 @@ namespace Surge
 		// Upload current batch vertex data to GPU (only the portion needed for this batch, not the entire VB)
 		Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
 		Uint uploadSizeInBytes = mCurrentBatch.VertexCount * sizeof(QuadVertex);
-		mRHI->UploadBuffer(mVertexBuffer, mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
-
-		mRHI->CmdBindPipeline(ctx, mPipeline);
-		mRHI->CmdBindVertexBuffer(ctx, mVertexBuffer, 0);
-		mRHI->CmdBindIndexBuffer(ctx, mIndexBuffer, 0);
-
-		QuadPushConstants push = { .ViewProj = mData->ViewProjection };
-		mRHI->CmdPushConstants(ctx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &push);
+		mRHI->UploadBuffer(mVertexBuffers[mCurrentFrameCtx.FrameIndex], mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
 		mRHI->CmdDrawIndexed(ctx, mCurrentBatch.QuadCount * 6, 1, 0, (int32_t)mCurrentFrameVertexOffset, 0);
 
 		mTotalVertexCount += mCurrentBatch.VertexCount;
@@ -287,8 +291,11 @@ namespace Surge
 		mRHI->DestroyTexture(mWhiteTexture);
 		mRHI->DestroyTexture(mOffscreenColor);
 		mRHI->DestroyPipeline(mPipeline);
-        mRHI->DestroyBuffer(mVertexBuffer);
-        mRHI->DestroyBuffer(mIndexBuffer);
+
+        for (Uint i = 0; i < FRAMES_IN_FLIGHT; i++)
+			mRHI->DestroyBuffer(mVertexBuffers[i]);
+
+		mRHI->DestroyBuffer(mIndexBuffer);
         mRHI->Shutdown();
     }
 
