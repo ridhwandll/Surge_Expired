@@ -6,7 +6,6 @@ android {
     namespace = 'com.surgetechnologies.surgeplayer'
     compileSdk 33
 
-
     ndkVersion = "27.3.13750724"
 
     defaultConfig {
@@ -71,6 +70,10 @@ android {
         }
     }
 
+    buildFeatures {
+        prefab true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -78,4 +81,12 @@ android {
 }
 
 dependencies {
+    // Provides com.google.androidgamesdk.GameActivity (Java side)
+    implementation "androidx.games:games-activity:3.0.0"
+
+    // GameActivity extends AppCompatActivity transitive but declare explicitly
+    implementation "androidx.appcompat:appcompat:1.6.1"
+
+    // Provides androidx.startup.InitializationProvider
+    implementation "androidx.startup:startup-runtime:1.1.1"
 }

@@ -2,7 +2,7 @@
 // Android entry point – replaces the desktop main() when building for Android.
 #ifdef SURGE_PLATFORM_ANDROID
 
-#include <android_native_app_glue.h>
+#include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
 #include "Surge/Platform/Android/AndroidApp.hpp"

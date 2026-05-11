@@ -9,7 +9,7 @@
 #include <shaderc/shaderc.hpp>
 #elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidApp.hpp"
-#include <android_native_app_glue.h>
+#include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <android/asset_manager.h>
 #endif
 

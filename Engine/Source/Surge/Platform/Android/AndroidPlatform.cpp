@@ -26,7 +26,7 @@ namespace Surge
     {
         android_app* app = Android::GAndroidApp;
         if (app && app->activity)
-            ANativeActivity_finish(app->activity);
+            GameActivity_finish(app->activity);
     }
 
     void Platform::ErrorMessageBox(const char* text)
