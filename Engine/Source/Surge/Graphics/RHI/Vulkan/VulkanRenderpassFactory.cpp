@@ -116,6 +116,16 @@ namespace Surge
 		VkRenderPass rp = VK_NULL_HANDLE;
 		VK_CALL(vkCreateRenderPass(rhi.GetDevice(), &rpInfo, nullptr, &rp));
 
+#if defined(SURGE_DEBUG)
+		VkDebugUtilsObjectNameInfoEXT nameInfo = {};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = VK_OBJECT_TYPE_RENDER_PASS;
+		nameInfo.objectHandle = (uint64_t)rp;
+		nameInfo.pObjectName = "RenderPass";
+		rhi.SetDebugName(nameInfo);
+#endif
+
+
 		return rp;
 	}
 

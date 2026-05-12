@@ -4,11 +4,11 @@
 
 namespace Surge
 {
-	void VulkanFrame::Initialize(const VulkanRHI& rhi, Uint frameCount)
+	void VulkanFrame::Initialize(const VulkanRHI& rhi, Uint framesInFlight)
 	{
-		SG_ASSERT(frameCount > 0, "VulkanFrame: frameCount must be > 0");
+		SG_ASSERT(framesInFlight > 0, "VulkanFrame: frameCount must be > 0");
 
-		mFrames.resize(frameCount);
+		mFrames.resize(framesInFlight);
 		for (auto& frame : mFrames)
 			InitSlot(rhi, frame);
 	}
@@ -33,8 +33,7 @@ namespace Surge
 		Uint queueIndex = rhi.GetQueueIndex();
 
 		// Fence
-		// Created pre-signaled so the first vkWaitForFences on frame 0
-		// doesn't block forever waiting for a submit that never happened
+		// Created pre-signaled so the first vkWaitForFences on frame 0 doesn't block forever waiting for a submit that never happened
 		VkFenceCreateInfo fenceInfo = {};
 		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;

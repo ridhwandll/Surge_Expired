@@ -225,14 +225,14 @@ namespace Surge
 		vkDestroyShaderModule(device, fragModule, nullptr);
 
 #if defined(SURGE_DEBUG)
-		if (desc.DebugName)
+		if (!desc.DebugName.empty())
 		{
 			// Name the pipeline and layout for RenderDoc/validation layers
 			VkDebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 			nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
 			nameInfo.objectHandle = (uint64_t)entry.Pipeline;
-			nameInfo.pObjectName = desc.DebugName;
+			nameInfo.pObjectName = desc.DebugName.c_str();
 
 		}
 #endif

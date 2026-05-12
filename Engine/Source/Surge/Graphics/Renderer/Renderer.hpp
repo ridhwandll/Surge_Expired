@@ -26,7 +26,6 @@ namespace Surge
     class Renderer
     {
     public:
-        static constexpr Uint FRAMES_IN_FLIGHT = 3;
 		static constexpr Uint MAX_QUADS_TOTAL = 100000; // 100k quads total, across all(10) batches
 		static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
@@ -93,7 +92,7 @@ namespace Surge
 		bool mMaxQuadCountReached = false;
 
         PipelineHandle mPipeline;
-        BufferHandle mVertexBuffers[FRAMES_IN_FLIGHT];
+        BufferHandle mVertexBuffers[RHI_FRAMES_IN_FLIGHT];
         BufferHandle mIndexBuffer;   
         TextureHandle mOffscreenColor;
 		FramebufferHandle mOffscreenFramebuffer;

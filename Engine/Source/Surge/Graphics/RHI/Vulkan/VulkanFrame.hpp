@@ -17,7 +17,7 @@ namespace Surge
 	class VulkanFrame
 	{
 	public:
-		void Initialize(const VulkanRHI& rhi, Uint frameCount);
+		void Initialize(const VulkanRHI& rhi, Uint framesInFlight);
 		void Shutdown(const VulkanRHI& rhi);
 
 		// Called at the start of each frame advances the index

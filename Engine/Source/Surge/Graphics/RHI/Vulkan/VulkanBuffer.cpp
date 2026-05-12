@@ -93,15 +93,15 @@ namespace Surge
 
 
 #if defined(SURGE_DEBUG)
-		if (desc.DebugName)
+		if (!desc.DebugName.empty())
 		{
 			VkDebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 			nameInfo.objectType = VK_OBJECT_TYPE_BUFFER;
 			nameInfo.objectHandle = (uint64_t)entry.Buffer;
-			nameInfo.pObjectName = desc.DebugName; 
+			nameInfo.pObjectName = desc.DebugName.c_str(); 
 			rhi.SetDebugName(nameInfo);
-			vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName);
+			vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName.c_str());
 		}
 #endif
 		return entry;

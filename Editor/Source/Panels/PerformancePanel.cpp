@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/PerformancePanel.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Graphics/RenderContext.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Editor.hpp"
 #include "SceneHierarchyPanel.hpp"
