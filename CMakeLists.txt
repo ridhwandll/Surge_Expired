@@ -24,6 +24,6 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 endif()
 
 add_subdirectory(Engine)
-#add_subdirectory(Editor) #Disable editor for now, it is not ready yet
+add_subdirectory(Editor) #Disable editor for now, it is not ready yet
 add_subdirectory(Player)
 add_subdirectory(Engine/Vendor)

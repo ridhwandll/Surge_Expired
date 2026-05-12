@@ -65,13 +65,13 @@ namespace Surge
 		VK_CALL(vkCreateFramebuffer(rhi.GetDevice(), &fbInfo, nullptr, &entry.Framebuffer));
 
 #if defined(SURGE_DEBUG)
-		if (desc.DebugName)
+		if (!desc.DebugName.empty())
 		{
 			VkDebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 			nameInfo.objectType = VK_OBJECT_TYPE_FRAMEBUFFER;
 			nameInfo.objectHandle = (uint64_t)entry.Framebuffer;
-			nameInfo.pObjectName = desc.DebugName;
+			nameInfo.pObjectName = desc.DebugName.c_str();
 			rhi.SetDebugName(nameInfo);
 		}
 #endif

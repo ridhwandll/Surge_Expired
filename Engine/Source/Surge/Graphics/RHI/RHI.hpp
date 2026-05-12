@@ -20,13 +20,12 @@ namespace Surge
 }
 #endif
 
+#define RHI_FRAMES_IN_FLIGHT 1
 
 namespace Surge
 {
 	class GraphicsRHI
 	{
-	public:
-		constexpr static Uint FRAMES_IN_FLIGHT = 3; // TODO: Expose this to user in case they want to change it, but for now we can just hardcode it
 	public:
 		GraphicsRHI() = default;
 		~GraphicsRHI() = default;

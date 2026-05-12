@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Graphics/Interface/Texture.hpp"
 
 namespace Surge
 {
@@ -17,6 +16,5 @@ namespace Surge
 
     private:
         Editor* mEditor;
-        Ref<Texture2D> mIcon;
     };
 } // namespace Surge

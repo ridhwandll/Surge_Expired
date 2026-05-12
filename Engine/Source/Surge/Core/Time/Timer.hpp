@@ -9,12 +9,16 @@ namespace Surge
     class Timer
     {
     public:
-        Timer(const std::string& name = "Timer", bool logOnDestructor = false) : mName(name), mLogOnDestructor(logOnDestructor) { Reset(); }
+        Timer(const std::string& name = "Timer", bool logOnDestructor = false)
+            : mName(name), mLogOnDestructor(logOnDestructor)
+        {
+            Reset();
+        }
 
         ~Timer()
         {
             if (mLogOnDestructor)
-                Log<Severity::Trace>("{0} took {1} seconds({2} ms)!", mName, Elapsed(), ElapsedMillis());
+                Log<Severity::Trace>("{0} took {1} ms!", mName, ElapsedMillis());
         }
 
         void Reset() { mStart = std::chrono::high_resolution_clock::now(); }

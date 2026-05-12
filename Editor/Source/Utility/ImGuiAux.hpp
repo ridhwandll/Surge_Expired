@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Graphics/Interface/Image.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
@@ -110,7 +109,7 @@ namespace Surge::ImGuiAux
     void TextCentered(const char* text);
     bool ButtonCentered(const char* title);
 
-    void Image(const Ref<Image2D>& image, const glm::vec2& size);
+    //void Image(const Ref<Image2D>& image, const glm::vec2& size);
 
     template <typename T>
     void TComboBox(const char* title, const char** stringArray, Uint stringArraySize, Uint currentStringIndexInArray, T callbackFunction)

@@ -13,7 +13,7 @@ namespace Surge
         ProjectSettings
     };
 
-    constexpr FORCEINLINE const char* PanelCodeToString(PanelCode code)
+    constexpr const char* PanelCodeToString(PanelCode code)
     {
         switch (code)
         {

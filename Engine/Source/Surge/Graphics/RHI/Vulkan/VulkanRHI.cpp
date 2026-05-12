@@ -64,7 +64,7 @@ namespace Surge
 		CreateInstance();
 		CreateSurface(window);
 		mDevice.Initialize(mInstance, mSurface);
-		mFrame.Initialize(*this, GraphicsRHI::FRAMES_IN_FLIGHT);
+		mFrame.Initialize(*this, RHI_FRAMES_IN_FLIGHT);
 		mSwapchain.Initialize(*this, window->GetSize().x, window->GetSize().y);
 
 		CreateSwapchainRenderpass();
@@ -112,13 +112,17 @@ namespace Surge
 		VkDevice device = mDevice.GetDevice();
 
 		// Get current frame SLOT (round-robin, predictable)
+
 		const PerFrame& frame = mFrame.GetCurrentVkFrame();
 		Uint swapchainWidth = mSwapchain.GetWidth();
 		Uint swapchainHeight = mSwapchain.GetHeight();
 
 		// Wait for this SLOT's fence
-		// This slot was used N frames ago, wait until the GPU is done with it
-		vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
+		// This slot was used N frames ago, wait until the GPU is done with it		
+		{
+			//Timer fenceTimer("vkWaitForFences", true);
+			vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
+		}
 
 		// Ask swapchain which IMAGE is available
 		// This is unpredictable, diver may return any index
@@ -130,6 +134,7 @@ namespace Surge
 		outCtx.SwapchainIndex = imageIndex;
 		outCtx.Width = swapchainWidth;
 		outCtx.Height = swapchainHeight;
+		//Log<Severity::Debug>("-------------Beginning CPU frame: FrameIndex: {}-------------", outCtx.FrameIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 		{
@@ -156,15 +161,15 @@ namespace Surge
 	void VulkanRHI::EndFrame(const FrameContext& ctx)
 	{
 		const PerFrame& frame = mFrame.GetCurrentVkFrame();
-		VkSemaphore releaseSemaphore = mSwapchain.GetFrame(ctx.SwapchainIndex).ReleaseSemaphore;
-
 		vkEndCommandBuffer(frame.CmdBuffer);
+		//Log<Severity::Debug>("-------------Ending CPU frame: FrameIndex: {}-------------", ctx.FrameIndex);
 
 		// Submit: frame slot semaphores sync with swapchain image
 		// Wait on AcquireSemaphore -> GPU waits until compositor releases the image
 		// Signal ReleaseSemaphore -> tells compositor GPU is done writing to it
 		// Signal Fence -> tells CPU this slot is free N frames from now
 		VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		VkSemaphore releaseSemaphore = mSwapchain.GetFrame(ctx.SwapchainIndex).ReleaseSemaphore;
 
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -178,7 +183,7 @@ namespace Surge
 		vkQueueSubmit(mDevice.GetQueue(), 1, &submitInfo, frame.Fence);
 
 		// Present: swapchain image index + release semaphore from slot
-		mSwapchain.Present(*this, releaseSemaphore, ctx.SwapchainIndex);
+		VK_CALL(mSwapchain.Present(*this, releaseSemaphore, ctx.SwapchainIndex));
 
 		// Advance SLOT index (completely independent of swapchain image index)
 		mFrame.AdvanceFrame();
@@ -479,7 +484,7 @@ namespace Surge
 		DescriptorSetEntry entry = {};
 		entry.Layout = layoutHandle;
 		entry.Frequency = frequency;
-		entry.Count = (frequency == DescriptorUpdateFrequency::DYNAMIC) ? GraphicsRHI::FRAMES_IN_FLIGHT : 1;
+		entry.Count = (frequency == DescriptorUpdateFrequency::DYNAMIC) ? RHI_FRAMES_IN_FLIGHT : 1;
 
 		// Build pool sizes from cached layout bindings
 		// Pool must hold entry.Count sets worth of descriptors
@@ -504,7 +509,7 @@ namespace Surge
 		VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &entry.Pool));
 
 		// Allocate entry.Count sets from the pool
-		VkDescriptorSetLayout layouts[GraphicsRHI::FRAMES_IN_FLIGHT] = {};
+		VkDescriptorSetLayout layouts[RHI_FRAMES_IN_FLIGHT] = {};
 		for (Uint i = 0; i < entry.Count; i++)
 			layouts[i] = layout->Layout;
 
@@ -883,6 +888,7 @@ namespace Surge
 		ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
 		ImGui::Text("%s", mStats.RHIVersion.c_str());
 		ImGui::Text("Draw call(s): %i", mStats.DrawCalls);
+		ImGui::Text("Frames in Flight: %d", RHI_FRAMES_IN_FLIGHT);
 
 		// We need to call GetStats() here to update the memory stats before displaying them
 		auto& memStats = GetStats();
@@ -910,7 +916,7 @@ namespace Surge
 					String bufText = std::format("BufferHandle ({}, {})", h.Index, h.Generation);
 					if (ImGui::TreeNode(bufText.c_str()))
 					{
-						ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+						ImGui::Text("Debug Name: %s", entry.Desc.DebugName.c_str());
 						ImGui::Text("Size: %.3f MB", entry.Desc.Size / (1024.0f * 1024.0f));
 						ImGui::Text("Usage: %s", VulkanUtils::BufferUsageToString(entry.Desc.Usage));
 						ImGui::Text("Host Visible: %s", entry.Desc.HostVisible ? "Yes" : "No");
@@ -931,7 +937,7 @@ namespace Surge
 					String pipeText = std::format("PipelineHandle ({}, {})", h.Index, h.Generation);
 					if (ImGui::TreeNode(pipeText.c_str()))
 					{
-						ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+						ImGui::Text("Debug Name: %s", entry.Desc.DebugName.c_str());
 						ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
 						ImGui::Text("Shader: %s", entry.Desc.Shader_.GetName().c_str());
 						ImGui::TreePop();
@@ -951,7 +957,7 @@ namespace Surge
 					String fbufText = std::format("FramebufferHandle ({}, {})", h.Index, h.Generation);
 					if (ImGui::TreeNode(fbufText.c_str()))
 					{
-						ImGui::Text("Debug Name: %s", entry.Desc.DebugName);
+						ImGui::Text("Debug Name: %s", entry.Desc.DebugName.c_str());
 						ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
 						ImGui::Text("Color Attachment Count: %d", desc.ColorAttachmentCount);
 						if (desc.ColorAttachmentCount > 0)

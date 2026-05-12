@@ -15,7 +15,7 @@ namespace Surge
 {
     void Titlebar::OnInit()
     {
-        mIcon = Texture2D::Create("Engine/Assets/Textures/Surge.png");
+        //mIcon = Texture2D::Create("Engine/Assets/Textures/Surge.png");
         mEditor = static_cast<Editor*>(Core::GetClient());
     }
 
@@ -35,7 +35,7 @@ namespace Surge
         if (ImGui::Begin("##dummy", NULL, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoDecoration))
         {
             constexpr float iconSize = 20.0f;
-            ImGuiAux::Image(mIcon->GetImage2D(), {iconSize * 2, iconSize * 2});
+            //ImGuiAux::Image(mIcon->GetImage2D(), {iconSize * 2, iconSize * 2});
             ImGuiAux::ShiftCursorY(iconSize);
             ImGui::SameLine();
 
@@ -99,7 +99,7 @@ namespace Surge
                     rect.Expand(5);     // Expand the rect by 5 units
                     rect.TranslateY(2); // Translate 2 units down Y axis to "Hide the bottom line"
                     ImDrawList* drawList = ImGui::GetWindowDrawList();
-                    drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColorLight), 0.8f, ImDrawCornerFlags_All, 1.0f);
+                    //drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColorLight), 0.8f, 1.0f);
 
                     const char* label = "Projects";
                     const ImGuiID id = ImGui::GetCurrentWindow()->GetID(label);
@@ -110,8 +110,8 @@ namespace Surge
                         window->RestoreFromMaximize();
                     }
                     ImGuiAux::DelayedToolTip("Click for opening ProjectBrowser");
-                    if (hovered)
-                        drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::Silver), 0.8f, ImDrawCornerFlags_All, 1.0f);
+					//if (hovered)
+					//    drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::Silver), 0.8f, ImDrawCornerFlags_All, 1.0f);
                 }
             }
 

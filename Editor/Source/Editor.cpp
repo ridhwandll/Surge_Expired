@@ -21,9 +21,6 @@ namespace Surge
         Log<Severity::Info>("{0}", UUID().ToString());
         Log<Severity::Info>("{0}", UUID().ToString());
 
-
-        ImGui::SetCurrentContext((ImGuiContext*)Core::GetRenderContext()->GetImGuiContext());
-
         mRenderer = Core::GetRenderer();
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
         mCamera.SetActive(true);
@@ -35,11 +32,10 @@ namespace Surge
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
         mPanelManager.PushPanel<PerformancePanel>();
         ViewportPanel* viewport = mPanelManager.PushPanel<ViewportPanel>();
-         mTitleBar.OnInit();
+        mTitleBar.OnInit();
 
-        mRenderer->SetRenderArea(static_cast<Uint>(viewport->GetViewportSize().x), static_cast<Uint>(viewport->GetViewportSize().y));
         mActiveScene = Ref<Scene>::Create(false);
-        mRenderer->SetSceneContext(mActiveScene);
+        //mRenderer->SetSceneContext(mActiveScene);
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
         
         Entity runtimeCamera;
@@ -72,20 +68,7 @@ namespace Surge
             TransformComponent& transform = pointLight.GetComponent<TransformComponent>();
             transform.Position = glm::vec3(-1, 1, 1);
         }
-        {
-            mActiveScene->CreateEntity(floor, "Floor");
-            MeshComponent& meshCmp = floor.AddComponent<MeshComponent>();
-            meshCmp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-            TransformComponent& transform = floor.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, -1, 0);
-            transform.Scale = glm::vec3(10, 1, 10);
-
-            meshCmp.Mesh->GetMaterials()[0]->Set("Material.Albedo", glm::vec3(0.2f, 0.2f, 0.2f));       
-        }
-        {
-            mActiveScene->CreateEntity(cube, "Cube");
-            cube.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-        }
+        mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 
     void Editor::OnUpdate()
@@ -109,34 +92,14 @@ namespace Surge
 
     void Editor::OnRuntimeStart()
     {
-        //mActiveProject.SetState(ProjectState::Play);
-        //mActiveProject.OnRuntimeStart();
-        //Ref<Scene> activeScene = mActiveProject.GetActiveScene();
-        //mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
-        //mRenderer->SetSceneContext(activeScene);
     }
 
     void Editor::OnRuntimeEnd()
     {
-        // mActiveProject.OnRuntimeEnd();
-        // mActiveProject.SetState(ProjectState::Edit);
-        // Ref<Scene> activeScene = mActiveProject.GetActiveScene();
-        // mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(activeScene.Raw());
-        // mRenderer->SetSceneContext(activeScene);
     }
 
     void Editor::Resize()
     {
-//         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
-//         glm::vec2 viewportSize = viewportPanel->GetViewportSize();
-//         Ref<Framebuffer> framebuffer = mRenderer->GetFinalPassFramebuffer();
-// 
-//         if (FramebufferSpecification spec = framebuffer->GetSpecification(); viewportSize.x > 0.0f && viewportSize.y > 0.0f && (spec.Width != viewportSize.x || spec.Height != viewportSize.y))
-//         {
-//             mRenderer->SetRenderArea((Uint)viewportSize.x, (Uint)viewportSize.y);
-//             mCamera.SetViewportSize(viewportSize);
-//             mActiveScene->OnResize(viewportSize.x, viewportSize.y);
-//         }
     }
 
     void Editor::OnShutdown()

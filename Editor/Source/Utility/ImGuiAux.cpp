@@ -3,22 +3,21 @@
 #include "Surge/Core/Input/Input.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Editor.hpp"
-#include <imgui_stdlib.h>
 
 namespace Surge
 {
     void ImGuiAux::DrawRectAroundWidget(const glm::vec4& color, float thickness, float rounding)
     {
-        ImGuiContext& g = *GImGui;
-        const ImRect& rect = (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? g.LastItemData.DisplayRect : g.LastItemData.Rect;
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawCornerFlags_All, thickness);
+		//ImGuiContext& g = *GImGui;
+		//const ImRect& rect = (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? g.LastItemData.DisplayRect : g.LastItemData.Rect;
+		//ImDrawList* drawList = ImGui::GetWindowDrawList();
+		//drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawCornerFlags_All, thickness);
     }
 
-    void ImGuiAux::Image(const Ref<Image2D>& image, const glm::vec2& size)
-    {
-        ImGui::Image(Core::GetRenderContext()->GetImGuiTextureID(image), {size.x, size.y});
-    }
+    //void ImGuiAux::Image(const Ref<Image2D>& image, const glm::vec2& size)
+    //{
+    //    ImGui::Image(Core::GetRenderContext()->GetImGuiTextureID(image), {size.x, size.y});
+    //}
 
     void ImGuiAux::TextCentered(const char* text)
     {
@@ -55,7 +54,7 @@ namespace Surge
 
     bool ImGuiAux::PropertyGridHeader(const String& name, bool openByDefault, const glm::vec2& size, bool spacing)
     {
-        ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
+        ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
 
         if (openByDefault)
             treeNodeFlags |= ImGuiTreeNodeFlags_DefaultOpen;
@@ -155,14 +154,14 @@ namespace Surge
             ImGui::SameLine();
 
             // Copy the name from mTempBuffer
-            if (ImGui::InputText("##Txt", &mTempBuffer, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue))
-            {
-                mRenaming = false;
-                name = mTempBuffer;
-                onRenameEnd(mTempBuffer);
-                mTempBuffer.clear();
-                mOldName.clear();
-            }
+            //if (ImGui::InputText("##Txt", &mTempBuffer, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue))
+            //{
+            //    mRenaming = false;
+            //    name = mTempBuffer;
+            //    onRenameEnd(mTempBuffer);
+            //    mTempBuffer.clear();
+            //    mOldName.clear();
+            //}
             ImGui::SetKeyboardFocusHere();
             ImGuiAux::DrawRectAroundWidget({0.1f, 0.3f, 1.0f, 1.0f}, 1.5f, 1.0f);
 

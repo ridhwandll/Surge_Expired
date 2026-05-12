@@ -28,17 +28,11 @@ namespace Surge
             if (ImGui::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
                 ImGui::OpenPopup("Add Entity");
 
-            if (ImGui::BeginPopup("Add Entity") || (ImGui::BeginPopupContextWindow(nullptr, 1, false)))
+            if (ImGui::BeginPopup("Add Entity") || (ImGui::BeginPopupContextWindow(nullptr, 1)))
             {
                 if (ImGui::MenuItem("Empty Entity"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Entity");
-                    mRenamingMech.SetRenamingState(true);
-                }
-                if (ImGui::MenuItem("Mesh"))
-                {
-                    mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
-                    mSelectedEntity.AddComponent<MeshComponent>();
                     mRenamingMech.SetRenamingState(true);
                 }
                 if (ImGui::MenuItem("Camera"))
@@ -108,8 +102,8 @@ namespace Surge
 
         if (isSelectedEntity)
         {
-            if (!mRenamingMech && mSelectedEntity)
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiAux::Colors::ExtraDark));
+            //if (!mRenamingMech && mSelectedEntity)
+            //    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiAux::Colors::ExtraDark));
 
             mRenamingMech.Update(name);
             ImGui::PopStyleColor();

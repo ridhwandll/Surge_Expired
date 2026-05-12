@@ -49,15 +49,17 @@ namespace Surge
 		ibDesc.DebugName = "BatchIB";
 		mIndexBuffer = mRHI->CreateBuffer(ibDesc);
 
-		// We allocate a large VB for max vertices across all batches, but we only fill and bind the portion
+		// We allocate a large VBs[RHI_FRAMES_IN_FLIGHT] for max vertices across all batches, but we only fill the portion
 		// needed for the current batch each frame. This is to avoid GPU buffer creation stalls when flushing mid-frame after each batch is submitted.
 		BufferDesc vbDesc = {};
 		vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
 		vbDesc.Usage = BufferUsage::VERTEX;
 		vbDesc.HostVisible = true;
-		vbDesc.DebugName = "BatchVB";		
-		for (Uint i = 0; i < FRAMES_IN_FLIGHT; i++)
+		for (Uint i = 0; i < RHI_FRAMES_IN_FLIGHT; i++)
+		{
+			vbDesc.DebugName = std::format("BatchVB Frame: {}", i).c_str();
 			mVertexBuffers[i] = mRHI->CreateBuffer(vbDesc);
+		}
 
 		// CPU side staging array fill this, then memcpy to GPU buffer
 		mVertexData.resize(MAX_QUADS_PER_BATCH * 4);
@@ -153,10 +155,13 @@ namespace Surge
 		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]	
 
 		mCurrentFrameCtx = mRHI->BeginFrame();
+
 		mCurrentFrameVertexOffset = 0;
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
 		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
+
 		mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
+
 		mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
 		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &mData->ViewProjection);
 		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
@@ -181,6 +186,7 @@ namespace Surge
 		mRHI->ShowMetricsWindow(); //Shows internal metrics about the RHI resource pools
 
 		mRHI->CmdEndSwapchainRenderpass(mCurrentFrameCtx);
+
 		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording
     }
 		
@@ -212,6 +218,7 @@ namespace Surge
 		ImGui::ProgressBar(usageRatio, ImVec2(-1.0f, 0.0f));
 		ImGui::Text("%u / %u Vertices", mTotalVertexCount, MAX_VERTICES);
 		ImGui::PopStyleColor();
+		ImGui::ColorEdit4("Clear Color", (float*)&mClearColor);
 
 		ImGui::End();
 	}
@@ -273,7 +280,7 @@ namespace Surge
 		// Upload current batch vertex data to GPU (only the portion needed for this batch, not the entire VB)
 		Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
 		Uint uploadSizeInBytes = mCurrentBatch.VertexCount * sizeof(QuadVertex);
-		mRHI->UploadBuffer(mVertexBuffers[mCurrentFrameCtx.FrameIndex], mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
+		mRHI->UploadBuffer(mVertexBuffers[ctx.FrameIndex], mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
 		mRHI->CmdDrawIndexed(ctx, mCurrentBatch.QuadCount * 6, 1, 0, (int32_t)mCurrentFrameVertexOffset, 0);
 
 		mTotalVertexCount += mCurrentBatch.VertexCount;
@@ -292,7 +299,7 @@ namespace Surge
 		mRHI->DestroyTexture(mOffscreenColor);
 		mRHI->DestroyPipeline(mPipeline);
 
-        for (Uint i = 0; i < FRAMES_IN_FLIGHT; i++)
+        for (Uint i = 0; i < RHI_FRAMES_IN_FLIGHT; i++)
 			mRHI->DestroyBuffer(mVertexBuffers[i]);
 
 		mRHI->DestroyBuffer(mIndexBuffer);

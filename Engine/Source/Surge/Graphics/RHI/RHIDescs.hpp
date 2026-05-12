@@ -67,7 +67,7 @@ namespace Surge
 		const void* InitialData = nullptr;
 		BufferUsage Usage = BufferUsage::VERTEX;
 		bool HostVisible = false;
-		const char* DebugName = nullptr;
+		String DebugName = "";
 	};
 
 	struct TextureDesc
@@ -86,7 +86,7 @@ namespace Surge
 		const void* InitialData = nullptr;
 		Uint DataSize = 0; // total bytes of InitialData
 
-		String DebugName = "TextureHandle";
+		String DebugName = "";
 	};
 
 	struct FramebufferAttachment
@@ -106,7 +106,7 @@ namespace Surge
 		Uint Width = 0;
 		Uint Height = 0;
 
-		const char* DebugName = nullptr;
+		String DebugName = "";
 	};
 
 	enum class VertexFormat
@@ -196,7 +196,7 @@ namespace Surge
 		FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // Offscreen
 		bool TargetSwapchain = false; // Swapchain pass
 
-		const char* DebugName = nullptr;
+		String DebugName = "";
 	};
 
 	enum class FilterMode { NEAREST, LINEAR };
@@ -213,7 +213,7 @@ namespace Surge
 		float MipBias = 0.0f;
 		float MaxAniso = 1.0f;
 		bool Anisotropy = false;
-		String DebugName = "Sampler";
+		String DebugName = "";
 	};
 
 	enum class DescriptorType : Uint
@@ -238,7 +238,7 @@ namespace Surge
 	{
 		DescriptorBinding Bindings[16] = {};
 		Uint BindingCount = 0;
-		const char* DebugName = nullptr;
+		String DebugName = "";
 	};
 
 	struct DescriptorWrite
