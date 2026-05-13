@@ -37,7 +37,6 @@ namespace Surge
 		TextureEntry entry = {};
 		entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		entry.Desc = desc;
-		bool isDepth = VulkanUtils::IsDepthFormat(desc.Format);
 
 		// VkImage
 		VkImageCreateInfo imageInfo = {};
@@ -150,6 +149,7 @@ namespace Surge
 		stagingDesc.DebugName = "TextureUploadStaging";
 		BufferHandle stagingHandle = rhi.CreateBuffer(stagingDesc);
 		BufferEntry* staging = rhi.mBufferPool.Get(stagingHandle);
+		Log<Severity::Debug>("Created staging buffer generation: {}", stagingHandle.Generation);
 
 		// One-time command buffer
 		VkCommandBuffer cmd = rhi.BeginOneTimeCommands();

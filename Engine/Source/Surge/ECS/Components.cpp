@@ -30,6 +30,10 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CameraComponent)
     .AddVariable<&Surge::CameraComponent::FixedAspectRatio>("FixedAspectRatio")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::CameraComponent)
 
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::MeshComponent)
+    .AddVariable<&Surge::MeshComponent::Mesh>("Mesh")
+SURGE_REFLECT_CLASS_REGISTER_END(Surge::MeshComponent)
+
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::PointLightComponent)
     .AddVariable<&Surge::PointLightComponent::Color>("Color")
     .AddVariable<&Surge::PointLightComponent::Intensity>("Intensity")

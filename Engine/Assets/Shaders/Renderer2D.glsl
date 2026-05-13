@@ -1,4 +1,4 @@
-[Shader: Vertex]
+//SURGE:[Shader: Vertex]
 #version 450
 
 layout(location = 0) in vec3 inPosition;
@@ -8,6 +8,7 @@ layout(location = 3) in uint inTextureIndex;
 
 layout(push_constant) uniform PushConstants
 {
+    mat4 Transform;
     mat4 ViewProj;
 } uPush;
 
@@ -23,7 +24,7 @@ void main()
     outTextureIndex = inTextureIndex;
 }
 
-[Shader: Fragment]
+//SURGE:[Shader: Fragment]
 #version 450
 
 layout(set = 0, binding = 0) uniform sampler2D uTexture[4096];

@@ -20,6 +20,8 @@
     <application
         android:label="Surge Player"
         android:hasCode="true"
+        android:appCategory="game"
+        android:isGame="true"
         android:theme="@style/SurgeGameTheme">
 
         <!--
@@ -31,6 +33,7 @@
             android:name="com.google.androidgamesdk.GameActivity"
             android:theme="@style/SurgeGameTheme"
             android:label="Surge Player"
+            android:immersive="true"
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustNothing"
             android:configChanges="orientation|keyboardHidden|screenSize|density"

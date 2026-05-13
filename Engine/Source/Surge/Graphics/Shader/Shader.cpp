@@ -19,7 +19,7 @@ namespace Surge
 	{
 #if defined(SURGE_PLATFORM_WINDOWS)
 		String source = Filesystem::ReadFile<String>(String(ENGINE_SHADER_PATH) + "/" + mName);
-		const char* typeToken = "[Shader:";
+		const char* typeToken = "//SURGE:[Shader:";
 		size_t typeTokenLength = strlen(typeToken);
 		size_t pos = source.find(typeToken, 0);
 		while (pos != std::string::npos)

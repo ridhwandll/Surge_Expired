@@ -10,6 +10,7 @@ namespace Surge::VulkanUtils
 	VkCullModeFlags ToVkCullMode(CullMode c);
 	VkFrontFace ToVkFrontFace(FrontFace f);
 	VkPrimitiveTopology ToVkTopology(Topology t);
+	VkPolygonMode ToVkPolygonMode(PolygonMode p);
 	VkCompareOp ToVkCompareOp(CompareOp op);
 	VkBlendFactor ToVkBlendFactor(BlendFactor f);
 	VkBlendOp ToVkBlendOp(BlendOp op);

@@ -18,7 +18,7 @@ namespace Surge
         wc.cbSize = sizeof(WNDCLASSEX);
 
         const ClientOptions& options = Surge::Core::GetClient()->GetClientOptions();
-        if (options.WindowDescription.Flags & WindowFlags::EditorAcceleration)
+        if (options.WindowDescription.Flags & WindowFlags::NoTitlebar)
             wc.lpfnWndProc = WindowProcWithImgui;
         else
             wc.lpfnWndProc = WindowProcWithoutImGui;

@@ -27,6 +27,8 @@ namespace Surge
         int mChangeQuadAmount;
         bool mMoveEnabled = true;
         Vector<Entity> mColoredQuads;
+		Entity mMeshEntity;
+
         Renderer* mRenderer;
     };
 } // namespace Surge

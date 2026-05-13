@@ -113,10 +113,13 @@ namespace Surge
 			cam.Primary = true;
 			cam.FixedAspectRatio = true;
 
-			cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
+			cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
 			TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-			transform.Position = glm::vec3(0, 0, 0);
-			transform.Rotation = glm::vec3(0, 0, 0);
+			//transform.Position = glm::vec3(0, 0, 0);
+			//transform.Rotation = glm::vec3(0, 0, 0);
+
+			transform.Position = glm::vec3(-10, 6, 10);
+			transform.Rotation = glm::vec3(-30, -45, 0);
 
 			cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
 			float size = cam.Camera.GetOrthographicSize();
@@ -134,7 +137,7 @@ namespace Surge
 		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
 		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
 
-		mTexturedQuadCount = 500.0f;
+		mTexturedQuadCount = 50.0f;
 		mChangeQuadAmount = mTexturedQuadCount;
 		FillTextures(mTexturedQuadCount);
 		for (Uint i = 0; i < mTexturedQuadCount; i++)
@@ -156,6 +159,7 @@ namespace Surge
 		{
 			float x = distX(gen);
 			float y = distY(gen);
+			float z = distY(gen);
 			Entity& quad = mColoredQuads.emplace_back();
 			mActiveScene->CreateEntity(quad, "StressQuad");
 			quad.AddComponent<SpriteRenderer>(glm::vec4(1.0f, 0.79f, 0.0f, 1.0f), TextureHandle::Invalid());
@@ -163,7 +167,20 @@ namespace Surge
 			t.Position = glm::vec3(x, y, 0.0f);
 			t.Scale = glm::vec3(0.02f, 0.02f, 1.0f);
 			t.MarkDirty();
-		} 
+		}
+
+		{
+			mActiveScene->CreateEntity(mMeshEntity, "Mesh");
+			MeshComponent& meshComp = mMeshEntity.AddComponent<MeshComponent>();
+			meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
+			//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/ABeautifulGame/glTF/ABeautifulGame.gltf");
+
+			auto& t = mMeshEntity.GetComponent<TransformComponent>();
+			t.Position = glm::vec3(0.0f, 1.0f, 1.0f);
+			t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+			t.MarkDirty();
+		}
+
 		mActiveScene->OnResize(windowSize.x, windowSize.y);
 		mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
 	}
@@ -197,7 +214,7 @@ namespace Surge
 	{
 		Clock& clock = Core::GetClock();
 		ImGuiID dockspaceID = ImGui::GetID("DockSpace");
-		
+
 #ifdef SURGE_PLATFORM_ANDROID
 		// On mobile we need a padding, else docking/undocking becomes a nightmare
 		float padding = 2.0f;
@@ -215,68 +232,75 @@ namespace Surge
 #endif
 
 		ImGui::Begin("Control & Stats");
+
+		if (ImGui::BeginMenuBar())
 		{
-			if (ImGui::BeginMenuBar())
+			if (ImGui::Button("Undock"))
 			{
-				if (ImGui::Button("Undock"))
-				{
-					ImGuiContext& g = *GImGui;
-					ImGuiWindow* window = g.CurrentWindow;
+				ImGuiContext& g = *GImGui;
+				ImGuiWindow* window = g.CurrentWindow;
 
-					if (window->DockNode != nullptr || window->DockId != 0)
-						ImGui::SetWindowDock(window, 0, ImGuiCond_Always);
-				}
-				ImGui::EndMenuBar();
+				if (window->DockNode != nullptr || window->DockId != 0)
+					ImGui::SetWindowDock(window, 0, ImGuiCond_Always);
 			}
-
-			ImGui::Text("Vertices: %i\n%.1fms (FPS: %.1f)", Core::GetRenderer()->GetvertexCount(), clock.GetMilliseconds(), 1 / clock.GetSeconds());
-
-			ImGui::Text("Textured Quads: %d", mTexturedQuadCount);
-			ImGui::Text("Non-Textured Quads: %d", mColoredQuads.size());
-			ImGui::Text("Total Quads: %d", Core::GetRenderer()->GetQuadCount());
-			ImGui::Checkbox("Move quads", &mMoveEnabled);
-			if (ImGui::SliderInt("ColorQuads", &mChangeQuadAmount, mTexturedQuadCount, Renderer::MAX_QUADS_TOTAL))
-			{
-				RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
-				float size = cam->GetOrthographicSize();
-				float aspect = cam->GetAspectRatio();
-				float halfWidth = size * aspect * 0.5f;
-				float halfHeight = size * 0.5f;
-
-				Uint currentQuadCount = Core::GetRenderer()->GetQuadCount();
-				if (currentQuadCount > mChangeQuadAmount)
-				{
-					Uint toRemove = currentQuadCount - mChangeQuadAmount;
-					for (Uint i = 0; i < toRemove; i++)
-					{
-						mActiveScene->DestroyEntity(mColoredQuads.back());
-						mColoredQuads.pop_back();
-					}
-				}
-				else if (currentQuadCount < mChangeQuadAmount)
-				{
-					Uint toAdd = mChangeQuadAmount - currentQuadCount;
-					for (Uint i = 0; i < toAdd; i++)
-					{
-						glm::vec2 pos = GenRandomPosition(halfWidth, halfHeight);
-						Entity& quad = mColoredQuads.emplace_back();
-						mActiveScene->CreateEntity(quad, "StressQuad");
-
-						float h = GenRandomHue();
-						float s = 1.0f;
-						float v = 1.0f;
-						glm::vec3 rgb = HSVtoRGB(h, s, v);
-						quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
-
-						auto& t = quad.GetComponent<TransformComponent>();
-						t.Position = glm::vec3(pos.x, pos.y, 0.0f);
-						t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
-					}
-				}
-			}
-
-
+			ImGui::EndMenuBar();
 		}
+
+		ImGui::Text("Vertices: %i\n%.1fms (FPS: %.1f)", Core::GetRenderer()->GetRenderer2D().GetvertexCount(), clock.GetMilliseconds(), 1 / clock.GetSeconds());
+		ImGui::Text("Textured Quads: %d", mTexturedQuadCount);
+		ImGui::Text("Non-Textured Quads: %d", mColoredQuads.size());
+		ImGui::Text("Total Quads: %d", Core::GetRenderer()->GetRenderer2D().GetQuadCount());
+		ImGui::Checkbox("Move quads", &mMoveEnabled);
+		if (ImGui::SliderInt("ColorQuads", &mChangeQuadAmount, mTexturedQuadCount, Renderer2D::MAX_QUADS_TOTAL))
+		{
+			RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
+			float size = cam->GetOrthographicSize();
+			float aspect = cam->GetAspectRatio();
+			float halfWidth = size * aspect * 0.5f;
+			float halfHeight = size * 0.5f;
+
+			Uint currentQuadCount = Core::GetRenderer()->GetRenderer2D().GetQuadCount();
+			if (currentQuadCount > mChangeQuadAmount)
+			{
+				Uint toRemove = currentQuadCount - mChangeQuadAmount;
+				for (Uint i = 0; i < toRemove; i++)
+				{
+					mActiveScene->DestroyEntity(mColoredQuads.back());
+					mColoredQuads.pop_back();
+				}
+			}
+			else if (currentQuadCount < mChangeQuadAmount)
+			{
+				Uint toAdd = mChangeQuadAmount - currentQuadCount;
+				for (Uint i = 0; i < toAdd; i++)
+				{
+					glm::vec2 pos = GenRandomPosition(halfWidth, halfHeight);
+					Entity& quad = mColoredQuads.emplace_back();
+					mActiveScene->CreateEntity(quad, "StressQuad");
+
+					float h = GenRandomHue();
+					float s = 1.0f;
+					float v = 1.0f;
+					glm::vec3 rgb = HSVtoRGB(h, s, v);
+					quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
+
+					auto& t = quad.GetComponent<TransformComponent>();
+					t.Position = glm::vec3(pos.x, pos.y, 0.0f);
+					t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
+				}
+			}
+		}
+
+		// Simple mesh controls
+		auto& t = mMeshEntity.GetComponent<TransformComponent>();
+		if (ImGui::DragFloat3("Mesh Position", glm::value_ptr(t.Position), 0.1f))
+			t.MarkDirty();
+		if (ImGui::DragFloat3("Mesh Rotation", glm::value_ptr(t.Rotation), 0.1f))
+			t.MarkDirty();
+		if (ImGui::DragFloat3("Mesh Scale", glm::value_ptr(t.Scale), 0.1f))
+			t.MarkDirty();
+
+
 		ImGui::End();
 	}
 
@@ -310,7 +334,7 @@ int main()
 {
 	Surge::ClientOptions clientOptions;
 	clientOptions.EnableImGui = false;
-	clientOptions.WindowDescription = { 1280, 720, "Player", Surge::WindowFlags::CreateDefault /*| Surge::WindowFlags::EditorAcceleration*/ };
+	clientOptions.WindowDescription = { 1280, 720, "Player", Surge::WindowFlags::CreateDefault /*| Surge::WindowFlags::NoTitlebar*/ };
 
 	Surge::Player* app = Surge::MakeClient<Surge::Player>();
 	app->SetOptions(clientOptions);

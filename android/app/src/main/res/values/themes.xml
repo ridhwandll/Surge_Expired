@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Fullscreen game theme — no title bar, no action bar -->
+    <!-- Fullscreen game theme no title bar, no action bar -->
     <style name="SurgeGameTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
+        <item name="android:isGame">true</item>
 
         <!-- Prevent white flash on startup -->
         <item name="android:windowIsTranslucent">false</item>
@@ -12,5 +13,8 @@
 
         <!-- Required for notch/cutout handling -->
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

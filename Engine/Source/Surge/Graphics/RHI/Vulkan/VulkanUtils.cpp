@@ -294,6 +294,7 @@ namespace Surge::VulkanUtils
 		case ShaderDataType::MAT4: return "Mat4";
 		case ShaderDataType::MAT3: return "Mat3";
 		case ShaderDataType::BOOL: return "Bool";
+		case ShaderDataType::STRUCT: return "Struct";
 		case ShaderDataType::NONE: SG_ASSERT_INTERNAL("ShaderDataType::NONE is invalid in this case!");
 		default:
 			SG_ASSERT_INTERNAL("Tf?");
@@ -418,4 +419,17 @@ namespace Surge::VulkanUtils
 		return flags;
 
 	}
+
+	VkPolygonMode ToVkPolygonMode(PolygonMode p)
+	{
+		switch (p)
+		{
+		case PolygonMode::FILL:  return VK_POLYGON_MODE_FILL;
+		case PolygonMode::LINE:  return VK_POLYGON_MODE_LINE;
+		case PolygonMode::POINT: return VK_POLYGON_MODE_POINT;
+		default:
+			SG_ASSERT_INTERNAL("Unknown PolygonMode!");
+		}
+	}
+
 }

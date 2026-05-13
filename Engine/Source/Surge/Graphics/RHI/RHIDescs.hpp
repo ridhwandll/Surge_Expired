@@ -81,8 +81,7 @@ namespace Surge
 		bool Transient = false;
 		SamplerHandle Sampler = {};
 
-		// Optional, if set, pixel data is uploaded to GPU immediately after creation
-		// Usage must include TRANSFER_DST if InitialData is provided
+		// Optional, if set, pixel data is uploaded to GPU immediately after creation; Usage must include TRANSFER_DST if InitialData is provided
 		const void* InitialData = nullptr;
 		Uint DataSize = 0; // total bytes of InitialData
 
