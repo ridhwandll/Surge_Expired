@@ -2,7 +2,7 @@
 #pragma once
 #include "Surge/Core/String.hpp"
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
-#include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanResourceEntries.hpp"
 #include <volk.h>
 #include <vk_mem_alloc.h>
 

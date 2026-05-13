@@ -31,9 +31,7 @@ list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Windows/.*")
 # Vendor helper source (header-only library with a single .cpp)
 list(APPEND ENGINE_SOURCES "${VENDOR_ROOT}/stb/stb_image.cpp" "${VENDOR_ROOT}/cgltf/cgltf.cpp")
 
-# -----------------------------------------------------------------------
 # Player sources
-# -----------------------------------------------------------------------
 file(GLOB PLAYER_SOURCES
     "${PLAYER_SRC_ROOT}/*.cpp"
 )
@@ -50,7 +48,7 @@ target_link_options(SurgePlayer PRIVATE
         "-Wl,-z,max-page-size=16384"
 )
 
-# -----------------------------------------------------------------------
+
 # Include directories
 # -----------------------------------------------------------------------
 target_include_directories(SurgePlayer PUBLIC

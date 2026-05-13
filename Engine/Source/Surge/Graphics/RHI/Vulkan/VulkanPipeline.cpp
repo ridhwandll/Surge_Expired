@@ -152,7 +152,7 @@ namespace Surge
 		// Rasterizer
 		VkPipelineRasterizationStateCreateInfo raster = {};
 		raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-		raster.polygonMode = VK_POLYGON_MODE_FILL;
+		raster.polygonMode = VulkanUtils::ToVkPolygonMode(desc.Raster.Polygon);
 		raster.cullMode = VulkanUtils::ToVkCullMode(desc.Raster.Cull);
 		raster.frontFace = VulkanUtils::ToVkFrontFace(desc.Raster.Front);
 		raster.lineWidth = desc.Raster.LineWidth;

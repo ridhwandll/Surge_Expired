@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
-#include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanResourceEntries.hpp"
 #include <volk.h>
 
 namespace Surge
@@ -10,8 +10,6 @@ namespace Surge
 	class VulkanBindlessRegistry
 	{
 	public:
-		static constexpr Uint MAX_TEXTURES = 4096;
-
 		void Init(const VulkanRHI& rhi);
 		void Shutdown(const VulkanRHI& rhi);
 

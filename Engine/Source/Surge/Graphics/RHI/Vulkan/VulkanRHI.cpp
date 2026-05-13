@@ -1,17 +1,18 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "VulkanRHI.hpp"
-#include "VulkanDebugger.hpp"
-#include "VulkanBuffer.hpp"
-#include "VulkanPipeline.hpp"
-#include "VulkanUtils.hpp"
+#include "Surge/Graphics/RHI/RHISettings.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanBuffer.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanPipeline.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanTexture.hpp"
+
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
-
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/native_window.h>
 #endif
-#include "VulkanTexture.hpp"
 #include "Backends/imgui_impl_vulkan.h"
 
 #define LOG_OBJ_CREATION_DELETION 0
@@ -64,7 +65,7 @@ namespace Surge
 		CreateInstance();
 		CreateSurface(window);
 		mDevice.Initialize(mInstance, mSurface);
-		mFrame.Initialize(*this, RHI_FRAMES_IN_FLIGHT);
+		mFrame.Initialize(*this, RHISettings::FRAMES_IN_FLIGHT);
 		mSwapchain.Initialize(*this, window->GetSize().x, window->GetSize().y);
 
 		CreateSwapchainRenderpass();
@@ -183,7 +184,9 @@ namespace Surge
 		vkQueueSubmit(mDevice.GetQueue(), 1, &submitInfo, frame.Fence);
 
 		// Present: swapchain image index + release semaphore from slot
-		VK_CALL(mSwapchain.Present(*this, releaseSemaphore, ctx.SwapchainIndex));
+		// We Dont check for out of date here, if the swapchain is out of date we will catch it at the beginning of the next frame when we try to acquire an image
+		// (Rid) Is this good?
+		mSwapchain.Present(*this, releaseSemaphore, ctx.SwapchainIndex);
 
 		// Advance SLOT index (completely independent of swapchain image index)
 		mFrame.AdvanceFrame();
@@ -239,19 +242,20 @@ namespace Surge
 		mBufferPool.Free(buffer); // Return slot to free list
 	}
 
-	TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc, const void* initialData /*= nullptr*/)
+	TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc)
 	{		
 		// TRANSFER_DST is required when InitialData is provided
-		SG_ASSERT(!(desc.InitialData && !(desc.Usage & TextureUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. " "Add TextureUsage::TRANSFER_DST to upload pixel data.");
+		SG_ASSERT(!(desc.InitialData && !(desc.Usage & TextureUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. Add TextureUsage::TRANSFER_DST to upload pixel data");
 
 		TextureEntry entry = VulkanTexture::Create(*this, desc);
 		TextureHandle h = mTexturePool.Allocate(std::move(entry));
 
-		SamplerEntry* samplerEntry = mSamplerPool.Get(desc.Sampler);
-		SG_ASSERT(samplerEntry, "Null sampler, please provide a valid Sampler Handle in TextureDesc");
-	
-		//if (!(desc.Usage & TextureUsage::COLOR_ATTACHMENT))
-		mTexturePool.Get(h)->BindlessIndex = mBindlessRegistry.RegisterTexture(*this, entry.View, samplerEntry->Sampler);		
+		if (desc.Usage & TextureUsage::SAMPLED)
+		{
+			SamplerEntry* samplerEntry = mSamplerPool.Get(desc.Sampler);
+			SG_ASSERT(samplerEntry, "Null sampler, please provide a valid Sampler Handle in TextureDesc to sample the texture in Shader");
+			mTexturePool.Get(h)->BindlessIndex = mBindlessRegistry.RegisterTexture(*this, entry.View, samplerEntry->Sampler);
+		}
 
 		if (desc.InitialData && desc.DataSize > 0)
 			UploadTextureData(h, desc.InitialData, desc.DataSize);
@@ -484,7 +488,7 @@ namespace Surge
 		DescriptorSetEntry entry = {};
 		entry.Layout = layoutHandle;
 		entry.Frequency = frequency;
-		entry.Count = (frequency == DescriptorUpdateFrequency::DYNAMIC) ? RHI_FRAMES_IN_FLIGHT : 1;
+		entry.Count = (frequency == DescriptorUpdateFrequency::DYNAMIC) ? RHISettings::FRAMES_IN_FLIGHT : 1;
 
 		// Build pool sizes from cached layout bindings
 		// Pool must hold entry.Count sets worth of descriptors
@@ -509,7 +513,7 @@ namespace Surge
 		VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &entry.Pool));
 
 		// Allocate entry.Count sets from the pool
-		VkDescriptorSetLayout layouts[RHI_FRAMES_IN_FLIGHT] = {};
+		VkDescriptorSetLayout layouts[RHISettings::FRAMES_IN_FLIGHT] = {};
 		for (Uint i = 0; i < entry.Count; i++)
 			layouts[i] = layout->Layout;
 
@@ -888,7 +892,7 @@ namespace Surge
 		ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
 		ImGui::Text("%s", mStats.RHIVersion.c_str());
 		ImGui::Text("Draw call(s): %i", mStats.DrawCalls);
-		ImGui::Text("Frames in Flight: %d", RHI_FRAMES_IN_FLIGHT);
+		ImGui::Text("Frames in Flight: %d", RHISettings::FRAMES_IN_FLIGHT);
 
 		// We need to call GetStats() here to update the memory stats before displaying them
 		auto& memStats = GetStats();

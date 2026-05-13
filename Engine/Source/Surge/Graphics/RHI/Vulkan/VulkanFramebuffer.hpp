@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
-#include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanResourceEntries.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRenderpassFactory.hpp"
 
 namespace Surge

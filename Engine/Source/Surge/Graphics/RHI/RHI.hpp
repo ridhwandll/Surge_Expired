@@ -20,8 +20,6 @@ namespace Surge
 }
 #endif
 
-#define RHI_FRAMES_IN_FLIGHT 1
-
 namespace Surge
 {
 	class GraphicsRHI
@@ -46,7 +44,7 @@ namespace Surge
 		void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
 
 		// Texture
-		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr) { return mBackendRHI.CreateTexture(desc, initialData); }
+		TextureHandle CreateTexture(const TextureDesc& desc) { return mBackendRHI.CreateTexture(desc); }
 		void DestroyTexture(TextureHandle texture) { mBackendRHI.DestroyTexture(texture); }
 		void ResizeTexture(TextureHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeTexture(h, newWidth, newHeight); }
 

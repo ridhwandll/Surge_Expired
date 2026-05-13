@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -72,7 +73,7 @@ namespace Surge
 	//class GraphicsRHI;
 	struct DescriptorSetEntry
 	{
-		VkDescriptorSet Sets[3] = {}; //RHI_FRAMES_IN_FLIGHT
+		VkDescriptorSet Sets[RHISettings::FRAMES_IN_FLIGHT] = {};
 		VkDescriptorPool Pool = VK_NULL_HANDLE; // owns its own pool
 		DescriptorLayoutHandle Layout = DescriptorLayoutHandle::Invalid();
 	    DescriptorUpdateFrequency Frequency = DescriptorUpdateFrequency::STATIC;

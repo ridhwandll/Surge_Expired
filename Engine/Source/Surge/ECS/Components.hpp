@@ -3,14 +3,15 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
+#include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Surge/Graphics/Mesh/Mesh.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
-#include "../Graphics/RHI/RHIHandle.hpp"
 
 namespace Surge
 {
-    struct SURGE_API IDComponent
+    struct IDComponent
     {
         IDComponent() = default;
         IDComponent(const UUID& id)
@@ -66,7 +67,7 @@ namespace Surge
 	};
 
 
-	struct SURGE_API SpriteRenderer
+	struct SpriteRenderer
 	{
         SpriteRenderer() = default;
 		SpriteRenderer(const glm::vec4& color)
@@ -82,7 +83,7 @@ namespace Surge
 		SURGE_REFLECTION_ENABLE;
 	};
 
-    struct SURGE_API CameraComponent
+    struct CameraComponent
     {
         CameraComponent() = default;
         CameraComponent(const RuntimeCamera& cam, bool primary, bool fixedAspectRatio)
@@ -95,7 +96,13 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API PointLightComponent
+    struct MeshComponent
+    {
+        Ref<Mesh> Mesh;
+        SURGE_REFLECTION_ENABLE;
+	};
+
+    struct PointLightComponent
     {
         PointLightComponent() = default;
         PointLightComponent(glm::vec3 color, float intensity, float radius, float falloff)

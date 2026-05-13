@@ -6,7 +6,7 @@
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDevice.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
-#include "Surge/Graphics/RHI/Vulkan/VulkanResourcePools.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanResourceEntries.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanFrame.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanFramebuffer.hpp"
@@ -49,7 +49,7 @@ namespace Surge
 		void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset);
 		void DestroyBuffer(BufferHandle buffer);
 
-		TextureHandle CreateTexture(const TextureDesc& desc, const void* initialData = nullptr);
+		TextureHandle CreateTexture(const TextureDesc& desc);
 		void DestroyTexture(TextureHandle h);
 		void UploadTextureData(TextureHandle h, const void* data, Uint size);
 		void ResizeTexture(TextureHandle h, Uint width, Uint height);

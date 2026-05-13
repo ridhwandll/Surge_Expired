@@ -76,13 +76,24 @@ namespace Surge
         {
             Renderer* renderer = Core::GetRenderer();
             renderer->BeginFrame(*camera.Data1, camera.Data2);
+
             {
 				auto view = mRegistry.view<SpriteRenderer, TransformComponent>();
 				for (auto [entity, sprite, transform] : view.each())
 				{
-					renderer->Submit(transform.GetTransform(), sprite.Color, sprite.Texture);
+					renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Texture);
 				}
             }
+
+			auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+            for (auto& entity : group)
+            {
+                auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+                if (mesh.Mesh)                
+                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
+                
+            }
+
             renderer->EndFrame();
         }
     }
@@ -114,7 +125,7 @@ namespace Surge
 
         CopyComponent<NameComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<TransformComponent>(other->mRegistry, mRegistry, enttMap);
-        //CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<PointLightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<DirectionalLightComponent>(other->mRegistry, mRegistry, enttMap);

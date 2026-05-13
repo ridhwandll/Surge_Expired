@@ -13,7 +13,7 @@ namespace Surge
         Minimized = BIT(1),
         Maximized = BIT(2),
         CreateDefault = BIT(3),
-        EditorAcceleration = BIT(4) //- Enables custom titlebar for the editor
+        NoTitlebar = BIT(4)
     };
     MAKE_BIT_ENUM(WindowFlags, Uint);
 

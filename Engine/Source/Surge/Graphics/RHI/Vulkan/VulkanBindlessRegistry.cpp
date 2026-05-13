@@ -7,18 +7,19 @@ namespace Surge
 {
 	void VulkanBindlessRegistry::Init(const VulkanRHI& rhi)
 	{
+		VkDevice device = rhi.GetDevice();
+
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.binding = 0;
 		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding.descriptorCount = MAX_TEXTURES;
-		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT
-			| VK_SHADER_STAGE_VERTEX_BIT;
+		binding.descriptorCount = RHISettings::MAX_BINDLESS_TEXTURES;
+		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 
 		// These three flags are the core of bindless
 		VkDescriptorBindingFlags flags =
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | // unused slots don't need valid data
-			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | // update while set is bound
-			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT; // variable size array
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |          // Unused slots don't need valid data
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |        // Update while set is bound
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT; // Variable size array
 
 		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo = {};
 		flagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
@@ -31,22 +32,22 @@ namespace Surge
 		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		layoutInfo.bindingCount = 1;
 		layoutInfo.pBindings = &binding;
+		VK_CALL(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &mLayout));
 
-		vkCreateDescriptorSetLayout(rhi.GetDevice(), &layoutInfo, nullptr, &mLayout);
-
-		VkDescriptorPoolSize poolSize = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_TEXTURES };
+		// Add buffers here later if we want to support bindless buffers, but for now we only need bindless textures
+		VkDescriptorPoolSize poolSize = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RHISettings::MAX_BINDLESS_TEXTURES };
 		VkDescriptorPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 		poolInfo.maxSets = 1;
 		poolInfo.poolSizeCount = 1;
 		poolInfo.pPoolSizes = &poolSize;
-		vkCreateDescriptorPool(rhi.GetDevice(), &poolInfo, nullptr, &mPool);
+		VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &mPool));
 
 		VkDescriptorSetVariableDescriptorCountAllocateInfo countInfo = {};
 		countInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
 		countInfo.descriptorSetCount = 1;
-		Uint maxCount = MAX_TEXTURES;
+		Uint maxCount = RHISettings::MAX_BINDLESS_TEXTURES;
 		countInfo.pDescriptorCounts = &maxCount;
 
 		VkDescriptorSetAllocateInfo allocInfo = {};
@@ -55,8 +56,7 @@ namespace Surge
 		allocInfo.descriptorPool = mPool;
 		allocInfo.descriptorSetCount = 1;
 		allocInfo.pSetLayouts = &mLayout;
-
-		vkAllocateDescriptorSets(rhi.GetDevice(), &allocInfo, &mSet);
+		VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &mSet));
 	}
 
 	void VulkanBindlessRegistry::Shutdown(const VulkanRHI& rhi)
@@ -80,7 +80,7 @@ namespace Surge
 		}
 		else
 		{
-			SG_ASSERT(mNextSlot < MAX_TEXTURES, "Bindless registry full");
+			SG_ASSERT(mNextSlot < RHISettings::MAX_BINDLESS_TEXTURES, "Bindless registry full");
 			slot = mNextSlot++;
 		}
 

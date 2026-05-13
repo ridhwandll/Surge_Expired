@@ -4,8 +4,6 @@
 
 namespace Surge
 {
-	std::vector<VkFramebuffer> swapchain_framebuffers;
-
 	void VulkanSwapchain::Initialize(const VulkanRHI& rhi, Uint width, Uint height)
 	{
 		Create(rhi, width, height);
@@ -43,28 +41,10 @@ namespace Surge
 		return vkQueuePresentKHR(queue, &present);
 	}
 
-	//static VkSurfaceFormatKHR SelectSurfaceFormat(VkPhysicalDevice gpu, VkSurfaceKHR surface, std::vector<VkFormat> const& preferred_formats = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_A8B8G8R8_SRGB_PACK32 })
-	//{
-	//	// Stolen from Sascha Willems' Vulkan samples:
-	//	uint32_t surface_format_count;
-	//	vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &surface_format_count, nullptr);
-	//	assert(0 < surface_format_count);
-	//	std::vector<VkSurfaceFormatKHR> supported_surface_formats(surface_format_count);
-	//	vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &surface_format_count, supported_surface_formats.data());
-	//
-	//	auto it = std::ranges::find_if(supported_surface_formats,
-	//		[&preferred_formats](VkSurfaceFormatKHR surface_format)
-	//		{
-	//			return std::ranges::any_of(preferred_formats,
-	//				[&surface_format](VkFormat format) { return format == surface_format.format; });
-	//		});
-	//
-	//	// We use the first supported format as a fallback in case none of the preferred formats is available
-	//	return it != supported_surface_formats.end() ? *it : supported_surface_formats[0];
-	//}
-
 	void VulkanSwapchain::Create(const VulkanRHI& rhi, Uint width, Uint height)
 	{
+		// Proudly stolen from Sascha Willems Vulkan Examples
+
 		VkDevice device = rhi.GetDevice();
 		VkPhysicalDevice gpu = rhi.GetGPU();
 		VkSurfaceKHR surface = rhi.GetSurface();
@@ -226,7 +206,7 @@ namespace Surge
 		vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &count, modes.data());
 
 		// On mobile -> FIFO is preferred (vsync, battery friendly)
-		// MAILBOX gives lower latency but burns more power
+		// MAILBOX gives lower latency(ImGui feels smooth) but burns more power
 #ifdef SURGE_PLATFORM_WINDOWS
 		for (auto& m : modes)
 		{

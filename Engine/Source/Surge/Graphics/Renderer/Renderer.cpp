@@ -2,23 +2,9 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Core.hpp"
-#include <exception>
-#include "Surge/Utility/Filesystem.hpp"
-#include <algorithm>
-
-#ifdef SURGE_PLATFORM_WINDOWS
-#include <shaderc/shaderc.hpp>
-#elif defined(SURGE_PLATFORM_ANDROID)
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#include <android/log.h>
-#endif
 
 namespace Surge
 {
-	static constexpr Uint MAX_VERTICES = Renderer::MAX_QUADS_TOTAL * 4;
-	static constexpr Uint MAX_INDICES = Renderer::MAX_QUADS_PER_BATCH * 6; // IB of 1 batch, we reuse this
-
     void Renderer::Initialize()
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
@@ -27,61 +13,19 @@ namespace Surge
 		mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
         
-		// Create IB of 1 batch, we resue this for all batches, as the max indices per batch is fixed
-		// We fill this with quad index data, and it will reference vertices in the VB based on the current batchs vertex offset
-		Vector<Uint> indices(MAX_INDICES);
-		Uint offset = 0;
-		for (Uint i = 0; i < MAX_INDICES; i += 6)
-		{
-			indices[i + 0] = offset + 0;
-			indices[i + 1] = offset + 1;
-			indices[i + 2] = offset + 2;
-			indices[i + 3] = offset + 0;
-			indices[i + 4] = offset + 2;
-			indices[i + 5] = offset + 3;
-			offset += 4;
-		}
-		BufferDesc ibDesc = {};
-		ibDesc.Size = sizeof(Uint) * MAX_INDICES;
-		ibDesc.Usage = BufferUsage::INDEX;
-		ibDesc.HostVisible = false;
-		ibDesc.InitialData = indices.data();
-		ibDesc.DebugName = "BatchIB";
-		mIndexBuffer = mRHI->CreateBuffer(ibDesc);
-
-		// We allocate a large VBs[RHI_FRAMES_IN_FLIGHT] for max vertices across all batches, but we only fill the portion
-		// needed for the current batch each frame. This is to avoid GPU buffer creation stalls when flushing mid-frame after each batch is submitted.
-		BufferDesc vbDesc = {};
-		vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
-		vbDesc.Usage = BufferUsage::VERTEX;
-		vbDesc.HostVisible = true;
-		for (Uint i = 0; i < RHI_FRAMES_IN_FLIGHT; i++)
-		{
-			vbDesc.DebugName = std::format("BatchVB Frame: {}", i).c_str();
-			mVertexBuffers[i] = mRHI->CreateBuffer(vbDesc);
-		}
-
-		// CPU side staging array fill this, then memcpy to GPU buffer
-		mVertexData.resize(MAX_QUADS_PER_BATCH * 4);
-		mCurrentBatch.Reset();
-
-		SamplerDesc samplerDesc = {};
-		mQuadSampler = mRHI->CreateSampler(samplerDesc);
-
 		// Offscreen color texture
 		glm::vec2 size = Core::GetWindow()->GetSize();
 		TextureDesc colorDesc = {};
 		colorDesc.Width = size.x;
 		colorDesc.Height = size.y;
 		colorDesc.Format = TextureFormat::RGBA8_UNORM;
-		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
+		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
 		colorDesc.DebugName = "Offscreen Color Texture";
-		colorDesc.Sampler = mQuadSampler;
-		mOffscreenColor = mRHI->CreateTexture(colorDesc);
+		mData->mFinalImage = mRHI->CreateTexture(colorDesc);
 
 		// Offscreen framebuffer
 		FramebufferAttachment colorAttachment = {};
-		colorAttachment.Handle = mOffscreenColor;
+		colorAttachment.Handle = mData->mFinalImage;
 		colorAttachment.Load = LoadOp::CLEAR;
 		colorAttachment.Store = StoreOp::STORE;
 
@@ -91,32 +35,10 @@ namespace Surge
 		fbDesc.Width = size.x;
 		fbDesc.Height = size.y;
 		fbDesc.DebugName = "Offscreen Framebuffer";
+		mData->mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
-		mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
-	
-		Shader shader;
-		shader.Load("Renderer2D.shader", ShaderType::VERTEX | ShaderType::FRAGMENT);
-
-		PipelineDesc desc = {};
-		desc.Shader_ = shader;
-		desc.Raster.Cull = CullMode::NONE;
-		desc.DebugName = "Quad Batch Pipeline";
-		desc.TargetFramebuffer = mOffscreenFramebuffer;
-		desc.TargetSwapchain = false;
-		desc.Blend.Enable = true;
-		mPipeline = mRHI->CreatePipeline(desc);
-
-		uint8_t whitePixel[] = { 255, 255, 255, 255 };			
-		TextureDesc texDesc = {};
-		texDesc.Width = 1;
-		texDesc.Height = 1;
-		texDesc.Format = TextureFormat::RGBA8_UNORM ;
-		texDesc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
-		texDesc.DebugName = "WhiteTexture";
-		texDesc.InitialData = whitePixel;
-		texDesc.DataSize = sizeof(whitePixel);
-		texDesc.Sampler = mQuadSampler;
-		mWhiteTexture = mRHI->CreateTexture(texDesc);
+		mRenderer2D.Initialize(mRHI.get(), mData.get());
+		mRenderer3D.Initialize(mRHI.get(), mData.get());
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera)
@@ -127,17 +49,11 @@ namespace Surge
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
 
-		mTotalVertexCount = 0;
-		mTotalQuadCount = 0;
+		mCurrentFrameCtx = mRHI->BeginFrame();
+		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
-		mCurrentFrameCtx = mRHI->BeginFrame();		
-		mCurrentFrameVertexOffset = 0;
-		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
-		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
-		mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
-		mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
-		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &mData->ViewProjection);
-		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
+		mRenderer2D.BeginFrame(mCurrentFrameCtx);
+		mRenderer3D.BeginFrame(mCurrentFrameCtx);
     }
 
 	void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
@@ -148,161 +64,69 @@ namespace Surge
 		mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
 		mData->CameraPosition = transform[3];
 	
-		mTotalVertexCount = 0;
-		mTotalQuadCount = 0;
-
-		// Begins command buffer recording (Off-screen pass)
-		// [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]	
-
 		mCurrentFrameCtx = mRHI->BeginFrame();
+		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
-		mCurrentFrameVertexOffset = 0;
-		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mOffscreenFramebuffer, mClearColor);
-		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
-
-		mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
-
-		mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
-		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(QuadPushConstants), &mData->ViewProjection);
-		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
+		mRenderer2D.BeginFrame(mCurrentFrameCtx);
+		mRenderer3D.BeginFrame(mCurrentFrameCtx);
 	}
 
     void Renderer::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
 
-		FlushBatch();
+		mRenderer3D.EndFrame();
+		mRenderer2D.EndFrame();
+
 		mRHI->CmdEndRenderPass(mCurrentFrameCtx);
 
-		mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mOffscreenColor); // Copy/blit offscreen color to swapchain backbuffer
+		// Swapchain
+		mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mData->mFinalImage);
 		mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);	
 
 		// ImGui Render
 		for (const auto& callback : mImGuiRenderCallbacks)
 			callback();
-
-		OnImGuiRender();;
-
-		mRHI->ShowMetricsWindow(); //Shows internal metrics about the RHI resource pools
-
+		
+		OnImGuiRender();
+	
 		mRHI->CmdEndSwapchainRenderpass(mCurrentFrameCtx);
-
 		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording
     }
 		
-	void Renderer::OnImGuiRender()
+	void Renderer::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
 	{
-		ImGui::Begin("Renderer2D Memory");
-		ImGui::Text("Batches: %u / %u", (mTotalQuadCount + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH, (MAX_QUADS_TOTAL + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH);
-		ImGui::Separator();
-
-		if (mMaxQuadCountReached)
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.25f, 1.0f), "Max quad count of Renderer2D reached!\nSome Quads were not rendered.");
-			ImGui::Separator();
-		}
-
-		float totalVerticesUsed = (float)mTotalVertexCount;
-		float maxVerticesPossible = (float)MAX_VERTICES;
-		float usageRatio = totalVerticesUsed / maxVerticesPossible;
-
-		float frameWeightMB = (sizeof(QuadVertex) * totalVerticesUsed) / 1024.0f / 1024.0f;
-		float totalWeightMB = (sizeof(QuadVertex) * maxVerticesPossible) / 1024.0f / 1024.0f;
-		ImGui::Text("GPU Vertex Buffer status: %.3f MB / %.3f MB", frameWeightMB, totalWeightMB);
-
-		ImVec4 barColor = ImVec4(0.0f, 0.7f, 0.0f, 1.0f); // Green
-		if (usageRatio > 0.65f) barColor = ImVec4(1.0f, 0.4f, 0.0f, 1.0f); // Orange
-		if (usageRatio > 0.95f) barColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
-
-		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
-		ImGui::ProgressBar(usageRatio, ImVec2(-1.0f, 0.0f));
-		ImGui::Text("%u / %u Vertices", mTotalVertexCount, MAX_VERTICES);
-		ImGui::PopStyleColor();
-		ImGui::ColorEdit4("Clear Color", (float*)&mClearColor);
-
-		ImGui::End();
+		mRenderer3D.SubmitMesh(transform, mesh);
 	}
 
-	void Renderer::Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
+	void Renderer::OnImGuiRender()
 	{
-		if (mCurrentBatch.QuadCount >= MAX_QUADS_PER_BATCH)
-			FlushBatch();
+		mRenderer2D.OnImGuiRender();
+		mRenderer3D.OnImGuiRender();
+		mRHI->ShowMetricsWindow();
+	}
 
-		if (mTotalQuadCount >= MAX_QUADS_TOTAL)
-		{
-			Log<Severity::Warn>("Max Quads per frame reached!");
-			mMaxQuadCountReached = true;
-			return;
-		}
-		mMaxQuadCountReached = false;
-		Uint texIndex = mRHI->GetBindlessIndex(texture.IsNull() ? mWhiteTexture : texture);
-
-		static constexpr glm::vec4 sLocalPositions[4] = {
-			{ 0.5f, -0.5f, 0.0f, 1.0f},
-			{ 0.5f,  0.5f, 0.0f, 1.0f},
-			{-0.5f,  0.5f, 0.0f, 1.0f},
-			{-0.5f, -0.5f, 0.0f, 1.0f},
-		};
-		static constexpr glm::vec2 sUVs[4] = {
-			{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}
-		};
-
-		for (Uint i = 0; i < 4; i++)
-		{
-			QuadVertex& v = mVertexData[mCurrentBatch.VertexCount++];
-			v.Position = transform * sLocalPositions[i];
-			v.Color = glm::packUnorm4x8(color);
-			v.UV = sUVs[i];
-			v.TextureIndex = texIndex;
-		}
-
-		mCurrentBatch.QuadCount++;
-		mTotalQuadCount++;
+	void Renderer::SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
+	{
+		mRenderer2D.Submit(transform, color, texture);
 	}
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
 	{
-		Core::AddFrameEndCallback([this, width, height]() {
-				mRHI->ResizeTexture(mOffscreenColor, width, height);
-				mRHI->ResizeFramebuffer(mOffscreenFramebuffer, width, height);
-			});
-		
-		Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
-	}
-
-	void Renderer::FlushBatch()
-	{
-		if (mCurrentBatch.QuadCount == 0)
-			return;
-
-		const FrameContext& ctx = mCurrentFrameCtx;
-
-		// Upload current batch vertex data to GPU (only the portion needed for this batch, not the entire VB)
-		Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
-		Uint uploadSizeInBytes = mCurrentBatch.VertexCount * sizeof(QuadVertex);
-		mRHI->UploadBuffer(mVertexBuffers[ctx.FrameIndex], mVertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
-		mRHI->CmdDrawIndexed(ctx, mCurrentBatch.QuadCount * 6, 1, 0, (int32_t)mCurrentFrameVertexOffset, 0);
-
-		mTotalVertexCount += mCurrentBatch.VertexCount;
-		mCurrentFrameVertexOffset += mCurrentBatch.VertexCount;
-
-		mCurrentBatch.Reset();
+		mRenderer2D.OnWindowResize(width, height);
+		mRenderer3D.OnWindowResize(width, height);
 	}
 
 	void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         mRHI->WaitIdle();
-		mRHI->DestroyFramebuffer(mOffscreenFramebuffer);
-		mRHI->DestroySampler(mQuadSampler);
-		mRHI->DestroyTexture(mWhiteTexture);
-		mRHI->DestroyTexture(mOffscreenColor);
-		mRHI->DestroyPipeline(mPipeline);
+		mRenderer2D.Shutdown();
+		mRenderer3D.Shutdown();
 
-        for (Uint i = 0; i < RHI_FRAMES_IN_FLIGHT; i++)
-			mRHI->DestroyBuffer(mVertexBuffers[i]);
+		mRHI->DestroyFramebuffer(mData->mOffscreenFramebuffer);
+		mRHI->DestroyTexture(mData->mFinalImage);
 
-		mRHI->DestroyBuffer(mIndexBuffer);
         mRHI->Shutdown();
     }
 
