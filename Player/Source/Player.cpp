@@ -54,6 +54,7 @@ namespace Surge
 	void Player::FillTextures(Uint texCount)
 	{
 		stbi_set_flip_vertically_on_load(1);
+		SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
 		for (int i = 0; i < texCount; i++)
 		{
 			String path = "Engine/Assets/Textures/RidWhite.png";
@@ -85,10 +86,16 @@ namespace Surge
 				desc.DebugName = String(std::to_string(i + 1) + ".png");
 				desc.InitialData = data;
 				desc.DataSize = width * height * 4;
-				desc.Sampler = mQuadSampler;
+				desc.Sampler = defautSampler;
 				TextureHandle texture = mRenderer->GetRHI()->CreateTexture(desc);
 				mTextures.push_back(texture);
 				stbi_image_free(data);
+
+				if (mTexID == NULL)
+				{
+					//mTexID = mRenderer->GetFinalImageImGuiID();
+					mTexID = mRenderer->GetRHI()->AddImGuiImage(texture);
+				}
 			}
 			else
 			{
@@ -115,9 +122,6 @@ namespace Surge
 
 			cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
 			TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-			//transform.Position = glm::vec3(0, 0, 0);
-			//transform.Rotation = glm::vec3(0, 0, 0);
-
 			transform.Position = glm::vec3(-10, 6, 10);
 			transform.Rotation = glm::vec3(-30, -45, 0);
 
@@ -127,10 +131,6 @@ namespace Surge
 			halfWidth = size * aspect * 0.5f;
 			halfHeight = size * 0.5f;
 		}
-
-		SamplerDesc samplerDesc = {};
-		samplerDesc.DebugName = "PlayerTexture sampler";
-		mQuadSampler = mRenderer->GetRHI()->CreateSampler(samplerDesc);
 
 		std::random_device rd;
 		std::mt19937 gen(rd());
@@ -147,7 +147,7 @@ namespace Surge
 		
 			Entity quad;
 			mActiveScene->CreateEntity(quad, "StressQuad");
-			quad.AddComponent<SpriteRenderer>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), mTextures[i]);
+			quad.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), mTextures[i]);
 		
 			auto& t = quad.GetComponent<TransformComponent>();
 			t.Position = glm::vec3(x, y, 0.0f);
@@ -159,10 +159,10 @@ namespace Surge
 		{
 			float x = distX(gen);
 			float y = distY(gen);
-			float z = distY(gen);
+
 			Entity& quad = mColoredQuads.emplace_back();
 			mActiveScene->CreateEntity(quad, "StressQuad");
-			quad.AddComponent<SpriteRenderer>(glm::vec4(1.0f, 0.79f, 0.0f, 1.0f), TextureHandle::Invalid());
+			quad.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 0.79f, 0.0f, 1.0f), TextureHandle::Invalid());
 			auto& t = quad.GetComponent<TransformComponent>();
 			t.Position = glm::vec3(x, y, 0.0f);
 			t.Scale = glm::vec3(0.02f, 0.02f, 1.0f);
@@ -282,7 +282,7 @@ namespace Surge
 					float s = 1.0f;
 					float v = 1.0f;
 					glm::vec3 rgb = HSVtoRGB(h, s, v);
-					quad.AddComponent<SpriteRenderer>(rgb, 1.0f);
+					quad.AddComponent<SpriteRendererComponent>(rgb, 1.0f);
 
 					auto& t = quad.GetComponent<TransformComponent>();
 					t.Position = glm::vec3(pos.x, pos.y, 0.0f);
@@ -301,6 +301,10 @@ namespace Surge
 			t.MarkDirty();
 
 
+		ImGui::End();
+
+		ImGui::Begin("Demo Viweport");
+		ImGui::Image(mTexID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 		ImGui::End();
 	}
 
@@ -322,8 +326,6 @@ namespace Surge
 	{
 		for (auto& texture : mTextures)
 			mRenderer->GetRHI()->DestroyTexture(texture);
-
-		mRenderer->GetRHI()->DestroySampler(mQuadSampler);
 	}
 
 } // namespace Surge
@@ -333,7 +335,7 @@ namespace Surge
 int main()
 {
 	Surge::ClientOptions clientOptions;
-	clientOptions.EnableImGui = false;
+	clientOptions.RenderFinalImageToSwapchian = true;
 	clientOptions.WindowDescription = { 1280, 720, "Player", Surge::WindowFlags::CreateDefault /*| Surge::WindowFlags::NoTitlebar*/ };
 
 	Surge::Player* app = Surge::MakeClient<Surge::Player>();

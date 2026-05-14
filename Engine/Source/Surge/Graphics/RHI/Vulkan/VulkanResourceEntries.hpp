@@ -5,6 +5,7 @@
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include <volk.h>
 #include <vk_mem_alloc.h>
+#include "imgui.h"
 
 namespace Surge
 {
@@ -13,7 +14,7 @@ namespace Surge
 		VkImage Image = VK_NULL_HANDLE;
 		VkImageView View = VK_NULL_HANDLE;
 		Uint BindlessIndex = UINT32_MAX;
-
+		ImTextureID ImGuiID = NULL;
 		VkDeviceSize Size = 0; //bytes
 		VmaAllocation Allocation = VK_NULL_HANDLE;
 		VkImageLayout Layout = VK_IMAGE_LAYOUT_UNDEFINED;

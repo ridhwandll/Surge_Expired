@@ -44,10 +44,12 @@ namespace Surge
 			desc.storeOp = VulkanUtils::ToVkStoreOp(key.ColorStore[i]);
 			desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			desc.initialLayout = key.ColorLoad[i] == LoadOp::LOAD ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+			//desc.initialLayout = key.ColorLoad[i] == LoadOp::LOAD ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+			desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			attachments.push_back(desc);
 
+			// It auto converts to the correct layout when we begin the render pass, but we need to specify the layout we will be using in the subpass
 			VkAttachmentReference ref = {};
 			ref.attachment = i;
 			ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;

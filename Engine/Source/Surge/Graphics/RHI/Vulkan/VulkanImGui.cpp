@@ -151,14 +151,21 @@ namespace Surge
 		// Load Fonts
 		style.FontSizeBase = 17.0f;
 		
+		// ----------------------- ImGui Font Management ----------------------- 
+		// Normal font -> index = 0
+		// Bold font   -> index = 1
+		// Italic font -> index = 2
+		// Use ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[index]) to use!
+		// ----------------------- ImGui Font Management ----------------------- 
+
 #ifdef SURGE_PLATFORM_WINDOWS
-		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);
+		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);		
+		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
 		io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
-		mBoldFont = io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
 #elif defined(SURGE_PLATFORM_ANDROID)
 		LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);
+		LoadImGuiFont("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
 		LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
-		mBoldFont = LoadImGuiFont("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
 #else
 		io.Fonts->AddFontDefault();
 #endif
@@ -172,6 +179,7 @@ namespace Surge
 	{
 		if (!mInitialized)
 			return;
+
 		VkDevice device = rhi.GetDevice();
 
 		vkDeviceWaitIdle(device);
@@ -211,9 +219,13 @@ namespace Surge
 
 	ImTextureID VulkanImGuiContext::AddImage(VkImageView view)
 	{
-		auto id = ImGui_ImplVulkan_AddTexture(nullptr, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		mImageTextureIDs.push_back((ImTextureID)id);
+		VkDescriptorSet id = ImGui_ImplVulkan_AddTexture(view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		return (ImTextureID)id;
+	}
+
+	void VulkanImGuiContext::DestroyImage(ImTextureID id)
+	{
+		ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)id);
 	}
 
 	void VulkanImGuiContext::EndFrame(VkCommandBuffer cmd)
@@ -232,11 +244,7 @@ namespace Surge
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 		}
-#endif
-		for (ImTextureID id : mImageTextureIDs)	
-			ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)id);
-		
-		mImageTextureIDs.clear();
+#endif	
 	}
 
 	void VulkanImGuiContext::SetDarkThemeColors()

@@ -34,7 +34,7 @@ namespace Surge
 			SG_ASSERT(!(desc.Usage & TextureUsage::TRANSFER_SRC), "TextureDesc: Transient textures cannot have TRANSFER_SRC usage");
 		}
 
-		TextureEntry entry = {};
+		TextureEntry entry = {};		
 		entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		entry.Desc = desc;
 
@@ -111,11 +111,19 @@ namespace Surge
 		}
 #endif
 
+		//if (desc.Usage & TextureUsage::COLOR_ATTACHMENT)
+		//{
+		//	VkCommandBuffer cmd = rhi.BeginOneTimeCommands();
+		//	TransitionLayout(cmd, entry, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		//	rhi.EndOneTimeCommands(cmd);	
+		//}
+
 		return entry;
 	}
 
 	void VulkanTexture::Destroy(const VulkanRHI& rhi, TextureEntry& entry)
 	{
+		rhi.WaitIdle();
 		if (entry.View != VK_NULL_HANDLE)
 		{
 			vkDestroyImageView(rhi.GetDevice(), entry.View, nullptr);
@@ -149,7 +157,6 @@ namespace Surge
 		stagingDesc.DebugName = "TextureUploadStaging";
 		BufferHandle stagingHandle = rhi.CreateBuffer(stagingDesc);
 		BufferEntry* staging = rhi.mBufferPool.Get(stagingHandle);
-		Log<Severity::Debug>("Created staging buffer generation: {}", stagingHandle.Generation);
 
 		// One-time command buffer
 		VkCommandBuffer cmd = rhi.BeginOneTimeCommands();
@@ -220,8 +227,7 @@ namespace Surge
 
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			srcStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-				| VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			srcStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 			break;
 
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:

@@ -10,17 +10,27 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
         mData = CreateScope<RendererData>();
 
+		const ClientOptions& clientOptions = Core::GetClient()->GetClientOptions();
+		RHISettings::BLIT_TO_SWAPCHAIN = clientOptions.RenderFinalImageToSwapchian;
+
 		mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
-        
+
+		//Sampler
+		SamplerDesc samplerDesc = {};
+		samplerDesc.DebugName = "Renderer DefaultSampler";
+		mData->mDefaultSampler = mRHI->CreateSampler(samplerDesc);
+
 		// Offscreen color texture
 		glm::vec2 size = Core::GetWindow()->GetSize();
 		TextureDesc colorDesc = {};
 		colorDesc.Width = size.x;
 		colorDesc.Height = size.y;
 		colorDesc.Format = TextureFormat::RGBA8_UNORM;
-		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
-		colorDesc.DebugName = "Offscreen Color Texture";
+		colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
+		colorDesc.DebugName = "Final Texture";
+		colorDesc.Sampler = mData->mDefaultSampler;
+		RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
 		mData->mFinalImage = mRHI->CreateTexture(colorDesc);
 
 		// Offscreen framebuffer
@@ -78,11 +88,15 @@ namespace Surge
 		mRenderer3D.EndFrame();
 		mRenderer2D.EndFrame();
 
-		mRHI->CmdEndRenderPass(mCurrentFrameCtx);
+		mRHI->CmdEndRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer);
 
 		// Swapchain
-		mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mData->mFinalImage);
-		mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);	
+		if (RHISettings::BLIT_TO_SWAPCHAIN) // Copy the Final Image to the swapchain (Used in Player)
+			mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mData->mFinalImage);
+		else // If not blitting, we need to transition the final image to SAMPLED for ImGui rendering(Used in Editor)
+			mRHI->GetBackendRHI().CmdTransitionTextureLayout(mCurrentFrameCtx, mData->mFinalImage, TextureUsage::SAMPLED);
+		
+		mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);
 
 		// ImGui Render
 		for (const auto& callback : mImGuiRenderCallbacks)
@@ -91,7 +105,8 @@ namespace Surge
 		OnImGuiRender();
 	
 		mRHI->CmdEndSwapchainRenderpass(mCurrentFrameCtx);
-		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording
+
+		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
     }
 		
 	void Renderer::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
@@ -101,9 +116,11 @@ namespace Surge
 
 	void Renderer::OnImGuiRender()
 	{
+		ImGui::Begin("Renderer");
 		mRenderer2D.OnImGuiRender();
 		mRenderer3D.OnImGuiRender();
 		mRHI->ShowMetricsWindow();
+		ImGui::End();
 	}
 
 	void Renderer::SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
@@ -113,6 +130,14 @@ namespace Surge
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
 	{
+		if (RHISettings::BLIT_TO_SWAPCHAIN)
+		{
+			Core::AddFrameEndCallback([this, width, height]()
+				{
+					mRHI->ResizeFramebuffer(mData->mOffscreenFramebuffer, width, height);
+				});
+		}
+
 		mRenderer2D.OnWindowResize(width, height);
 		mRenderer3D.OnWindowResize(width, height);
 	}
@@ -123,7 +148,7 @@ namespace Surge
         mRHI->WaitIdle();
 		mRenderer2D.Shutdown();
 		mRenderer3D.Shutdown();
-
+		mRHI->DestroySampler(mData->mDefaultSampler);
 		mRHI->DestroyFramebuffer(mData->mOffscreenFramebuffer);
 		mRHI->DestroyTexture(mData->mFinalImage);
 

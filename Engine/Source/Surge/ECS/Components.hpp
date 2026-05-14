@@ -67,14 +67,14 @@ namespace Surge
 	};
 
 
-	struct SpriteRenderer
+	struct SpriteRendererComponent
 	{
-        SpriteRenderer() = default;
-		SpriteRenderer(const glm::vec4& color)
+        SpriteRendererComponent() = default;
+		SpriteRendererComponent(const glm::vec4& color)
 			: Color(color), Texture(TextureHandle::Invalid()) {}
-		SpriteRenderer(const glm::vec3& color, float alpha)
+		SpriteRendererComponent(const glm::vec3& color, float alpha)
 			: Color(glm::vec4(color, alpha)), Texture(TextureHandle::Invalid()) {}
-		SpriteRenderer(const glm::vec4& colorTint, TextureHandle texture)
+		SpriteRendererComponent(const glm::vec4& colorTint, TextureHandle texture)
 			: Color(colorTint), Texture(texture) {}
 
         glm::vec4 Color;
@@ -130,8 +130,8 @@ namespace Surge
     };
 
 //! NOTE: ALL THE MAJOR COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
-#define ALL_MAJOR_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
-                             ::Surge::CameraComponent, ::Surge::PointLightComponent, ::Surge::SpriteRenderer,\
+#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
+                             ::Surge::CameraComponent, ::Surge::PointLightComponent, ::Surge::SpriteRendererComponent,\
                              ::Surge::DirectionalLightComponent
 
 } // namespace Surge

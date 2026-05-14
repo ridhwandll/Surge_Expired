@@ -16,15 +16,15 @@ namespace Surge
 		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 
 		// These three flags are the core of bindless
-		VkDescriptorBindingFlags flags =
+		VkDescriptorBindingFlags bindlessFlags =
 			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |          // Unused slots don't need valid data
 			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |        // Update while set is bound
 			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT; // Variable size array
 
-		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo = {};
-		flagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flagsInfo = {};
+		flagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
 		flagsInfo.bindingCount = 1;
-		flagsInfo.pBindingFlags = &flags;
+		flagsInfo.pBindingFlags = &bindlessFlags;
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -44,8 +44,8 @@ namespace Surge
 		poolInfo.pPoolSizes = &poolSize;
 		VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &mPool));
 
-		VkDescriptorSetVariableDescriptorCountAllocateInfo countInfo = {};
-		countInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+		VkDescriptorSetVariableDescriptorCountAllocateInfoEXT countInfo = {};
+		countInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
 		countInfo.descriptorSetCount = 1;
 		Uint maxCount = RHISettings::MAX_BINDLESS_TEXTURES;
 		countInfo.pDescriptorCounts = &maxCount;

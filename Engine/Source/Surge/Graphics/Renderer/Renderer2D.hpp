@@ -70,7 +70,6 @@ namespace Surge
 		Vector<QuadDrawCmd> mDrawCommands; // We store the draw commands for each batch, and execute them all at the end of the frame in one go
 
 		TextureHandle mWhiteTexture;
-		SamplerHandle mQuadSampler;
         Uint mTotalVertexCount = 0;
         Uint mTotalQuadCount = 0;
         Uint mCurrentFrameVertexOffset = 0;

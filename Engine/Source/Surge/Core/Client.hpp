@@ -9,7 +9,7 @@ namespace Surge
     struct ClientOptions
     {
         WindowDesc WindowDescription;
-        bool EnableImGui = true;
+        bool RenderFinalImageToSwapchian = true;
     };
 
     class SURGE_API Client

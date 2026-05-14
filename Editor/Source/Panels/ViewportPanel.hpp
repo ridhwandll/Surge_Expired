@@ -18,7 +18,7 @@ namespace Surge
         virtual void Shutdown() override;
 
         const glm::vec2& GetViewportSize() const { return mViewportSize; }
-
+		bool IsViewportHovered() const { return mIsViewportHovered; }
     public:
         static PanelCode GetStaticCode() { return PanelCode::Viewport; }
 
@@ -27,6 +27,7 @@ namespace Surge
         glm::vec2 mViewportSize = glm::vec2(0.0f);
         int mGizmoType = -1;
         bool mGizmoInUse = false;
+		bool mIsViewportHovered = false;
         SceneHierarchyPanel* mSceneHierarchy;
     };
 } // namespace Surge

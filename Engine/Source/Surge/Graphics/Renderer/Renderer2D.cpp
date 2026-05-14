@@ -51,9 +51,6 @@ namespace Surge
 		mCurrentBatch.Reset();
 		// CPU side staging array for 1 batch fill this, then memcpy-ied to GPU buffer
 		mCurrentBatch.VertexData.resize(MAX_QUADS_PER_BATCH * 4);
-
-		SamplerDesc samplerDesc = {};
-		mQuadSampler = mRHI->CreateSampler(samplerDesc);
 	
 		Shader shader;
 		shader.Load("Renderer2D.glsl", ShaderType::VERTEX | ShaderType::FRAGMENT);
@@ -76,7 +73,7 @@ namespace Surge
 		texDesc.DebugName = "WhiteTexture";
 		texDesc.InitialData = whitePixel;
 		texDesc.DataSize = sizeof(whitePixel);
-		texDesc.Sampler = mQuadSampler;
+		texDesc.Sampler = mData->mDefaultSampler;
 		mWhiteTexture = mRHI->CreateTexture(texDesc);
 
 		// Amount of max draw calls
@@ -87,7 +84,6 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
 
-		mRHI->DestroySampler(mQuadSampler);
 		mRHI->DestroyTexture(mWhiteTexture);
 		mRHI->DestroyPipeline(mPipeline);
 
@@ -193,19 +189,17 @@ namespace Surge
 
 	void Renderer2D::OnWindowResize(Uint width, Uint height)
 	{
-		Surge::Core::AddFrameEndCallback([this, width, height]()
-			{
-				mRHI->ResizeTexture(mData->mFinalImage, width, height);
-				mRHI->ResizeFramebuffer(mData->mOffscreenFramebuffer, width, height);		
-				//Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
-			});
 	}
 
 	void Renderer2D::OnImGuiRender()
 	{
-		ImGui::Begin("Renderer2D Memory");
-		ImGui::Text("Batches: %u / %u", (mTotalQuadCount + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH, (MAX_QUADS_TOTAL + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH);
+		ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+		ImGui::PushFont(boldFont, 25.0f);
+		ImGui::TextUnformatted("Renderer2D");
 		ImGui::Separator();
+		ImGui::PopFont();
+
+		ImGui::Text("Batches: %u / %u", (mTotalQuadCount + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH, (MAX_QUADS_TOTAL + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH);
 
 		if (mMaxQuadCountReached)
 		{
@@ -214,12 +208,11 @@ namespace Surge
 		}
 
 		float totalVerticesUsed = (float)mTotalVertexCount;
-		float maxVerticesPossible = (float)MAX_VERTICES;
-		float usageRatio = totalVerticesUsed / maxVerticesPossible;
+		float usageRatio = totalVerticesUsed / MAX_VERTICES;
 
 		float frameWeightMB = (sizeof(QuadVertex) * totalVerticesUsed) / 1024.0f / 1024.0f;
-		float totalWeightMB = (sizeof(QuadVertex) * maxVerticesPossible) / 1024.0f / 1024.0f;
-		ImGui::Text("GPU Vertex Buffer: %.3f MB / %.3f MB", frameWeightMB, totalWeightMB);
+		float totalWeightMB = (sizeof(QuadVertex) * MAX_VERTICES) / 1024.0f / 1024.0f;
+		ImGui::Text("Vertex Buffer(GPU): %.1f MB / %.1f MB", frameWeightMB, totalWeightMB);
 
 		ImVec4 barColor = ImVec4(0.0f, 0.7f, 0.0f, 1.0f); // Green
 		if (usageRatio > 0.65f) barColor = ImVec4(1.0f, 0.4f, 0.0f, 1.0f); // Orange
@@ -230,8 +223,6 @@ namespace Surge
 		ImGui::Text("%u / %u Vertices", mTotalVertexCount, MAX_VERTICES);
 		ImGui::PopStyleColor();
 		ImGui::ColorEdit4("Clear Color", (float*)&mData->mClearColor);
-
-		ImGui::End();
 	}
 
 } // namespace Surge

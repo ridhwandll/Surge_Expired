@@ -36,7 +36,7 @@ namespace Surge
 		VulkanRHI() = default;
 		~VulkanRHI() = default;
 		void Initialize(Window* window);
-		void WaitIdle();
+		void WaitIdle() const;
 		void Shutdown();
 
 		void BeginFrame(FrameContext& outCtx);
@@ -53,10 +53,12 @@ namespace Surge
 		void DestroyTexture(TextureHandle h);
 		void UploadTextureData(TextureHandle h, const void* data, Uint size);
 		void ResizeTexture(TextureHandle h, Uint width, Uint height);
+		TextureDesc GetDesc(TextureHandle h);
 
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
 		void DestroyFramebuffer(FramebufferHandle h);
 		void ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height);
+		FramebufferDesc GetDesc(FramebufferHandle h);
 
 		PipelineHandle CreatePipeline(const PipelineDesc& desc);
 		void DestroyPipeline(PipelineHandle h);
@@ -84,13 +86,13 @@ namespace Surge
 
 		void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data);
 		void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle);
-		void CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout); // TODO: Expose to RHI
+		void CmdTransitionTextureLayout(const FrameContext& ctx, TextureHandle h, TextureUsage newLayout);
 
 		void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
 		void CmdEndSwapchainRenderpass(const FrameContext& ctx);
 
 		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor);
-		void CmdEndRenderPass(const FrameContext& ctx);
+		void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h);
 
 		// setIndex maps to layout(set = N) in GLSL
 		void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex);
@@ -99,6 +101,10 @@ namespace Surge
 		void EndOneTimeCommands(VkCommandBuffer cmd) const;
 
 		void SetDebugName(const VkDebugUtilsObjectNameInfoEXT& nameInfo) const { mDebugger.SetDebugName(*this, nameInfo); }
+
+		ImTextureID AddImGuiImage(TextureHandle h);
+		ImTextureID GetImGuiImage(TextureHandle h);
+		void DestroyImGuiImage(TextureHandle h);
 
 		// Getters for internal use by Vulkan* classes
 		const VulkanSwapchain& GetSwapchain() const { return mSwapchain; }

@@ -172,7 +172,7 @@ namespace Surge
         SG_ASSERT_NOMSG(e);
 
         nlohmann::json& out = j[std::format("Entity{0}", index)];
-        SerializeComponents<ALL_MAJOR_COMPONENTS>(out, e);
+        SerializeComponents<SERIALIZABLE_COMPONENTS>(out, e);
     }
 
     template <>
@@ -321,7 +321,7 @@ namespace Surge
         SG_ASSERT_NOMSG(e);
 
         nlohmann::json& inJson = j[std::format("Entity{0}", index)];
-        DeserializeComponents<ALL_MAJOR_COMPONENTS>(inJson, e);
+        DeserializeComponents<SERIALIZABLE_COMPONENTS>(inJson, e);
     }
 
     template <>

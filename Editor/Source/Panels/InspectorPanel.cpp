@@ -22,18 +22,16 @@ namespace Surge
         bool remvove = false;
         if (open)
         {
-            const ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
-            const float lineHeight = 15 + GImGui->Style.FramePadding.y;
-
-            if (isRemoveable)
-            {
-                ImGui::SameLine();
-                ImGui::SetCursorPosX(contentRegionAvailable.x + 13.0f);
-                if (ImGui::Button(reinterpret_cast<const char*>(ICON_SURGE_TRASH_O)))
-                    remvove = true;
-            }
             if (ImGui::BeginTable("##ComponentTable", 2, ImGuiTableFlags_Resizable))
             {
+				if (isRemoveable)
+				{
+                    ImGui::TableNextColumn();
+					ImGui::TextUnformatted("Settings");
+                    ImGui::TableNextColumn();
+					if (ImGui::Button(reinterpret_cast<const char*>("REMOVE")))
+						remvove = true;
+				}
                 function();
                 ImGui::EndTable();
             }
@@ -72,6 +70,10 @@ namespace Surge
                         entity.AddComponent<CameraComponent>();
                     if (ImGui::MenuItem("Point Light"))
                         entity.AddComponent<PointLightComponent>();
+					if (ImGui::MenuItem("Sprite Renderer"))
+						entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+					if (ImGui::MenuItem("Mesh Component"))
+						entity.AddComponent<MeshComponent>();
                     if (ImGui::MenuItem("Directional Light"))
                         entity.AddComponent<DirectionalLightComponent>();
                     ImGui::EndPopup();
@@ -96,9 +98,12 @@ namespace Surge
             TransformComponent& component = entity.GetComponent<TransformComponent>();
             DrawComponent<TransformComponent>(
                 entity, "Transform", [&component]() {
-                    ImGuiAux::TProperty<glm::vec3>("Position", &component.Position);
-                    ImGuiAux::TProperty<glm::vec3>("Rotation", &component.Rotation);
-                    ImGuiAux::TProperty<glm::vec3>("Scale", &component.Scale);
+                    if (ImGuiAux::TProperty<glm::vec3>("Position", &component.Position));
+                        component.MarkDirty();
+                    if (ImGuiAux::TProperty<glm::vec3>("Rotation", &component.Rotation))
+                        component.MarkDirty();
+                    if (ImGuiAux::TProperty<glm::vec3>("Scale", &component.Scale))
+                        component.MarkDirty();
                 },
                 false);
         }
@@ -167,6 +172,23 @@ namespace Surge
                 }
             });
         }
+
+		if (entity.HasComponent<SpriteRendererComponent>())
+		{
+            SpriteRendererComponent& component = entity.GetComponent<SpriteRendererComponent>();
+			DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
+				ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
+				});
+		}
+
+		if (entity.HasComponent<MeshComponent>())
+		{
+            MeshComponent& component = entity.GetComponent<MeshComponent>();
+			DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
+                String kek = "TODO: Implement Asset Manager";
+				ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
+				});
+		}
 
         if (entity.HasComponent<PointLightComponent>())
         {

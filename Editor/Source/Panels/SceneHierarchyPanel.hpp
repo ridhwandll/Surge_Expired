@@ -37,7 +37,6 @@ namespace Surge
         PanelCode mCode;
         Scene* mSceneContext;
         Entity mSelectedEntity; // TODO: Make It a vector when we allow multiple selection
-
-        ImGuiAux::RenamingMechanism mRenamingMech;
     };
+
 } // namespace Surge

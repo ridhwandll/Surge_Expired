@@ -17,6 +17,7 @@ namespace Surge
         glm::mat4 ViewProjection;
 
 		TextureHandle mFinalImage;
+        SamplerHandle mDefaultSampler;
 		FramebufferHandle mOffscreenFramebuffer;
 		glm::vec4 mClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
     };
@@ -39,8 +40,16 @@ namespace Surge
 		void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture = TextureHandle::Invalid());
 		void OnWindowResize(Uint width, Uint height);
 
-        TextureHandle GetFinalImage() const { return mData->mFinalImage; }
+		TextureHandle GetFinalImage() const { return mData->mFinalImage; }
+        FramebufferHandle GetFinalFramebuffer() const { return mData->mOffscreenFramebuffer; }
+        ImTextureID GetFinalImageImGuiID() const
+		{
+			SG_ASSERT(!RHISettings::BLIT_TO_SWAPCHAIN, "Renderer is blitting to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
+            return mRHI->GetImGuiImage(mData->mFinalImage);
+		}
+
 		const Renderer2D& GetRenderer2D() const { return mRenderer2D; }
+		SamplerHandle GetDefaultSampler() const { return mData->mDefaultSampler; }
 
 		const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
         Scope<GraphicsRHI>& GetRHI() { return mRHI; }
