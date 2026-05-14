@@ -39,17 +39,36 @@ namespace Surge
             mActiveScene->CreateEntity(sprite, "Sprite");
             SpriteRendererComponent& s = sprite.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         }
-		{
-			mActiveScene->CreateEntity(cube, "Mesh");
-			MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
-			meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-			//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/ABeautifulGame/glTF/ABeautifulGame.gltf");
 
-			auto& t = cube.GetComponent<TransformComponent>();
-			t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-			t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-			t.MarkDirty();
+        // Load meshes from files
+		//{
+		//	mActiveScene->CreateEntity(cube, "Mesh");
+		//	MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
+		//	//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
+		//	//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/ABeautifulGame/glTF/ABeautifulGame.gltf");
+        //
+		//	auto& t = cube.GetComponent<TransformComponent>();
+		//	t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+		//	t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+		//	t.MarkDirty();
+		//}
+
+        // Load in-engine generated meshes
+		{
+			std::array<Entity, 7> generatedMeshEntities;
+			for (int i = 0; i < 7; i++)
+			{
+				mActiveScene->CreateEntity(generatedMeshEntities[i], MeshGenerator::DefaultMeshToString(static_cast<DefaultMesh>(i)));
+				MeshComponent& meshComp = generatedMeshEntities[i].AddComponent<MeshComponent>();
+				meshComp.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(i));
+
+				TransformComponent& t = generatedMeshEntities[i].GetComponent<TransformComponent>();
+				t.Position = glm::vec3(-5.0f + i * 2.0f, 1.0f, 0.0f);
+				t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+				t.MarkDirty();
+			}
 		}
+
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 

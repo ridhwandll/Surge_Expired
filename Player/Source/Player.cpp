@@ -170,15 +170,18 @@ namespace Surge
 		}
 
 		{
-			mActiveScene->CreateEntity(mMeshEntity, "Mesh");
-			MeshComponent& meshComp = mMeshEntity.AddComponent<MeshComponent>();
-			meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-			//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/ABeautifulGame/glTF/ABeautifulGame.gltf");
-
-			auto& t = mMeshEntity.GetComponent<TransformComponent>();
-			t.Position = glm::vec3(0.0f, 1.0f, 1.0f);
-			t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-			t.MarkDirty();
+			std::array<Entity, 7> generatedMeshEntities;
+			for (int i = 0; i < 7; i++)
+			{
+				mActiveScene->CreateEntity(generatedMeshEntities[i], "Mesh" + std::to_string(i));
+				MeshComponent& meshComp = generatedMeshEntities[i].AddComponent<MeshComponent>();
+				meshComp.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(i));
+		
+				TransformComponent& t = generatedMeshEntities[i].GetComponent<TransformComponent>();
+				t.Position = glm::vec3(-5.0f + i * 2.0f, 1.0f, 0.0f);
+				t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+				t.MarkDirty();
+			}
 		}
 
 		mActiveScene->OnResize(windowSize.x, windowSize.y);
@@ -290,16 +293,6 @@ namespace Surge
 				}
 			}
 		}
-
-		// Simple mesh controls
-		auto& t = mMeshEntity.GetComponent<TransformComponent>();
-		if (ImGui::DragFloat3("Mesh Position", glm::value_ptr(t.Position), 0.1f))
-			t.MarkDirty();
-		if (ImGui::DragFloat3("Mesh Rotation", glm::value_ptr(t.Rotation), 0.1f))
-			t.MarkDirty();
-		if (ImGui::DragFloat3("Mesh Scale", glm::value_ptr(t.Scale), 0.1f))
-			t.MarkDirty();
-
 
 		ImGui::End();
 

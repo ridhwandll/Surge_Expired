@@ -726,11 +726,11 @@ namespace Surge
 		VkImage swapchainImage = mSwapchain.GetFrame(ctx.SwapchainIndex).Image;
 		Uint w = mSwapchain.GetDimensions().Width;
 		Uint h = mSwapchain.GetDimensions().Height;
-
-		// Transition offscreen: UNDEFINED to TRANSFER_SRC
+		
+		// Transition offscreen: src->Layout to TRANSFER_SRC
 		VkImageMemoryBarrier srcBarrier = {};
 		srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		srcBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		srcBarrier.oldLayout = src->Layout;
 		srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		srcBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;

@@ -130,7 +130,7 @@ namespace Surge
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
 	{
-		if (RHISettings::BLIT_TO_SWAPCHAIN)
+		if (RHISettings::BLIT_TO_SWAPCHAIN && (width > 0 && height > 0))
 		{
 			Core::AddFrameEndCallback([this, width, height]()
 				{
