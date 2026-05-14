@@ -98,22 +98,24 @@ namespace Surge
 		else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR)		
 			composite = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
 		
-		VkSwapchainCreateInfoKHR info{
-			.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-			.pNext = nullptr,
-			.surface = surface,
-			.minImageCount = desiredSwapchainImages,
-			.imageFormat = format.format,
-			.imageColorSpace = format.colorSpace,
-			.imageExtent = swapchainSize,
-			.imageArrayLayers = 1,
-			.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, //VK_IMAGE_USAGE_TRANSFER_DST_BIT needed as we blit
-			.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-			.preTransform = preTransform,
-			.compositeAlpha = composite,
-			.presentMode = swapchainPresentMode,
-			.clipped = true,
-			.oldSwapchain = oldSwapchain };
+		VkSwapchainCreateInfoKHR info{};
+		info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		info.surface = surface;
+		info.minImageCount = desiredSwapchainImages;
+		info.imageFormat = format.format;
+		info.imageColorSpace = format.colorSpace;
+		info.imageExtent = swapchainSize;
+		info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		info.imageArrayLayers = 1;
+		info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.preTransform = preTransform;
+		info.compositeAlpha = composite;
+		info.presentMode = swapchainPresentMode;
+		info.clipped = true;
+		info.oldSwapchain = oldSwapchain;
+
+		if (RHISettings::BLIT_TO_SWAPCHAIN)
+			info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		VK_CALL(vkCreateSwapchainKHR(device, &info, nullptr, &mSwapchain));
 		Log<Severity::Debug>("VulkanSwapchain created with Width:{} Height:{}", swapchainSize.width, swapchainSize.height);

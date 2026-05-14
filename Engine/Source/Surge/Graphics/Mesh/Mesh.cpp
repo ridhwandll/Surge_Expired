@@ -257,6 +257,58 @@ namespace Surge
 		//		LoadTexture(mPath, mat.normal_texture, material, "NormalMap");
 		//	}
 		//}
+
+		CreateRHIObjects();
+		cgltf_free(data);
+	}
+
+	Mesh::Mesh(DefaultMesh type)
+	{
+		MeshGenerator::MeshData meshData = MeshGenerator::GenerateDefaultMesh(type);
+		mVertices = std::move(meshData.Vertices);
+		mIndices = std::move(meshData.Indices);
+
+		// Only one submesh for default meshes
+		mSubmeshes.emplace_back();
+		Submesh& submesh = mSubmeshes.back();
+		submesh.BaseVertex = 0;
+		submesh.BaseIndex = 0;
+		submesh.MaterialIndex = 0;
+
+		submesh.VertexCount = (Uint)mVertices.size();
+		submesh.IndexCount = (Uint)mIndices.size() * 3;
+
+		submesh.Transform = glm::mat4(1.0f);
+		submesh.LocalTransform = glm::mat4(1.0f);
+		submesh.MeshName = "DefaultMesh";
+		submesh.NodeName= "DefaultMesh_Node";
+
+		submesh.BoundingBox.Reset();
+		//Compute AABB
+		glm::vec3 minBound(std::numeric_limits<float>::max());
+		glm::vec3 maxBound(-std::numeric_limits<float>::max());
+		for (const auto& v : mVertices)
+		{
+			minBound = glm::min(minBound, v.Position);
+			maxBound = glm::max(maxBound, v.Position);
+		}
+		submesh.BoundingBox.Min = minBound;
+		submesh.BoundingBox.Max = maxBound;
+
+		CreateRHIObjects();
+	}
+
+	Mesh::~Mesh()
+	{
+		Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+
+		rhi->WaitIdle();
+		rhi->DestroyBuffer(mVertexBuffer);
+		rhi->DestroyBuffer(mIndexBuffer);
+	}
+
+	void Mesh::CreateRHIObjects()
+	{
 		Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
 
 		BufferDesc vbDesc = {};
@@ -274,17 +326,6 @@ namespace Surge
 		ibDesc.InitialData = mIndices.data();
 		ibDesc.DebugName = "MeshIB";
 		mIndexBuffer = rhi->CreateBuffer(ibDesc);
-
-		cgltf_free(data);
-	}
-
-	Mesh::~Mesh()
-	{
-		Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
-
-		rhi->WaitIdle();
-		rhi->DestroyBuffer(mVertexBuffer);
-		rhi->DestroyBuffer(mIndexBuffer);
 	}
 
 } // namespace Surge

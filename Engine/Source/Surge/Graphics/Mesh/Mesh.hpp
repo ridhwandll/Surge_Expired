@@ -4,19 +4,10 @@
 #include "Surge/Core/Memory.hpp"
 #include "SurgeMath/AABB.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include <glm/glm.hpp>
+#include "DefaultMeshes.hpp"
 
 namespace Surge
 {
-	struct Vertex
-	{
-		glm::vec3 Position;
-		glm::vec3 Normal;
-		glm::vec3 Tangent;
-		glm::vec3 Bitangent;
-		glm::vec2 TexCoord;
-	};
-
 	struct Submesh
 	{
 		Uint BaseVertex;
@@ -32,16 +23,11 @@ namespace Surge
 		String NodeName, MeshName;
 	};
 
-	struct Index
-	{
-		Uint V1, V2, V3;
-	};
-
 	class Mesh : public RefCounted
 	{
-	public:
-		// Relative path to Engine/Assets directory
-		Mesh(const String& filepath);
+	public:		
+		Mesh(DefaultMesh type);
+		Mesh(const String& filepath); // Relative path to Engine/Assets directory
 		~Mesh();
 
 		const String& GetPath() const { return mPath; }
@@ -50,6 +36,8 @@ namespace Surge
 		BufferHandle GetIndexBuffer() const { return mIndexBuffer; }
 
 		const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }		
+	private:
+		void CreateRHIObjects();
 
 	private:
 		String mPath;
