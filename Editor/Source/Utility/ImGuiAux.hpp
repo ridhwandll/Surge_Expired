@@ -45,9 +45,10 @@ namespace Surge::ImGuiAux
         ScopedBoldFont(const ScopedBoldFont&) = delete;
         ScopedBoldFont operator=(const ScopedBoldFont&) = delete;
 
-        ScopedBoldFont(bool largeFont = false)
+        ScopedBoldFont()
         {
-            largeFont ? ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]) : ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+            // Bold font at index 1 (See Surge/Graphics/RHI/Vulkan/VulkanImGui.cpp)
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
         }
         ~ScopedBoldFont()
         {
@@ -109,7 +110,7 @@ namespace Surge::ImGuiAux
     void TextCentered(const char* text);
     bool ButtonCentered(const char* title);
 
-    //void Image(const Ref<Image2D>& image, const glm::vec2& size);
+    void Image(TextureHandle image, const glm::vec2& size);
 
     template <typename T>
     void TComboBox(const char* title, const char** stringArray, Uint stringArraySize, Uint currentStringIndexInArray, T callbackFunction)
@@ -138,7 +139,7 @@ namespace Surge::ImGuiAux
     }
 
     template <typename T, CustomProprtyFlag F = CustomProprtyFlag::None>
-    constexpr FORCEINLINE bool TProperty(const char* title, T* value, float dragMin = 0.0f, float dragMax = 0.0f)
+    constexpr bool TProperty(const char* title, T* value, float dragMin = 0.0f, float dragMax = 0.0f)
     {
         ImGui::PushID(title);
         bool result = false;
@@ -160,13 +161,15 @@ namespace Surge::ImGuiAux
                 result = ImGui::DragFloat4("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
             else if constexpr (std::is_same_v<T, bool>)
                 result = ImGui::Checkbox("##v", value);
+			else if constexpr (std::is_same_v<T, String>)
+                ImGui::TextUnformatted(value->c_str());
             else
                 static_assert(false);
         }
         else if constexpr (F == CustomProprtyFlag::Color3 && std::is_same_v<T, glm::vec3>)
             result = ImGui::ColorEdit3("##v", glm::value_ptr(*value));
         else if constexpr (F == CustomProprtyFlag::Color4 && std::is_same_v<T, glm::vec4>)
-            result = ImGui::ColorEdit4("##v", glm::value_ptr(*value));
+            result = ImGui::ColorEdit4("##v", glm::value_ptr(*value), ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
         else
             static_assert(false, "Invalid case! Maybe you used wrong CustomProprtyFlag with wrong type? For example: Using glm::vec3 with CustomProprtyFlag::Color4");
         ImGui::PopItemWidth();
@@ -177,7 +180,7 @@ namespace Surge::ImGuiAux
         return result;
     }
 
-    FORCEINLINE bool TSelectable(const char* title)
+    inline bool TSelectable(const char* title)
     {
         ImGui::TableNextColumn();
         bool isSlected = ImGui::Selectable(title);
@@ -186,7 +189,7 @@ namespace Surge::ImGuiAux
         return isSlected;
     }
 
-    FORCEINLINE bool TButton(const char* title, const char* buttonText)
+    inline bool TButton(const char* title, const char* buttonText)
     {
         ImGui::PushID(title);
         bool result = false;
@@ -207,7 +210,7 @@ namespace Surge::ImGuiAux
         return result;
     }
 
-    FORCEINLINE bool Button(const char* buttonText)
+    inline bool Button(const char* buttonText)
     {
         bool result = false;
         result = ImGui::Button(buttonText);
@@ -219,7 +222,7 @@ namespace Surge::ImGuiAux
     }
 
     template <typename T>
-    FORCEINLINE bool TSlider(const char* label, T& value, T min, T max)
+    inline bool TSlider(const char* label, T& value, T min, T max)
     {
         bool modified = false;
         ImGui::PushID(label);
@@ -249,7 +252,7 @@ namespace Surge::ImGuiAux
         return modified;
     }
 
-    FORCEINLINE void ToolTip(const char* tip)
+    inline void ToolTip(const char* tip)
     {
         if (ImGui::IsItemHovered())
         {
@@ -259,7 +262,7 @@ namespace Surge::ImGuiAux
         }
     }
 
-    FORCEINLINE void DelayedToolTip(const char* tip)
+    inline void DelayedToolTip(const char* tip)
     {
         if (ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 0.5f)
         {
@@ -269,16 +272,15 @@ namespace Surge::ImGuiAux
         }
     }
 
-    FORCEINLINE void ShiftCursorX(float x)
+    inline void ShiftCursorX(float x)
     {
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x);
     }
-    FORCEINLINE void ShiftCursorY(float y)
+    inline void ShiftCursorY(float y)
     {
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y);
     }
 
-    // clang-format off
     class RenamingMechanism
     {
     public:
@@ -297,6 +299,6 @@ namespace Surge::ImGuiAux
         String mOldName;
         String mTempBuffer;
     };
-    // clang-format on
+
 
 } // namespace Surge::ImGuiAux

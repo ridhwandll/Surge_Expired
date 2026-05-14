@@ -76,7 +76,7 @@ namespace Surge
 		mBindlessRegistry.Init(*this);
 	}
 
-	void VulkanRHI::WaitIdle()
+	void VulkanRHI::WaitIdle() const
 	{
 		vkDeviceWaitIdle(mDevice.GetDevice());
 	}
@@ -248,6 +248,10 @@ namespace Surge
 		SG_ASSERT(!(desc.InitialData && !(desc.Usage & TextureUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. Add TextureUsage::TRANSFER_DST to upload pixel data");
 
 		TextureEntry entry = VulkanTexture::Create(*this, desc);
+
+		if (desc.GenerateImGuiID)
+			entry.ImGuiID = mImGuiContext.AddImage(entry.View);
+
 		TextureHandle h = mTexturePool.Allocate(std::move(entry));
 
 		if (desc.Usage & TextureUsage::SAMPLED)
@@ -271,6 +275,10 @@ namespace Surge
 			return;
 
 		VK_RHI_LOG(Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation));
+
+		if (entry->Desc.GenerateImGuiID)
+			DestroyImGuiImage(h);
+
 		mBindlessRegistry.UnregisterTexture(entry->BindlessIndex);
 		VulkanTexture::Destroy(*this, *entry);
 		mTexturePool.Free(h);		
@@ -290,12 +298,17 @@ namespace Surge
 		if (!entry)
 			return;
 
+		if (entry->Desc.GenerateImGuiID)
+			DestroyImGuiImage(h);
+
 		VulkanTexture::Destroy(*this, *entry);
 		TextureDesc desc = entry->Desc;
 		desc.Width = width;
 		desc.Height = height;
 
 		*entry = VulkanTexture::Create(*this, desc);
+		if (desc.GenerateImGuiID)
+			entry->ImGuiID = mImGuiContext.AddImage(entry->View);
 	}
 
 	FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc)
@@ -327,13 +340,32 @@ namespace Surge
 		// Destroy old VkFramebuffer, textures still live
 		VulkanFramebuffer::Destroy(*this, *entry);
 
+		// Resize the attached Textures
+		for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
+			ResizeTexture(entry->Desc.ColorAttachments[i].Handle, width, height);
+		if (entry->Desc.HasDepth)
+			ResizeTexture(entry->Desc.DepthAttachment.Handle, width, height);		
+
 		// Rebuild with new dimensions
-		// Caller must resize textures first via ResizeTexture()
 		FramebufferDesc desc = entry->Desc;
 		desc.Width = width;
 		desc.Height = height;
 
 		*entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
+	}
+
+	FramebufferDesc VulkanRHI::GetDesc(FramebufferHandle h)
+	{
+		FramebufferEntry* entry = mFramebufferPool.Get(h);
+		SG_ASSERT(entry, "GetDesc: invalid FramebufferHandle");
+		return entry->Desc;
+	}
+
+	TextureDesc VulkanRHI::GetDesc(TextureHandle h)
+	{
+		TextureEntry* entry = mTexturePool.Get(h);
+		SG_ASSERT(entry, "GetDesc: invalid TextureHandle");
+		return entry->Desc;
 	}
 
 	PipelineHandle VulkanRHI::CreatePipeline(const PipelineDesc& desc)
@@ -695,10 +727,10 @@ namespace Surge
 		Uint w = mSwapchain.GetDimensions().Width;
 		Uint h = mSwapchain.GetDimensions().Height;
 
-		// Transition offscreen: COLOR_ATTACHMENT_OPTIMAL to TRANSFER_SRC
+		// Transition offscreen: UNDEFINED to TRANSFER_SRC
 		VkImageMemoryBarrier srcBarrier = {};
 		srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		srcBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		srcBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		srcBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -751,20 +783,20 @@ namespace Surge
 		postBlit.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		postBlit.subresourceRange.levelCount = 1;
 		postBlit.subresourceRange.layerCount = 1;
-
 		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &postBlit);
 
 		// Track layout for offscreen texture
 		src->Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	}
 
-	void VulkanRHI::CmdTextureBarrier(const FrameContext& ctx, TextureHandle h, VkImageLayout newLayout)
+	void VulkanRHI::CmdTransitionTextureLayout(const FrameContext& ctx, TextureHandle h, TextureUsage newLayout)
 	{
 		TextureEntry* entry = mTexturePool.Get(h);
-		SG_ASSERT(entry, "VulkanRHI::CmdTextureBarrier: invalid TextureHandle");
+		SG_ASSERT(entry, "VulkanRHI::CmdTransitionTextureLayout: invalid TextureHandle");
 
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-		VulkanTexture::TransitionLayout(cmd, *entry, newLayout);
+		VkImageLayout vkLayout = VulkanUtils::TextureUsageToVkLayout(newLayout); // Validate newLayout is compatible with our supported usages
+		VulkanTexture::TransitionLayout(cmd, *entry, vkLayout);
 	}
 
 	void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
@@ -831,10 +863,29 @@ namespace Surge
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
 	}
 
-	void VulkanRHI::CmdEndRenderPass(const FrameContext& ctx)
+	void VulkanRHI::CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h)
 	{
 		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
 		vkCmdEndRenderPass(cmd);
+
+		FramebufferEntry* entry = mFramebufferPool.Get(h);
+		// Starting a Renderpass transitions attachments to finalLayout, so we need to update our tracked layout to match
+		if (entry)
+		{
+			for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
+			{
+				TextureEntry* tex = mTexturePool.Get(entry->Desc.ColorAttachments[i].Handle);
+				if (tex)
+					tex->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // finalLayout
+			}
+			if (entry->Desc.HasDepth)
+			{
+				TextureEntry* depth = mTexturePool.Get(entry->Desc.DepthAttachment.Handle);
+				if (depth)
+					depth->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			}
+		}
+
 	}
 
 	void VulkanRHI::CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex /*= 0*/)
@@ -881,12 +932,41 @@ namespace Surge
 		vkFreeCommandBuffers(mDevice.GetDevice(), mFrame.GetFrame(0).CmdPool, 1, &cmd);
 	}
 
+	ImTextureID VulkanRHI::AddImGuiImage(TextureHandle h)
+	{
+		TextureEntry* entry = mTexturePool.Get(h);
+		SG_ASSERT(entry, "AddImGuiImage: invalid TextureHandle");
+
+		return mImGuiContext.AddImage(entry->View);
+	}
+
+	ImTextureID VulkanRHI::GetImGuiImage(TextureHandle h)
+	{
+		TextureEntry* entry = mTexturePool.Get(h);
+		SG_ASSERT(entry, "GetImGuiImage: invalid TextureHandle");
+		SG_ASSERT(entry->Desc.GenerateImGuiID, "GetImGuiImage: Texture was not created with GenerateImGuiID flag!");
+		return entry->ImGuiID;
+	}
+
+	void VulkanRHI::DestroyImGuiImage(TextureHandle h)
+	{
+		TextureEntry* entry = mTexturePool.Get(h);
+		SG_ASSERT(entry, "DestroyImGuiImage: invalid TextureHandle");
+		SG_ASSERT(entry->Desc.GenerateImGuiID, "DestroyImGuiImage: Texture was not created with GenerateImGuiID flag!");
+		mImGuiContext.DestroyImage(entry->ImGuiID);
+	}
+
 	void VulkanRHI::ShowPoolDebugImGuiWindow()
 	{
-		ImGui::Begin("Vulkan RHI");
+		ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+		ImGui::PushFont(boldFont, 25.0f);
+		ImGui::TextUnformatted("Vulkan RHI");
+		ImGui::Separator();
+		ImGui::PopFont();
+
 		constexpr float boldFontSize = 18.0f;
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), 22.0f);
-		ImGui::Text("GPU Info");
+		ImGui::PushFont(boldFont, boldFontSize);
+		ImGui::TextUnformatted("GPU Info");
 		ImGui::PopFont();		
 		ImGui::Text("GPU: %s", mStats.GPUName.c_str());
 		ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
@@ -899,18 +979,18 @@ namespace Surge
 		float used = memStats.UsedGPUMemory;
 		float total = memStats.TotalAllowedGPUMemory;
 		float frac = (total > 0.0f) ? (used / total) : 0.0f;
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
-		ImGui::Text("GPU Memory");
+		ImGui::PushFont(boldFont, boldFontSize);
+		ImGui::TextUnformatted("GPU Memory");
 		ImGui::PopFont();
 		ImGui::Text("Allocations: %llu", memStats.AllocationCount);
 		ImGui::Text("%.3f MB / %.3f MB", used, total);
 		ImGui::ProgressBar(frac, ImVec2(-1, 0));
 		ImGui::Separator();
-		ImGui::PushFont(mImGuiContext.GetBoldFont(), 22.0f);
-		ImGui::Text("RHI Pools");
+		ImGui::PushFont(boldFont, boldFontSize);
+		ImGui::TextUnformatted("RHI Pools");
 		ImGui::PopFont();
 
-		//ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
+		//ImGui::PushFont(boldFont, boldFontSize);
 		if (ImGui::TreeNode("BufferPool"))
 		{
 			//ImGui::PopFont();
@@ -1053,7 +1133,6 @@ namespace Surge
 				});
 			ImGui::TreePop();
 		}
-		ImGui::End();
 	}
 
 	void VulkanRHI::CreateInstance()
@@ -1182,18 +1261,16 @@ namespace Surge
 	{
 		VkDevice device = mDevice.GetDevice();		
 		// Proudly stolen from Sascha Willems' Vulkan examples:
-		VkAttachmentDescription attachment
-		{
-			.format = mSwapchain.GetDimensions().Format,               // Backbuffer format
-			.samples = VK_SAMPLE_COUNT_1_BIT,                          // Not multisampled
-			.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,                      // We blit, so LOAD_OP_LOAD to preserve the blit contents
-			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,                   // When ending the frame, we want tiles to be written out
-			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // Don't care about stencil since we're not using it
-			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,        // Don't care about stencil since we're not using it
-			.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // The image layout will be undefined when the render pass begins
-			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR             // After the render pass is complete, we will transition to PRESENT_SRC_KHR layout.
-		};
-
+		VkAttachmentDescription attachment = {};		
+		attachment.format = mSwapchain.GetDimensions().Format;               // Backbuffer format
+		attachment.samples = VK_SAMPLE_COUNT_1_BIT;                          // Not multisampled
+		attachment.loadOp = RHISettings::BLIT_TO_SWAPCHAIN ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;                   // When ending the frame, we want tiles to be written out
+		attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachment.initialLayout = RHISettings::BLIT_TO_SWAPCHAIN ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+		attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // After the render pass is complete, we will transition to PRESENT_SRC_KHR layout.
+		
 		// We have one subpass. This subpass has one color attachment.
 		// While executing this subpass, the attachment will be in attachment optimal layout.
 		VkAttachmentReference colorRef = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };

@@ -6,6 +6,7 @@
 
 namespace Surge::VulkanUtils
 {
+	VkImageLayout TextureUsageToVkLayout(TextureUsage usage);
 	VkFormat ToVkVertexFormat(VertexFormat f);
 	VkCullModeFlags ToVkCullMode(CullMode c);
 	VkFrontFace ToVkFrontFace(FrontFace f);

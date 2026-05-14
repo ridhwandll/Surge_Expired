@@ -33,14 +33,25 @@ namespace Surge
                 if (ImGui::MenuItem("Empty Entity"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Entity");
-                    mRenamingMech.SetRenamingState(true);
                 }
                 if (ImGui::MenuItem("Camera"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Camera");
                     mSelectedEntity.AddComponent<CameraComponent>();
                 }
+				ImGui::Separator();
+				if (ImGui::MenuItem("Sprite Renderer"))
+				{
+					mSceneContext->CreateEntity(mSelectedEntity, "Sprite");
+                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+				}
                 ImGui::Separator();
+				if (ImGui::MenuItem("Mesh"))
+				{
+					mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
+					mSelectedEntity.AddComponent<MeshComponent>();
+				}
+				ImGui::Separator();
                 if (ImGui::MenuItem("Point Light"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Point Light");
@@ -59,7 +70,7 @@ namespace Surge
             if (ImGui::BeginTable("HierarchyTable", 2, flags))
             {
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
-                ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("A").x * 12.0f);
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("A").x * 12.0f);
                 ImGui::TableHeadersRow();
 
                 Uint idCounter = 0;
@@ -82,34 +93,38 @@ namespace Surge
     void SceneHierarchyPanel::DrawEntityNode(Entity& e)
     {
         String& name = e.GetComponent<NameComponent>().Name;
-        ImGuiTreeNodeFlags flags = ((mSelectedEntity == e) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanFullWidth;
+        // ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_Leaf added as we dont have entity parenting yet
+        ImGuiTreeNodeFlags flags = ((mSelectedEntity == e) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth;
+		bool isSelectedEntity = false;
+		if (mSelectedEntity == e)
+			isSelectedEntity = true;
 
-        bool isSelectedEntity = false;
-        if (mSelectedEntity == e)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
-            isSelectedEntity = true;
-        }
+		{
+			ImGuiAux::ScopedColor style({ ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive }, { 0.0, 0.0, 0.0, 0.0 });
+			if (isSelectedEntity)
+			{
+				ImGuiAux::ScopedBoldFont font;
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
+				ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
+                ImGui::PopStyleColor();
+			}
+			else
+				ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
+		}
 
-        bool opened = false;
-        {
-            ImGuiAux::ScopedColor style({ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive}, {0.0, 0.0, 0.0, 0.0});
-            opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
-        }
-
-        if (ImGui::IsItemClicked() && !mRenamingMech)
+		if (ImGui::IsItemClicked())
             mSelectedEntity = e;
+
 
         if (isSelectedEntity)
         {
-            //if (!mRenamingMech && mSelectedEntity)
-            //    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiAux::Colors::ExtraDark));
-
-            mRenamingMech.Update(name);
-            ImGui::PopStyleColor();
+            if (mSelectedEntity)
+            {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColorLight));
+            }
         }
 
-        if (ImGui::BeginPopupContextItem() && !mRenamingMech)
+        if (ImGui::BeginPopupContextItem())
         {
             if (ImGui::MenuItem("Delete"))
             {
@@ -117,16 +132,24 @@ namespace Surge
                     mSelectedEntity = {};
 
                 // Only execute when the frame ends, else it will give crash on "Entity not found"
-                Surge::Core::AddFrameEndCallback([=]() { mSceneContext->DestroyEntity(e); });
+                Surge::Core::AddFrameEndCallback([this, e]() { mSceneContext->DestroyEntity(e); });
             }
             ImGui::EndPopup();
         }
-
-        if (opened)
-            ImGui::TreePop();
+        ImGui::TreePop();
 
         ImGui::TableNextColumn();
-        ImGui::TextUnformatted("Entity");
+		{
+            
+            if (isSelectedEntity)
+			{
+				ImGuiAux::ScopedBoldFont font;
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
+				ImGui::TextUnformatted("Selected Entity");
+				ImGui::PopStyleColor();
+            }
+            else ImGui::TextUnformatted("Entity");
+		}
     }
 
     void SceneHierarchyPanel::Shutdown()

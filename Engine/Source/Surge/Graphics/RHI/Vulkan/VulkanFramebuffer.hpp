@@ -10,7 +10,7 @@ namespace Surge
 	class VulkanFramebuffer
 	{
 	public:
-		static FramebufferEntry Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, const HandlePool<TextureHandle, TextureEntry>& texPool);
+		static FramebufferEntry Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, HandlePool<TextureHandle, TextureEntry>& texPool);
 		static void Destroy(const VulkanRHI& rhi, FramebufferEntry& entry);
 	};
 }

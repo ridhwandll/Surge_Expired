@@ -3,71 +3,53 @@
 #include "Editor.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Panels/ViewportPanel.hpp"
-#include "Panels/PerformancePanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <random>
 
 namespace Surge
 {
     void Editor::OnInitialize()
     {
-        Log<Severity::Info>("{0}", UUID().ToString());
-        Log<Severity::Info>("{0}", UUID().ToString());
-        Log<Severity::Info>("{0}", UUID().ToString());
-        Log<Severity::Info>("{0}", UUID().ToString());
-        Log<Severity::Info>("{0}", UUID().ToString());
-
         mRenderer = Core::GetRenderer();
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
         mCamera.SetActive(true);
 
         // Configure panels
-        mTitleBar = Titlebar();
         SceneHierarchyPanel* sceneHierarchy;
         sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
-        mPanelManager.PushPanel<PerformancePanel>();
-        ViewportPanel* viewport = mPanelManager.PushPanel<ViewportPanel>();
-        mTitleBar.OnInit();
+        mPanelManager.PushPanel<ViewportPanel>();
 
         mActiveScene = Ref<Scene>::Create(false);
         //mRenderer->SetSceneContext(mActiveScene);
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
         
         Entity runtimeCamera;
-        Entity dirLight;
-        Entity pointLight;
-        Entity floor;
+        Entity sprite;
         Entity cube;
         {
             mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
             cam.Primary = true;
             TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, 0, -10);
+			transform.Position = glm::vec3(-10, 6, 10);
+			transform.Rotation = glm::vec3(-30, -45, 0);
         }
         {
-            mActiveScene->CreateEntity(dirLight, "Directional Light");
-            DirectionalLightComponent& d = dirLight.AddComponent<DirectionalLightComponent>();
-            d.Intensity = 4;
-
-            TransformComponent& transform = dirLight.GetComponent<TransformComponent>();
-            transform.Rotation = glm::vec3(30, -60, -80);
+            mActiveScene->CreateEntity(sprite, "Sprite");
+            SpriteRendererComponent& s = sprite.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         }
-        {
-            mActiveScene->CreateEntity(pointLight, "Point Light");
-            PointLightComponent& p = pointLight.AddComponent<PointLightComponent>();
-            p.Color = glm::vec3(0.8f, 0.0f, 1.0f);
-            p.Intensity = 8;
-            p.Radius = 5;
+		{
+			mActiveScene->CreateEntity(cube, "Mesh");
+			MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
+			meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
+			//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/ABeautifulGame/glTF/ABeautifulGame.gltf");
 
-            TransformComponent& transform = pointLight.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-1, 1, 1);
-        }
+			auto& t = cube.GetComponent<TransformComponent>();
+			t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+			t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+			t.MarkDirty();
+		}
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 
@@ -79,14 +61,18 @@ namespace Surge
 
     void Editor::OnImGuiRender()
     {
-        mTitleBar.Render();
         ImGuiAux::DockSpace();
         mPanelManager.RenderAll();
     }
 
     void Editor::OnEvent(Event& e)
     {
-        mCamera.OnEvent(e);
+		if (e.GetEventType() == EventType::MouseMoved)
+        {
+			ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
+			if (viewportPanel->IsViewportHovered())
+				mCamera.OnEvent(e);
+        }
         mPanelManager.OnEvent(e);
     }
 
@@ -100,6 +86,20 @@ namespace Surge
 
     void Editor::Resize()
     {
+		ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
+        Scope<GraphicsRHI>& rhi = mRenderer->GetRHI();
+
+		glm::vec2 viewportSize = viewportPanel->GetViewportSize();
+		FramebufferHandle fbHandle = mRenderer->GetFinalFramebuffer();
+        FramebufferDesc desc = rhi->GetDesc(fbHandle);
+
+		if (viewportSize.x > 0.0f && viewportSize.y > 0.0f && (desc.Width != viewportSize.x || desc.Height != viewportSize.y))
+		{
+			rhi->WaitIdle(); // Ensure GPU is not using the framebuffer before resizing
+			mCamera.SetViewportSize(viewportSize);
+			rhi->ResizeFramebuffer(fbHandle, (Uint)viewportSize.x, (Uint)viewportSize.y);
+			mActiveScene->OnResize(viewportSize.x, viewportSize.y);
+		}
     }
 
     void Editor::OnShutdown()
@@ -112,8 +112,8 @@ namespace Surge
 int main()
 {
     Surge::ClientOptions clientOptions;
-    clientOptions.EnableImGui = true;
-    clientOptions.WindowDescription = {1280, 720, "Surge Editor", Surge::WindowFlags::CreateDefault | Surge::WindowFlags::EditorAcceleration};
+    clientOptions.RenderFinalImageToSwapchian = false; // We grab the imgui image id from renderer
+    clientOptions.WindowDescription = {1280, 720, "Surge Editor", Surge::WindowFlags::CreateDefault};
 
     Surge::Editor* app = Surge::MakeClient<Surge::Editor>();
     app->SetOptions(clientOptions);

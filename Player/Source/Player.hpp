@@ -21,7 +21,8 @@ namespace Surge
         void OnImGuiRender();
         void FillTextures(Uint texCount);
 	private:
-		SamplerHandle mQuadSampler;
+
+        ImTextureID mTexID = 0;
 		Uint mTexturedQuadCount = 500;
         Vector<TextureHandle> mTextures;
         int mChangeQuadAmount;

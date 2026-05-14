@@ -85,6 +85,8 @@ namespace Surge
 		const void* InitialData = nullptr;
 		Uint DataSize = 0; // total bytes of InitialData
 
+		bool GenerateImGuiID = false;
+
 		String DebugName = "";
 	};
 

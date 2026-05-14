@@ -52,6 +52,7 @@ namespace Surge
 		FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }
 		void DestroyFramebuffer(FramebufferHandle h) { mBackendRHI.DestroyFramebuffer(h); }
 		void ResizeFramebuffer(FramebufferHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeFramebuffer(h, newWidth, newHeight); }
+		FramebufferDesc GetDesc(FramebufferHandle h) { return mBackendRHI.GetDesc(h); }
 
 		// Pipeline
 		PipelineHandle CreatePipeline(const PipelineDesc& desc) { return mBackendRHI.CreatePipeline(desc); }
@@ -87,12 +88,17 @@ namespace Surge
 		void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
 
 		void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
-		void CmdEndRenderPass(const FrameContext& ctx) { mBackendRHI.CmdEndRenderPass(ctx); }
+		void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdEndRenderPass(ctx, h); }
+		void CmdTransitionTextureLayout(const FrameContext& ctx, TextureHandle h, TextureUsage newLayout) { mBackendRHI.CmdTransitionTextureLayout(ctx, h, newLayout); }
 
 		// setIndex maps to layout(set = N) in GLSL
 		void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
 
 		void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
+
+		ImTextureID AddImGuiImage(TextureHandle h) { return mBackendRHI.AddImGuiImage(h); }
+		ImTextureID GetImGuiImage(TextureHandle h) { return mBackendRHI.GetImGuiImage(h); }
+
 		// TODO: REMOVE
 		BackendRHI& GetBackendRHI() { return mBackendRHI; }
 

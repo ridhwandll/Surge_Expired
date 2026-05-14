@@ -38,14 +38,10 @@ namespace Surge
         }
 
         template <typename T> //TODO: Switch to C++20 Concepts
-        T* GetPanel() const
+        T* GetPanel()
         {
             static_assert(std::is_base_of_v<IPanel, T>, "T must derive from IPanel!");
-            auto itr = mPanels.find(T::GetStaticCode());
-            if (itr != mPanels.end())
-                return static_cast<T*>(itr->second.Panel);
-
-            return nullptr;
+            return static_cast<T*>(mPanels[T::GetStaticCode()].Panel);
         }
 
         void RenderAll()

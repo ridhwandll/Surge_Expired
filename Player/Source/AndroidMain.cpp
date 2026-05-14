@@ -30,7 +30,7 @@ void android_main(android_app* app)
     }
 
     Surge::ClientOptions clientOptions;
-    clientOptions.EnableImGui = false;
+    clientOptions.RenderFinalImageToSwapchian = true;
     Surge::WindowDesc desc;
     desc.Width = static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window));
     desc.Height = static_cast<Surge::Uint>(ANativeWindow_getHeight(app->window));

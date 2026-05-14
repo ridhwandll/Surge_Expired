@@ -142,7 +142,7 @@ namespace Surge
     using HashMap = std::unordered_map<T1, T2>;
 
     template <typename T1, typename T2>
-    struct SURGE_API Pair
+    struct Pair
     {
         T1 Data1;
         T2 Data2;

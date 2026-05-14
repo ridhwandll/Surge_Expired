@@ -432,4 +432,23 @@ namespace Surge::VulkanUtils
 		}
 	}
 
+	VkImageLayout TextureUsageToVkLayout(TextureUsage usage)
+	{
+		switch (usage)
+		{
+		case TextureUsage::SAMPLED:          return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		case TextureUsage::COLOR_ATTACHMENT: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		case TextureUsage::DEPTH_ATTACHMENT: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		case TextureUsage::STORAGE:			 return VK_IMAGE_LAYOUT_GENERAL;
+		case TextureUsage::TRANSFER_SRC:     return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		case TextureUsage::TRANSFER_DST:     return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		case TextureUsage::TRANSIENT_ATTACHMENT:
+			SG_ASSERT_INTERNAL("I dont know what image layout to add here");
+		default:
+			// Always safe as a fallback, but can be slower
+			Log<Severity::Warn>("TextureUsageToVkLayout: unhandled TextureUsage flag, defaulting to VK_IMAGE_LAYOUT_GENERAL. This may cause performance issues.");
+			return VK_IMAGE_LAYOUT_GENERAL;
+		}
+	}
+
 }

@@ -5,7 +5,7 @@
 
 namespace Surge
 {	
-	FramebufferEntry VulkanFramebuffer::Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, const HandlePool<TextureHandle, TextureEntry>& texPool)
+	FramebufferEntry VulkanFramebuffer::Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, HandlePool<TextureHandle, TextureEntry>& texPool)
 	{
 		SG_ASSERT(desc.Width > 0, "FramebufferDesc: Width is 0");
 		SG_ASSERT(desc.Height > 0, "FramebufferDesc: Height is 0");
@@ -21,7 +21,7 @@ namespace Surge
 		Uint viewCount = 0;
 		for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
 		{
-			const TextureEntry* tex = texPool.Get(desc.ColorAttachments[i].Handle);
+			TextureEntry* tex = texPool.Get(desc.ColorAttachments[i].Handle);
 			SG_ASSERT(tex, "FramebufferDesc: invalid ColorAttachment handle!");
 
 			key.ColorFormats[i] = VulkanUtils::TextureFormatToVkFormat(tex->Desc.Format);
@@ -29,6 +29,8 @@ namespace Surge
 			key.ColorStore[i] = desc.ColorAttachments[i].Store;
 			views[viewCount++] = tex->View;
 
+			// Does this do auto transition?
+			//tex->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; 
 			// Default clear color per attachment (Foof pink)
 			entry.ClearValues[i].color = { {1.0f, 0.0f, 1.0f, 1.0f} };
 			entry.ClearCount++;
