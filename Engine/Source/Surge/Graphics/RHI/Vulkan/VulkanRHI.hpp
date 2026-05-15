@@ -70,8 +70,11 @@ namespace Surge
 		DescriptorLayoutHandle GetDescriptorLayout(PipelineHandle h) const;
 		void DestroyDescriptorLayout(DescriptorLayoutHandle h);
 
-		Uint GetBindlessIndex(TextureHandle h);
+		Uint GetBindlessTextureIndex(TextureHandle h) const;
+		Uint GetBindlessBufferIndex(BufferHandle h) const;
 		void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline);
+
+		void BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex);
 		DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
 		void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount);
 		void DestroyDescriptorSet(DescriptorSetHandle h);

@@ -1,12 +1,29 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Memory.hpp"
-#include "Lights.hpp"
+#include "Surge/Graphics/Renderer/Lights.hpp"
 #include "Surge/Graphics/Renderer/Renderer2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer3D.hpp"
+#include "Surge/ECS/Components.hpp"
 
 namespace Surge
-{
+{   
+	// GPU Data
+	struct FrameUBO
+	{
+		glm::mat4 ViewProjection;  // 64 bytes
+		glm::vec3 CameraPos;       // 12 bytes
+		float _pad0;               // 4 bytes pads to 16-byte boundary
+	};
+    static_assert(sizeof(FrameUBO) % 16 == 0, "Size of 'FrameUBO' struct must be 16 bytes aligned!");
+
+	struct PushConstantData
+	{
+		glm::mat4 Transform;
+        Uint LightBufferIndex = 0;
+		Uint LightCount; // TODO Move this somewhere else
+	};
+
     class Scene;
     struct RendererData
     {
@@ -16,7 +33,13 @@ namespace Surge
         glm::mat4 ProjectionMatrix;
         glm::mat4 ViewProjection;
 
+        // FrameUBO
+        DescriptorSetHandle mFrameDescriptorSet;
+		BufferHandle mFrameUBO;
+
 		TextureHandle mFinalImage;
+        TextureHandle mDepthImage;
+
         SamplerHandle mDefaultSampler;
 		FramebufferHandle mOffscreenFramebuffer;
 		glm::vec4 mClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -36,8 +59,10 @@ namespace Surge
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
 
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh);
-		void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture = TextureHandle::Invalid());
+		void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh) { mRenderer3D.SubmitMesh(transform, mesh); }
+		void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture = TextureHandle::Invalid()) { mRenderer2D.Submit(transform, color, texture); }
+        void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation) { mRenderer3D.SubmitLight(light, position, rotation); }
+
 		void OnWindowResize(Uint width, Uint height);
 
 		TextureHandle GetFinalImage() const { return mData->mFinalImage; }

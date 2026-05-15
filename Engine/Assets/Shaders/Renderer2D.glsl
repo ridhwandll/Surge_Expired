@@ -6,10 +6,19 @@ layout(location = 1) in uint inColor;
 layout(location = 2) in vec2 inUV;
 layout(location = 3) in uint inTextureIndex;
 
+layout(set = 0, binding = 0) uniform FrameUBO
+{
+    mat4 ViewProjection;
+    vec3 CameraPos;
+    float _pad;
+
+} uFrame;
+
 layout(push_constant) uniform PushConstants
 {
     mat4 Transform;
-    mat4 ViewProj;
+    uint LightBufferIndex;
+    uint LightCount;
 } uPush;
 
 layout(location = 0) flat out uint outColor;
@@ -18,7 +27,7 @@ layout(location = 2) flat out uint outTextureIndex;
 
 void main()
 {
-    gl_Position = uPush.ViewProj * vec4(inPosition, 1.0);
+    gl_Position = uFrame.ViewProjection * vec4(inPosition, 1.0);
     outColor = inColor;
     outUV = inUV;
     outTextureIndex = inTextureIndex;
@@ -27,7 +36,22 @@ void main()
 //SURGE:[Shader: Fragment]
 #version 450
 
-layout(set = 0, binding = 0) uniform sampler2D uTexture[4096];
+layout(set = 0, binding = 0) uniform FrameUBO
+{
+    mat4 ViewProjection;
+    vec3 CameraPos;
+    float _pad;
+
+} uFrame;
+
+layout(push_constant) uniform PushConstants
+{
+    mat4 Transform;
+    uint LightBufferIndex;
+    uint LightCount;
+} uMesh;
+
+layout(set = 1, binding = 1) uniform sampler2D uTexture[4096];
 
 layout(location = 0) flat in uint inColor;
 layout(location = 1) in vec2 inUV;

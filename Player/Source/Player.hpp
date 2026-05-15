@@ -22,13 +22,12 @@ namespace Surge
         void FillTextures(Uint texCount);
 	private:
 
-        ImTextureID mTexID = 0;
 		Uint mTexturedQuadCount = 500;
         Vector<TextureHandle> mTextures;
         int mChangeQuadAmount;
         bool mMoveEnabled = true;
         Vector<Entity> mColoredQuads;
-		Entity mMeshEntity;
+		Entity mFloor;
 
         Renderer* mRenderer;
     };

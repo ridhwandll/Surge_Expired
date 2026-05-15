@@ -4,14 +4,19 @@
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Graphics/Mesh/Mesh.hpp"
+#include "Surge/Graphics/Renderer/Lights.hpp"
+#include "Surge/ECS/Components.hpp"
 
 namespace Surge
 {
     class Scene;
     class EditorCamera;
 	struct RendererData;
+
     class Renderer3D
     {
+    public:
+		static constexpr Uint MAX_LIGHTS = 256;
     public:
         Renderer3D() = default;
         ~Renderer3D() = default;
@@ -26,6 +31,7 @@ namespace Surge
         void BeginFrame(const FrameContext& frameCtx);
         void EndFrame();
         void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh);
+        void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation);
 		void OnWindowResize(Uint width, Uint height);
 
         void OnImGuiRender();
@@ -44,6 +50,17 @@ namespace Surge
 		PipelineHandle mPipeline;
 
         Vector<MeshDrawCmd> mMeshDrawCommands;
+
+		struct LightData
+		{
+			GPULight Lights[MAX_LIGHTS];
+			Uint Count = 0;
+		};
+        BufferHandle mGPULightBuffer = BufferHandle::Invalid();
+		Uint mLightBufferIndex = UINT32_MAX;
+		LightData mLightCPU = {};
+
 		friend class Renderer;
     };
+
 } // namespace Surge

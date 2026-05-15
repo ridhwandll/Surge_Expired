@@ -5,6 +5,7 @@
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/Mesh/Mesh.hpp"
+#include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -102,36 +103,24 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
 	};
 
-    struct PointLightComponent
+    struct LightComponent
     {
-        PointLightComponent() = default;
-        PointLightComponent(glm::vec3 color, float intensity, float radius, float falloff)
-            : Color(color), Intensity(intensity), Radius(radius), Falloff(falloff) {}
+        LightComponent() = default;
+        LightComponent(LightType type, const glm::vec3& color, float intensity, float radius, float falloff)
+            : Type(type), Color(color), Intensity(intensity), Radius(radius) {}
 
-        glm::vec3 Color = {1.0f, 1.0f, 1.0f};
+        LightType Type = LightType::POINT;
+        glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
         float Intensity = 1.0f;
         float Radius = 3.0f;
-        float Falloff = 0.0f;
+        float Falloff = 1.0f;
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API DirectionalLightComponent
-    {
-        DirectionalLightComponent() = default;
-        DirectionalLightComponent(glm::vec3 direction, glm::vec3 color, float intensity)
-            : Direction(direction), Color(color), Intensity(intensity) {}
 
-        glm::vec3 Direction = {1.0f, 1.0f, 1.0f};
-        glm::vec3 Color = {1.0f, 1.0f, 1.0f};
-        float Intensity = 1.0f;
-        float Size = 45.5f;
-
-        SURGE_REFLECTION_ENABLE;
-    };
-
-//! NOTE: ALL THE MAJOR COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
+//! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define SERIALIZABLE_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
-                             ::Surge::CameraComponent, ::Surge::PointLightComponent, ::Surge::SpriteRendererComponent,\
-                             ::Surge::DirectionalLightComponent
+                             ::Surge::CameraComponent, ::Surge::SpriteRendererComponent,\
+                             ::Surge::MeshComponent, ::Surge::LightComponent \
 
 } // namespace Surge

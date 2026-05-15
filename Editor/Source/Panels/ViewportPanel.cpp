@@ -17,12 +17,26 @@ namespace Surge
     {
         mCode = GetStaticCode();
         mSceneHierarchy = static_cast<Editor*>(Core::GetClient())->GetPanelManager().GetPanel<SceneHierarchyPanel>();
+		mEditorCam = static_cast<EditorCamera*>(panelInitArgs);
+
     }
 
     void ViewportPanel::OnEvent(Event& e)
     {
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) -> bool {
+
+            // Hit F to Focus
+            if (keyEvent.GetKeyCode() == Key::F)
+            {
+                const Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
+                if (selectedEntity && mIsViewportHovered)
+                {
+					const TransformComponent& transform = selectedEntity.GetComponent<TransformComponent>();
+                    mEditorCam->Focus(transform.Position);
+                }
+            }
+
             //if (!Input::IsMouseButtonPressed(Mouse::ButtonRight))
             //{
             //    switch (keyEvent.GetKeyCode())

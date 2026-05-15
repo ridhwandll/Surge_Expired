@@ -93,7 +93,6 @@ namespace Surge
 					v.Bitangent = faces[i].b;
 					v.TexCoord = uvs[j];
 
-					// Derive corner position from basis vectors
 					float signX = (j == 1 || j == 2) ? 1.0f : -1.0f;
 					float signY = (j == 2 || j == 3) ? 1.0f : -1.0f;
 					v.Position = faces[i].n * h + faces[i].t * signX * h + faces[i].b * signY * h;
@@ -154,21 +153,33 @@ namespace Surge
 			for (Uint r = 0; r <= rings; ++r)
 			{
 				float phi = glm::pi<float>() * (float)r / (float)rings;
-				float sinPhi = std::sin(phi);
-				float cosPhi = std::cos(phi);
+				float sinPhi = glm::sin(phi);
+				float cosPhi = glm::cos(phi);
 
 				for (Uint s = 0; s <= segments; ++s)
 				{
 					float theta = 2.0f * glm::pi<float>() * (float)s / (float)segments;
-					float sinTheta = std::sin(theta);
-					float cosTheta = std::cos(theta);
+					float sinTheta = glm::sin(theta);
+					float cosTheta = glm::cos(theta);
 
 					Vertex v;
-					v.Normal = glm::vec3(sinPhi * cosTheta, cosPhi, sinPhi * sinTheta);
+					// Position and Normals (Y is Up)
+					v.Normal = glm::vec3(-sinPhi * cosTheta, -cosPhi, -sinPhi * sinTheta);
 					v.Position = v.Normal * radius;
 					v.TexCoord = glm::vec2((float)s / segments, (float)r / rings);
-					v.Tangent = glm::vec3(-sinTheta, 0.0f, cosTheta);
-					v.Bitangent = glm::cross(v.Normal, v.Tangent);
+
+					// Tangent Vector (Derivative with respect to Theta)
+					// This is the direction of increasing 's' texture coordinate.
+					v.Tangent = glm::normalize(glm::vec3(-sinPhi * sinTheta, 0.0f, sinPhi * cosTheta));
+
+					// Handle the poles where sinPhi == 0 to avoid NaNs
+					if (sinPhi == 0.0f)
+						v.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+					
+					// Bitangent Vector
+					// Cross product direction dictates whether lighting calculations 
+					// read your surfaces inside-out or outside-in!
+					v.Bitangent = glm::normalize(glm::cross(v.Normal, v.Tangent));
 
 					mesh.Vertices.push_back(v);
 				}
@@ -191,190 +202,208 @@ namespace Surge
 		// CONE
 		inline MeshData GenerateCone(float radius = 0.5f, float height = 1.0f, Uint segments = 32)
 		{
-			MeshData mesh;
-			float halfH = height * 0.5f;
+			MeshData meshData;
+			float halfHeight = height * 0.5f;
+			float thetaStep = (2.0f * glm::pi<float>()) / (float)segments;
 
-			// Body vertices + Apex duplicates for smooth texture mapping seam
-			for (Uint i = 0; i <= segments; ++i)
+			// Generate Side Vertices
+			for (Uint i = 0; i <= segments; i++)
 			{
-				float ratio = (float)i / segments;
-				float angle = ratio * 2.0f * glm::pi<float>();
-				float c = std::cos(angle);
-				float s = std::sin(angle);
+				float theta = i * thetaStep;
+				float cosTheta = cos(theta);
+				float sinTheta = sin(theta);
 
-				// Base perimeter vertex
-				Vertex vBase;
-				vBase.Position = glm::vec3(c * radius, -halfH, s * radius);
-				vBase.Normal = glm::normalize(glm::vec3(c * height / radius, radius / height, s * height / radius));
-				vBase.TexCoord = glm::vec2(ratio, 0.0f);
-				ComputeTangents(vBase);
-				mesh.Vertices.push_back(vBase);
+				glm::vec3 basePos = glm::vec3(radius * cosTheta, -halfHeight, radius * sinTheta);
 
-				// Matching Tip vertex (unique UVs per segment slice)
-				Vertex vTip;
-				vTip.Position = glm::vec3(0.0f, halfH, 0.0f);
-				vTip.Normal = vBase.Normal;
-				vTip.TexCoord = glm::vec2(ratio, 1.0f);
-				ComputeTangents(vTip);
-				mesh.Vertices.push_back(vTip);
+				float slantAngle = atan2(radius, height);
+				float nx = cosTheta * cos(slantAngle);
+				float ny = sin(slantAngle);
+				float nz = sinTheta * cos(slantAngle);
+				glm::vec3 sideNormal = glm::normalize(glm::vec3(nx, ny, nz));
+
+				glm::vec3 tangent = glm::normalize(glm::vec3(-sinTheta, 0.0f, cosTheta));
+				glm::vec3 bitangent = glm::cross(sideNormal, tangent);
+
+				// Base Vertex
+				Vertex baseVertex;
+				baseVertex.Position = basePos;
+				baseVertex.Normal = sideNormal;
+				baseVertex.Tangent = tangent;
+				baseVertex.Bitangent = bitangent;
+				baseVertex.TexCoord = glm::vec2((float)i / segments, 0.0f);
+				meshData.Vertices.push_back(baseVertex);
+
+				// Tip Vertex
+				Vertex tipVertex;
+				tipVertex.Position = glm::vec3(0.0f, halfHeight, 0.0f);
+				tipVertex.Normal = sideNormal;
+				tipVertex.Tangent = tangent;
+				tipVertex.Bitangent = bitangent;
+				tipVertex.TexCoord = glm::vec2((float)i / segments, 1.0f);
+				meshData.Vertices.push_back(tipVertex);
 			}
 
-			// Body indices
-			for (Uint i = 0; i < segments; ++i)
+			// Side Indices: Corrected for CCW Front Face
+			for (Uint i = 0; i < segments; i++)
 			{
-				Uint baseIdx = i * 2;
-				mesh.Indices.push_back({ baseIdx, baseIdx + 1, baseIdx + 2 });
+				Uint baseIndex = i * 2;
+				Index idx;
+				idx.V1 = baseIndex;
+				idx.V2 = baseIndex + 1;
+				idx.V3 = baseIndex + 2;
+				meshData.Indices.push_back(idx);
 			}
 
-			// Bottom Cap Center
-			Uint centerIdx = (Uint)mesh.Vertices.size();
-			Vertex capCenter;
-			capCenter.Position = glm::vec3(0.0f, -halfH, 0.0f);
-			capCenter.Normal = glm::vec3(0.0f, -1.0f, 0.0f);
-			capCenter.TexCoord = glm::vec2(0.5f, 0.5f);
-			ComputeTangents(capCenter);
-			mesh.Vertices.push_back(capCenter);
+			// Generate Bottom Cap
+			Uint capCenterIndex = (Uint)meshData.Vertices.size();
 
-			// Bottom Cap Perimeter
-			Uint capStart = (Uint)mesh.Vertices.size();
-			for (Uint i = 0; i <= segments; ++i)
+			Vertex centerVertex;
+			centerVertex.Position = glm::vec3(0.0f, -halfHeight, 0.0f);
+			centerVertex.Normal = glm::vec3(0.0f, -1.0f, 0.0f);
+			centerVertex.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+			centerVertex.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
+			centerVertex.TexCoord = glm::vec2(0.5f, 0.5f);
+			meshData.Vertices.push_back(centerVertex);
+
+			Uint capEdgeStart = (Uint)meshData.Vertices.size();
+			for (Uint i = 0; i <= segments; i++)
 			{
-				float ratio = (float)i / segments;
-				float angle = ratio * 2.0f * glm::pi<float>();
+				float theta = i * thetaStep;
 				Vertex v;
-				v.Position = glm::vec3(std::cos(angle) * radius, -halfH, std::sin(angle) * radius);
+				v.Position = glm::vec3(radius * cos(theta), -halfHeight, radius * sin(theta));
 				v.Normal = glm::vec3(0.0f, -1.0f, 0.0f);
-				v.TexCoord = glm::vec2(std::cos(angle) * 0.5f + 0.5f, std::sin(angle) * 0.5f + 0.5f);
-				ComputeTangents(v);
-				mesh.Vertices.push_back(v);
+				v.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+				v.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
+				v.TexCoord = glm::vec2(cos(theta) * 0.5f + 0.5f, sin(theta) * 0.5f + 0.5f);
+				meshData.Vertices.push_back(v);
 			}
 
-			for (Uint i = 0; i < segments; ++i)
-				mesh.Indices.push_back({ centerIdx, capStart + i + 1, capStart + i });
+			// Bottom Cap Indices: Corrected for CCW Front Face (looking from bottom)
+			for (Uint i = 0; i < segments; i++)
+			{
+				Index idx;
+				idx.V1 = capCenterIndex;
+				idx.V2 = capEdgeStart + i;
+				idx.V3 = capEdgeStart + i + 1;
+				meshData.Indices.push_back(idx);
+			}
 
-			return mesh;
+			return meshData;
 		}
 
 		// CYLINDER	
 		inline MeshData GenerateCylinder(float radius = 0.5f, float height = 1.0f, int sectors = 32)
 		{
-			MeshData mesh;
+			MeshData meshData;
+
 			float halfHeight = height / 2.0f;
-
-			// Side wall vertices and indices
-			Uint sideStartIdx = 0;
-			for (int i = 0; i <= sectors; ++i)
-			{
-				float ratio = static_cast<float>(i) / sectors;
-				float angle = 2.0f * glm::pi<float>() * ratio;
-				float x = radius * cos(angle);
-				float z = radius * sin(angle); // Using Z as depth (Y-up convention)
-
-				// Normal, Tangent, and Bitangent for the sides
-				glm::vec3 normal = glm::normalize(glm::vec3(x, 0.0f, z));
-				glm::vec3 tangent = glm::normalize(glm::vec3(-sin(angle), 0.0f, cos(angle)));
-				glm::vec3 bitangent = glm::cross(normal, tangent);
-
-				// Bottom side vertex
-				Vertex bottomVertex;
-				bottomVertex.Position = glm::vec3(x, -halfHeight, z);
-				bottomVertex.Normal = normal;
-				bottomVertex.Tangent = tangent;
-				bottomVertex.Bitangent = bitangent;
-				bottomVertex.TexCoord = glm::vec2(ratio, 0.0f);
-				mesh.Vertices.push_back(bottomVertex);
-
-				// Top side vertex
-				Vertex topVertex;
-				topVertex.Position = glm::vec3(x, halfHeight, z);
-				topVertex.Normal = normal;
-				topVertex.Tangent = tangent;
-				topVertex.Bitangent = bitangent;
-				topVertex.TexCoord = glm::vec2(ratio, 1.0f);
-				mesh.Vertices.push_back(topVertex);
-			}
-
-			// Side indices
-			for (int i = 0; i < sectors; ++i)
-			{
-				Uint b1 = sideStartIdx + (i * 2);
-				Uint t1 = b1 + 1;
-				Uint b2 = sideStartIdx + ((i + 1) * 2);
-				Uint t2 = b2 + 1;
-
-				mesh.Indices.push_back({ b1, b2, t1 });
-				mesh.Indices.push_back({ t1, b2, t2 });
-			}
+			float angleStep = 2.0f * glm::pi<float>() / static_cast<float>(sectors);
 
 			// Bottom cap
-			Uint bottomCenterIdx = mesh.Vertices.size();
 			Vertex bottomCenter;
-			bottomCenter.Position = glm::vec3(0.0f, -halfHeight, 0.0f);
-			bottomCenter.Normal = glm::vec3(0.0f, -1.0f, 0.0f);
-			bottomCenter.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
-			bottomCenter.Bitangent = glm::vec3(0.0f, 0.0f, -1.0f);
-			bottomCenter.TexCoord = glm::vec2(0.5f, 0.5f);
-			mesh.Vertices.push_back(bottomCenter);
+			bottomCenter.Position = { 0.0f, -halfHeight, 0.0f };
+			bottomCenter.Normal = { 0.0f, -1.0f, 0.0f };
+			bottomCenter.Tangent = { 1.0f, 0.0f, 0.0f };
+			bottomCenter.Bitangent = { 0.0f, 0.0f, 1.0f };
+			bottomCenter.TexCoord = { 0.5f, 0.5f };
+			meshData.Vertices.push_back(bottomCenter);
+			Uint bottomCenterIndex = 0;
 
-			Uint bottomCapStartIdx = mesh.Vertices.size();
-			for (int i = 0; i < sectors; ++i)
+			Uint bottomRimStart = static_cast<Uint>(meshData.Vertices.size());
+			for (int i = 0; i <= sectors; i++)
 			{
-				float angle = 2.0f * glm::pi<float>() * i / sectors;
-				float x = radius * cos(angle);
-				float z = radius * sin(angle);
+				float angle = i * angleStep;
+				float cosA = glm::cos(angle);
+				float sinA = glm::sin(angle);
 
 				Vertex v;
-				v.Position = glm::vec3(x, -halfHeight, z);
-				v.Normal = glm::vec3(0.0f, -1.0f, 0.0f);
-				v.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
-				v.Bitangent = glm::vec3(0.0f, 0.0f, -1.0f);
-				v.TexCoord = glm::vec2(0.5f + 0.5f * cos(angle), 0.5f + 0.5f * sin(angle));
-				mesh.Vertices.push_back(v);
+				v.Position = { radius * cosA, -halfHeight, radius * sinA };
+				v.Normal = { 0.0f, -1.0f, 0.0f };
+				v.Tangent = { 1.0f, 0.0f, 0.0f };
+				v.Bitangent = { 0.0f, 0.0f, 1.0f };
+				v.TexCoord = { cosA * 0.5f + 0.5f, sinA * 0.5f + 0.5f };
+				meshData.Vertices.push_back(v);
 			}
 
-			// Bottom cap indices (facing downwards: clockwise order from bottom look)
-			for (int i = 0; i < sectors; ++i)
-			{
-				Uint current = bottomCapStartIdx + i;
-				Uint next = bottomCapStartIdx + ((i + 1) % sectors);
-				mesh.Indices.push_back({ bottomCenterIdx, next, current });
-			}
+			// Bottom cap triangles
+			for (int i = 0; i < sectors; i++)			
+				meshData.Indices.push_back({ bottomCenterIndex, static_cast<Uint>(bottomRimStart + i), static_cast<Uint>(bottomRimStart + i + 1) });			
 
 			// Top cap
-			Uint topCenterIdx = mesh.Vertices.size();
+			Uint topCenterIndex = static_cast<Uint>(meshData.Vertices.size());
 			Vertex topCenter;
-			topCenter.Position = glm::vec3(0.0f, halfHeight, 0.0f);
-			topCenter.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
-			topCenter.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
-			topCenter.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
-			topCenter.TexCoord = glm::vec2(0.5f, 0.5f);
-			mesh.Vertices.push_back(topCenter);
+			topCenter.Position = { 0.0f, halfHeight, 0.0f };
+			topCenter.Normal = { 0.0f, 1.0f, 0.0f };
+			topCenter.Tangent = { 1.0f, 0.0f, 0.0f };
+			topCenter.Bitangent = { 0.0f, 0.0f, -1.0f };
+			topCenter.TexCoord = { 0.5f, 0.5f };
+			meshData.Vertices.push_back(topCenter);
 
-			Uint topCapStartIdx = mesh.Vertices.size();
-			for (int i = 0; i < sectors; ++i)
+			Uint topRimStart = static_cast<Uint>(meshData.Vertices.size());
+			for (int i = 0; i <= sectors; i++)
 			{
-				float angle = 2.0f * glm::pi<float>() * i / sectors;
-				float x = radius * cos(angle);
-				float z = radius * sin(angle);
+				float angle = i * angleStep;
+				float cosA = glm::cos(angle);
+				float sinA = glm::sin(angle);
 
 				Vertex v;
-				v.Position = glm::vec3(x, halfHeight, z);
-				v.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
-				v.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
-				v.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
-				v.TexCoord = glm::vec2(0.5f + 0.5f * cos(angle), 0.5f + 0.5f * sin(angle));
-				mesh.Vertices.push_back(v);
+				v.Position = { radius * cosA, halfHeight, radius * sinA };
+				v.Normal = { 0.0f, 1.0f, 0.0f };
+				v.Tangent = { 1.0f, 0.0f, 0.0f };
+				v.Bitangent = { 0.0f, 0.0f, -1.0f };
+				v.TexCoord = { cosA * 0.5f + 0.5f, sinA * 0.5f + 0.5f };
+				meshData.Vertices.push_back(v);
 			}
 
-			// Top cap indices (facing upwards: counter-clockwise order)
-			for (int i = 0; i < sectors; ++i)
+			// Top cap triangles
+			for (int i = 0; i < sectors; i++)			
+				meshData.Indices.push_back({ topCenterIndex, static_cast<Uint>(topRimStart + i + 1), static_cast<Uint>(topRimStart + i) });
+			
+			// Side surface
+			Uint sideStart = static_cast<Uint>(meshData.Vertices.size());
+			for (int i = 0; i <= sectors; i++)
 			{
-				Uint current = topCapStartIdx + i;
-				Uint next = topCapStartIdx + ((i + 1) % sectors);
-				mesh.Indices.push_back({ topCenterIdx, current, next });
+				float angle = i * angleStep;
+				float cosA = glm::cos(angle);
+				float sinA = glm::sin(angle);
+				float u = static_cast<float>(i) / static_cast<float>(sectors);
+
+				glm::vec3 sideNormal = glm::normalize(glm::vec3(cosA, 0.0f, sinA));
+				glm::vec3 sideTangent = glm::normalize(glm::vec3(-sinA, 0.0f, cosA));
+				glm::vec3 sideBitangent = { 0.0f, 1.0f, 0.0f };
+
+				Vertex vBottom;
+				vBottom.Position = { radius * cosA, -halfHeight, radius * sinA };
+				vBottom.Normal = sideNormal;
+				vBottom.Tangent = sideTangent;
+				vBottom.Bitangent = sideBitangent;
+				vBottom.TexCoord = { u, 1.0f };
+				meshData.Vertices.push_back(vBottom);
+
+				Vertex vTop;
+				vTop.Position = { radius * cosA, halfHeight, radius * sinA };
+				vTop.Normal = sideNormal;
+				vTop.Tangent = sideTangent;
+				vTop.Bitangent = sideBitangent;
+				vTop.TexCoord = { u, 0.0f };
+				meshData.Vertices.push_back(vTop);
 			}
 
-			return mesh;
+			// Side quads as two CCW triangles
+			for (int i = 0; i < sectors; i++)
+			{
+				Uint currentBottom = sideStart + i * 2;
+				Uint currentTop = sideStart + i * 2 + 1;
+				Uint nextBottom = sideStart + (i + 1) * 2;
+				Uint nextTop = sideStart + (i + 1) * 2 + 1;
+
+				// Triangle 1
+				meshData.Indices.push_back({ currentBottom, currentTop, nextTop });
+				// Triangle 2
+				meshData.Indices.push_back({ currentBottom, nextTop, nextBottom });
+			}
+
+			return meshData;
 		}
 
 		// BEAN
@@ -402,14 +431,14 @@ namespace Surge
 					yOffset = -halfCylH;
 				}
 
-				float sinPhi = std::sin(phi);
-				float cosPhi = std::cos(phi);
+				float sinPhi = glm::sin(phi);
+				float cosPhi = glm::cos(phi);
 
 				for (Uint s = 0; s <= segments; ++s)
 				{
 					float theta = 2.0f * glm::pi<float>() * (float)s / segments;
-					float sinTheta = std::sin(theta);
-					float cosTheta = std::cos(theta);
+					float sinTheta = glm::sin(theta);
+					float cosTheta = glm::cos(theta);
 
 					Vertex v;
 					v.Normal = glm::vec3(sinPhi * cosTheta, cosPhi, sinPhi * sinTheta);
@@ -442,14 +471,14 @@ namespace Surge
 			for (Uint m = 0; m <= mainSegments; ++m)
 			{
 				float mainAngle = ((float)m / mainSegments) * 2.0f * glm::pi<float>();
-				float cosMain = std::cos(mainAngle);
-				float sinMain = std::sin(mainAngle);
+				float cosMain = glm::cos(mainAngle);
+				float sinMain = glm::sin(mainAngle);
 
 				for (Uint t = 0; t <= tubeSegments; ++t)
 				{
 					float tubeAngle = ((float)t / tubeSegments) * 2.0f * glm::pi<float>();
-					float cosTube = std::cos(tubeAngle);
-					float sinTube = std::sin(tubeAngle);
+					float cosTube = glm::cos(tubeAngle);
+					float sinTube = glm::sin(tubeAngle);
 
 					Vertex v;
 					// Position

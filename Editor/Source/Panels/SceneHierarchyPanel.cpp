@@ -46,21 +46,41 @@ namespace Surge
                     mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
 				}
                 ImGui::Separator();
-				if (ImGui::MenuItem("Mesh"))
+				if (ImGui::BeginMenu("Mesh"))
 				{
-					mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
-					mSelectedEntity.AddComponent<MeshComponent>();
+					int defMesh = -1;
+                    if (ImGui::MenuItem("Empty Mesh"))
+                    {
+						mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
+						mSelectedEntity.AddComponent<MeshComponent>();
+                    }
+                    if (ImGui::MenuItem("Cube"))                    
+                        defMesh = static_cast<int>(DefaultMesh::CUBE);
+					if (ImGui::MenuItem("Sphere"))
+                       defMesh = static_cast<int>(DefaultMesh::SPHERE);
+					if (ImGui::MenuItem("Bean"))
+						defMesh = static_cast<int>(DefaultMesh::BEAN);
+					if (ImGui::MenuItem("Cone"))
+						defMesh = static_cast<int>(DefaultMesh::CONE);
+					if (ImGui::MenuItem("Cylinder"))
+						defMesh = static_cast<int>(DefaultMesh::CYLINDER);
+					if (ImGui::MenuItem("Torus"))
+						defMesh = static_cast<int>(DefaultMesh::TORUS);
+					if (ImGui::MenuItem("Plane"))
+						defMesh = static_cast<int>(DefaultMesh::PLANE);
+
+                    if (defMesh != -1)
+                    {
+                        mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
+                        mSelectedEntity.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(defMesh));
+                    }
+					ImGui::EndPopup();
 				}
 				ImGui::Separator();
-                if (ImGui::MenuItem("Point Light"))
+                if (ImGui::MenuItem("Light"))
                 {
-                    mSceneContext->CreateEntity(mSelectedEntity, "Point Light");
-                    mSelectedEntity.AddComponent<PointLightComponent>();
-                }
-                if (ImGui::MenuItem("Directional Light"))
-                {
-                    mSceneContext->CreateEntity(mSelectedEntity, "Directional Light");
-                    mSelectedEntity.AddComponent<DirectionalLightComponent>();
+                    mSceneContext->CreateEntity(mSelectedEntity, "Light");
+                    mSelectedEntity.AddComponent<LightComponent>();
                 }
                 ImGui::EndPopup();
             }
