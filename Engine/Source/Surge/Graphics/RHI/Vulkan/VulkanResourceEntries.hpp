@@ -14,6 +14,7 @@ namespace Surge
 		VkImage Image = VK_NULL_HANDLE;
 		VkImageView View = VK_NULL_HANDLE;
 		Uint BindlessIndex = UINT32_MAX;
+
 		ImTextureID ImGuiID = NULL;
 		VkDeviceSize Size = 0; //bytes
 		VmaAllocation Allocation = VK_NULL_HANDLE;
@@ -27,7 +28,7 @@ namespace Surge
 		VkBuffer Buffer = VK_NULL_HANDLE;
 		VmaAllocation Allocation = VK_NULL_HANDLE;
 		void* MappedPtr = nullptr;
-
+		Uint BindlessIndex = UINT32_MAX;
 		BufferDesc Desc = {};
 	};
 
@@ -71,7 +72,6 @@ namespace Surge
 		DYNAMIC, // updated per frame. per-object params, animated materials
 	};
 
-	//class GraphicsRHI;
 	struct DescriptorSetEntry
 	{
 		VkDescriptorSet Sets[RHISettings::FRAMES_IN_FLIGHT] = {};

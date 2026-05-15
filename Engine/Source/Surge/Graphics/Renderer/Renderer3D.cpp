@@ -5,6 +5,16 @@
 
 namespace Surge
 {
+	inline static GPULight LightComponentToGPULight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)
+	{
+		GPULight gpuLight{};
+		gpuLight.PositionType = (light.Type == LightType::DIRECTIONAL) ? glm::vec4(rotation, 0.0f) : glm::vec4(position, 1.0f); // Directional light has w = 0, Point light has w = 1
+		gpuLight.ColorRGBIntensityA = glm::vec4(light.Color, light.Intensity);
+		gpuLight.Radius = light.Radius;
+		gpuLight.Falloff = light.Falloff;
+		return gpuLight;
+	}
+
     void Renderer3D::Initialize(GraphicsRHI* rhi, RendererData* data)
     {
         SURGE_PROFILE_FUNC("Renderer3D::Initialize()");
@@ -14,22 +24,38 @@ namespace Surge
 		Shader shader;
 		shader.Load("Renderer3D.glsl", ShaderType::VERTEX | ShaderType::FRAGMENT);
 
+		DepthDesc depth;
+		depth.TestEnable = true;
+		depth.WriteEnable = true;
+		depth.Op = CompareOp::LESS;
+
 		PipelineDesc desc = {};
 		desc.Shader_ = shader;
 		desc.Raster.Topo = Topology::TRIANGLE_LIST;
 		desc.Raster.Polygon = PolygonMode::FILL;
 		desc.Raster.Cull = CullMode::BACK;
+		desc.Depth = depth;
 		desc.DebugName = "Renderer3D Pipeline";
 		desc.TargetFramebuffer = mData->mOffscreenFramebuffer;
 		desc.TargetSwapchain = false;
 		desc.Blend.Enable = true;
 		mPipeline = mRHI->CreatePipeline(desc);		
+
+		// GPU Light
+		BufferDesc gpuLightDesc = {};
+		gpuLightDesc.Usage = BufferUsage::STORAGE; // Registers it to Bindless
+		gpuLightDesc.HostVisible = true;
+		gpuLightDesc.DebugName = "GPU Lights";
+		gpuLightDesc.Size = sizeof(GPULight) * MAX_LIGHTS;
+		mGPULightBuffer = mRHI->CreateBuffer(gpuLightDesc);
+		mLightBufferIndex = mRHI->GetBindlessBufferIndex(mGPULightBuffer);
     }
 
 	void Renderer3D::BeginFrame(const FrameContext& frameCtx)
 	{
 		SURGE_PROFILE_FUNC("Renderer3D::BeginFrame(FrameContext)");	
 		mCurrentFrameCtx = frameCtx;
+		mLightCPU.Count = 0;
 
 		mRHI->BindBindlessSet(mCurrentFrameCtx, mPipeline);
 	}
@@ -37,6 +63,10 @@ namespace Surge
     void Renderer3D::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
+
+		if (mLightCPU.Count > 0)		
+			mRHI->UploadBuffer(mGPULightBuffer, mLightCPU.Lights, sizeof(GPULight) * mLightCPU.Count, 0);
+		
 
 		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
 
@@ -50,8 +80,12 @@ namespace Surge
 			for (Uint i = 0; i < mesh.GetSubmeshes().size(); i++)
 			{
 				const Submesh& submesh = submeshes[i];
-				glm::mat4 meshData[2] = { cmd.Transform * submesh.Transform, mData->ViewProjection };
-				mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(glm::mat4) * 2, meshData);
+
+				PushConstantData pushConstants = { 
+					.Transform = cmd.Transform * submesh.Transform, 
+					.LightBufferIndex = mLightBufferIndex,
+					.LightCount = mLightCPU.Count };
+				mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
 				mRHI->CmdDrawIndexed(mCurrentFrameCtx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
 			}
 		}
@@ -63,19 +97,28 @@ namespace Surge
 		mMeshDrawCommands.emplace_back(MeshDrawCmd{ transform, mesh });
 	}
 
+	void Renderer3D::SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)
+	{
+		SG_ASSERT(mLightCPU.Count < MAX_LIGHTS, "Renderer3D: exceeded MAX_LIGHTS");
+
+		mLightCPU.Lights[mLightCPU.Count++] = LightComponentToGPULight(light, position, rotation);
+	}
+
 	void Renderer3D::OnImGuiRender()
 	{
+
 	}
 
 	void Renderer3D::OnWindowResize(Uint width, Uint height)
 	{
-		Log<Severity::Debug>("WindowResized // Latest dimensions: Width:{0} Height:{1}", width, height);
+		Log<Severity::Debug>("Renderer3D::OnWindowResize: Latest dimensions: Width:{0} Height:{1}", width, height);
 	}
 	
 	void Renderer3D::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer3D::Shutdown()");
 		mRHI->DestroyPipeline(mPipeline);
+		mRHI->DestroyBuffer(mGPULightBuffer);
     }
 
 } // namespace Surge

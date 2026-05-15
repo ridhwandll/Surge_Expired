@@ -6,13 +6,17 @@ namespace Surge
 {
 	static VkBufferUsageFlags ToVkBufferUsage(BufferUsage usage)
 	{
-		VkBufferUsageFlags flags = 0;
-		if ((Uint)usage & (Uint)BufferUsage::VERTEX) flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-		if ((Uint)usage & (Uint)BufferUsage::INDEX) flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-		if ((Uint)usage & (Uint)BufferUsage::UNIFORM) flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		if ((Uint)usage & (Uint)BufferUsage::STORAGE) flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		if ((Uint)usage & (Uint)BufferUsage::STAGING) flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		return flags;
+		switch (usage)
+		{
+		case BufferUsage::VERTEX:  return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		case BufferUsage::INDEX:   return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+		case BufferUsage::UNIFORM: return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		case BufferUsage::STORAGE: return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		case BufferUsage::STAGING: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		default:
+			SG_ASSERT_INTERNAL("Tf you doin bruh? Unknown BufferUsage");
+			return 0;
+		}
 	}
 
 	BufferEntry VulkanBuffer::Create(const VulkanRHI& rhi, const BufferDesc& desc)
@@ -27,7 +31,7 @@ namespace Surge
 		bufferInfo.size = desc.Size;
 		bufferInfo.usage = ToVkBufferUsage(desc.Usage);
 
-		bool isStaging = desc.Usage & BufferUsage::STAGING;
+		bool isStaging = desc.Usage == BufferUsage::STAGING;
 		if (isStaging)
 			bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 

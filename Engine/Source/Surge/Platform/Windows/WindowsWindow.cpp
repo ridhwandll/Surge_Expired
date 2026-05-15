@@ -211,10 +211,29 @@ namespace Surge
                 break;
             }
             case WM_KEYDOWN:
+            case WM_SYSKEYDOWN: // For Alt key
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                int repeatCount = (lParam & 0xffff);
-                KeyPressedEvent event(static_cast<KeyCode>(wParam), repeatCount);
+				WPARAM virtualKeyCode = wParam;
+				Uint scancode = (lParam & 0x00ff0000) >> 16;
+				bool isExtended = (lParam & 0x01000000) != 0;
+
+				if (virtualKeyCode == VK_SHIFT)
+				{
+					// MapVirtualKey translates the scancode to the specific L/R version
+					virtualKeyCode = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+				}
+				else if (virtualKeyCode == VK_CONTROL)
+				{
+					virtualKeyCode = isExtended ? VK_RCONTROL : VK_LCONTROL;
+				}
+				else if (virtualKeyCode == VK_MENU) // Alt key
+				{
+					virtualKeyCode = isExtended ? VK_RMENU : VK_LMENU;
+				}
+
+				int repeatCount = (lParam & 0xffff);
+                KeyPressedEvent event(static_cast<KeyCode>(virtualKeyCode), repeatCount);
                 data->mEventCallback(event);
                 break;
             }

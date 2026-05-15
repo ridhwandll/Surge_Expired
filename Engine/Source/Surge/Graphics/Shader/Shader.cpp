@@ -77,7 +77,7 @@ namespace Surge
 			shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), mName.c_str(), options);
 			if (result.GetCompilationStatus() != shaderc_compilation_status_success)
 			{
-				Log<Severity::Error>("{} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage));
+				Log<Severity::Error>("{}:{} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage), mName);
 				Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
 				SG_ASSERT_INTERNAL("Shader Compilation failure!");
 			}
@@ -112,7 +112,7 @@ namespace Surge
 
             String fullPath = GetShaderCachePath(spirvHandle.Type);
 			AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);
-
+			SG_ASSERT(asset, "Cannot open cached shader!");
 			// Read the buffer
 			size_t size = AAsset_getLength(asset);
 			if (size % 4 != 0)

@@ -55,6 +55,13 @@ namespace Surge
         Entity(const entt::entity& handle, Scene* scene)
             : mEnttHandle(handle), mScene(scene) {}
 
+		template <typename T>
+		const T& GetComponent() const
+		{
+			T& component = mScene->GetRegistry().get<T>(mEnttHandle);
+			return component;
+		}
+
         template <typename T>
         T& GetComponent()
         {

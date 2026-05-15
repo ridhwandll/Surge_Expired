@@ -225,7 +225,7 @@ namespace Surge::VulkanUtils
 		switch (format)
 		{
 		case TextureFormat::RGBA8_SRGB:			return "RGBA8_SRGB";
-		case TextureFormat::RGBA8_UNORM:			return "RGBA8_UNORM";
+		case TextureFormat::RGBA8_UNORM:		return "RGBA8_UNORM";
 		case TextureFormat::BGRA8_SRGB:			return "BGRA8_SRGB";
 		case TextureFormat::D32_SFLOAT:			return "DEPTH32_SFLOAT";
 		case TextureFormat::D24_UNORM_S8_UINT:	return "D24_UNORM_S8_UINT";
@@ -326,15 +326,33 @@ namespace Surge::VulkanUtils
 
 	String ShaderTypeToString(const ShaderType& type)
 	{
-		switch (type)
-		{
-		case ShaderType::VERTEX: return "Vertex";
-		case ShaderType::FRAGMENT: return "Fragment";
-		case ShaderType::COMPUTE: return "Compute";
-		case ShaderType::NONE: SG_ASSERT_INTERNAL("ShaderType::NONE is invalid in this case!");
-		}
-		SG_ASSERT_INTERNAL("Unknown ShaderType!");
-		return "NONE";
+		static thread_local char buffer[64];
+		char* ptr = buffer;
+		auto bits = static_cast<Uint>(type);
+		bool first = true;
+
+		auto append = [&](const char* str)
+			{
+				if (!first)
+				{
+					*ptr++ = ' ';
+					*ptr++ = '|';
+					*ptr++ = ' ';
+				}
+				while (*str)
+					*ptr++ = *str++;
+				first = false;
+			};
+
+		if (bits & (Uint)ShaderType::VERTEX)   append("VERTEX");
+		if (bits & (Uint)ShaderType::FRAGMENT) append("FRAGMENT");
+		if (bits & (Uint)ShaderType::COMPUTE)  append("COMPUTE");
+
+		if (first)
+			append("NONE");
+
+		*ptr = '\0'; // Null terminate the string
+		return buffer;
 	}
 
 	ShaderType ShaderTypeFromString(const String& type)

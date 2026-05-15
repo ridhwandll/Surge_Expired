@@ -33,22 +33,53 @@ namespace Surge
 		RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
 		mData->mFinalImage = mRHI->CreateTexture(colorDesc);
 
+		TextureDesc depthDesc = {};
+		depthDesc.Width = size.x;
+		depthDesc.Height = size.y;
+		depthDesc.Format = TextureFormat::D32_SFLOAT;
+		depthDesc.Usage = TextureUsage::DEPTH_ATTACHMENT;
+		depthDesc.DebugName = "Final Depth Texture";
+		depthDesc.GenerateImGuiID = false;
+		mData->mDepthImage = mRHI->CreateTexture(depthDesc);
+
 		// Offscreen framebuffer
 		FramebufferAttachment colorAttachment = {};
 		colorAttachment.Handle = mData->mFinalImage;
 		colorAttachment.Load = LoadOp::CLEAR;
 		colorAttachment.Store = StoreOp::STORE;
 
+		FramebufferAttachment depthAttachment = {};
+		depthAttachment.Handle = mData->mDepthImage;
+		depthAttachment.Load = LoadOp::CLEAR;
+		depthAttachment.Store = StoreOp::DONT_CARE;
+
 		FramebufferDesc fbDesc = {};
 		fbDesc.ColorAttachments[0] = colorAttachment;
 		fbDesc.ColorAttachmentCount = 1;
+		fbDesc.DepthAttachment = depthAttachment;
+		fbDesc.HasDepth = true;
 		fbDesc.Width = size.x;
 		fbDesc.Height = size.y;
 		fbDesc.DebugName = "Offscreen Framebuffer";
 		mData->mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
+		// Frame UBO
+		BufferDesc frameUBODesc = {};
+		frameUBODesc.Usage = BufferUsage::UNIFORM;
+		frameUBODesc.HostVisible = true;
+		frameUBODesc.DebugName = "FrameUBO";
+		frameUBODesc.Size = sizeof(FrameUBO);
+		mData->mFrameUBO = mRHI->CreateBuffer(frameUBODesc);
+
 		mRenderer2D.Initialize(mRHI.get(), mData.get());
 		mRenderer3D.Initialize(mRHI.get(), mData.get());
+
+		mData->mFrameDescriptorSet = mRHI->CreateDescriptorSet(mRHI->GetDescriptorLayout(mRenderer3D.mPipeline), DescriptorUpdateFrequency::STATIC, "Frame DescriptorSet");
+		DescriptorWrite frameDescriptorWrite = {};
+		frameDescriptorWrite.Slot = 0;
+		frameDescriptorWrite.Type = DescriptorType::UNIFORM_BUFFER;
+		frameDescriptorWrite.Buffer = mData->mFrameUBO;
+		mRHI->UpdateDescriptorSet(mData->mFrameDescriptorSet, &frameDescriptorWrite, 1);
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera)
@@ -59,11 +90,18 @@ namespace Surge
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
 
+		FrameUBO frameData = {};
+		frameData.ViewProjection = mData->ViewProjection;
+		frameData.CameraPos = mData->CameraPosition;
+		mRHI->UploadBuffer(mData->mFrameUBO, &frameData, sizeof(FrameUBO));
+
 		mCurrentFrameCtx = mRHI->BeginFrame();
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
 		mRenderer2D.BeginFrame(mCurrentFrameCtx);
 		mRenderer3D.BeginFrame(mCurrentFrameCtx);
+
+		mRHI->BindDescriptorSet(mCurrentFrameCtx, mRenderer3D.mPipeline, mData->mFrameDescriptorSet, 0);
     }
 
 	void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
@@ -74,11 +112,18 @@ namespace Surge
 		mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
 		mData->CameraPosition = transform[3];
 	
+		FrameUBO frameData = {};
+		frameData.ViewProjection = mData->ViewProjection;
+		frameData.CameraPos = mData->CameraPosition;
+		mRHI->UploadBuffer(mData->mFrameUBO, &frameData, sizeof(FrameUBO));
+
 		mCurrentFrameCtx = mRHI->BeginFrame();
 		mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
 		mRenderer2D.BeginFrame(mCurrentFrameCtx);
 		mRenderer3D.BeginFrame(mCurrentFrameCtx);
+
+		mRHI->BindDescriptorSet(mCurrentFrameCtx, mRenderer3D.mPipeline, mData->mFrameDescriptorSet, 0);
 	}
 
     void Renderer::EndFrame()
@@ -108,11 +153,6 @@ namespace Surge
 
 		mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
     }
-		
-	void Renderer::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
-	{
-		mRenderer3D.SubmitMesh(transform, mesh);
-	}
 
 	void Renderer::OnImGuiRender()
 	{
@@ -121,11 +161,6 @@ namespace Surge
 		mRenderer3D.OnImGuiRender();
 		mRHI->ShowMetricsWindow();
 		ImGui::End();
-	}
-
-	void Renderer::SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
-	{
-		mRenderer2D.Submit(transform, color, texture);
 	}
 
 	void Renderer::OnWindowResize(Uint width, Uint height)
@@ -148,9 +183,14 @@ namespace Surge
         mRHI->WaitIdle();
 		mRenderer2D.Shutdown();
 		mRenderer3D.Shutdown();
+
+		mRHI->DestroyDescriptorSet(mData->mFrameDescriptorSet);
+
+		mRHI->DestroyBuffer(mData->mFrameUBO);
 		mRHI->DestroySampler(mData->mDefaultSampler);
 		mRHI->DestroyFramebuffer(mData->mOffscreenFramebuffer);
 		mRHI->DestroyTexture(mData->mFinalImage);
+		mRHI->DestroyTexture(mData->mDepthImage);
 
         mRHI->Shutdown();
     }

@@ -120,7 +120,7 @@ namespace Surge
 			return;
 		}
 		mMaxQuadCountReached = false;
-		Uint texIndex = mRHI->GetBindlessIndex(texture.IsNull() ? mWhiteTexture : texture);
+		Uint texIndex = mRHI->GetBindlessTextureIndex(texture.IsNull() ? mWhiteTexture : texture);
 
 		static constexpr glm::vec4 sLocalPositions[4] = {
 			{ 0.5f, -0.5f, 0.0f, 1.0f},
@@ -158,9 +158,9 @@ namespace Surge
 		mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
 		mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
 
-		// quadData[0] is just a placeholder to match the 3D shader
-		glm::mat4 quadData[2] = { glm::mat4(1.0f) , mData->ViewProjection };
-		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX, 0, sizeof(glm::mat4) * 2, &quadData);
+		// quadData is just a placeholder to match the 3D shader
+		PushConstantData pushConstants = { .Transform = glm::mat4(1.0f), .LightCount = 0};
+		mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
 
 		for (const QuadDrawCmd& cmd : mDrawCommands)
 			mRHI->CmdDrawIndexed(mCurrentFrameCtx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);

@@ -90,12 +90,6 @@ namespace Surge
 				TextureHandle texture = mRenderer->GetRHI()->CreateTexture(desc);
 				mTextures.push_back(texture);
 				stbi_image_free(data);
-
-				if (mTexID == NULL)
-				{
-					//mTexID = mRenderer->GetFinalImageImGuiID();
-					mTexID = mRenderer->GetRHI()->AddImGuiImage(texture);
-				}
 			}
 			else
 			{
@@ -136,7 +130,6 @@ namespace Surge
 		std::mt19937 gen(rd());
 		std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
 		std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
-
 		mTexturedQuadCount = 50.0f;
 		mChangeQuadAmount = mTexturedQuadCount;
 		FillTextures(mTexturedQuadCount);
@@ -152,8 +145,7 @@ namespace Surge
 			auto& t = quad.GetComponent<TransformComponent>();
 			t.Position = glm::vec3(x, y, 0.0f);
 			t.Scale = glm::vec3(0.3f, 0.3f, 1.0f);
-		}
-		
+		}		
 		Uint basicQuadCount = 500;
 		for (Uint i = 0; i < basicQuadCount; i++)
 		{
@@ -168,22 +160,64 @@ namespace Surge
 			t.Scale = glm::vec3(0.02f, 0.02f, 1.0f);
 			t.MarkDirty();
 		}
+		//{
+		//	std::array<Entity, 7> generatedMeshEntities;
+		//	for (int i = 0; i < 7; i++)
+		//	{
+		//		mActiveScene->CreateEntity(generatedMeshEntities[i], "Mesh" + std::to_string(i));
+		//		MeshComponent& meshComp = generatedMeshEntities[i].AddComponent<MeshComponent>();
+		//		meshComp.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(i));
+		//
+		//		TransformComponent& t = generatedMeshEntities[i].GetComponent<TransformComponent>();
+		//		t.Position = glm::vec3(-5.0f + i * 2.0f, 1.0f, 0.0f);
+		//		t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+		//		t.MarkDirty();
+		//	}
+		//}
 
 		{
-			std::array<Entity, 7> generatedMeshEntities;
-			for (int i = 0; i < 7; i++)
 			{
-				mActiveScene->CreateEntity(generatedMeshEntities[i], "Mesh" + std::to_string(i));
-				MeshComponent& meshComp = generatedMeshEntities[i].AddComponent<MeshComponent>();
-				meshComp.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(i));
-		
-				TransformComponent& t = generatedMeshEntities[i].GetComponent<TransformComponent>();
-				t.Position = glm::vec3(-5.0f + i * 2.0f, 1.0f, 0.0f);
+				mActiveScene->CreateEntity(mFloor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
+				MeshComponent& meshComp = mFloor.AddComponent<MeshComponent>();
+				meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
+				TransformComponent& t = mFloor.GetComponent<TransformComponent>();
+				t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
+				t.MarkDirty();
+			}
+			{
+				Entity cube;
+				mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
+				MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
+				meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
+				TransformComponent& t = cube.GetComponent<TransformComponent>();
+				t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
 				t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
 				t.MarkDirty();
 			}
 		}
-
+		{
+			Entity pointLight;
+			mActiveScene->CreateEntity(pointLight, "Point Light");
+			LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
+			lightComp.Type = LightType::POINT;
+			lightComp.Intensity = 1.2f;
+			lightComp.Radius = 10.0f;
+			TransformComponent& t = pointLight.GetComponent<TransformComponent>();
+			t.Position = glm::vec3(1.0f, 1.5f, 1.0f);
+			t.MarkDirty();
+		}
+		{
+			Entity directionalLight;
+			mActiveScene->CreateEntity(directionalLight, "Directional Light");
+			LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
+			lightComp.Type = LightType::DIRECTIONAL;
+			lightComp.Intensity = 0.5f;
+			lightComp.Radius = 1.0f;
+			TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
+			t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+			t.Rotation = glm::vec3(-30.0f, -40.0f, -30.0f);
+			t.MarkDirty();
+		}
 		mActiveScene->OnResize(windowSize.x, windowSize.y);
 		mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
 	}
@@ -191,6 +225,10 @@ namespace Surge
 	void Player::OnUpdate()
 	{
 		float dt = Core::GetClock().GetSeconds();
+
+		TransformComponent& floorTransform = mFloor.GetComponent<TransformComponent>();
+		floorTransform.Rotation.y += 50.0f * dt;
+		floorTransform.MarkDirty();
 
 		if (mMoveEnabled && mColoredQuads.size() > 0)
 		{
@@ -294,10 +332,6 @@ namespace Surge
 			}
 		}
 
-		ImGui::End();
-
-		ImGui::Begin("Demo Viweport");
-		ImGui::Image(mTexID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 		ImGui::End();
 	}
 

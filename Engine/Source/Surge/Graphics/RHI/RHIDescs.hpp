@@ -26,13 +26,12 @@ namespace Surge
 
 	enum class BufferUsage : Uint
 	{
-		VERTEX = BIT(0),
-		INDEX = BIT(1),
-		UNIFORM = BIT(2),
-		STORAGE = BIT(3),
-		STAGING = BIT(4),
+		VERTEX,
+		INDEX,
+		UNIFORM,
+		STORAGE,
+		STAGING
 	};
-	MAKE_BIT_ENUM(BufferUsage, Uint);
 
 	enum class TextureFormat
 	{
@@ -234,7 +233,6 @@ namespace Surge
 		ShaderType Stage = ShaderType::FRAGMENT;
 		bool Partial = false; // allow partially bound arrays
 	};
-
 	struct DescriptorLayoutDesc
 	{
 		DescriptorBinding Bindings[16] = {};

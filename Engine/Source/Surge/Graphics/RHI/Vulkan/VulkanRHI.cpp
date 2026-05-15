@@ -220,6 +220,12 @@ namespace Surge
 	{
 		VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateBuffer: Name: {0} Size: {1} bytes", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size));
 		BufferEntry entry = VulkanBuffer::Create(*this, desc);
+
+		// Currently we support bindless access for STORAGE buffers
+		bool isShaderAccessible = desc.Usage == BufferUsage::STORAGE;
+		if (isShaderAccessible)		
+			entry.BindlessIndex = mBindlessRegistry.RegisterBuffer(*this, entry.Buffer, 0, entry.Desc.Size);		
+
 		return mBufferPool.Allocate(std::move(entry));
 	}
 
@@ -237,7 +243,12 @@ namespace Surge
 		if (!entry)		
 			return;
 		
-		VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));
+		VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));		
+
+		bool isShaderAccessible = entry->Desc.Usage == BufferUsage::STORAGE;
+		if (isShaderAccessible)
+			mBindlessRegistry.UnregisterBuffer(entry->BindlessIndex);
+
 		VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
 		mBufferPool.Free(buffer); // Return slot to free list
 	}
@@ -444,7 +455,6 @@ namespace Surge
 		entry.Desc = desc;
 
 		VkDescriptorSetLayoutBinding vkBindings[16] = {};
-		VkDescriptorBindingFlags vkBindingFlags[16] = {};
 
 		for (Uint i = 0; i < desc.BindingCount; i++)
 		{
@@ -453,22 +463,11 @@ namespace Surge
 			vkBindings[i].descriptorType = VulkanUtils::ToVkDescriptorType(b.Type);
 			vkBindings[i].descriptorCount = b.Count;
 			vkBindings[i].stageFlags = VulkanUtils::ShaderTypeToVulkanShaderStage(b.Stage);
-
-			// Bindless
-			VkDescriptorBindingFlags flags =
-				VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |         
-				VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |       
-				VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 		}
-
-		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo = {};
-		flagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		flagsInfo.bindingCount = desc.BindingCount;
-		flagsInfo.pBindingFlags = vkBindingFlags;
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.pNext = &flagsInfo;
+		layoutInfo.pNext = nullptr;
 		layoutInfo.bindingCount = desc.BindingCount;
 		layoutInfo.pBindings = vkBindings;
 
@@ -494,11 +493,18 @@ namespace Surge
 		mDescriptorLayoutPool.Free(h);
 	}
 
-	Surge::Uint VulkanRHI::GetBindlessIndex(TextureHandle h)
+	Uint VulkanRHI::GetBindlessTextureIndex(TextureHandle h) const
 	{
-		TextureEntry* entry = mTexturePool.Get(h);
-		SG_ASSERT(entry, "GetBindlessIndex: invalid TextureHandle");
+		const TextureEntry* entry = mTexturePool.Get(h);
+		SG_ASSERT(entry, "GetBindlessTextureIndex: invalid TextureHandle");
 
+		return entry->BindlessIndex;
+	}
+
+	Uint VulkanRHI::GetBindlessBufferIndex(BufferHandle h) const
+	{
+		const BufferEntry* entry = mBufferPool.Get(h);
+		SG_ASSERT(entry, "GetBindlessBufferIndex: invalid BufferHandle");
 		return entry->BindlessIndex;
 	}
 
@@ -510,6 +516,20 @@ namespace Surge
 		SG_ASSERT(entry, "BindBindlessSet: invalid PipelineHandle");
 
 		mBindlessRegistry.Bind(cmd, entry->Layout);
+	}
+
+	void VulkanRHI::BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex)
+	{
+		PipelineEntry* entry = mPipelinePool.Get(pipeline);
+		SG_ASSERT(entry, "BindDescriptorSet: invalid PipelineHandle");
+
+		DescriptorSetEntry* setEntry = mDescriptorSetPool.Get(setHandle);
+		SG_ASSERT(setEntry, "BindDescriptorSet: invalid DescriptorSetHandle");
+
+		VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+
+		Uint setToBind = (setEntry->Frequency == DescriptorUpdateFrequency::DYNAMIC) ? ctx.FrameIndex : 0;
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, entry->Layout, setIndex, 1, &setEntry->Sets[setToBind], 0, nullptr);
 	}
 
 	DescriptorSetHandle VulkanRHI::CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
@@ -1071,7 +1091,7 @@ namespace Surge
 						if (desc.HasDepth)
 						{
 							ImGui::Text("Depth Attachment:");
-							ImGui::Text("TextureHandle (%d, %d), LoadOp: %s, StoreOp: %s", desc.DepthAttachment.Handle.Index, desc.DepthAttachment.Handle.Generation,
+							ImGui::Text("TextureHandle (%d, %d)\nLoadOp: %s\nStoreOp: %s", desc.DepthAttachment.Handle.Index, desc.DepthAttachment.Handle.Generation,
 								VulkanUtils::LoadOpToString(desc.DepthAttachment.Load), VulkanUtils::StoreOpToString(desc.DepthAttachment.Store));
 						}
 						ImGui::TreePop();

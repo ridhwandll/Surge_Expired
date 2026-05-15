@@ -29,5 +29,6 @@ namespace Surge
         bool mGizmoInUse = false;
 		bool mIsViewportHovered = false;
         SceneHierarchyPanel* mSceneHierarchy;
+        EditorCamera* mEditorCam;
     };
 } // namespace Surge

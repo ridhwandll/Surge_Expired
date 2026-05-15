@@ -13,6 +13,23 @@ namespace Surge
 
 		const ShaderReflectionData& reflectedData = desc.Shader_.GetReflectionData();
 
+		// Find required descriptor sets count
+		//Vector<Uint> descrioptorSetsCount;
+		//const Vector<ShaderBuffer>&  shaderBuffers = reflectedData.GetBuffers();
+		//const Vector<ShaderResource>& shaderTextures = reflectedData.GetResources();
+		//for (const ShaderBuffer& buffer : shaderBuffers)
+		//{
+		//	// Check if the number of the set is already mentioned in the vector
+		//	if (std::find(descrioptorSetsCount.begin(), descrioptorSetsCount.end(), buffer.Set) == descrioptorSetsCount.end())
+		//		descrioptorSetsCount.push_back(buffer.Set);
+		//}
+		//for (const ShaderResource& res : shaderTextures)
+		//{
+		//	// Check if the number of the set is already mentioned in the vector
+		//	if (std::find(descrioptorSetsCount.begin(), descrioptorSetsCount.end(), res.Set) == descrioptorSetsCount.end())
+		//		descrioptorSetsCount.push_back(res.Set);
+		//}
+
 		PipelineEntry entry = {};
 		entry.Desc = desc;
 
@@ -20,57 +37,57 @@ namespace Surge
 		VkPipelineLayoutCreateInfo layoutInfo = {};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-		VkDescriptorSetLayout bindlessLayout = rhi.mBindlessRegistry.GetLayout();
-		SG_ASSERT(bindlessLayout != VK_NULL_HANDLE, "VulkanPipeline: BindlessLayout not set");
+		std::array<VkDescriptorSetLayout, 2> vkDescLayouts = {};
 
 		// WIP: Descriptor set layouts 
-		//DescriptorLayoutDesc layoutDesc = {};
-		//Uint descriptorSetCount = 1;
-		//layoutDesc.BindingCount = 1;
-		//for (const ShaderBuffer& buffer : reflectedData.GetBuffers())
-		//{
-		//	DescriptorBinding dsc{				
-		//		.Slot = 0,
-		//		.Type = DescriptorType::UNIFORM_BUFFER,
-		//		.Count = 1,
-		//		.Stage = buffer.ShaderStages,
-		//		.Partial = false
-		//	};
-		//	layoutDesc.Bindings[buffer.Binding] = dsc;
-		//}
-		//
-		//for (const ShaderResource& texture : reflectedData.GetResources())
-		//{
-		//	DescriptorBinding dsc{
-		//		.Slot = 0,
-		//		.Type = DescriptorType::TEXTURE,
-		//		.Count = texture.ArraySize,
-		//		.Stage = texture.ShaderStages,
-		//		.Partial = false
-		//	};
-		//	layoutDesc.Bindings[texture.Binding] = dsc;
-		//}
-		//entry.DescriptorSetLayout = rhi.CreateDescriptorLayout(layoutDesc);		
-		
+		DescriptorLayoutDesc layoutDesc = {};
+
+		layoutDesc.BindingCount = 1;
+		for (const ShaderBuffer& buffer : reflectedData.GetBuffers())
+		{
+			DescriptorBinding dsc{};
+			dsc.Slot = buffer.Binding;
+			dsc.Type = DescriptorType::UNIFORM_BUFFER;
+			dsc.Count = 1;
+			dsc.Stage = buffer.ShaderStages;
+			dsc.Partial = false;
+			
+			layoutDesc.Bindings[buffer.Binding] = dsc;
+			break; // FiXME: For no
+		}
+		entry.DescriptorSetLayout = rhi.CreateDescriptorLayout(layoutDesc);
+		vkDescLayouts[0] = rhi.mDescriptorLayoutPool.Get(entry.DescriptorSetLayout)->Layout;
+
+		vkDescLayouts[1] = rhi.mBindlessRegistry.GetLayout(); // Bindless set layout
+		SG_ASSERT(vkDescLayouts[1] != VK_NULL_HANDLE, "VulkanPipeline: BindlessLayout not set");
+
 		// Push constants
 		const Vector<ShaderPushConstant>& pushConstants = reflectedData.GetPushConstantBuffers();
-		Vector<VkPushConstantRange> pushRanges(pushConstants.size());
-		for (size_t i = 0; i < pushConstants.size(); ++i)
+
+		// TODO: Remove this hardcoded 1 and make it dynamic based on the number of push constant buffers in the shader
+		Vector<VkPushConstantRange> pushRanges(1);
+		for (size_t i = 0; i < 1; ++i)
 		{
 			const ShaderPushConstant& pushConstant = pushConstants[i];
 			SG_ASSERT(!(pushConstant.ShaderStages & ShaderType::COMPUTE), "Compute shader is not supported in VulkanPipeline yet!");
 
-			if (pushConstant.ShaderStages & ShaderType::VERTEX) pushRanges[i].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
-			if (pushConstant.ShaderStages & ShaderType::FRAGMENT) pushRanges[i].stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+			//if (pushConstant.ShaderStages & ShaderType::VERTEX)
+			//	pushRanges[i].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+			//if (pushConstant.ShaderStages & ShaderType::FRAGMENT)
+			//	pushRanges[i].stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 
+			pushRanges[i].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			pushRanges[i].offset = 0;
 			pushRanges[i].size = pushConstant.Size;
 		}
 
-		//auto vklayout = rhi.mDescriptorLayoutPool.Get(entry.DescriptorSetLayout)->Layout;
-		auto vkLayout = bindlessLayout;
-		layoutInfo.pSetLayouts = &vkLayout;
-		layoutInfo.setLayoutCount = 1;
+		// Asscheek fucnkig vulkan wasted my 5hr here. Summary:
+		// The array index of a layout inside pSetLayouts directly establishes its set = N number in GLSL/HLSL
+		// pSetLayouts[0] defines the layout for layout(set = 0, binding = ...)
+		// pSetLayouts[1] defines the layout for layout(set = 1, binding = ...)
+		// pSetLayouts[2] defines the layout for layout(set = 2, binding = ...)
+		layoutInfo.pSetLayouts = vkDescLayouts.data();
+		layoutInfo.setLayoutCount = static_cast<Uint>(vkDescLayouts.size());
 		layoutInfo.pushConstantRangeCount = pushRanges.size();
 		layoutInfo.pPushConstantRanges = pushRanges.data();
 

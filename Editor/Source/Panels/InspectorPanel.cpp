@@ -68,14 +68,12 @@ namespace Surge
                 {
                     if (ImGui::MenuItem("Camera"))
                         entity.AddComponent<CameraComponent>();
-                    if (ImGui::MenuItem("Point Light"))
-                        entity.AddComponent<PointLightComponent>();
 					if (ImGui::MenuItem("Sprite Renderer"))
 						entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
 					if (ImGui::MenuItem("Mesh Component"))
 						entity.AddComponent<MeshComponent>();
-                    if (ImGui::MenuItem("Directional Light"))
-                        entity.AddComponent<DirectionalLightComponent>();
+					if (ImGui::MenuItem("Light"))
+						entity.AddComponent<LightComponent>();
                     ImGui::EndPopup();
                 }
             }
@@ -190,24 +188,42 @@ namespace Surge
 				});
 		}
 
-        if (entity.HasComponent<PointLightComponent>())
+        if (entity.HasComponent<LightComponent>())
         {
-            PointLightComponent& component = entity.GetComponent<PointLightComponent>();
-            DrawComponent<PointLightComponent>(entity, "Point Light", [&component]() {
-                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
-                ImGuiAux::TProperty<float>("Intensity", &component.Intensity);
-                ImGuiAux::TProperty<float>("Radius", &component.Radius);
-                ImGuiAux::TProperty<float>("Falloff", &component.Falloff, 0.0f, 1.0f);
-            });
-        }
+            LightComponent& component = entity.GetComponent<LightComponent>();
+            DrawComponent<LightComponent>(entity, "Light", [&component]()
+            {
+				const char* lightTypeStrings[] = { "POINT", "DIRECTIONAL" };
+				const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted("TYPE");
+				ImGui::TableNextColumn();
+				ImGui::PushItemWidth(-1);
+				if (ImGui::BeginCombo("##TYPE", currentLightTypeString))
+				{
+					for (int i = 0; i < 2; i++)
+					{
+						const bool isSelected = currentLightTypeString == lightTypeStrings[i];
+						if (ImGui::Selectable(lightTypeStrings[i], isSelected))
+						{
+							currentLightTypeString = lightTypeStrings[i];
+							component.Type = static_cast<LightType>(i);
+						}
+						if (isSelected)
+							ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::PopItemWidth();
 
-        if (entity.HasComponent<DirectionalLightComponent>())
-        {
-            DirectionalLightComponent& component = entity.GetComponent<DirectionalLightComponent>();
-            DrawComponent<DirectionalLightComponent>(entity, "Directional Light", [&component]() {
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
                 ImGuiAux::TProperty<float>("Intensity", &component.Intensity);
-                ImGuiAux::TProperty<float>("Size", &component.Size);
+
+				if (component.Type == LightType::POINT)
+                {
+                    ImGuiAux::TProperty<float>("Radius", &component.Radius);
+                    ImGuiAux::TSlider<float>("Falloff", component.Falloff, 0.1f, 2.0f);
+                }
             });
         }
     }

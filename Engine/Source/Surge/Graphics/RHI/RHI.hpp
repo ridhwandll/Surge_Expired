@@ -68,8 +68,10 @@ namespace Surge
 
 		void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline) { mBackendRHI.BindBindlessSet(ctx, pipeline); }
 
-		Uint GetBindlessIndex(TextureHandle h) { return mBackendRHI.GetBindlessIndex(h); }
+		Uint GetBindlessTextureIndex(TextureHandle h) const { return mBackendRHI.GetBindlessTextureIndex(h); }
+		Uint GetBindlessBufferIndex(BufferHandle h) const { return mBackendRHI.GetBindlessBufferIndex(h); }
 		DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(layoutHandle, frequency, debugName); }
+		void BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.BindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
 		void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount) { mBackendRHI.UpdateDescriptorSet(setHandle, writes, writeCount); }
 		void DestroyDescriptorSet(DescriptorSetHandle h) { mBackendRHI.DestroyDescriptorSet(h); }
 
