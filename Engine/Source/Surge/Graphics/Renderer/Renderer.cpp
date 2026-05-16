@@ -16,6 +16,9 @@ namespace Surge
 		mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
 
+		mData->mMaterialRegistry.Initialize(mRHI.get());
+
+
 		//Sampler
 		SamplerDesc samplerDesc = {};
 		samplerDesc.DebugName = "Renderer DefaultSampler";
@@ -80,6 +83,18 @@ namespace Surge
 		frameDescriptorWrite.Type = DescriptorType::UNIFORM_BUFFER;
 		frameDescriptorWrite.Buffer = mData->mFrameUBO;
 		mRHI->UpdateDescriptorSet(mData->mFrameDescriptorSet, &frameDescriptorWrite, 1);
+
+		uint8_t whitePixel[] = { 255, 255, 255, 255 };
+		TextureDesc texDesc = {};
+		texDesc.Width = 1;
+		texDesc.Height = 1;
+		texDesc.Format = TextureFormat::RGBA8_UNORM;
+		texDesc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
+		texDesc.DebugName = "WhiteTexture";
+		texDesc.InitialData = whitePixel;
+		texDesc.DataSize = sizeof(whitePixel);
+		texDesc.Sampler = mData->mDefaultSampler;
+		mData->mWhiteTexture = mRHI->CreateTexture(texDesc);
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera)
@@ -177,6 +192,11 @@ namespace Surge
 		mRenderer3D.OnWindowResize(width, height);
 	}
 
+	Ref<Material> Renderer::CreateMaterial(const String& debugName)
+	{
+		return Ref<Material>::Create(mData->mMaterialRegistry, debugName);
+	}
+
 	void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
@@ -184,6 +204,7 @@ namespace Surge
 		mRenderer2D.Shutdown();
 		mRenderer3D.Shutdown();
 
+		mRHI->DestroyTexture(mData->mWhiteTexture);
 		mRHI->DestroyDescriptorSet(mData->mFrameDescriptorSet);
 
 		mRHI->DestroyBuffer(mData->mFrameUBO);
@@ -192,6 +213,7 @@ namespace Surge
 		mRHI->DestroyTexture(mData->mFinalImage);
 		mRHI->DestroyTexture(mData->mDepthImage);
 
+		mData->mMaterialRegistry.Shutdown();
         mRHI->Shutdown();
     }
 

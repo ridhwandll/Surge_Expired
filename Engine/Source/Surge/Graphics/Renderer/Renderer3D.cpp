@@ -70,7 +70,7 @@ namespace Surge
 
 		mRHI->CmdBindPipeline(mCurrentFrameCtx, mPipeline);
 
-		for (const auto& cmd : mMeshDrawCommands)
+		for (auto& cmd : mMeshDrawCommands)
 		{
 			const Mesh& mesh = *cmd.Mesh;
 			mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mesh.GetVertexBuffer());
@@ -84,7 +84,12 @@ namespace Surge
 				PushConstantData pushConstants = { 
 					.Transform = cmd.Transform * submesh.Transform, 
 					.LightBufferIndex = mLightBufferIndex,
-					.LightCount = mLightCPU.Count };
+					.LightCount = mLightCPU.Count,
+					.MaterialBufferIndex = mData->mMaterialRegistry.GetBufferBindlessIndex(),
+					.MaterialIndex = cmd.Material->GetMaterialIndex()
+				};
+
+				cmd.Material->Apply();
 				mRHI->CmdPushConstants(mCurrentFrameCtx, mPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
 				mRHI->CmdDrawIndexed(mCurrentFrameCtx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
 			}
@@ -92,9 +97,9 @@ namespace Surge
 		mMeshDrawCommands.clear();
     }
 
-	void Renderer3D::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
+	void Renderer3D::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material)
 	{
-		mMeshDrawCommands.emplace_back(MeshDrawCmd{ transform, mesh });
+		mMeshDrawCommands.emplace_back(MeshDrawCmd{ transform, mesh, material });
 	}
 
 	void Renderer3D::SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)

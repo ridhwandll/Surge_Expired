@@ -56,7 +56,7 @@ namespace Surge
 			{
 				auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
 				if (mesh.Mesh)
-					renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
+					renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
 
 			}
 		}
@@ -94,7 +94,7 @@ namespace Surge
 				{
 					auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
 					if (mesh.Mesh)
-						renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
+						renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
 
 				}
 			}

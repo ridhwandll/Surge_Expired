@@ -179,8 +179,17 @@ namespace Surge
 			{
 				mActiveScene->CreateEntity(mFloor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
 				MeshComponent& meshComp = mFloor.AddComponent<MeshComponent>();
+
 				meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
+				meshComp.Material_ = mRenderer->CreateMaterial("FloorMat");
+				meshComp.Material_->SetAlbedo({ 0.8f, 0.6f, 0.4f })
+					.SetRoughness(0.85f)
+					.SetMetallic(0.0f)
+					.SetReflectance(0.04f)
+					.Apply();
+
 				TransformComponent& t = mFloor.GetComponent<TransformComponent>();
+				t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
 				t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
 				t.MarkDirty();
 			}
@@ -189,6 +198,14 @@ namespace Surge
 				mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
 				MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
 				meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
+
+				meshComp.Material_ = mRenderer->CreateMaterial("SphereMat");
+				meshComp.Material_->SetAlbedo({ 0.8f, 0.2f, 0.2f })
+					.SetRoughness(0.8f)
+					.SetMetallic(0.2f)
+					.SetReflectance(0.04f)
+					.Apply();
+
 				TransformComponent& t = cube.GetComponent<TransformComponent>();
 				t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
 				t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -203,7 +220,7 @@ namespace Surge
 			lightComp.Intensity = 1.2f;
 			lightComp.Radius = 10.0f;
 			TransformComponent& t = pointLight.GetComponent<TransformComponent>();
-			t.Position = glm::vec3(1.0f, 1.5f, 1.0f);
+			t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
 			t.MarkDirty();
 		}
 		{

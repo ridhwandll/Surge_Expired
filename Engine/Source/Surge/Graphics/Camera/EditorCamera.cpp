@@ -35,6 +35,9 @@ namespace Surge
 
     void EditorCamera::OnUpdate()
     {
+        if (Core::GetWindow()->IsWindowMinimized())
+            return;
+
         const float ts = Core::GetClock().GetMilliseconds();
         const glm::vec2& mouse {Input::GetMouseX(), Input::GetMouseY()};
         const glm::vec2 delta = (mouse - mInitialMousePosition) * 0.001f;

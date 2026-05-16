@@ -19,6 +19,8 @@ layout(push_constant) uniform PushConstants
     mat4 Transform;
     uint LightBufferIndex;
     uint LightCount;
+    uint MaterialBufferIndex;
+    uint MaterialIndex;
 } uPush;
 
 layout(location = 0) flat out uint outColor;
@@ -49,6 +51,8 @@ layout(push_constant) uniform PushConstants
     mat4 Transform;
     uint LightBufferIndex;
     uint LightCount;
+    uint MaterialBufferIndex;
+    uint MaterialIndex;
 } uMesh;
 
 layout(set = 1, binding = 1) uniform sampler2D uTexture[4096];

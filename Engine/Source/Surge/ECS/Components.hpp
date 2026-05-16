@@ -5,6 +5,7 @@
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/Mesh/Mesh.hpp"
+#include "Surge/Graphics/Material/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 #include <glm/glm.hpp>
@@ -100,6 +101,7 @@ namespace Surge
     struct MeshComponent
     {
         Ref<Mesh> Mesh;
+		Ref<Material> Material_;
         SURGE_REFLECTION_ENABLE;
 	};
 
