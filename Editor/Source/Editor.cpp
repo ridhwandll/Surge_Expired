@@ -10,51 +10,33 @@
 
 namespace Surge
 {
-	void Editor::FillTextures(Uint texCount)
+	TextureHandle Editor::LoadTexture()
 	{
+		TextureHandle texture = TextureHandle::Invalid();
 		stbi_set_flip_vertically_on_load(1);
 		SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
-		for (int i = 0; i < texCount; i++)
+		String path = "Engine/Assets/Textures/RidWhite.png";
+		int width, height, channels;
+		stbi_uc* data = nullptr;
+		data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+		if (data)
 		{
-			String path = "Engine/Assets/Textures/RidWhite.png";
-			int width, height, channels;
-			stbi_uc* data = nullptr;
-#ifdef SURGE_PLATFORM_WINDOWS
-			data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-#elif defined(SURGE_PLATFORM_ANDROID)
-			android_app* app = Android::GAndroidApp;
-			AAssetManager* assetManager = app->activity->assetManager;
-			AAsset* asset = AAssetManager_open(assetManager, path.c_str(), AASSET_MODE_BUFFER);
-
-			Vector<unsigned char> buffer;
-			int bufferSize = AAsset_getLength(asset);
-			buffer.resize(bufferSize);
-
-			AAsset_read(asset, buffer.data(), bufferSize);
-			AAsset_close(asset);
-
-			data = stbi_load_from_memory(buffer.data(), bufferSize, &width, &height, &channels, 4);
-#endif
-			if (data)
-			{
-				TextureDesc desc = {};
-				desc.Width = width;
-				desc.Height = height;
-				desc.Format = TextureFormat::RGBA8_SRGB;
-				desc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
-				desc.DebugName = String(std::to_string(i + 1) + ".png");
-				desc.InitialData = data;
-				desc.DataSize = width * height * 4;
-				desc.Sampler = defautSampler;
-				TextureHandle texture = mRenderer->GetRHI()->CreateTexture(desc);
-				mTextures.push_back(texture);
-				stbi_image_free(data);
-			}
-			else
-			{
-				Log<Severity::Error>("Failed to load texture at path: {0}", path);
-			}
+			TextureDesc desc = {};
+			desc.Width = width;
+			desc.Height = height;
+			desc.Format = TextureFormat::RGBA8_SRGB;
+			desc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
+			desc.DebugName = "Tex.png";
+			desc.InitialData = data;
+			desc.DataSize = width * height * 4;
+			desc.Sampler = defautSampler;
+			texture = mRenderer->GetRHI()->CreateTexture(desc);			
+			stbi_image_free(data);
 		}
+		else		
+			Log<Severity::Error>("Failed to load texture at path: {0}", path);		
+
+		return texture;
 	}
 
     void Editor::OnInitialize()
@@ -84,67 +66,22 @@ namespace Surge
 			transform.Position = glm::vec3(-10, 6, 10);
 			transform.Rotation = glm::vec3(-30, -45, 0);
         }
-
-        //{
-        //    mActiveScene->CreateEntity(sprite, "Sprite");
-        //    SpriteRendererComponent& s = sprite.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-        //}
-
-        // Load meshes from files
-		//{
-		//	mActiveScene->CreateEntity(cube, "Mesh");
-		//	MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
-		//	//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/Box.gltf");
-		//	//meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/ABeautifulGame/glTF/ABeautifulGame.gltf");
-        //
-		//	auto& t = cube.GetComponent<TransformComponent>();
-		//	t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-		//	t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-		//	t.MarkDirty();
-		//}
-
-        // Load in-engine generated meshes
-		//{
-		//	std::array<Entity, 7> generatedMeshEntities;
-		//	for (int i = 0; i < 7; i++)
-		//	{
-		//		mActiveScene->CreateEntity(generatedMeshEntities[i], MeshGenerator::DefaultMeshToString(static_cast<DefaultMesh>(i)));
-		//		MeshComponent& meshComp = generatedMeshEntities[i].AddComponent<MeshComponent>();
-		//		meshComp.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(i));
-		//
-		//		TransformComponent& t = generatedMeshEntities[i].GetComponent<TransformComponent>();
-		//		t.Position = glm::vec3(-5.0f + i * 2.0f, 1.0f, 0.0f);
-		//		t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-		//		t.MarkDirty();
-		//	}
-		//}
-
-		//std::random_device rd;
-		//std::mt19937 gen(rd());
-		//std::uniform_real_distribution<float> distX(-10, 10);
-		//std::uniform_real_distribution<float> distY(-10, 10);
-		//Uint texturedQuadCount = 50.0f;
-		//FillTextures(texturedQuadCount);
-		//for (Uint i = 0; i < texturedQuadCount; i++)
-		//{
-		//	float x = distX(gen);
-		//	float y = distY(gen);
-		//
-		//	Entity quad;
-		//	mActiveScene->CreateEntity(quad, "StressQuad");
-		//	quad.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), mTextures[i]);
-		//
-		//	auto& t = quad.GetComponent<TransformComponent>();
-		//	t.Position = glm::vec3(x, y, 0.0f);
-		//	t.Scale = glm::vec3(0.3f, 0.3f, 1.0f);
-		//}
-
+			
+		mRidTex = LoadTexture();
 		{
 			{
 				Entity floor;
 				mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
 				MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
+
 				meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
+				meshComp.Material_ = mRenderer->CreateMaterial("FloorMat");
+				meshComp.Material_->SetAlbedo({ 0.8f, 0.6f, 0.4f })
+					.SetRoughness(0.85f)
+					.SetMetallic(0.0f)
+					.SetReflectance(0.04f)
+					.Apply();
+
 				TransformComponent& t = floor.GetComponent<TransformComponent>();
 				t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
 				t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
@@ -155,6 +92,15 @@ namespace Surge
 				mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
 				MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
 				meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
+
+				meshComp.Material_ = mRenderer->CreateMaterial("SphereMat");
+				meshComp.Material_->SetAlbedo({ 0.8f, 0.2f, 0.2f })
+					.SetRoughness(0.8f)
+					.SetMetallic(0.2f)
+					.SetReflectance(0.04f)
+					.SetAlbedoTexture(mRidTex) //Currently not working
+					.Apply();
+
 				TransformComponent& t = cube.GetComponent<TransformComponent>();
 				t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
 				t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -236,8 +182,7 @@ namespace Surge
 
     void Editor::OnShutdown()
     {
-		for (auto& texture : mTextures)
-			mRenderer->GetRHI()->DestroyTexture(texture);
+		mRenderer->GetRHI()->DestroyTexture(mRidTex);
     }
 
 } // namespace Surge

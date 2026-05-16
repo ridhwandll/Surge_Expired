@@ -20,6 +20,8 @@ layout(push_constant) uniform PushConstants
     mat4 Transform;
     uint LightBufferIndex;
     uint LightCount;
+    uint MaterialBufferIndex;
+    uint MaterialIndex;
 } uMesh;
 
 struct VertexOutput
@@ -70,7 +72,18 @@ layout(push_constant) uniform PushConstants
     mat4 Transform;
     uint LightBufferIndex; // bindless index into uBuffers[]
     uint LightCount;
+    uint MaterialBufferIndex;
+    uint MaterialIndex;
 } uMesh;
+
+struct Material
+{
+    vec4 AlbedoMetallic;    // xyz=albedo, w=metallic
+    float Roughness;
+    float Reflectance;
+    uint AlbedoTexIndex;
+    uint NormalTexIndex;
+};
 
 struct Light
 {
@@ -80,12 +93,18 @@ struct Light
     float Falloff;
     float _pad1, _pad2;
 };
-//Set: 1 Lights (TODO Add materials)
+//Set: 1 Lights
 layout(set = 1, binding = 0) readonly buffer LightBuffer
 {
     Light lights[];
 
-}slights[];
+} slights[];
+
+layout(set = 1, binding = 0) readonly buffer MaterialBuffer
+{
+    Material materials[];
+
+} sMaterialBuffers[];
 
 //Bindless texture array: 
 layout(set = 1, binding = 1) uniform sampler2D uTexture[4096];
@@ -98,13 +117,6 @@ layout(set = 1, binding = 1) uniform sampler2D uTexture[4096];
 //    uint  lightCount;
 //} scene;
 
-struct Material
-{
-    vec3 Albedo;
-    float Metallic;
-    float Roughness;
-    float Reflectance;
-};
 
 // Energy conserving Blinn-Phong?
 vec3 CalculateMobilePBR(Light light, Material mat, vec3 N, vec3 V, vec3 fragPos)
@@ -149,8 +161,8 @@ vec3 CalculateMobilePBR(Light light, Material mat, vec3 N, vec3 V, vec3 fragPos)
     // f0 represents the base reflectivity (at 0 degrees)
     // Non-metals (dielectrics) use a constant (usually 0.04), metals use Albedo
     vec3 f0 = vec3(0.04) * mat.Reflectance;
-    vec3 specColor = mix(f0, mat.Albedo, mat.Metallic);
-    vec3 diffuseColor = mat.Albedo * (1.0 - mat.Metallic);
+    vec3 specColor = mix(f0, mat.AlbedoMetallic.rgb, mat.AlbedoMetallic.a);
+    vec3 diffuseColor = mat.AlbedoMetallic.rgb * (1.0 - mat.AlbedoMetallic.a);
 
     // Normalized Blinn-Phong Specular
     // The (shininess + 8)/8 factor ensures the light energy stays consistent
@@ -168,27 +180,26 @@ vec3 CalculateMobilePBR(Light light, Material mat, vec3 N, vec3 V, vec3 fragPos)
 
 void main()
 {
-    // TODO: Support actual materials
-    Material mat;
-    mat.Albedo = vec3(1.0, 0.7, 0.1); // The "Base Color"
-    mat.Metallic = 0.4;               // 0.0 (Plastic) to 1.0 (Metal)
-    mat.Roughness = 0.7;              // 0.0 (Shiny) to 1.0 (Rough)
-    mat.Reflectance = 0.5;            // Standard 4% f0 scale
+    Material mat = sMaterialBuffers[uMesh.MaterialBufferIndex].materials[uMesh.MaterialIndex];
 
     vec3 N = normalize(vInput.Normal);
     vec3 V = normalize(uFrame.CameraPos - vInput.WorldPos);
 
-    // Ambient Lighting
-    vec3 ambientIntensity = vec3(0.03); 
-    vec3 ambient = ambientIntensity * mat.Albedo * (1.0 - mat.Metallic);
+    // Environment Reflection
+    vec3 skyColor = vec3(0.3, 0.3, 0.3);  // Dull Blue Sky
+    vec3 groundColor = vec3(0.1, 0.1, 0.1); // Dark Ground    
+    float skyWeight = N.y * 0.5 + 0.5; 
+    vec3 fakeEnvironment = mix(groundColor, skyColor, skyWeight);
+
+    // Metals reflect the environment tinted by their Albedo
+    vec3 ambientReflection = fakeEnvironment * mix(vec3(0.04), mat.AlbedoMetallic.rgb, mat.AlbedoMetallic.a);
 
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);
     for (uint i = 0; i < uMesh.LightCount; i++)       
-        directAccumulation += CalculateMobilePBR(slights[uMesh.LightBufferIndex].lights[i], mat, N, V, vInput.WorldPos);    
-    
+        directAccumulation += CalculateMobilePBR(slights[uMesh.LightBufferIndex].lights[i], mat, N, V, vInput.WorldPos);        
 
-    vec3 color = ambient + directAccumulation;
+    vec3 color = ambientReflection + directAccumulation;
     color = color / (color + vec3(1.0));
 
     // Linear to sRGB conversion (Gamma Correction)

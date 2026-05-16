@@ -185,6 +185,18 @@ namespace Surge
 			DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
                 String kek = "TODO: Implement Asset Manager";
 				ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
+
+                glm::vec3 albedoColor = component.Material_->GetAlbedo();
+				if (ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &albedoColor))				
+                    component.Material_->SetAlbedo(albedoColor);
+
+                float metallic = component.Material_->GetMetallic();
+				if (ImGuiAux::TSlider<float>("Metallic", metallic, 0.0f, 1.0f))
+					component.Material_->SetMetallic(metallic);
+
+				float roughness = component.Material_->GetRoughness();
+				if (ImGuiAux::TSlider<float>("Roughness", roughness, 0.0f, 1.0f))
+					component.Material_->SetRoughness(roughness);
 				});
 		}
 

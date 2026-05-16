@@ -30,7 +30,7 @@ namespace Surge
 		// Called by Renderer, not meant to be called directly
         void BeginFrame(const FrameContext& frameCtx);
         void EndFrame();
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh);
+        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material);
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation);
 		void OnWindowResize(Uint width, Uint height);
 
@@ -40,6 +40,7 @@ namespace Surge
         {
             glm::mat4 Transform;
             Ref<Mesh> Mesh;
+            Ref<Material> Material;
 		};
 
     private:

@@ -5,6 +5,8 @@
 #include "Surge/Graphics/Renderer/Renderer2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer3D.hpp"
 #include "Surge/ECS/Components.hpp"
+#include "Surge/Graphics/Material/MaterialRegistry.hpp"
+#include "Surge/Graphics/Material/Material.hpp"
 
 namespace Surge
 {   
@@ -22,6 +24,8 @@ namespace Surge
 		glm::mat4 Transform;
         Uint LightBufferIndex = 0;
 		Uint LightCount; // TODO Move this somewhere else
+		Uint MaterialBufferIndex;
+		Uint MaterialIndex;
 	};
 
     class Scene;
@@ -37,8 +41,11 @@ namespace Surge
         DescriptorSetHandle mFrameDescriptorSet;
 		BufferHandle mFrameUBO;
 
+        TextureHandle mWhiteTexture;
 		TextureHandle mFinalImage;
         TextureHandle mDepthImage;
+
+		MaterialRegistry mMaterialRegistry;
 
         SamplerHandle mDefaultSampler;
 		FramebufferHandle mOffscreenFramebuffer;
@@ -59,12 +66,14 @@ namespace Surge
         void BeginFrame(const EditorCamera& camera);
         void EndFrame();
 
-		void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh) { mRenderer3D.SubmitMesh(transform, mesh); }
+		void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material) { mRenderer3D.SubmitMesh(transform, mesh, material); }
 		void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture = TextureHandle::Invalid()) { mRenderer2D.Submit(transform, color, texture); }
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation) { mRenderer3D.SubmitLight(light, position, rotation); }
 
 		void OnWindowResize(Uint width, Uint height);
+		Ref<Material> CreateMaterial(const String& debugName = "Material");
 
+		Uint GetWhiteTextureBindlessIndex() const { return mRHI->GetBindlessTextureIndex(mData->mWhiteTexture); }
 		TextureHandle GetFinalImage() const { return mData->mFinalImage; }
         FramebufferHandle GetFinalFramebuffer() const { return mData->mOffscreenFramebuffer; }
         ImTextureID GetFinalImageImGuiID() const

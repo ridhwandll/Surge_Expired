@@ -28,11 +28,11 @@ namespace Surge
     private:
         void Resize();
         void OnImGuiRender();
-        void FillTextures(Uint texCount);
+        TextureHandle Editor::LoadTexture();
     private:
+        TextureHandle mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
-        Vector<TextureHandle> mTextures;
         PanelManager mPanelManager;
     };
 } // namespace Surge

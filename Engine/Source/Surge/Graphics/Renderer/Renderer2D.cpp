@@ -64,18 +64,6 @@ namespace Surge
 		desc.Blend.Enable = true;
 		mPipeline = mRHI->CreatePipeline(desc);
 
-		uint8_t whitePixel[] = { 255, 255, 255, 255 };			
-		TextureDesc texDesc = {};
-		texDesc.Width = 1;
-		texDesc.Height = 1;
-		texDesc.Format = TextureFormat::RGBA8_UNORM ;
-		texDesc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
-		texDesc.DebugName = "WhiteTexture";
-		texDesc.InitialData = whitePixel;
-		texDesc.DataSize = sizeof(whitePixel);
-		texDesc.Sampler = mData->mDefaultSampler;
-		mWhiteTexture = mRHI->CreateTexture(texDesc);
-
 		// Amount of max draw calls
 		mDrawCommands.reserve(MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH);
     }
@@ -84,7 +72,6 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
 
-		mRHI->DestroyTexture(mWhiteTexture);
 		mRHI->DestroyPipeline(mPipeline);
 
         for (Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
@@ -120,7 +107,7 @@ namespace Surge
 			return;
 		}
 		mMaxQuadCountReached = false;
-		Uint texIndex = mRHI->GetBindlessTextureIndex(texture.IsNull() ? mWhiteTexture : texture);
+		Uint texIndex = mRHI->GetBindlessTextureIndex(texture.IsNull() ? mData->mWhiteTexture : texture);
 
 		static constexpr glm::vec4 sLocalPositions[4] = {
 			{ 0.5f, -0.5f, 0.0f, 1.0f},

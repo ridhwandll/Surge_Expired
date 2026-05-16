@@ -32,6 +32,7 @@ SURGE_REFLECT_CLASS_REGISTER_END(Surge::CameraComponent)
 
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::MeshComponent)
     .AddVariable<&Surge::MeshComponent::Mesh>("Mesh")
+    .AddVariable<&Surge::MeshComponent::Material_>("Material")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::MeshComponent)
 
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::LightComponent)
