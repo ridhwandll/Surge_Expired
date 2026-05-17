@@ -5,7 +5,7 @@
 
 namespace Surge::Math
 {
-    FORCEINLINE bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale)
+    inline bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale)
     {
         // From glm::decompose in matrix_decompose.inl
         using namespace glm;

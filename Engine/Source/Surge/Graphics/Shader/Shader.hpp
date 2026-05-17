@@ -16,22 +16,22 @@ namespace Surge
         Shader() = default;
         ~Shader() = default;
 
-		//Must be located at ENGINE_SHADER_PATH + "/" + name + ".shader"
+        //Must be located at ENGINE_SHADER_PATH + "/" + name
         void Load(const String& name, ShaderType type);
 
-		const ShaderReflectionData& GetReflectionData() const { return mReflectionData; }
-		const Vector<SPIRVHandle>& GetSPIRVs() const { return mShaderSPIRVs; }
-		const String& GetName() const { return mName; }
+        const ShaderReflectionData& GetReflectionData() const { return mReflectionData; }
+        const Vector<SPIRVHandle>& GetSPIRVs() const { return mShaderSPIRVs; }
+        const String& GetName() const { return mName; }
     private:
         void ParseShader();
-		void Compile();
+        void Compile();
         String GetShaderCachePath(ShaderType type);
     private:
-		String mName;
+        String mName;
         HashMap<ShaderType, String> mShaderSources;
-		Vector<SPIRVHandle> mShaderSPIRVs;
+        Vector<SPIRVHandle> mShaderSPIRVs;
         ShaderType mTypesBit;
-		ShaderReflectionData mReflectionData;
+        ShaderReflectionData mReflectionData;
     };
 
 } // namespace Surge

@@ -4,133 +4,125 @@
 
 namespace Surge
 {
-	static VkBufferUsageFlags ToVkBufferUsage(BufferUsage usage)
-	{
-		switch (usage)
-		{
-		case BufferUsage::VERTEX:  return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-		case BufferUsage::INDEX:   return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-		case BufferUsage::UNIFORM: return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		case BufferUsage::STORAGE: return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		case BufferUsage::STAGING: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		default:
-			SG_ASSERT_INTERNAL("Tf you doin bruh? Unknown BufferUsage");
-			return 0;
-		}
-	}
+    static VkBufferUsageFlags ToVkBufferUsage(BufferUsage usage)
+    {
+        switch (usage)
+        {
+        case BufferUsage::VERTEX:  return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        case BufferUsage::INDEX:   return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        case BufferUsage::UNIFORM: return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        case BufferUsage::STORAGE: return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        case BufferUsage::STAGING: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        default:
+            SG_ASSERT_INTERNAL("Tf you doin bruh? Unknown BufferUsage");
+            return 0;
+        }
+    }
 
-	BufferEntry VulkanBuffer::Create(const VulkanRHI& rhi, const BufferDesc& desc)
-	{
-		SG_ASSERT(desc.Size > 0, "BufferDesc::Size must be > 0");
+    BufferEntry VulkanBuffer::Create(const VulkanRHI& rhi, const BufferDesc& desc)
+    {
+        SG_ASSERT(desc.Size > 0, "BufferDesc::Size must be > 0");
 
-		BufferEntry entry = {};
-		entry.Desc = desc;
+        BufferEntry entry = {};
+        entry.Desc = desc;
 
-		VkBufferCreateInfo bufferInfo = {};
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = desc.Size;
-		bufferInfo.usage = ToVkBufferUsage(desc.Usage);
+        VkBufferCreateInfo bufferInfo = {};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = desc.Size;
+        bufferInfo.usage = ToVkBufferUsage(desc.Usage);
 
-		bool isStaging = desc.Usage == BufferUsage::STAGING;
-		if (isStaging)
-			bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        bool isStaging = desc.Usage == BufferUsage::STAGING;
+        if (isStaging)
+            bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-		if (!desc.HostVisible && !isStaging)
-			bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        if (!desc.HostVisible && !isStaging)
+            bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-		VmaAllocationCreateInfo allocInfo = {};
-		allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-		if (desc.HostVisible)
-		{
-			// Persistent mapping: valid on mobile UMA, free to keep mapped forever
-			allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-			allocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			allocInfo.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		}
+        if (desc.HostVisible)
+        {
+            // Persistent mapping: valid on mobile UMA, free to keep mapped forever
+            allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            allocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            allocInfo.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        }
 
-		VmaAllocator allocator = rhi.GetAllocator();
-		VmaAllocationInfo vmaAllocInfo = {};
-	 	VK_CALL(vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &entry.Buffer, &entry.Allocation, &vmaAllocInfo));
+        VmaAllocator allocator = rhi.GetAllocator();
+        VmaAllocationInfo vmaAllocInfo = {};
+        VK_CALL(vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &entry.Buffer, &entry.Allocation, &vmaAllocInfo));
 
-		// If host visible, store the persistent mapped pointer directly
-		if (desc.HostVisible)
-		{
-			SG_ASSERT(vmaAllocInfo.pMappedData != nullptr, "VulkanBuffer: Host visible buffer failed to map");
-			entry.MappedPtr = vmaAllocInfo.pMappedData;
-		}
+        // If host visible, store the persistent mapped pointer directly
+        if (desc.HostVisible)
+        {
+            SG_ASSERT(vmaAllocInfo.pMappedData != nullptr, "VulkanBuffer: Host visible buffer failed to map");
+            entry.MappedPtr = vmaAllocInfo.pMappedData;
+        }
 
-		if (desc.InitialData != nullptr && desc.HostVisible)
-		{
-			memcpy(entry.MappedPtr, desc.InitialData, desc.Size);
-		}
-		else if (desc.InitialData != nullptr && !desc.HostVisible)
-		{
-			VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-			stagingInfo.size = desc.Size;
-			stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        if (desc.InitialData != nullptr && desc.HostVisible)
+        {
+            memcpy(entry.MappedPtr, desc.InitialData, desc.Size);
+        }
+        else if (desc.InitialData != nullptr && !desc.HostVisible)
+        {
+            VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+            stagingInfo.size = desc.Size;
+            stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-			VmaAllocationCreateInfo stagingAllocInfo = {};
-			stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-			stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            VmaAllocationCreateInfo stagingAllocInfo = {};
+            stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+            stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-			VkBuffer stagingBuffer;
-			VmaAllocation stagingAllocation;
-			VmaAllocationInfo stagingResultInfo;
-			stagingAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            VkBuffer stagingBuffer;
+            VmaAllocation stagingAllocation;
+            VmaAllocationInfo stagingResultInfo;
+            stagingAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
-			VK_CALL(vmaCreateBuffer(allocator, &stagingInfo, &stagingAllocInfo, &stagingBuffer, &stagingAllocation, &stagingResultInfo));
-			SG_ASSERT(stagingResultInfo.pMappedData != nullptr, "Staging buffer failed to map");
+            VK_CALL(vmaCreateBuffer(allocator, &stagingInfo, &stagingAllocInfo, &stagingBuffer, &stagingAllocation, &stagingResultInfo));
+            SG_ASSERT(stagingResultInfo.pMappedData != nullptr, "Staging buffer failed to map");
 
-			memcpy(stagingResultInfo.pMappedData, desc.InitialData, desc.Size);
+            memcpy(stagingResultInfo.pMappedData, desc.InitialData, desc.Size);
 
-			const VkCommandBuffer cb = rhi.BeginOneTimeCommands();
+            const VkCommandBuffer cb = rhi.BeginOneTimeCommands();
 
-			VkBufferCopy copyRegion = {};
-			copyRegion.size = desc.Size;
-			vkCmdCopyBuffer(cb, stagingBuffer, entry.Buffer, 1, &copyRegion);
+            VkBufferCopy copyRegion = {};
+            copyRegion.size = desc.Size;
+            vkCmdCopyBuffer(cb, stagingBuffer, entry.Buffer, 1, &copyRegion);
 
-			rhi.EndOneTimeCommands(cb);
+            rhi.EndOneTimeCommands(cb);
 
-			vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
-		}
-
+            vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        }
 
 #if defined(SURGE_DEBUG)
-		if (!desc.DebugName.empty())
-		{
-			VkDebugUtilsObjectNameInfoEXT nameInfo = {};
-			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-			nameInfo.objectType = VK_OBJECT_TYPE_BUFFER;
-			nameInfo.objectHandle = (uint64_t)entry.Buffer;
-			nameInfo.pObjectName = desc.DebugName.c_str(); 
-			rhi.SetDebugName(nameInfo);
-			vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName.c_str());
-		}
+        rhi.SetDebugName(VK_OBJECT_TYPE_BUFFER, (uint64_t)entry.Buffer, desc.DebugName);
+        vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName.c_str());
 #endif
-		return entry;
-	}
 
-	void VulkanBuffer::Destroy(const VulkanRHI& rhi, BufferEntry& entry)
-	{
-		if (entry.Buffer != VK_NULL_HANDLE)
-		{
-			vmaDestroyBuffer(rhi.GetAllocator(), entry.Buffer, entry.Allocation);
-			entry.Buffer = VK_NULL_HANDLE;
-			entry.Allocation = VK_NULL_HANDLE;
-			entry.MappedPtr = nullptr;
-			entry.Desc = {};
-		}
-	}
+        return entry;
+    }
 
-	void VulkanBuffer::Upload(BufferEntry& entry, const void* data, Uint size, Uint offset /*= 0*/)
-	{
-		SG_ASSERT(entry.Buffer != VK_NULL_HANDLE, "Uploading to a null buffer");
-		SG_ASSERT(offset + size <= entry.Desc.Size, "Upload out of buffer bounds");
-		SG_ASSERT(entry.MappedPtr != nullptr, "Upload called on a non-host-visible buffer. Use a staging buffer for GPU-only resources.");
+    void VulkanBuffer::Destroy(const VulkanRHI& rhi, BufferEntry& entry)
+    {
+        if (entry.Buffer != VK_NULL_HANDLE)
+        {
+            vmaDestroyBuffer(rhi.GetAllocator(), entry.Buffer, entry.Allocation);
+            entry.Buffer = VK_NULL_HANDLE;
+            entry.Allocation = VK_NULL_HANDLE;
+            entry.MappedPtr = nullptr;
+            entry.Desc = {};
+        }
+    }
 
-		memcpy((uint8_t*)entry.MappedPtr + offset, data, size);
-		// No explicit flush needed, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-		// is required at allocation time for host visible buffers
-	}
+    void VulkanBuffer::Upload(BufferEntry& entry, const void* data, Uint size, Uint offset /*= 0*/)
+    {
+        SG_ASSERT(entry.Buffer != VK_NULL_HANDLE, "Uploading to a null buffer");
+        SG_ASSERT(offset + size <= entry.Desc.Size, "Upload out of buffer bounds");
+        SG_ASSERT(entry.MappedPtr != nullptr, "Upload called on a non-host-visible buffer. Use a staging buffer for GPU-only resources.");
+
+        memcpy((uint8_t*)entry.MappedPtr + offset, data, size);
+        // No explicit flush needed, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        // is required at allocation time for host visible buffers
+    }
 }

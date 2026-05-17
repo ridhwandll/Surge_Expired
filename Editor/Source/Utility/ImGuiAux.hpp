@@ -161,7 +161,7 @@ namespace Surge::ImGuiAux
                 result = ImGui::DragFloat4("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
             else if constexpr (std::is_same_v<T, bool>)
                 result = ImGui::Checkbox("##v", value);
-			else if constexpr (std::is_same_v<T, String>)
+            else if constexpr (std::is_same_v<T, String>)
                 ImGui::TextUnformatted(value->c_str());
             else
                 static_assert(false);

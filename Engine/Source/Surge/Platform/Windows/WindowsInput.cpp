@@ -37,10 +37,14 @@ namespace Surge
 
     void Input::SetCursorMode(CursorMode cursorMode)
     {
-        switch (cursorMode)
+        if (cursorMode == CursorMode::Normal)
         {
-            case CursorMode::Normal: SetCursor(LoadCursor(nullptr, IDC_ARROW)); break;
-            case CursorMode::Locked: SetCursor(nullptr); break;
+            SetCursor(LoadCursor(nullptr, IDC_ARROW));
+            ClipCursor(NULL);
         }
+        else if (cursorMode == CursorMode::Locked)
+        {
+            SetCursor(nullptr);
+		}
     }
 } // namespace Surge
