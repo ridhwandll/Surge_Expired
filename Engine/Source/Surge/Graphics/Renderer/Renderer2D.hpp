@@ -38,7 +38,7 @@ namespace Surge
 
         // Called by Renderer, not meant to be called directly
         void BeginFrame(const FrameContext& frameCtx);
-        void Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture = TextureHandle::Invalid());
+        void Submit(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid());
         void EndFrame();
 
         void WriteToGPUBuffer();
@@ -76,7 +76,7 @@ namespace Surge
 
         PipelineHandle m2DPipeline;
         BufferHandle mVertexBuffers[RHISettings::FRAMES_IN_FLIGHT];
-        BufferHandle mIndexBuffer;   
+        BufferHandle mIndexBuffer;
 
         GraphicsRHI* mRHI;
         RendererData* mData;

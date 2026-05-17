@@ -23,7 +23,7 @@ namespace Surge
     private:
 
         Uint mTexturedQuadCount = 500;
-        Vector<TextureHandle> mTextures;
+        Vector<ImageHandle> mTextures;
         int mChangeQuadAmount;
         bool mMoveEnabled = true;
         Vector<Entity> mColoredQuads;

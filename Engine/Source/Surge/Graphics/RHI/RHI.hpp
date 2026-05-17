@@ -44,9 +44,9 @@ namespace Surge
         void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
 
         // Texture
-        TextureHandle CreateTexture(const TextureDesc& desc) { return mBackendRHI.CreateTexture(desc); }
-        void DestroyTexture(TextureHandle texture) { mBackendRHI.DestroyTexture(texture); }
-        void ResizeTexture(TextureHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeTexture(h, newWidth, newHeight); }
+        ImageHandle CreateTexture(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
+        void DestroyTexture(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
+        void ResizeTexture(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }
 
         // Framebuffer
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }
@@ -68,7 +68,7 @@ namespace Surge
 
         void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline) { mBackendRHI.BindBindlessSet(ctx, pipeline); }
 
-        Uint GetBindlessTextureIndex(TextureHandle h) const { return mBackendRHI.GetBindlessTextureIndex(h); }
+        Uint GetBindlessTextureIndex(ImageHandle h) const { return mBackendRHI.GetBindlessTextureIndex(h); }
         Uint GetBindlessBufferIndex(BufferHandle h) const { return mBackendRHI.GetBindlessBufferIndex(h); }
         DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(layoutHandle, frequency, debugName); }
         void BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.BindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
@@ -84,22 +84,22 @@ namespace Surge
         void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
 
         void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data) { mBackendRHI.CmdPushConstants(ctx, h, shaderStage, offset, size, data); }
-        void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }
+        void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }
 
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }
         void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
 
         void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdEndRenderPass(ctx, h); }
-        void CmdTransitionTextureLayout(const FrameContext& ctx, TextureHandle h, TextureUsage newLayout) { mBackendRHI.CmdTransitionTextureLayout(ctx, h, newLayout); }
+        void CmdTransitionTextureLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
 
         // setIndex maps to layout(set = N) in GLSL
         void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
 
         void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
 
-        ImTextureID AddImGuiImage(TextureHandle h) { return mBackendRHI.AddImGuiImage(h); }
-        ImTextureID GetImGuiImage(TextureHandle h) { return mBackendRHI.GetImGuiImage(h); }
+        ImTextureID AddImGuiImage(ImageHandle h) { return mBackendRHI.AddImGuiImage(h); }
+        ImTextureID GetImGuiImage(ImageHandle h) { return mBackendRHI.GetImGuiImage(h); }
 
         // TODO: REMOVE
         BackendRHI& GetBackendRHI() { return mBackendRHI; }

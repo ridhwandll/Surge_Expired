@@ -5,7 +5,7 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanBuffer.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanPipeline.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
-#include "Surge/Graphics/RHI/Vulkan/VulkanTexture.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImage.hpp"
 
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
@@ -91,7 +91,7 @@ namespace Surge
         mDescriptorLayoutPool.ForEachAlive([&](const DescriptorLayoutHandle& h, DescriptorLayoutEntry& entry) { DestroyDescriptorLayout(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
         mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry& entry){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
         mFramebufferPool.ForEachAlive([&](const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
-        mTexturePool.ForEachAlive([&](const TextureHandle& h, TextureEntry& entry) { VulkanTexture::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
+        mTexturePool.ForEachAlive([&](const ImageHandle& h, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
         mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!"); });
         mPipelinePool.ForEachAlive([&](const PipelineHandle& h, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!"); });
 
@@ -253,19 +253,19 @@ namespace Surge
         mBufferPool.Free(buffer); // Return slot to free list
     }
 
-    TextureHandle VulkanRHI::CreateTexture(const TextureDesc& desc)
+    ImageHandle VulkanRHI::CreateImage(const ImageDesc& desc)
     {		
         // TRANSFER_DST is required when InitialData is provided
-        SG_ASSERT(!(desc.InitialData && !(desc.Usage & TextureUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. Add TextureUsage::TRANSFER_DST to upload pixel data");
+        SG_ASSERT(!(desc.InitialData && !(desc.Usage & ImageUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. Add TextureUsage::TRANSFER_DST to upload pixel data");
 
-        TextureEntry entry = VulkanTexture::Create(*this, desc);
+        ImageEntry entry = VulkanImage::Create(*this, desc);
 
         if (desc.GenerateImGuiID)
             entry.ImGuiID = mImGuiContext.AddImage(entry.View);
 
-        TextureHandle h = mTexturePool.Allocate(std::move(entry));
+        ImageHandle h = mTexturePool.Allocate(std::move(entry));
 
-        if (desc.Usage & TextureUsage::SAMPLED)
+        if (desc.Usage & ImageUsage::SAMPLED)
         {
             SamplerEntry* samplerEntry = mSamplerPool.Get(desc.Sampler);
             SG_ASSERT(samplerEntry, "Null sampler, please provide a valid Sampler Handle in TextureDesc to sample the texture in Shader");
@@ -273,15 +273,15 @@ namespace Surge
         }
 
         if (desc.InitialData && desc.DataSize > 0)
-            UploadTextureData(h, desc.InitialData, desc.DataSize);
+            UploadImageData(h, desc.InitialData, desc.DataSize);
 
         VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage)));
         return h;
     }
 
-    void VulkanRHI::DestroyTexture(TextureHandle h)
+    void VulkanRHI::DestroyImage(ImageHandle h)
     {
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         if (!entry)
             return;
 
@@ -291,33 +291,33 @@ namespace Surge
             DestroyImGuiImage(h);
 
         mBindlessRegistry.UnregisterTexture(entry->BindlessIndex);
-        VulkanTexture::Destroy(*this, *entry);
+        VulkanImage::Destroy(*this, *entry);
         mTexturePool.Free(h);		
     }
 
-    void VulkanRHI::UploadTextureData(TextureHandle h, const void* data, Uint size)
+    void VulkanRHI::UploadImageData(ImageHandle h, const void* data, Uint size)
     {
         SG_ASSERT(data && size > 0, "UploadTextureData: data is null or size is 0");
-        VulkanTexture::UploadData(*this, h, data, size);
+        VulkanImage::UploadData(*this, h, data, size);
     }
 
-    void VulkanRHI::ResizeTexture(TextureHandle h, Uint width, Uint height)
+    void VulkanRHI::ResizeImage(ImageHandle h, Uint width, Uint height)
     {
         vkDeviceWaitIdle(mDevice.GetDevice());
 
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         if (!entry)
             return;
 
         if (entry->Desc.GenerateImGuiID)
             DestroyImGuiImage(h);
 
-        VulkanTexture::Destroy(*this, *entry);
-        TextureDesc desc = entry->Desc;
+        VulkanImage::Destroy(*this, *entry);
+        ImageDesc desc = entry->Desc;
         desc.Width = width;
         desc.Height = height;
 
-        *entry = VulkanTexture::Create(*this, desc);
+        *entry = VulkanImage::Create(*this, desc);
         if (desc.GenerateImGuiID)
             entry->ImGuiID = mImGuiContext.AddImage(entry->View);
     }
@@ -353,9 +353,9 @@ namespace Surge
 
         // Resize the attached Textures
         for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
-            ResizeTexture(entry->Desc.ColorAttachments[i].Handle, width, height);
+            ResizeImage(entry->Desc.ColorAttachments[i].Handle, width, height);
         if (entry->Desc.HasDepth)
-            ResizeTexture(entry->Desc.DepthAttachment.Handle, width, height);		
+            ResizeImage(entry->Desc.DepthAttachment.Handle, width, height);		
 
         // Rebuild with new dimensions
         FramebufferDesc desc = entry->Desc;
@@ -372,9 +372,9 @@ namespace Surge
         return entry->Desc;
     }
 
-    TextureDesc VulkanRHI::GetDesc(TextureHandle h)
+    ImageDesc VulkanRHI::GetDesc(ImageHandle h)
     {
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "GetDesc: invalid TextureHandle");
         return entry->Desc;
     }
@@ -493,9 +493,9 @@ namespace Surge
         mDescriptorLayoutPool.Free(h);
     }
 
-    Uint VulkanRHI::GetBindlessTextureIndex(TextureHandle h) const
+    Uint VulkanRHI::GetBindlessTextureIndex(ImageHandle h) const
     {
-        const TextureEntry* entry = mTexturePool.Get(h);
+        const ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "GetBindlessTextureIndex: invalid TextureHandle");
 
         return entry->BindlessIndex;
@@ -620,7 +620,7 @@ namespace Surge
             case DescriptorType::TEXTURE:
             case DescriptorType::STORAGE_TEXTURE:
             {
-                TextureEntry* tex = mTexturePool.Get(w.Texture);
+                ImageEntry* tex = mTexturePool.Get(w.Texture);
                 SG_ASSERT(tex, "UpdateDescriptorSet: invalid TextureHandle at slot");
 
                 SamplerEntry* smp = mSamplerPool.Get(w.Sampler);
@@ -726,10 +726,10 @@ namespace Surge
         vkCmdPushConstants(cmd, entry->Layout, VulkanUtils::ShaderTypeToVulkanShaderStage(shaderStage), offset, size, data);
     }
 
-    void VulkanRHI::CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle)
+    void VulkanRHI::CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle)
     {
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-        TextureEntry* src = mTexturePool.Get(srcHandle);
+        ImageEntry* src = mTexturePool.Get(srcHandle);
         SG_ASSERT(src, "CmdBlitToSwapchain: invalid source TextureHandle");
 
         VkImage swapchainImage = mSwapchain.GetFrame(ctx.SwapchainIndex).Image;
@@ -798,14 +798,14 @@ namespace Surge
         src->Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     }
 
-    void VulkanRHI::CmdTransitionTextureLayout(const FrameContext& ctx, TextureHandle h, TextureUsage newLayout)
+    void VulkanRHI::CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout)
     {
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "VulkanRHI::CmdTransitionTextureLayout: invalid TextureHandle");
 
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-        VkImageLayout vkLayout = VulkanUtils::TextureUsageToVkLayout(newLayout); // Validate newLayout is compatible with our supported usages
-        VulkanTexture::TransitionLayout(cmd, *entry, vkLayout);
+        VkImageLayout vkLayout = VulkanUtils::ImageUsageToVkLayout(newLayout); // Validate newLayout is compatible with our supported usages
+        VulkanImage::TransitionLayout(cmd, *entry, vkLayout);
     }
 
     void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
@@ -886,13 +886,13 @@ namespace Surge
         {
             for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
             {
-                TextureEntry* tex = mTexturePool.Get(entry->Desc.ColorAttachments[i].Handle);
+                ImageEntry* tex = mTexturePool.Get(entry->Desc.ColorAttachments[i].Handle);
                 if (tex)
                     tex->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // finalLayout
             }
             if (entry->Desc.HasDepth)
             {
-                TextureEntry* depth = mTexturePool.Get(entry->Desc.DepthAttachment.Handle);
+                ImageEntry* depth = mTexturePool.Get(entry->Desc.DepthAttachment.Handle);
                 if (depth)
                     depth->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             }
@@ -944,25 +944,25 @@ namespace Surge
         vkFreeCommandBuffers(mDevice.GetDevice(), mFrame.GetFrame(0).CmdPool, 1, &cmd);
     }
 
-    ImTextureID VulkanRHI::AddImGuiImage(TextureHandle h)
+    ImTextureID VulkanRHI::AddImGuiImage(ImageHandle h)
     {
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "AddImGuiImage: invalid TextureHandle");
 
         return mImGuiContext.AddImage(entry->View);
     }
 
-    ImTextureID VulkanRHI::GetImGuiImage(TextureHandle h)
+    ImTextureID VulkanRHI::GetImGuiImage(ImageHandle h)
     {
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "GetImGuiImage: invalid TextureHandle");
         SG_ASSERT(entry->Desc.GenerateImGuiID, "GetImGuiImage: Texture was not created with GenerateImGuiID flag!");
         return entry->ImGuiID;
     }
 
-    void VulkanRHI::DestroyImGuiImage(TextureHandle h)
+    void VulkanRHI::DestroyImGuiImage(ImageHandle h)
     {
-        TextureEntry* entry = mTexturePool.Get(h);
+        ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "DestroyImGuiImage: invalid TextureHandle");
         SG_ASSERT(entry->Desc.GenerateImGuiID, "DestroyImGuiImage: Texture was not created with GenerateImGuiID flag!");
         mImGuiContext.DestroyImage(entry->ImGuiID);
@@ -1062,8 +1062,8 @@ namespace Surge
                             {
                                 for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
                                 {
-                                    TextureEntry* texEntry = mTexturePool.Get(desc.ColorAttachments[i].Handle);
-                                    TextureDesc tDesc = texEntry->Desc;
+                                    ImageEntry* texEntry = mTexturePool.Get(desc.ColorAttachments[i].Handle);
+                                    ImageDesc tDesc = texEntry->Desc;
                                     String texText = std::format("TextureHandle ({}, {})", h.Index, h.Generation);
                                     if (ImGui::TreeNode(texText.c_str()))
                                     {
@@ -1127,9 +1127,9 @@ namespace Surge
         {
             //ImGui::PopFont();
             ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
-            mTexturePool.ForEachAlive([](const TextureHandle& h, TextureEntry& entry)
+            mTexturePool.ForEachAlive([](const ImageHandle& h, ImageEntry& entry)
                 {
-                    TextureDesc desc = entry.Desc;
+                    ImageDesc desc = entry.Desc;
                     String texText = std::format("{} ({}, {})", desc.DebugName, h.Index, h.Generation);
                     if (ImGui::TreeNode(texText.c_str()))
                     {

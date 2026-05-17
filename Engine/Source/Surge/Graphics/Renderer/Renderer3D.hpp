@@ -21,7 +21,7 @@ namespace Surge
         Renderer3D() = default;
         ~Renderer3D() = default;
 
-        TextureHandle GetFinalImage() const { return TextureHandle::Invalid(); /*TODO*/ }
+        ImageHandle GetFinalImage() const { return ImageHandle::Invalid(); /*TODO*/ }
 
     private:
         void Initialize(GraphicsRHI* rhi, RendererData* data);

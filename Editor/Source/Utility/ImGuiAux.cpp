@@ -14,12 +14,6 @@ namespace Surge
         //drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawCornerFlags_All, thickness);
     }
 
-    void ImGuiAux::Image(TextureHandle image, const glm::vec2& size)
-    {
-        ImTextureID id = Core::GetRenderer()->GetFinalImageImGuiID();
-        ImGui::Image(id, ImVec2(size.x, size.y));
-    }
-
     void ImGuiAux::TextCentered(const char* text)
     {
         float windowWidth = ImGui::GetWindowSize().x;

@@ -5,7 +5,7 @@
 
 namespace Surge
 {	
-    FramebufferEntry VulkanFramebuffer::Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, HandlePool<TextureHandle, TextureEntry>& texPool)
+    FramebufferEntry VulkanFramebuffer::Create(const VulkanRHI& rhi, const FramebufferDesc& desc, VulkanRenderpassFactory& rpFactory, HandlePool<ImageHandle, ImageEntry>& imagePool)
     {
         SG_ASSERT(desc.Width > 0, "FramebufferDesc: Width is 0");
         SG_ASSERT(desc.Height > 0, "FramebufferDesc: Height is 0");
@@ -21,7 +21,7 @@ namespace Surge
         Uint viewCount = 0;
         for (Uint i = 0; i < desc.ColorAttachmentCount; i++)
         {
-            TextureEntry* tex = texPool.Get(desc.ColorAttachments[i].Handle);
+            ImageEntry* tex = imagePool.Get(desc.ColorAttachments[i].Handle);
             SG_ASSERT(tex, "FramebufferDesc: invalid ColorAttachment handle!");
 
             key.ColorFormats[i] = VulkanUtils::TextureFormatToVkFormat(tex->Desc.Format);
@@ -39,7 +39,7 @@ namespace Surge
 
         if (!desc.DepthAttachment.Handle.IsNull())
         {
-            const TextureEntry* depth = texPool.Get(desc.DepthAttachment.Handle);
+            const ImageEntry* depth = imagePool.Get(desc.DepthAttachment.Handle);
             SG_ASSERT(depth, "FramebufferDesc: invalid DepthAttachment handle");
 
             key.DepthFormat = VulkanUtils::TextureFormatToVkFormat(depth->Desc.Format);

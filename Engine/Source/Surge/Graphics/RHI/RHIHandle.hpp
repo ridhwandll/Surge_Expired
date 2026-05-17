@@ -4,156 +4,156 @@
 
 namespace Surge
 {
-	template<typename Tag>
-	struct RHIHandle
-	{
-		static constexpr Uint INVALID_INDEX = ~0u;
-		
-		Uint Index = INVALID_INDEX; // Index into the pool's slot array. Generation is used to detect stale handles after a slot is freed and reallocated
-		Uint Generation = 0;
+    template<typename Tag>
+    struct RHIHandle
+    {
+        static constexpr Uint INVALID_INDEX = ~0u;
+        
+        Uint Index = INVALID_INDEX; // Index into the pool's slot array. Generation is used to detect stale handles after a slot is freed and reallocated
+        Uint Generation = 0;
 
-		bool IsNull() const { return Index == INVALID_INDEX; }
+        bool IsNull() const { return Index == INVALID_INDEX; }
 
-		bool operator==(const RHIHandle& o) const { return Index == o.Index && Generation == o.Generation; }
-		bool operator!=(const RHIHandle& o) const { return !(*this == o); }
+        bool operator==(const RHIHandle& o) const { return Index == o.Index && Generation == o.Generation; }
+        bool operator!=(const RHIHandle& o) const { return !(*this == o); }
 
-		static RHIHandle Invalid() { return {}; } // Index = ~0u, Generation = 0
-	};
+        static RHIHandle Invalid() { return {}; } // Index = ~0u, Generation = 0
+    };
 
-	struct FramebufferTag {};
-	using FramebufferHandle = RHIHandle<FramebufferTag>;
+    struct FramebufferTag {};
+    using FramebufferHandle = RHIHandle<FramebufferTag>;
 
-	struct TextureTag {};
-	using TextureHandle = RHIHandle<TextureTag>;
+    struct ImageTag {};
+    using ImageHandle = RHIHandle<ImageTag>;
 
-	struct BufferTag {};
-	using BufferHandle = RHIHandle<BufferTag>;
+    struct BufferTag {};
+    using BufferHandle = RHIHandle<BufferTag>;
 
-	struct PipelineTag {};
-	using PipelineHandle = RHIHandle<PipelineTag>;
+    struct PipelineTag {};
+    using PipelineHandle = RHIHandle<PipelineTag>;
 
-	struct SamplerTag {};
-	using SamplerHandle = RHIHandle<SamplerTag>;
+    struct SamplerTag {};
+    using SamplerHandle = RHIHandle<SamplerTag>;
 
-	struct DescriptorLayoutTag {};
-	using DescriptorLayoutHandle = RHIHandle<DescriptorLayoutTag>;
+    struct DescriptorLayoutTag {};
+    using DescriptorLayoutHandle = RHIHandle<DescriptorLayoutTag>;
 
-	struct DescriptorSetTag {};
-	using DescriptorSetHandle = RHIHandle<DescriptorSetTag>;
+    struct DescriptorSetTag {};
+    using DescriptorSetHandle = RHIHandle<DescriptorSetTag>;
 
-	template<typename XHandle, typename T>
-	class HandlePool
-	{
-	public:
-		struct Slot
-		{
-			T Data = {};
-			Uint Generation = 0;
-			bool Alive = false;
-		};
+    template<typename XHandle, typename T>
+    class HandlePool
+    {
+    public:
+        struct Slot
+        {
+            T Data = {};
+            Uint Generation = 0;
+            bool Alive = false;
+        };
 
-		// Allocate a slot and move data into it. Returns a valid handle.
-		XHandle Allocate(T&& value)
-		{
-			Uint index;
+        // Allocate a slot and move data into it. Returns a valid handle.
+        XHandle Allocate(T&& value)
+        {
+            Uint index;
 
-			if (!mFreeList.empty())
-			{
-				index = mFreeList.back();
-				mFreeList.pop_back();
-			}
-			else
-			{
-				index = static_cast<Uint>(mSlots.size());
-				mSlots.emplace_back();
-			}
+            if (!mFreeList.empty())
+            {
+                index = mFreeList.back();
+                mFreeList.pop_back();
+            }
+            else
+            {
+                index = static_cast<Uint>(mSlots.size());
+                mSlots.emplace_back();
+            }
 
-			Slot& slot = mSlots[index];
-			slot.Data = std::move(value);
-			slot.Alive = true;
+            Slot& slot = mSlots[index];
+            slot.Data = std::move(value);
+            slot.Alive = true;
 
-			// Guard against generation wrapping back to 0
-			// (a stale handle with Generation = N would match a recycled slot if the slot wrapped around to the same generation)
-			slot.Generation = (slot.Generation == ~0u) ? 1 : slot.Generation + 1;
+            // Guard against generation wrapping back to 0
+            // (a stale handle with Generation = N would match a recycled slot if the slot wrapped around to the same generation)
+            slot.Generation = (slot.Generation == ~0u) ? 1 : slot.Generation + 1;
 
-			XHandle handle;
-			handle.Index = index;
-			handle.Generation = slot.Generation;
-			return handle;
-		}
+            XHandle handle;
+            handle.Index = index;
+            handle.Generation = slot.Generation;
+            return handle;
+        }
 
-		// Returns true only if the handle was issued by this pool
-		// and the slot has not been destroyed since.
-		bool IsValid(XHandle h) const
-		{
-			if (h.IsNull() || h.Index >= static_cast<Uint>(mSlots.size()))
-				return false;
+        // Returns true only if the handle was issued by this pool
+        // and the slot has not been destroyed since.
+        bool IsValid(XHandle h) const
+        {
+            if (h.IsNull() || h.Index >= static_cast<Uint>(mSlots.size()))
+                return false;
 
-			const Slot& s = mSlots[h.Index];
-			return s.Alive && s.Generation == h.Generation;
-		}
+            const Slot& s = mSlots[h.Index];
+            return s.Alive && s.Generation == h.Generation;
+        }
 
-		// Get mutable data. Returns nullptr for invalid/stale handles.
-		T* Get(XHandle h)
-		{
-			if (!IsValid(h))
-				return nullptr;
+        // Get mutable data. Returns nullptr for invalid/stale handles.
+        T* Get(XHandle h)
+        {
+            if (!IsValid(h))
+                return nullptr;
 
-			return &mSlots[h.Index].Data;
-		}
+            return &mSlots[h.Index].Data;
+        }
 
-		// Get immutable data.
-		const T* Get(XHandle h) const
-		{
-			if (!IsValid(h))
-				return nullptr;
-			return &mSlots[h.Index].Data;
-		}
+        // Get immutable data.
+        const T* Get(XHandle h) const
+        {
+            if (!IsValid(h))
+                return nullptr;
+            return &mSlots[h.Index].Data;
+        }
 
-		// Mark the slot as free and reset its data.
-		// IMPORTANT: destroy any GPU resources BEFORE calling this.
-		// After Destroy() returns, the data is gone.
-		void Free(XHandle h)
-		{
-			if (!IsValid(h))
-				return;
+        // Mark the slot as free and reset its data.
+        // IMPORTANT: destroy any GPU resources BEFORE calling this.
+        // After Destroy() returns, the data is gone.
+        void Free(XHandle h)
+        {
+            if (!IsValid(h))
+                return;
 
-			Slot& s = mSlots[h.Index];
-			s.Data = T{};
-			s.Alive = false;
-			mFreeList.push_back(h.Index);
-		}
+            Slot& s = mSlots[h.Index];
+            s.Data = T{};
+            s.Alive = false;
+            mFreeList.push_back(h.Index);
+        }
 
-		// Iterate all currently live slots. Callback: void(const XHandle& h, T& entry)
-		template<typename Fn>
-		void ForEachAlive(Fn&& fn)
-		{
-			for (Uint i = 0; i < static_cast<Uint>(mSlots.size()); i++)
-			{
-				Slot& s = mSlots[i];
+        // Iterate all currently live slots. Callback: void(const XHandle& h, T& entry)
+        template<typename Fn>
+        void ForEachAlive(Fn&& fn)
+        {
+            for (Uint i = 0; i < static_cast<Uint>(mSlots.size()); i++)
+            {
+                Slot& s = mSlots[i];
 
-				if (!s.Alive)
-					continue;
+                if (!s.Alive)
+                    continue;
 
-				XHandle h;
-				h.Index = i;
-				h.Generation = s.Generation;
-				fn(h, s.Data);
-			}
-		}
+                XHandle h;
+                h.Index = i;
+                h.Generation = s.Generation;
+                fn(h, s.Data);
+            }
+        }
 
-		Uint AliveObjCount() const
-		{
-			Uint count = 0;
-			for (const auto& s : mSlots)
-				count += s.Alive ? 1 : 0;
+        Uint AliveObjCount() const
+        {
+            Uint count = 0;
+            for (const auto& s : mSlots)
+                count += s.Alive ? 1 : 0;
 
-			return count;
-		}
+            return count;
+        }
 
-	private:
-		Vector<Slot> mSlots;
-		Vector<Uint> mFreeList;
-	};
+    private:
+        Vector<Slot> mSlots;
+        Vector<Uint> mFreeList;
+    };
 
 } // namespace Surge

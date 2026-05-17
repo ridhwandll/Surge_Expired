@@ -110,8 +110,6 @@ namespace Surge::ImGuiAux
     void TextCentered(const char* text);
     bool ButtonCentered(const char* title);
 
-    void Image(TextureHandle image, const glm::vec2& size);
-
     template <typename T>
     void TComboBox(const char* title, const char** stringArray, Uint stringArraySize, Uint currentStringIndexInArray, T callbackFunction)
     {

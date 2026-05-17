@@ -25,21 +25,21 @@ namespace Surge
 
         // Offscreen color texture
         glm::vec2 size = Core::GetWindow()->GetSize();
-        TextureDesc colorDesc = {};
+        ImageDesc colorDesc = {};
         colorDesc.Width = size.x;
         colorDesc.Height = size.y;
-        colorDesc.Format = TextureFormat::B10G11R11_UFLOAT_PACK32;
-        colorDesc.Usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
+        colorDesc.Format = ImageFormat::B10G11R11_UFLOAT_PACK32;
+        colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED | ImageUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
         colorDesc.DebugName = "Final Texture";
         colorDesc.Sampler = mData->mDefaultSampler;
         RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
         mData->mFinalImage = mRHI->CreateTexture(colorDesc);
 
-        TextureDesc depthDesc = {};
+        ImageDesc depthDesc = {};
         depthDesc.Width = size.x;
         depthDesc.Height = size.y;
-        depthDesc.Format = TextureFormat::D32_SFLOAT;
-        depthDesc.Usage = TextureUsage::DEPTH_ATTACHMENT;
+        depthDesc.Format = ImageFormat::D32_SFLOAT;
+        depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
         depthDesc.DebugName = "Final Depth Texture";
         depthDesc.GenerateImGuiID = false;
         mData->mDepthImage = mRHI->CreateTexture(depthDesc);
@@ -87,16 +87,16 @@ namespace Surge
         mRHI->UpdateDescriptorSet(mData->mFrameDescriptorSet, &frameDescriptorWrite, 1);
 
         uint8_t whitePixel[] = { 255, 255, 255, 255 };
-        TextureDesc texDesc = {};
+        ImageDesc texDesc = {};
         texDesc.Width = 1;
         texDesc.Height = 1;
-        texDesc.Format = TextureFormat::RGBA8_UNORM;
-        texDesc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
+        texDesc.Format = ImageFormat::RGBA8_UNORM;
+        texDesc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
         texDesc.DebugName = "WhiteTexture";
         texDesc.InitialData = whitePixel;
         texDesc.DataSize = sizeof(whitePixel);
         texDesc.Sampler = mData->mDefaultSampler;
-        mData->mWhiteTexture = mRHI->CreateTexture(texDesc);
+        mData->mWhiteImage = mRHI->CreateTexture(texDesc);
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera)
@@ -157,7 +157,7 @@ namespace Surge
         if (RHISettings::BLIT_TO_SWAPCHAIN) // Copy the Final Image to the swapchain (Used in Player)
             mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mData->mFinalImage);
         else // If not blitting, we need to transition the final image to SAMPLED for ImGui rendering(Used in Editor)
-            mRHI->GetBackendRHI().CmdTransitionTextureLayout(mCurrentFrameCtx, mData->mFinalImage, TextureUsage::SAMPLED);
+            mRHI->GetBackendRHI().CmdTransitionImageLayout(mCurrentFrameCtx, mData->mFinalImage, ImageUsage::SAMPLED);
         
         mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);
 
@@ -207,7 +207,7 @@ namespace Surge
         mRenderer2D.Shutdown();
         mRenderer3D.Shutdown();
 
-        mRHI->DestroyTexture(mData->mWhiteTexture);
+        mRHI->DestroyTexture(mData->mWhiteImage);
         mRHI->DestroyDescriptorSet(mData->mFrameDescriptorSet);
 
         mRHI->DestroyBuffer(mData->mFrameUBO);

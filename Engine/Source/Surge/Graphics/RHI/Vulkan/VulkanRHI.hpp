@@ -49,11 +49,11 @@ namespace Surge
         void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset);
         void DestroyBuffer(BufferHandle buffer);
 
-        TextureHandle CreateTexture(const TextureDesc& desc);
-        void DestroyTexture(TextureHandle h);
-        void UploadTextureData(TextureHandle h, const void* data, Uint size);
-        void ResizeTexture(TextureHandle h, Uint width, Uint height);
-        TextureDesc GetDesc(TextureHandle h);
+        ImageHandle CreateImage(const ImageDesc& desc);
+        void DestroyImage(ImageHandle h);
+        void UploadImageData(ImageHandle h, const void* data, Uint size);
+        void ResizeImage(ImageHandle h, Uint width, Uint height);
+        ImageDesc GetDesc(ImageHandle h);
 
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
         void DestroyFramebuffer(FramebufferHandle h);
@@ -70,7 +70,7 @@ namespace Surge
         DescriptorLayoutHandle GetDescriptorLayout(PipelineHandle h) const;
         void DestroyDescriptorLayout(DescriptorLayoutHandle h);
 
-        Uint GetBindlessTextureIndex(TextureHandle h) const;
+        Uint GetBindlessTextureIndex(ImageHandle h) const;
         Uint GetBindlessBufferIndex(BufferHandle h) const;
         void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline);
 
@@ -88,8 +88,8 @@ namespace Surge
         void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h);
 
         void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data);
-        void CmdBlitToSwapchain(const FrameContext& ctx, TextureHandle srcHandle);
-        void CmdTransitionTextureLayout(const FrameContext& ctx, TextureHandle h, TextureUsage newLayout);
+        void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle);
+        void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout);
 
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
         void CmdEndSwapchainRenderpass(const FrameContext& ctx);
@@ -105,9 +105,9 @@ namespace Surge
 
         void SetDebugName(VkObjectType objType, uint64_t objectHandle, const String& name) const { mDebugger.SetDebugName(*this, objType, objectHandle, name); }
 
-        ImTextureID AddImGuiImage(TextureHandle h);
-        ImTextureID GetImGuiImage(TextureHandle h);
-        void DestroyImGuiImage(TextureHandle h);
+        ImTextureID AddImGuiImage(ImageHandle h);
+        ImTextureID GetImGuiImage(ImageHandle h);
+        void DestroyImGuiImage(ImageHandle h);
 
         // Getters for internal use by Vulkan* classes
         const VulkanSwapchain& GetSwapchain() const { return mSwapchain; }
@@ -164,13 +164,13 @@ namespace Surge
         HandlePool<PipelineHandle, PipelineEntry> mPipelinePool;
         HandlePool<BufferHandle, BufferEntry> mBufferPool;
         HandlePool<FramebufferHandle, FramebufferEntry> mFramebufferPool;
-        HandlePool<TextureHandle, TextureEntry> mTexturePool;
+        HandlePool<ImageHandle, ImageEntry> mTexturePool;
         HandlePool<SamplerHandle, SamplerEntry> mSamplerPool;
         HandlePool<DescriptorLayoutHandle, DescriptorLayoutEntry> mDescriptorLayoutPool;
         HandlePool<DescriptorSetHandle, DescriptorSetEntry> mDescriptorSetPool;
 
         friend class VulkanPipeline;
-        friend class VulkanTexture;
+        friend class VulkanImage;
     };
 
 }

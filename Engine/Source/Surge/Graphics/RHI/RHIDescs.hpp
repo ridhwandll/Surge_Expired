@@ -33,7 +33,7 @@ namespace Surge
         STAGING
     };
 
-    enum class TextureFormat
+    enum class ImageFormat
     {
         RGBA8_SRGB,
         RGBA8_UNORM,
@@ -44,7 +44,7 @@ namespace Surge
         B10G11R11_UFLOAT_PACK32
     };
 
-    enum class TextureUsage : Uint
+    enum class ImageUsage : Uint
     {
         SAMPLED = BIT(0),
         COLOR_ATTACHMENT = BIT(1),
@@ -54,7 +54,7 @@ namespace Surge
         TRANSFER_SRC = BIT(5),
         TRANSFER_DST = BIT(6)
     };
-    MAKE_BIT_ENUM(TextureUsage, Uint);
+    MAKE_BIT_ENUM(ImageUsage, Uint);
 
     enum class LoadOp { CLEAR, LOAD, DONT_CARE };
     enum class StoreOp { STORE, DONT_CARE };
@@ -67,17 +67,17 @@ namespace Surge
         const void* InitialData = nullptr;
         BufferUsage Usage = BufferUsage::VERTEX;
         bool HostVisible = false;
-        String DebugName = "";
+        String DebugName;
     };
 
-    struct TextureDesc
+    struct ImageDesc
     {
         Uint Width = 1;
         Uint Height = 1;
         Uint Mips = 1;
         Uint Layers = 1;
-        TextureFormat Format = TextureFormat::RGBA8_SRGB;
-        TextureUsage Usage = TextureUsage::SAMPLED;
+        ImageFormat Format = ImageFormat::RGBA8_SRGB;
+        ImageUsage Usage = ImageUsage::SAMPLED;
         bool Transient = false;
         SamplerHandle Sampler = {};
 
@@ -87,12 +87,12 @@ namespace Surge
 
         bool GenerateImGuiID = false;
 
-        String DebugName = "";
+        String DebugName;
     };
 
     struct FramebufferAttachment
     {
-        TextureHandle Handle;
+        ImageHandle Handle;
         LoadOp Load = LoadOp::CLEAR;
         StoreOp Store = StoreOp::STORE;
     };
@@ -107,7 +107,7 @@ namespace Surge
         Uint Width = 0;
         Uint Height = 0;
 
-        String DebugName = "";
+        String DebugName;
     };
 
     enum class VertexFormat
@@ -238,7 +238,7 @@ namespace Surge
     {
         DescriptorBinding Bindings[16] = {};
         Uint BindingCount = 0;
-        String DebugName = "";
+        String DebugName;
     };
 
     struct DescriptorWrite
@@ -247,7 +247,7 @@ namespace Surge
         Uint ArrayIndex = 0; // for array bindings
         DescriptorType Type = DescriptorType::TEXTURE;
 
-        TextureHandle Texture = TextureHandle::Invalid();
+        ImageHandle Texture = ImageHandle::Invalid();
         SamplerHandle Sampler = SamplerHandle::Invalid();
         BufferHandle Buffer = BufferHandle::Invalid();
         uint64_t BufferOffset = 0;

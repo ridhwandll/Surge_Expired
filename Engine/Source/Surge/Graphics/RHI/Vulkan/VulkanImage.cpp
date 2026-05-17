@@ -1,13 +1,13 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Graphics/RHI/Vulkan/VulkanTexture.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanImage.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 
 namespace Surge
 {
-    VkImageAspectFlags VulkanTexture::GetAspectFlags(TextureFormat format)
+    VkImageAspectFlags VulkanImage::GetAspectFlags(ImageFormat format)
     {
-        if (format == TextureFormat::D24_UNORM_S8_UINT)
+        if (format == ImageFormat::D24_UNORM_S8_UINT)
             return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
         if (VulkanUtils::IsDepthFormat(format))
@@ -16,7 +16,7 @@ namespace Surge
         return VK_IMAGE_ASPECT_COLOR_BIT;
     }
 
-    TextureEntry VulkanTexture::Create(const VulkanRHI& rhi, const TextureDesc& desc)
+    ImageEntry VulkanImage::Create(const VulkanRHI& rhi, const ImageDesc& desc)
     {
         SG_ASSERT(desc.Width > 0, "TextureDesc::Width must be > 0");
         SG_ASSERT(desc.Height > 0, "TextureDesc::Height must be > 0");
@@ -30,11 +30,11 @@ namespace Surge
         // Transient textures must not be sampled or transferred
         if (desc.Transient)
         {
-            SG_ASSERT(!(desc.Usage & TextureUsage::SAMPLED), "TextureDesc: Transient textures cannot have SAMPLED usage they live on tile memory and are never written to DRAM");
-            SG_ASSERT(!(desc.Usage & TextureUsage::TRANSFER_SRC), "TextureDesc: Transient textures cannot have TRANSFER_SRC usage");
+            SG_ASSERT(!(desc.Usage & ImageUsage::SAMPLED), "TextureDesc: Transient textures cannot have SAMPLED usage they live on tile memory and are never written to DRAM");
+            SG_ASSERT(!(desc.Usage & ImageUsage::TRANSFER_SRC), "TextureDesc: Transient textures cannot have TRANSFER_SRC usage");
         }
 
-        TextureEntry entry = {};		
+        ImageEntry entry = {};		
         entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         entry.Desc = desc;
 
@@ -103,7 +103,7 @@ namespace Surge
         return entry;
     }
 
-    void VulkanTexture::Destroy(const VulkanRHI& rhi, TextureEntry& entry)
+    void VulkanImage::Destroy(const VulkanRHI& rhi, ImageEntry& entry)
     {
         rhi.WaitIdle();
         if (entry.View != VK_NULL_HANDLE)
@@ -124,9 +124,9 @@ namespace Surge
         //entry.Desc = {}; //Don't clear the desc since it may be needed for resizing or other purposes after destruction
     }
 
-    void VulkanTexture::UploadData(VulkanRHI& rhi, TextureHandle h, const void* data, Uint size)
+    void VulkanImage::UploadData(VulkanRHI& rhi, ImageHandle h, const void* data, Uint size)
     {
-        TextureEntry* entry = rhi.mTexturePool.Get(h);
+        ImageEntry* entry = rhi.mTexturePool.Get(h);
         SG_ASSERT(entry, "UploadTextureData: invalid TextureHandle");
         SG_ASSERT(data && size > 0, "UploadTextureData: data is null or size is 0");
 
@@ -151,7 +151,7 @@ namespace Surge
         region.bufferOffset = 0;
         region.bufferRowLength = 0;// tightly packed
         region.bufferImageHeight = 0;
-        region.imageSubresource.aspectMask = VulkanTexture::GetAspectFlags(entry->Desc.Format);
+        region.imageSubresource.aspectMask = VulkanImage::GetAspectFlags(entry->Desc.Format);
         region.imageSubresource.mipLevel = 0;
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
@@ -170,7 +170,7 @@ namespace Surge
         rhi.DestroyBuffer(stagingHandle);
     }
 
-    void VulkanTexture::TransitionLayout(VkCommandBuffer cmd, TextureEntry& entry, VkImageLayout newLayout)
+    void VulkanImage::TransitionLayout(VkCommandBuffer cmd, ImageEntry& entry, VkImageLayout newLayout)
     {
         if (entry.Layout == newLayout)
             return;

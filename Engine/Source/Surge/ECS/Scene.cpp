@@ -36,37 +36,37 @@ namespace Surge
         camera.OnUpdate();
         Renderer* renderer = Core::GetRenderer();
         renderer->BeginFrame(camera);
-		{
-			auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
-			for (auto [entity, sprite, transform] : view.each())
-			{
-				renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Texture);
-			}
-		}
-		{
-			auto view = mRegistry.view<LightComponent, TransformComponent>();
-			for (auto [entity, light, transform] : view.each())
-			{
-				renderer->SubmitLight(light, transform.Position, transform.Rotation);
-			}
-		}
-		{
-			auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-			for (auto& entity : group)
-			{
-				auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-				if (mesh.Mesh)
-					renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
+        {
+            auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
+            for (const auto& [entity, sprite, transform] : view.each())
+            {
+                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
+            }
+        }
+        {
+            auto view = mRegistry.view<LightComponent, TransformComponent>();
+            for (const auto& [entity, light, transform] : view.each())
+            {
+                renderer->SubmitLight(light, transform.Position, transform.Rotation);
+            }
+        }
+        {
+            auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+            for (auto& entity : group)
+            {
+                auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+                if (mesh.Mesh)
+                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
 
-			}
-		}
+            }
+        }
         renderer->EndFrame();
     }
 
     void Scene::Update()
     {
-		SURGE_PROFILE_FUNC("Scene::Update()");
-		//Timer timer("Scene::Update()", true);
+        SURGE_PROFILE_FUNC("Scene::Update()");
+        //Timer timer("Scene::Update()", true);
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
         if (camera.Data1)
@@ -75,29 +75,29 @@ namespace Surge
             renderer->BeginFrame(*camera.Data1, camera.Data2);
 
             {
-				auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
-				for (auto [entity, sprite, transform] : view.each())
-				{
-					renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Texture);
-				}
+                auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
+                for (const auto& [entity, sprite, transform] : view.each())
+                {
+                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
+                }
             }
-			{
-				auto view = mRegistry.view<LightComponent, TransformComponent>();
-				for (auto [entity, light, transform] : view.each())
-				{
-					renderer->SubmitLight(light, transform.Position, transform.Rotation);
-				}
-			}
-			{
-				auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-				for (auto& entity : group)
-				{
-					auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-					if (mesh.Mesh)
-						renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
+            {
+                auto view = mRegistry.view<LightComponent, TransformComponent>();
+                for (const auto& [entity, light, transform] : view.each())
+                {
+                    renderer->SubmitLight(light, transform.Position, transform.Rotation);
+                }
+            }
+            {
+                auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+                for (auto& entity : group)
+                {
+                    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+                    if (mesh.Mesh)
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
 
-				}
-			}
+                }
+            }
 
             renderer->EndFrame();
         }

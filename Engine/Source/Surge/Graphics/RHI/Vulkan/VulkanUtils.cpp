@@ -96,17 +96,17 @@ namespace Surge::VulkanUtils
         return VK_BLEND_OP_ADD;
     }
 
-    VkFormat TextureFormatToVkFormat(TextureFormat format)
+    VkFormat TextureFormatToVkFormat(ImageFormat format)
     {
         switch (format)
         {
-        case TextureFormat::RGBA8_SRGB:  return VK_FORMAT_R8G8B8A8_SRGB;
-        case TextureFormat::RGBA8_UNORM: return VK_FORMAT_R8G8B8A8_UNORM;
-        case TextureFormat::BGRA8_SRGB:  return VK_FORMAT_B8G8R8A8_SRGB;
-        case TextureFormat::D24_UNORM_S8_UINT:  return VK_FORMAT_D24_UNORM_S8_UINT;
-        case TextureFormat::D32_SFLOAT:  return VK_FORMAT_D32_SFLOAT;
-        case TextureFormat::R16G16B16A16_SFLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
-        case TextureFormat::B10G11R11_UFLOAT_PACK32: return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+        case ImageFormat::RGBA8_SRGB:  return VK_FORMAT_R8G8B8A8_SRGB;
+        case ImageFormat::RGBA8_UNORM: return VK_FORMAT_R8G8B8A8_UNORM;
+        case ImageFormat::BGRA8_SRGB:  return VK_FORMAT_B8G8R8A8_SRGB;
+        case ImageFormat::D24_UNORM_S8_UINT:  return VK_FORMAT_D24_UNORM_S8_UINT;
+        case ImageFormat::D32_SFLOAT:  return VK_FORMAT_D32_SFLOAT;
+        case ImageFormat::R16G16B16A16_SFLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case ImageFormat::B10G11R11_UFLOAT_PACK32: return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
         default:
             SG_ASSERT_INTERNAL("Unsupported TextureFormat !");
         }
@@ -114,38 +114,38 @@ namespace Surge::VulkanUtils
     }
 
 
-    bool IsDepthFormat(TextureFormat format)
+    bool IsDepthFormat(ImageFormat format)
     {
         switch (format)
         {
-        case TextureFormat::D32_SFLOAT:
-        case TextureFormat::D24_UNORM_S8_UINT:
+        case ImageFormat::D32_SFLOAT:
+        case ImageFormat::D24_UNORM_S8_UINT:
             return true;
         default:
             return false;
         }
     }
 
-    VkImageUsageFlags ToVkImageUsage(TextureUsage usage, bool transient)
+    VkImageUsageFlags ToVkImageUsage(ImageUsage usage, bool transient)
     {
         VkImageUsageFlags flags = 0;
 
-        if (usage & TextureUsage::SAMPLED)
+        if (usage & ImageUsage::SAMPLED)
             flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
-        if (usage & TextureUsage::COLOR_ATTACHMENT)
+        if (usage & ImageUsage::COLOR_ATTACHMENT)
             flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-        if (usage & TextureUsage::DEPTH_ATTACHMENT)
+        if (usage & ImageUsage::DEPTH_ATTACHMENT)
             flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-        if (usage & TextureUsage::STORAGE)
+        if (usage & ImageUsage::STORAGE)
             flags |= VK_IMAGE_USAGE_STORAGE_BIT;
 
-        if (usage & TextureUsage::TRANSFER_SRC)
+        if (usage & ImageUsage::TRANSFER_SRC)
             flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-        if (usage & TextureUsage::TRANSFER_DST)
+        if (usage & ImageUsage::TRANSFER_DST)
             flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
         // Transient attachments on TBDR data lives on tile, never hits DRAM
@@ -221,22 +221,22 @@ namespace Surge::VulkanUtils
         return "Unknown";
     }
 
-    Surge::String TextureFormatToString(TextureFormat format)
+    Surge::String TextureFormatToString(ImageFormat format)
     {
         switch (format)
         {
-        case TextureFormat::RGBA8_SRGB:			return "RGBA8_SRGB";
-        case TextureFormat::RGBA8_UNORM:		return "RGBA8_UNORM";
-        case TextureFormat::BGRA8_SRGB:			return "BGRA8_SRGB";
-        case TextureFormat::D32_SFLOAT:			return "DEPTH32_SFLOAT";
-        case TextureFormat::D24_UNORM_S8_UINT:	return "D24_UNORM_S8_UINT";
-        case TextureFormat::R16G16B16A16_SFLOAT: return "R16G16B16A16_SFLOAT";
+        case ImageFormat::RGBA8_SRGB:			return "RGBA8_SRGB";
+        case ImageFormat::RGBA8_UNORM:		return "RGBA8_UNORM";
+        case ImageFormat::BGRA8_SRGB:			return "BGRA8_SRGB";
+        case ImageFormat::D32_SFLOAT:			return "DEPTH32_SFLOAT";
+        case ImageFormat::D24_UNORM_S8_UINT:	return "D24_UNORM_S8_UINT";
+        case ImageFormat::R16G16B16A16_SFLOAT: return "R16G16B16A16_SFLOAT";
         }
         SG_ASSERT_INTERNAL("Unknown TextureFormat enum value!");
         return "Unknown";
     }
 
-    const char* TextureUsageToString(TextureUsage usage)
+    const char* TextureUsageToString(ImageUsage usage)
     {
         thread_local char buffer[128];
         char* ptr = buffer;
@@ -256,13 +256,13 @@ namespace Surge::VulkanUtils
                 first = false;
             };
 
-        if (bits & (Uint)TextureUsage::SAMPLED)              append("SAMPLED");
-        if (bits & (Uint)TextureUsage::COLOR_ATTACHMENT)     append("COLOR_ATTACHMENT");
-        if (bits & (Uint)TextureUsage::DEPTH_ATTACHMENT)     append("DEPTH_ATTACHMENT");
-        if (bits & (Uint)TextureUsage::TRANSIENT_ATTACHMENT) append("TRANSIENT_ATTACHMENT");
-        if (bits & (Uint)TextureUsage::STORAGE)              append("STORAGE");
-        if (bits & (Uint)TextureUsage::TRANSFER_SRC)         append("TRANSFER_SRC");
-        if (bits & (Uint)TextureUsage::TRANSFER_DST)         append("TRANSFER_DST");
+        if (bits & (Uint)ImageUsage::SAMPLED)              append("SAMPLED");
+        if (bits & (Uint)ImageUsage::COLOR_ATTACHMENT)     append("COLOR_ATTACHMENT");
+        if (bits & (Uint)ImageUsage::DEPTH_ATTACHMENT)     append("DEPTH_ATTACHMENT");
+        if (bits & (Uint)ImageUsage::TRANSIENT_ATTACHMENT) append("TRANSIENT_ATTACHMENT");
+        if (bits & (Uint)ImageUsage::STORAGE)              append("STORAGE");
+        if (bits & (Uint)ImageUsage::TRANSFER_SRC)         append("TRANSFER_SRC");
+        if (bits & (Uint)ImageUsage::TRANSFER_DST)         append("TRANSFER_DST");
 
         if (first)
             append("NONE");
@@ -451,17 +451,17 @@ namespace Surge::VulkanUtils
         }
     }
 
-    VkImageLayout TextureUsageToVkLayout(TextureUsage usage)
+    VkImageLayout ImageUsageToVkLayout(ImageUsage usage)
     {
         switch (usage)
         {
-        case TextureUsage::SAMPLED:          return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        case TextureUsage::COLOR_ATTACHMENT: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        case TextureUsage::DEPTH_ATTACHMENT: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        case TextureUsage::STORAGE:			 return VK_IMAGE_LAYOUT_GENERAL;
-        case TextureUsage::TRANSFER_SRC:     return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        case TextureUsage::TRANSFER_DST:     return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        case TextureUsage::TRANSIENT_ATTACHMENT:
+        case ImageUsage::SAMPLED:          return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        case ImageUsage::COLOR_ATTACHMENT: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        case ImageUsage::DEPTH_ATTACHMENT: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        case ImageUsage::STORAGE:			 return VK_IMAGE_LAYOUT_GENERAL;
+        case ImageUsage::TRANSFER_SRC:     return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        case ImageUsage::TRANSFER_DST:     return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        case ImageUsage::TRANSIENT_ATTACHMENT:
             SG_ASSERT_INTERNAL("I dont know what image layout to add here");
         default:
             // Always safe as a fallback, but can be slower

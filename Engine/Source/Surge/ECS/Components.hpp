@@ -35,55 +35,55 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-	struct SURGE_API TransformComponent
-	{
-		TransformComponent() = default;
-		TransformComponent(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
-			: Position(position), Rotation(rotation), Scale(scale) {}
+    struct SURGE_API TransformComponent
+    {
+        TransformComponent() = default;
+        TransformComponent(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
+            : Position(position), Rotation(rotation), Scale(scale) {}
 
-		glm::vec3 Position = glm::vec3(0.0f);
-		glm::vec3 Rotation = glm::vec3(0.0f); // Degrees
-		glm::vec3 Scale = glm::vec3(1.0f);
+        glm::vec3 Position = glm::vec3(0.0f);
+        glm::vec3 Rotation = glm::vec3(0.0f); // Degrees
+        glm::vec3 Scale = glm::vec3(1.0f);
 
-		// Call transform changed (e.g. after physics)
-		void MarkDirty() { mDirty = true; }
+        // Call transform changed (e.g. after physics)
+        void MarkDirty() { mDirty = true; }
 
-		const glm::mat4& GetTransform() const
-		{
-			if (mDirty)
-			{
-				mCachedTransform = glm::translate(glm::mat4(1.0f), Position)
-					* glm::mat4_cast(glm::quat(glm::radians(Rotation)))
-					* glm::scale(glm::mat4(1.0f), Scale);
+        const glm::mat4& GetTransform() const
+        {
+            if (mDirty)
+            {
+                mCachedTransform = glm::translate(glm::mat4(1.0f), Position)
+                    * glm::mat4_cast(glm::quat(glm::radians(Rotation)))
+                    * glm::scale(glm::mat4(1.0f), Scale);
 
-				mDirty = false;
-			}
-			return mCachedTransform;
-		}
+                mDirty = false;
+            }
+            return mCachedTransform;
+        }
 
-		SURGE_REFLECTION_ENABLE;
+        SURGE_REFLECTION_ENABLE;
 
-	private:
-		mutable glm::mat4 mCachedTransform{ 1.0f };
-		mutable bool mDirty = true;
-	};
+    private:
+        mutable glm::mat4 mCachedTransform{ 1.0f };
+        mutable bool mDirty = true;
+    };
 
 
-	struct SpriteRendererComponent
-	{
+    struct SpriteRendererComponent
+    {
         SpriteRendererComponent() = default;
-		SpriteRendererComponent(const glm::vec4& color)
-			: Color(color), Texture(TextureHandle::Invalid()) {}
-		SpriteRendererComponent(const glm::vec3& color, float alpha)
-			: Color(glm::vec4(color, alpha)), Texture(TextureHandle::Invalid()) {}
-		SpriteRendererComponent(const glm::vec4& colorTint, TextureHandle texture)
-			: Color(colorTint), Texture(texture) {}
+        SpriteRendererComponent(const glm::vec4& color)
+            : Color(color), Image(ImageHandle::Invalid()) {}
+        SpriteRendererComponent(const glm::vec3& color, float alpha)
+            : Color(glm::vec4(color, alpha)), Image(ImageHandle::Invalid()) {}
+        SpriteRendererComponent(const glm::vec4& colorTint, ImageHandle texture)
+            : Color(colorTint), Image(texture) {}
 
         glm::vec4 Color;
-		TextureHandle Texture = TextureHandle::Invalid();
+        ImageHandle Image = ImageHandle::Invalid();
 
-		SURGE_REFLECTION_ENABLE;
-	};
+        SURGE_REFLECTION_ENABLE;
+    };
 
     struct CameraComponent
     {
@@ -101,9 +101,9 @@ namespace Surge
     struct MeshComponent
     {
         Ref<Mesh> Mesh;
-		Ref<Material> Material_;
+        Ref<Material> Material_;
         SURGE_REFLECTION_ENABLE;
-	};
+    };
 
     struct LightComponent
     {

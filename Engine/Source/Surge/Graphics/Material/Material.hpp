@@ -29,8 +29,8 @@ namespace Surge
         Material& SetMetallic(float v);
         Material& SetRoughness(float v);
         Material& SetReflectance(float v);
-        Material& SetAlbedoTexture(TextureHandle h);
-        Material& SetNormalTexture(TextureHandle h);
+        Material& SetAlbedoTexture(ImageHandle h);
+        Material& SetNormalTexture(ImageHandle h);
 
         glm::vec3 GetAlbedo() const { return glm::vec3(mGPUData.AlbedoMetallic); }
         float GetMetallic() const { return mGPUData.AlbedoMetallic.w; }

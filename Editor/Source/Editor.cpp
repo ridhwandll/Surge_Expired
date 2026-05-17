@@ -10,9 +10,9 @@
 
 namespace Surge
 {
-    TextureHandle Editor::LoadTexture()
+    ImageHandle Editor::LoadTexture()
     {
-        TextureHandle texture = TextureHandle::Invalid();
+        ImageHandle texture = ImageHandle::Invalid();
         stbi_set_flip_vertically_on_load(1);
         SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
         String path = "Engine/Assets/Textures/RidWhite.png";
@@ -21,16 +21,16 @@ namespace Surge
         data = stbi_load(path.c_str(), &width, &height, &channels, 4);
         if (data)
         {
-            TextureDesc desc = {};
+            ImageDesc desc = {};
             desc.Width = width;
             desc.Height = height;
-            desc.Format = TextureFormat::RGBA8_SRGB;
-            desc.Usage = TextureUsage::SAMPLED | TextureUsage::TRANSFER_DST;
+            desc.Format = ImageFormat::RGBA8_SRGB;
+            desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
             desc.DebugName = "Tex.png";
             desc.InitialData = data;
             desc.DataSize = width * height * 4;
             desc.Sampler = defautSampler;
-            texture = mRenderer->GetRHI()->CreateTexture(desc);			
+            texture = mRenderer->GetRHI()->CreateTexture(desc);
             stbi_image_free(data);
         }
         else		

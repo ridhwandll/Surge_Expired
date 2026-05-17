@@ -93,7 +93,7 @@ namespace Surge
         mCurrentFrameVertexOffset = 0;
     }
 
-    void Renderer2D::Submit(const glm::mat4& transform, const glm::vec4& color, TextureHandle texture)
+    void Renderer2D::Submit(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture)
     {
         if (mCurrentBatch.QuadCount >= MAX_QUADS_PER_BATCH)
             WriteToGPUBuffer();
@@ -105,7 +105,7 @@ namespace Surge
             return;
         }
         mMaxQuadCountReached = false;
-        Uint texIndex = mRHI->GetBindlessTextureIndex(texture.IsNull() ? mData->mWhiteTexture : texture);
+        Uint texIndex = mRHI->GetBindlessTextureIndex(texture.IsNull() ? mData->mWhiteImage : texture);
 
         static constexpr glm::vec4 sLocalPositions[4] = {
             { 0.5f, -0.5f, 0.0f, 1.0f},

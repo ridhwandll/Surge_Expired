@@ -4,6 +4,7 @@
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Panels/PaneManager.hpp"
+#include "Surge/Graphics/RHI/RHIHandle.hpp"
 
 namespace Surge
 {
@@ -28,9 +29,9 @@ namespace Surge
     private:
         void Resize();
         void OnImGuiRender();
-        TextureHandle Editor::LoadTexture();
+        ImageHandle Editor::LoadTexture();
     private:
-        TextureHandle mRidTex;
+        ImageHandle mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
         PanelManager mPanelManager;
