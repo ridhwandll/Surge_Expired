@@ -8,10 +8,10 @@ namespace Surge
 {
     void ImGuiAux::DrawRectAroundWidget(const glm::vec4& color, float thickness, float rounding)
     {
-		//ImGuiContext& g = *GImGui;
-		//const ImRect& rect = (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? g.LastItemData.DisplayRect : g.LastItemData.Rect;
-		//ImDrawList* drawList = ImGui::GetWindowDrawList();
-		//drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawCornerFlags_All, thickness);
+        //ImGuiContext& g = *GImGui;
+        //const ImRect& rect = (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? g.LastItemData.DisplayRect : g.LastItemData.Rect;
+        //ImDrawList* drawList = ImGui::GetWindowDrawList();
+        //drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawCornerFlags_All, thickness);
     }
 
     void ImGuiAux::Image(TextureHandle image, const glm::vec2& size)
@@ -32,19 +32,19 @@ namespace Surge
     {
         ImGuiID dockspaceID = ImGui::GetID("DockSpace");
 #ifdef SURGE_PLATFORM_ANDROID
-		// On mobile we need a padding, else docking/undocking becomes a nightmare
-		float padding = 2.0f;
-		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + padding, viewport->WorkPos.y + padding));
-		ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - (padding * 2), viewport->WorkSize.y - (padding * 2)));
-		ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
-		ImGui::Begin("SafeDockSpaceHost", nullptr, hostFlags);
-		ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
-		ImGui::End();
-		ImGui::PopStyleColor();
+        // On mobile we need a padding, else docking/undocking becomes a nightmare
+        float padding = 2.0f;
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + padding, viewport->WorkPos.y + padding));
+        ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - (padding * 2), viewport->WorkSize.y - (padding * 2)));
+        ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+        ImGui::Begin("SafeDockSpaceHost", nullptr, hostFlags);
+        ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+        ImGui::End();
+        ImGui::PopStyleColor();
 #elif defined(SURGE_PLATFORM_WINDOWS)
-		ImGui::DockSpaceOverViewport(dockspaceID, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+        ImGui::DockSpaceOverViewport(dockspaceID, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 #endif
     }
 

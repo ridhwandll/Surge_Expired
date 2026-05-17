@@ -33,7 +33,7 @@ namespace Surge
         mProjection[1][1] *= -1;
     }
 
-    void EditorCamera::OnUpdate()
+	void EditorCamera::OnUpdate()
     {
         if (Core::GetWindow()->IsWindowMinimized())
             return;
@@ -48,6 +48,7 @@ namespace Surge
             {
                 mCameraMode = CameraMode::Flycam;
                 const float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
+				Input::SetCursorMode(CursorMode::Locked);
 
                 if (Input::IsKeyPressed(Key::Q))
                     mPositionDelta -= ts * mSpeed * glm::vec3 {0.f, yawSign, 0.f};
@@ -71,6 +72,7 @@ namespace Surge
             else if (Input::IsKeyPressed(Key::LeftAlt))
             {
                 mCameraMode = CameraMode::Arcball;
+				Input::SetCursorMode(CursorMode::Locked);
 
                 if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
                     MousePan(delta);
@@ -79,6 +81,8 @@ namespace Surge
                 else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
                     MouseZoom(delta.x + delta.y);
             }
+            else
+				Input::SetCursorMode(CursorMode::Normal);
         }
         mInitialMousePosition = mouse;
 

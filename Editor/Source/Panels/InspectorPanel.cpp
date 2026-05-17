@@ -5,6 +5,7 @@
 #include "Surge/Utility/FileDialogs.hpp"
 #include "Surge/Core/Core.hpp"
 #include <imgui.h>
+#include <imgui_stdlib.h>
 #include <imgui_internal.h>
 #include <IconsFontAwesome.hpp>
 #include <filesystem>
@@ -24,14 +25,14 @@ namespace Surge
         {
             if (ImGui::BeginTable("##ComponentTable", 2, ImGuiTableFlags_Resizable))
             {
-				if (isRemoveable)
-				{
+                if (isRemoveable)
+                {
                     ImGui::TableNextColumn();
-					ImGui::TextUnformatted("Settings");
+                    ImGui::TextUnformatted("Settings");
                     ImGui::TableNextColumn();
-					if (ImGui::Button(reinterpret_cast<const char*>("REMOVE")))
-						remvove = true;
-				}
+                    if (ImGui::Button(reinterpret_cast<const char*>("REMOVE")))
+                        remvove = true;
+                }
                 function();
                 ImGui::EndTable();
             }
@@ -68,12 +69,12 @@ namespace Surge
                 {
                     if (ImGui::MenuItem("Camera"))
                         entity.AddComponent<CameraComponent>();
-					if (ImGui::MenuItem("Sprite Renderer"))
-						entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
-					if (ImGui::MenuItem("Mesh Component"))
-						entity.AddComponent<MeshComponent>();
-					if (ImGui::MenuItem("Light"))
-						entity.AddComponent<LightComponent>();
+                    if (ImGui::MenuItem("Sprite Renderer"))
+                        entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+                    if (ImGui::MenuItem("Mesh Component"))
+                        entity.AddComponent<MeshComponent>();
+                    if (ImGui::MenuItem("Light"))
+                        entity.AddComponent<LightComponent>();
                     ImGui::EndPopup();
                 }
             }
@@ -87,7 +88,7 @@ namespace Surge
         {
             NameComponent& component = entity.GetComponent<NameComponent>();
             ImGui::PushItemWidth(-1);
-            //ImGui::InputText("##n@Me", &component.Name);
+            ImGui::InputText("##nA@Me", &component.Name);
             ImGui::PopItemWidth();
         }
 
@@ -171,67 +172,67 @@ namespace Surge
             });
         }
 
-		if (entity.HasComponent<SpriteRendererComponent>())
-		{
+        if (entity.HasComponent<SpriteRendererComponent>())
+        {
             SpriteRendererComponent& component = entity.GetComponent<SpriteRendererComponent>();
-			DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
-				ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
-				});
-		}
+            DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
+                ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
+                });
+        }
 
-		if (entity.HasComponent<MeshComponent>())
-		{
+        if (entity.HasComponent<MeshComponent>())
+        {
             MeshComponent& component = entity.GetComponent<MeshComponent>();
-			DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
+            DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
                 String kek = "TODO: Implement Asset Manager";
-				ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
+                ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
 
                 glm::vec3 albedoColor = component.Material_->GetAlbedo();
-				if (ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &albedoColor))				
+                if (ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &albedoColor))
                     component.Material_->SetAlbedo(albedoColor);
 
                 float metallic = component.Material_->GetMetallic();
-				if (ImGuiAux::TSlider<float>("Metallic", metallic, 0.0f, 1.0f))
-					component.Material_->SetMetallic(metallic);
+                if (ImGuiAux::TSlider<float>("Metallic", metallic, 0.0f, 1.0f))
+                    component.Material_->SetMetallic(metallic);
 
-				float roughness = component.Material_->GetRoughness();
-				if (ImGuiAux::TSlider<float>("Roughness", roughness, 0.0f, 1.0f))
-					component.Material_->SetRoughness(roughness);
-				});
-		}
+                float roughness = component.Material_->GetRoughness();
+                if (ImGuiAux::TSlider<float>("Roughness", roughness, 0.0f, 1.0f))
+                    component.Material_->SetRoughness(roughness);
+                });
+        }
 
         if (entity.HasComponent<LightComponent>())
         {
             LightComponent& component = entity.GetComponent<LightComponent>();
             DrawComponent<LightComponent>(entity, "Light", [&component]()
             {
-				const char* lightTypeStrings[] = { "POINT", "DIRECTIONAL" };
-				const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
-				ImGui::TableNextColumn();
-				ImGui::TextUnformatted("TYPE");
-				ImGui::TableNextColumn();
-				ImGui::PushItemWidth(-1);
-				if (ImGui::BeginCombo("##TYPE", currentLightTypeString))
-				{
-					for (int i = 0; i < 2; i++)
-					{
-						const bool isSelected = currentLightTypeString == lightTypeStrings[i];
-						if (ImGui::Selectable(lightTypeStrings[i], isSelected))
-						{
-							currentLightTypeString = lightTypeStrings[i];
-							component.Type = static_cast<LightType>(i);
-						}
-						if (isSelected)
-							ImGui::SetItemDefaultFocus();
-					}
-					ImGui::EndCombo();
-				}
-				ImGui::PopItemWidth();
+                const char* lightTypeStrings[] = { "POINT", "DIRECTIONAL" };
+                const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("TYPE");
+                ImGui::TableNextColumn();
+                ImGui::PushItemWidth(-1);
+                if (ImGui::BeginCombo("##TYPE", currentLightTypeString))
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        const bool isSelected = currentLightTypeString == lightTypeStrings[i];
+                        if (ImGui::Selectable(lightTypeStrings[i], isSelected))
+                        {
+                            currentLightTypeString = lightTypeStrings[i];
+                            component.Type = static_cast<LightType>(i);
+                        }
+                        if (isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopItemWidth();
 
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
                 ImGuiAux::TProperty<float>("Intensity", &component.Intensity);
 
-				if (component.Type == LightType::POINT)
+                if (component.Type == LightType::POINT)
                 {
                     ImGuiAux::TProperty<float>("Radius", &component.Radius);
                     ImGuiAux::TSlider<float>("Falloff", component.Falloff, 0.1f, 2.0f);

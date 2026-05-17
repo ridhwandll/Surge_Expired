@@ -15,7 +15,7 @@
 
 namespace Surge
 {
-	static glm::vec3 HSVtoRGB(float h, float s, float v)
+    static glm::vec3 HSVtoRGB(float h, float s, float v)
 	{
 		float c = v * s;
 		float x = c * (1.0f - fabs(fmod(h * 6.0f, 2.0f) - 1.0f));

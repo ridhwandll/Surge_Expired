@@ -507,8 +507,8 @@ namespace Surge
 					Uint current = m * (tubeSegments + 1) + t;
 					Uint next = current + tubeSegments + 1;
 
-					mesh.Indices.push_back({ current, next, current + 1 });
-					mesh.Indices.push_back({ current + 1, next, next + 1 });
+					mesh.Indices.push_back({ current, current + 1, next });
+					mesh.Indices.push_back({ current + 1, next + 1, next });
 				}
 			}
 			return mesh;

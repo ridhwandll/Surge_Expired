@@ -59,22 +59,6 @@ struct VertexOutput
 layout(location = 0) in VertexOutput vInput;
 layout(location = 0) out vec4 FinalColor;
 
-layout(set = 0, binding = 0) uniform FrameUBO
-{
-    mat4 ViewProjection;
-    vec3 CameraPos;
-    float _pad;
-
-} uFrame;
-
-layout(push_constant) uniform PushConstants
-{
-    mat4 Transform;
-    uint LightBufferIndex; // bindless index into uBuffers[]
-    uint LightCount;
-    uint MaterialBufferIndex;
-    uint MaterialIndex;
-} uMesh;
 
 struct Material
 {
@@ -93,14 +77,40 @@ struct Light
     float Falloff;
     float _pad1, _pad2;
 };
-//Set: 1 Lights
-layout(set = 1, binding = 0) readonly buffer LightBuffer
+
+// --------------------------
+// Push Constants
+// --------------------------
+
+layout(push_constant) uniform PushConstants
+{
+    mat4 Transform;
+    uint LightBufferIndex; // bindless index into uBuffers[]
+    uint LightCount;
+    uint MaterialBufferIndex;
+    uint MaterialIndex;
+} uMesh;
+
+// --------------------------
+// Set 0: Scene Uniform 
+// --------------------------
+layout(set = 0, binding = 0) uniform FrameUBO
+{
+    mat4 ViewProjection;
+    vec3 CameraPos;
+    float _pad;
+
+} uFrame;
+
+// --------------------------
+// Set 1: Bindless Resources
+// --------------------------
+layout(set = 1, binding = 0) readonly buffer LightBufferBINDLESS
 {
     Light lights[];
 
-} slights[];
-
-layout(set = 1, binding = 0) readonly buffer MaterialBuffer
+} sLights[];
+layout(set = 1, binding = 0) readonly buffer MaterialBufferBINDLESS
 {
     Material materials[];
 
@@ -178,6 +188,16 @@ vec3 CalculateMobilePBR(Light light, Material mat, vec3 N, vec3 V, vec3 fragPos)
     return (diffuse + specular) * lightIntensity * attenuation;
 }
 
+vec3 ACESFilmic(vec3 x)
+{
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 void main()
 {
     Material mat = sMaterialBuffers[uMesh.MaterialBufferIndex].materials[uMesh.MaterialIndex];
@@ -185,22 +205,19 @@ void main()
     vec3 N = normalize(vInput.Normal);
     vec3 V = normalize(uFrame.CameraPos - vInput.WorldPos);
 
-    // Environment Reflection
-    vec3 skyColor = vec3(0.3, 0.3, 0.3);  // Dull Blue Sky
-    vec3 groundColor = vec3(0.1, 0.1, 0.1); // Dark Ground    
-    float skyWeight = N.y * 0.5 + 0.5; 
-    vec3 fakeEnvironment = mix(groundColor, skyColor, skyWeight);
-
-    // Metals reflect the environment tinted by their Albedo
-    vec3 ambientReflection = fakeEnvironment * mix(vec3(0.04), mat.AlbedoMetallic.rgb, mat.AlbedoMetallic.a);
+    // TODO: GI
+    vec3 ambient = vec3(0.05) * mat.AlbedoMetallic.rgb;
 
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);
     for (uint i = 0; i < uMesh.LightCount; i++)       
-        directAccumulation += CalculateMobilePBR(slights[uMesh.LightBufferIndex].lights[i], mat, N, V, vInput.WorldPos);        
+        directAccumulation += CalculateMobilePBR(sLights[uMesh.LightBufferIndex].lights[i], mat, N, V, vInput.WorldPos);        
 
-    vec3 color = ambientReflection + directAccumulation;
-    color = color / (color + vec3(1.0));
+    vec3 HDRColor  = ambient + directAccumulation;
+
+    // TODO Move to a separate post process pass
+    //color = color / (color + vec3(1.0)); //Reinhard
+    vec3 color = ACESFilmic(HDRColor); //ACES Filmic
 
     // Linear to sRGB conversion (Gamma Correction)
     color = pow(color, vec3(1.0 / 2.2));
