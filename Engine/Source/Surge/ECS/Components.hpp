@@ -101,7 +101,7 @@ namespace Surge
     struct MeshComponent
     {
         Ref<Mesh> Mesh;
-        Ref<Material> Material_;
+        Ref<Material> Material_ = nullptr;
         SURGE_REFLECTION_ENABLE;
     };
 

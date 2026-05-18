@@ -10,10 +10,6 @@ namespace Surge
     Scene::Scene(bool runtime)
     {
         mRuntime = runtime;
-        // mParentProject = parentProject;
-        // mMetadata.Name = name;
-        // mMetadata.SceneUUID = UUID();
-        // mMetadata.ScenePath = path;
     }
 
     Scene::~Scene()
@@ -35,29 +31,27 @@ namespace Surge
     {
         camera.OnUpdate();
         Renderer* renderer = Core::GetRenderer();
-        renderer->BeginFrame(camera);
+
+        auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+        Uint submitCount3D = meshGroup.size();
+
+        renderer->BeginFrame(camera, submitCount3D);
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
-            for (const auto& [entity, sprite, transform] : view.each())
-            {
+            for(const auto& [entity, sprite, transform] : view.each())
                 renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
-            }
         }
         {
             auto view = mRegistry.view<LightComponent, TransformComponent>();
-            for (const auto& [entity, light, transform] : view.each())
-            {
+            for(const auto& [entity, light, transform] : view.each())
                 renderer->SubmitLight(light, transform.Position, transform.Rotation);
-            }
         }
         {
-            auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-            for (auto& entity : group)
+            // 3D Meshes
+            for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
             {
-                auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                if (mesh.Mesh)
+                if(mesh.Mesh)
                     renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
-
             }
         }
         renderer->EndFrame();
@@ -69,36 +63,31 @@ namespace Surge
         //Timer timer("Scene::Update()", true);
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
+        auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+        Uint submitCount3D = (Uint)meshGroup.size();
+
         if (camera.Data1)
         {
             Renderer* renderer = Core::GetRenderer();
-            renderer->BeginFrame(*camera.Data1, camera.Data2);
-
+            renderer->BeginFrame(*camera.Data1, camera.Data2, submitCount3D);
             {
                 auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
                 for (const auto& [entity, sprite, transform] : view.each())
-                {
                     renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
-                }
             }
             {
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
                 for (const auto& [entity, light, transform] : view.each())
-                {
                     renderer->SubmitLight(light, transform.Position, transform.Rotation);
-                }
             }
             {
-                auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-                for (auto& entity : group)
+                // 3D Meshes
+                for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
                 {
-                    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                    if (mesh.Mesh)
+                    if(mesh.Mesh)
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
-
                 }
             }
-
             renderer->EndFrame();
         }
     }

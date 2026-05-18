@@ -285,6 +285,7 @@ namespace Surge
         if (!entry)
             return;
 
+        WaitIdle();
         VK_RHI_LOG(Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation));
 
         if (entry->Desc.GenerateImGuiID)
@@ -1127,19 +1128,29 @@ namespace Surge
         {
             //ImGui::PopFont();
             ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
-            mTexturePool.ForEachAlive([](const ImageHandle& h, ImageEntry& entry)
+            mTexturePool.ForEachAlive([this](const ImageHandle& h, ImageEntry& entry)
                 {
                     ImageDesc desc = entry.Desc;
                     String texText = std::format("{} ({}, {})", desc.DebugName, h.Index, h.Generation);
                     if (ImGui::TreeNode(texText.c_str()))
                     {
+
                         ImGui::Text("Debug Name: %s", desc.DebugName.c_str());
                         ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
                         ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
                         ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
                         ImGui::Text("Size: %.5f MB", entry.Size / (1024.0f * 1024.0f));
-                        //ImTextureID id = mImGuiContext.AddImage(entry.View);
-                        //ImGui::Image(id, ImVec2(desc.Width, desc.Height));
+                        if(desc.Usage & ImageUsage::SAMPLED && desc.GenerateImGuiID)
+                        {
+                            float aspectRatio = (float)desc.Width / (float)desc.Height;
+                            glm::vec2 imgSize = (aspectRatio > 1.0f) ? ImVec2(200.0f, 200.0f / aspectRatio) : ImVec2(200.0f * aspectRatio, 200.0f);
+                            ImGui::Text("Preview: %f, %f", imgSize.x, imgSize.y);
+                            ImGui::Image(entry.ImGuiID, imgSize);
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted("ImGui Preview is not available for this image");
+                        }
                         ImGui::TreePop();
                     }
                 });
@@ -1374,5 +1385,4 @@ namespace Surge
         ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationLayers(instanceLayers));
         return instanceLayers;
     }
-
 }

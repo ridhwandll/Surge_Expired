@@ -10,7 +10,7 @@ endfunction()
 add_subdirectory(volk)
 add_subdirectory(SPIRV-Cross)
 add_subdirectory(ImGui)
-#add_subdirectory(Optick)
+add_subdirectory(Optick)
 
 DisableTargetWarnings(volk)
 DisableTargetWarnings(SPIRV-Cross)

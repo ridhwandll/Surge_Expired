@@ -51,11 +51,13 @@ namespace Surge
         mLightBufferIndex = mRHI->GetBindlessBufferIndex(mGPULightBuffer);
     }
 
-    void Renderer3D::BeginFrame(const FrameContext& frameCtx)
+    void Renderer3D::BeginFrame(const FrameContext& frameCtx, Uint submitCount)
     {
-        SURGE_PROFILE_FUNC("Renderer3D::BeginFrame(FrameContext)");	
+        SURGE_PROFILE_FUNC("Renderer3D::BeginFrame(FrameContext)");
         mCurrentFrameCtx = frameCtx;
         mLightCPU.Count = 0;
+
+        mMeshDrawCommands.reserve(submitCount);
     }
 
     void Renderer3D::EndFrame()

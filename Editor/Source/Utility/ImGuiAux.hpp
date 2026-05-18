@@ -137,7 +137,7 @@ namespace Surge::ImGuiAux
     }
 
     template <typename T, CustomProprtyFlag F = CustomProprtyFlag::None>
-    constexpr bool TProperty(const char* title, T* value, float dragMin = 0.0f, float dragMax = 0.0f)
+    bool TProperty(const char* title, T* value, float dragMin = 0.0f, float dragMax = 0.0f)
     {
         ImGui::PushID(title);
         bool result = false;
@@ -145,31 +145,36 @@ namespace Surge::ImGuiAux
         ImGui::TextUnformatted(title);
         ImGui::TableNextColumn();
         ImGui::PushItemWidth(-1);
-        if constexpr (F == CustomProprtyFlag::None)
+
         {
-            if constexpr (std::is_same_v<T, int>)
-                result = ImGui::DragInt("##v", value, 1, static_cast<int>(dragMin), static_cast<int>(dragMax));
-            else if constexpr (std::is_same_v<T, float>)
-                result = ImGui::DragFloat("##v", value, 0.01, dragMin, dragMax);
-            else if constexpr (std::is_same_v<T, glm::vec2>)
-                result = ImGui::DragFloat2("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
-            else if constexpr (std::is_same_v<T, glm::vec3>)
-                result = ImGui::DragFloat3("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
-            else if constexpr (std::is_same_v<T, glm::vec4>)
-                result = ImGui::DragFloat4("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
-            else if constexpr (std::is_same_v<T, bool>)
-                result = ImGui::Checkbox("##v", value);
-            else if constexpr (std::is_same_v<T, String>)
-                ImGui::TextUnformatted(value->c_str());
+            ScopedBoldFont font;
+            if constexpr(F == CustomProprtyFlag::None)
+            {
+                if constexpr(std::is_same_v<T, int>)
+                    result = ImGui::DragInt("##v", value, 1, static_cast<int>(dragMin), static_cast<int>(dragMax));
+                else if constexpr(std::is_same_v<T, float>)
+                    result = ImGui::DragFloat("##v", value, 0.01, dragMin, dragMax);
+                else if constexpr(std::is_same_v<T, glm::vec2>)
+                    result = ImGui::DragFloat2("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
+                else if constexpr(std::is_same_v<T, glm::vec3>)
+                    result = ImGui::DragFloat3("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
+                else if constexpr(std::is_same_v<T, glm::vec4>)
+                    result = ImGui::DragFloat4("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
+                else if constexpr(std::is_same_v<T, bool>)
+                    result = ImGui::Checkbox("##v", value);
+                else if constexpr(std::is_same_v<T, String>)
+                    ImGui::TextUnformatted(value->c_str());
+                else
+                    static_assert(false);
+            }
+            else if constexpr(F == CustomProprtyFlag::Color3 && std::is_same_v<T, glm::vec3>)
+                result = ImGui::ColorEdit3("##v", glm::value_ptr(*value));
+            else if constexpr(F == CustomProprtyFlag::Color4 && std::is_same_v<T, glm::vec4>)
+                result = ImGui::ColorEdit4("##v", glm::value_ptr(*value), ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
             else
-                static_assert(false);
+                static_assert(false, "Invalid case! Maybe you used wrong CustomProprtyFlag with wrong type? For example: Using glm::vec3 with CustomProprtyFlag::Color4");
         }
-        else if constexpr (F == CustomProprtyFlag::Color3 && std::is_same_v<T, glm::vec3>)
-            result = ImGui::ColorEdit3("##v", glm::value_ptr(*value));
-        else if constexpr (F == CustomProprtyFlag::Color4 && std::is_same_v<T, glm::vec4>)
-            result = ImGui::ColorEdit4("##v", glm::value_ptr(*value), ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
-        else
-            static_assert(false, "Invalid case! Maybe you used wrong CustomProprtyFlag with wrong type? For example: Using glm::vec3 with CustomProprtyFlag::Color4");
+
         ImGui::PopItemWidth();
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
@@ -195,10 +200,6 @@ namespace Surge::ImGuiAux
         ImGui::TextUnformatted(title);
         ImGui::TableNextColumn();
 
-        auto& style = ImGui::GetStyle();
-        ImVec4 buttonCol = style.Colors[ImGuiCol_Button];
-
-        ImGuiAux::ScopedColor color({ImGuiCol_ButtonHovered}, buttonCol);
         result = ImGui::Button(buttonText);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
@@ -210,8 +211,7 @@ namespace Surge::ImGuiAux
 
     inline bool Button(const char* buttonText)
     {
-        bool result = false;
-        result = ImGui::Button(buttonText);
+        bool result = ImGui::Button(buttonText);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
@@ -231,18 +231,21 @@ namespace Surge::ImGuiAux
 
         ImGui::PushItemWidth(-1);
 
-        if constexpr (std::is_same_v<T, float>)
         {
-            if (ImGui::SliderFloat("##label", &value, min, max))
-                modified = true;
+            ScopedBoldFont font;
+            if constexpr(std::is_same_v<T, float>)
+            {
+                if(ImGui::SliderFloat("##label", &value, min, max))
+                    modified = true;
+            }
+            else if constexpr(std::is_same_v<T, Uint>)
+            {
+                if(ImGui::SliderInt("##label", reinterpret_cast<int*>(&value), min, max))
+                    modified = true;
+            }
+            else
+                static_assert(false);
         }
-        else if constexpr (std::is_same_v<T, Uint>)
-        {
-            if (ImGui::SliderInt("##label", reinterpret_cast<int*>(&value), min, max))
-                modified = true;
-        }
-        else
-            static_assert(false);
 
         ImGui::PopItemWidth();
 

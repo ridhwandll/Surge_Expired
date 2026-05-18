@@ -15,7 +15,6 @@ namespace Surge
 
         mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
-
         mData->mMaterialRegistry.Initialize(mRHI.get());
 
         //Sampler
@@ -29,9 +28,12 @@ namespace Surge
         colorDesc.Width = size.x;
         colorDesc.Height = size.y;
         colorDesc.Format = ImageFormat::B10G11R11_UFLOAT_PACK32;
-        colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED | ImageUsage::TRANSFER_SRC; // TRANSFER_SRC needed for blit
+        colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT;
         colorDesc.DebugName = "Final Texture";
         colorDesc.Sampler = mData->mDefaultSampler;
+
+        // TRANSFER_SRC needed for blit
+        RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.Usage |= ImageUsage::TRANSFER_SRC : colorDesc.Usage |= ImageUsage::SAMPLED;
         RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
         mData->mFinalImage = mRHI->CreateTexture(colorDesc);
 
@@ -41,7 +43,6 @@ namespace Surge
         depthDesc.Format = ImageFormat::D32_SFLOAT;
         depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
         depthDesc.DebugName = "Final Depth Texture";
-        depthDesc.GenerateImGuiID = false;
         mData->mDepthImage = mRHI->CreateTexture(depthDesc);
 
         // Offscreen framebuffer
@@ -99,7 +100,7 @@ namespace Surge
         mData->mWhiteImage = mRHI->CreateTexture(texDesc);
     }
 
-    void Renderer::BeginFrame(const EditorCamera& camera)
+    void Renderer::BeginFrame(const EditorCamera& camera, Uint submitCount3D)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
         mData->ViewMatrix = camera.GetViewMatrix();
@@ -116,13 +117,13 @@ namespace Surge
         mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
         mRenderer2D.BeginFrame(mCurrentFrameCtx);
-        mRenderer3D.BeginFrame(mCurrentFrameCtx);
+        mRenderer3D.BeginFrame(mCurrentFrameCtx, submitCount3D);
 
         // Binding with the 3D pipeline? is it ok?
         mRHI->BindDescriptorSet(mCurrentFrameCtx, mRenderer3D.m3DPipeline, mData->mFrameDescriptorSet, 0);
     }
 
-    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
+    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
         mData->ViewMatrix = glm::inverse(transform);
@@ -139,7 +140,7 @@ namespace Surge
         mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
         mRenderer2D.BeginFrame(mCurrentFrameCtx);
-        mRenderer3D.BeginFrame(mCurrentFrameCtx);
+        mRenderer3D.BeginFrame(mCurrentFrameCtx, submitCount3D);
 
         mRHI->BindDescriptorSet(mCurrentFrameCtx, mRenderer3D.m3DPipeline, mData->mFrameDescriptorSet, 0);
     }

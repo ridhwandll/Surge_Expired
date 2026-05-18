@@ -27,7 +27,7 @@ namespace Surge
         int mChangeQuadAmount;
         bool mMoveEnabled = true;
         Vector<Entity> mColoredQuads;
-        Entity mFloor;
+        Entity mVkScene;
 
         Renderer* mRenderer;
     };

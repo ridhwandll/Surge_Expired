@@ -49,6 +49,9 @@ namespace Surge
 
     void ViewportPanel::OnEvent(Event& e)
     {
+        if(!mIsViewportHovered)
+            return;
+
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) -> bool {
 
@@ -56,7 +59,7 @@ namespace Surge
             if (keyEvent.GetKeyCode() == Key::F)
             {
                 const Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
-                if (selectedEntity && mIsViewportHovered)
+                if (selectedEntity)
                 {
                     const TransformComponent& transform = selectedEntity.GetComponent<TransformComponent>();
                     mEditorCam->Focus(transform.Position);
@@ -90,6 +93,12 @@ namespace Surge
                     {
                         if (!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::SCALE;
+                        break;
+                    }
+                    case Key::T:
+                    {
+                        if (!mGizmoInUse)
+                            mGizmoType = ImGuizmo::OPERATION::UNIVERSAL;
                         break;
                     }
                 }

@@ -82,13 +82,13 @@ namespace Surge
 
     void Renderer2D::BeginFrame(const FrameContext& frameCtx)
     {
-        SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
+        SURGE_PROFILE_FUNC("Renderer2D::BeginFrame(Camera)");
     
         mTotalVertexCount = 0;
         mTotalQuadCount = 0;
 
         // Begins command buffer recording (Off-screen pass)
-        // [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]	
+        // [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
         mCurrentFrameCtx = frameCtx;
         mCurrentFrameVertexOffset = 0;
     }

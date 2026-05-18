@@ -180,6 +180,7 @@ namespace Surge::VulkanUtils
     const char* BufferUsageToString(BufferUsage usage)
     {
         static thread_local char buffer[64];
+
         char* ptr = buffer;
         auto bits = static_cast<Uint>(usage);
         bool first = true;
@@ -225,12 +226,13 @@ namespace Surge::VulkanUtils
     {
         switch (format)
         {
-        case ImageFormat::RGBA8_SRGB:			return "RGBA8_SRGB";
-        case ImageFormat::RGBA8_UNORM:		return "RGBA8_UNORM";
-        case ImageFormat::BGRA8_SRGB:			return "BGRA8_SRGB";
-        case ImageFormat::D32_SFLOAT:			return "DEPTH32_SFLOAT";
-        case ImageFormat::D24_UNORM_S8_UINT:	return "D24_UNORM_S8_UINT";
+        case ImageFormat::RGBA8_SRGB: return "RGBA8_SRGB";
+        case ImageFormat::RGBA8_UNORM: return "RGBA8_UNORM";
+        case ImageFormat::BGRA8_SRGB: return "BGRA8_SRGB";
+        case ImageFormat::D32_SFLOAT: return "DEPTH32_SFLOAT";
+        case ImageFormat::D24_UNORM_S8_UINT: return "D24_UNORM_S8_UINT";
         case ImageFormat::R16G16B16A16_SFLOAT: return "R16G16B16A16_SFLOAT";
+        case ImageFormat::B10G11R11_UFLOAT_PACK32: return "B10G11R11_UFLOAT_PACK32";
         }
         SG_ASSERT_INTERNAL("Unknown TextureFormat enum value!");
         return "Unknown";

@@ -39,44 +39,49 @@ namespace Surge
                     mSceneContext->CreateEntity(mSelectedEntity, "Camera");
                     mSelectedEntity.AddComponent<CameraComponent>();
                 }
-				ImGui::Separator();
-				if (ImGui::MenuItem("Sprite Renderer"))
-				{
-					mSceneContext->CreateEntity(mSelectedEntity, "Sprite");
-                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
-				}
                 ImGui::Separator();
-				if (ImGui::BeginMenu("Mesh"))
-				{
-					int defMesh = -1;
+                if (ImGui::MenuItem("Sprite Renderer"))
+                {
+                    mSceneContext->CreateEntity(mSelectedEntity, "Sprite");
+                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+                }
+                ImGui::Separator();
+                if (ImGui::BeginMenu("Mesh"))
+                {
+                    int defMesh = -1;
                     if (ImGui::MenuItem("Empty Mesh"))
-                    {
-						mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
-						mSelectedEntity.AddComponent<MeshComponent>();
-                    }
-                    if (ImGui::MenuItem("Cube"))                    
+                        defMesh = -2;
+                    if (ImGui::MenuItem("Cube"))
                         defMesh = static_cast<int>(DefaultMesh::CUBE);
-					if (ImGui::MenuItem("Sphere"))
+                    if (ImGui::MenuItem("Sphere"))
                        defMesh = static_cast<int>(DefaultMesh::SPHERE);
-					if (ImGui::MenuItem("Bean"))
-						defMesh = static_cast<int>(DefaultMesh::BEAN);
-					if (ImGui::MenuItem("Cone"))
-						defMesh = static_cast<int>(DefaultMesh::CONE);
-					if (ImGui::MenuItem("Cylinder"))
-						defMesh = static_cast<int>(DefaultMesh::CYLINDER);
-					if (ImGui::MenuItem("Torus"))
-						defMesh = static_cast<int>(DefaultMesh::TORUS);
-					if (ImGui::MenuItem("Plane"))
-						defMesh = static_cast<int>(DefaultMesh::PLANE);
+                    if (ImGui::MenuItem("Bean"))
+                        defMesh = static_cast<int>(DefaultMesh::BEAN);
+                    if (ImGui::MenuItem("Cone"))
+                        defMesh = static_cast<int>(DefaultMesh::CONE);
+                    if (ImGui::MenuItem("Cylinder"))
+                        defMesh = static_cast<int>(DefaultMesh::CYLINDER);
+                    if (ImGui::MenuItem("Torus"))
+                        defMesh = static_cast<int>(DefaultMesh::TORUS);
+                    if (ImGui::MenuItem("Plane"))
+                        defMesh = static_cast<int>(DefaultMesh::PLANE);
 
-                    if (defMesh != -1)
+                    if(defMesh == -2)
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
-                        mSelectedEntity.AddComponent<MeshComponent>().Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(defMesh));
+                        MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
+                        meshComponent.Material_ = Core::GetRenderer()->CreateMaterial("TODO Remove this");
                     }
-					ImGui::EndPopup();
-				}
-				ImGui::Separator();
+                    else if (defMesh != -1)
+                    {
+                        mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
+                        MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
+                        meshComponent.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(defMesh));
+                        meshComponent.Material_ = Core::GetRenderer()->CreateMaterial("TODO Remove this");
+                    }
+                    ImGui::EndPopup();
+                }
+                ImGui::Separator();
                 if (ImGui::MenuItem("Light"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Light");
@@ -115,24 +120,24 @@ namespace Surge
         String& name = e.GetComponent<NameComponent>().Name;
         // ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_Leaf added as we dont have entity parenting yet
         ImGuiTreeNodeFlags flags = ((mSelectedEntity == e) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth;
-		bool isSelectedEntity = false;
-		if (mSelectedEntity == e)
-			isSelectedEntity = true;
+        bool isSelectedEntity = false;
+        if (mSelectedEntity == e)
+            isSelectedEntity = true;
 
-		{
-			ImGuiAux::ScopedColor style({ ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive }, { 0.0, 0.0, 0.0, 0.0 });
-			if (isSelectedEntity)
-			{
-				ImGuiAux::ScopedBoldFont font;
+        {
+            ImGuiAux::ScopedColor style({ ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive }, { 0.0, 0.0, 0.0, 0.0 });
+            if (isSelectedEntity)
+            {
+                ImGuiAux::ScopedBoldFont font;
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
-				ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
+                ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
                 ImGui::PopStyleColor();
-			}
-			else
-				ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
-		}
+            }
+            else
+                ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
+        }
 
-		if (ImGui::IsItemClicked())
+        if (ImGui::IsItemClicked())
             mSelectedEntity = e;
 
 
@@ -159,17 +164,17 @@ namespace Surge
         ImGui::TreePop();
 
         ImGui::TableNextColumn();
-		{
+        {
             
             if (isSelectedEntity)
-			{
-				ImGuiAux::ScopedBoldFont font;
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
-				ImGui::TextUnformatted("Selected Entity");
-				ImGui::PopStyleColor();
+            {
+                ImGuiAux::ScopedBoldFont font;
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
+                ImGui::TextUnformatted("Selected Entity");
+                ImGui::PopStyleColor();
             }
             else ImGui::TextUnformatted("Entity");
-		}
+        }
     }
 
     void SceneHierarchyPanel::Shutdown()

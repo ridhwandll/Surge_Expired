@@ -71,8 +71,12 @@ namespace Surge
                         entity.AddComponent<CameraComponent>();
                     if (ImGui::MenuItem("Sprite Renderer"))
                         entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
-                    if (ImGui::MenuItem("Mesh Component"))
+                    if(ImGui::MenuItem("Mesh Component"))
+                    {
                         entity.AddComponent<MeshComponent>();
+                        MeshComponent& meshComponent = entity.AddComponent<MeshComponent>();
+                        meshComponent.Material_ = Core::GetRenderer()->CreateMaterial("TODO Remove this");
+                    }
                     if (ImGui::MenuItem("Light"))
                         entity.AddComponent<LightComponent>();
                     ImGui::EndPopup();

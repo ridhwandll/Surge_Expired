@@ -6,29 +6,29 @@
 
 namespace Surge
 {
-	class VulkanRHI;
-	class VulkanImGuiContext
-	{
-	public:
-		void Init(const VulkanRHI& rhi);
-		void Shutdown(const VulkanRHI& rhi);
+    class VulkanRHI;
+    class VulkanImGuiContext
+    {
+    public:
+        void Init(const VulkanRHI& rhi);
+        void Shutdown(const VulkanRHI& rhi);
 
-		// Call once per frame before any ImGui:: widget calls
-		void BeginFrame();
+        // Call once per frame before any ImGui:: widget calls
+        void BeginFrame();
 
-		ImTextureID AddImage(VkImageView view);
-		void DestroyImage(ImTextureID id);
+        ImTextureID AddImage(VkImageView view);
+        void DestroyImage(ImTextureID id);
 
-		// Call once per frame after all ImGui:: widget calls
-		// Must be called while swapchain render pass is active
-		void EndFrame(VkCommandBuffer cmd);
+        // Call once per frame after all ImGui:: widget calls
+        // Must be called while swapchain render pass is active
+        void EndFrame(VkCommandBuffer cmd);
 
-		bool IsInitialized() const { return mInitialized; }
-	private:
-		void SetDarkThemeColors();
-	private:
-		VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
-		bool mInitialized = false;
-	};
+        bool IsInitialized() const { return mInitialized; }
+    private:
+        void SetDarkThemeColors();
+    private:
+        VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
+        bool mInitialized = false;
+    };
 
 }

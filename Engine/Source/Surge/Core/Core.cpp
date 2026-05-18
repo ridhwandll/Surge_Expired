@@ -5,6 +5,7 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
 #include "Surge/AssetManager/AssetManager.hpp"
+#include "Profiler.hpp"
 #include <filesystem>
 
 
@@ -76,7 +77,7 @@ namespace Surge::Core
             if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
                 continue;
 
-			GCoreData.SurgeClient->OnUpdate();
+            GCoreData.SurgeClient->OnUpdate();
 
             if (!GCoreData.FrameEndCallbacks.empty())
             {

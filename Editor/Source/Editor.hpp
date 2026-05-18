@@ -31,6 +31,7 @@ namespace Surge
         void OnImGuiRender();
         ImageHandle Editor::LoadTexture();
     private:
+        bool mShowRuntimeView = false;
         ImageHandle mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;

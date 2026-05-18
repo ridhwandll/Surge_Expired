@@ -27,6 +27,7 @@ namespace Surge
             desc.Format = ImageFormat::RGBA8_SRGB;
             desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
             desc.DebugName = "Tex.png";
+            desc.GenerateImGuiID = true;
             desc.InitialData = data;
             desc.DataSize = width * height * 4;
             desc.Sampler = defautSampler;
@@ -108,9 +109,9 @@ namespace Surge
             }
             {
                 Entity e;
-                mActiveScene->CreateEntity(e, MeshGenerator::DefaultMeshToString(DefaultMesh::TORUS));
+                mActiveScene->CreateEntity(e, "Vulkan Scene");
                 MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::TORUS);
+                meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
 
                 meshComp.Material_ = mRenderer->CreateMaterial("TorusMat");
                 meshComp.Material_->SetAlbedo({ 0.8f, 0.2f, 0.2f })
@@ -121,7 +122,7 @@ namespace Surge
                     .Apply();
 
                 TransformComponent& t = e.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(1.0f, 1.0f, 1.0f);
+                t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
                 t.MarkDirty();
             }
@@ -155,7 +156,10 @@ namespace Surge
     void Editor::OnUpdate()
     {
         Resize();
-        mActiveScene->Update(mCamera);
+        if (mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
+            mActiveScene->Update();
+        else
+            mActiveScene->Update(mCamera);
     }
 
     void Editor::OnImGuiRender()
@@ -171,6 +175,12 @@ namespace Surge
             mCamera.OnEvent(e);
 
         mPanelManager.OnEvent(e);
+
+        EventDispatcher dispatcher(e);
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
+            if(keyEvent.GetKeyCode() == Key::F5)
+                mShowRuntimeView = !mShowRuntimeView;
+                                             });
     }
 
     void Editor::OnRuntimeStart()
@@ -201,7 +211,8 @@ namespace Surge
 
     void Editor::OnShutdown()
     {
-        mRenderer->GetRHI()->DestroyTexture(mRidTex);
+        auto& rhi = mRenderer->GetRHI();
+        rhi->DestroyTexture(mRidTex);
     }
 
 } // namespace Surge

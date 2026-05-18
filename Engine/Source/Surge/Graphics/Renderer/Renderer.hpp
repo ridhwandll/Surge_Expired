@@ -38,6 +38,7 @@ namespace Surge
         glm::mat4 ViewProjection;
 
         // FrameUBO
+
         DescriptorSetHandle mFrameDescriptorSet;
         BufferHandle mFrameUBO;
 
@@ -62,8 +63,8 @@ namespace Surge
         void Initialize();
         void Shutdown();
 
-        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
-        void BeginFrame(const EditorCamera& camera);
+        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D = 0);
+        void BeginFrame(const EditorCamera& camera, Uint submitCount3D = 0);
         void EndFrame();
 
         void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material) { mRenderer3D.SubmitMesh(transform, mesh, material); }

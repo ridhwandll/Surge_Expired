@@ -8,7 +8,6 @@ namespace Surge
     void VulkanBindlessRegistry::Init(const VulkanRHI& rhi)
     {
         VkDevice device = rhi.GetDevice();
-
         // Bindless layout
 
         std::array<VkDescriptorSetLayoutBinding, 2> bindings = {};

@@ -28,7 +28,7 @@ namespace Surge
         void Shutdown();
 
         // Called by Renderer, not meant to be called directly
-        void BeginFrame(const FrameContext& frameCtx);
+        void BeginFrame(const FrameContext& frameCtx, Uint submitCount = 0);
         void EndFrame();
         void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material);
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation);
@@ -48,8 +48,6 @@ namespace Surge
         GraphicsRHI* mRHI;
         RendererData* mData;
 
-        PipelineHandle m3DPipeline;
-
         Vector<MeshDrawCmd> mMeshDrawCommands;
 
         struct LightData
@@ -60,6 +58,7 @@ namespace Surge
         BufferHandle mGPULightBuffer = BufferHandle::Invalid();
         Uint mLightBufferIndex = UINT32_MAX;
         LightData mLightCPU = {};
+        PipelineHandle m3DPipeline;
 
         friend class Renderer;
     };

@@ -33,7 +33,7 @@ namespace Surge
         mProjection[1][1] *= -1;
     }
 
-	void EditorCamera::OnUpdate()
+    void EditorCamera::OnUpdate()
     {
         if (Core::GetWindow()->IsWindowMinimized())
             return;
@@ -48,7 +48,7 @@ namespace Surge
             {
                 mCameraMode = CameraMode::Flycam;
                 const float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
-				Input::SetCursorMode(CursorMode::Locked);
+                Input::SetCursorMode(CursorMode::Locked);
 
                 if (Input::IsKeyPressed(Key::Q))
                     mPositionDelta -= ts * mSpeed * glm::vec3 {0.f, yawSign, 0.f};
@@ -72,7 +72,7 @@ namespace Surge
             else if (Input::IsKeyPressed(Key::LeftAlt))
             {
                 mCameraMode = CameraMode::Arcball;
-				Input::SetCursorMode(CursorMode::Locked);
+                Input::SetCursorMode(CursorMode::Locked);
 
                 if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
                     MousePan(delta);
@@ -82,7 +82,7 @@ namespace Surge
                     MouseZoom(delta.x + delta.y);
             }
             else
-				Input::SetCursorMode(CursorMode::Normal);
+                Input::SetCursorMode(CursorMode::Normal);
         }
         mInitialMousePosition = mouse;
 
@@ -156,8 +156,8 @@ namespace Surge
     {
         EventDispatcher dispatcher(event);
         dispatcher.Dispatch<MouseScrolledEvent>([this](MouseScrolledEvent& e) { return OnMouseScroll(e); });
-        dispatcher.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e) { return OnKeyReleased(e); });
-        dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e) { return OnKeyPressed(e); });
+        //dispatcher.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e) { return OnKeyReleased(e); });
+        //dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e) { return OnKeyPressed(e); });
     }
 
     bool EditorCamera::OnMouseScroll(MouseScrolledEvent& e)
