@@ -15,7 +15,7 @@ namespace Surge
         desc.HostVisible = true;
         desc.DebugName = "MaterialRegistry";
         mBuffer = mRHI->CreateBuffer(desc);
-        mBufferIndex = mRHI->GetBindlessBufferIndex(mBuffer);
+        //mBufferIndex = mRHI->GetBindlessBufferIndex(mBuffer);
     }
 
     void MaterialRegistry::Shutdown()

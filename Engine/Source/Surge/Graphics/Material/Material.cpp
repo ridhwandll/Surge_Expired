@@ -49,21 +49,19 @@ namespace Surge
 
     Material& Material::SetAlbedoTexture(ImageHandle h)
     {
-        Uint whiteTextureIndex = Core::GetRenderer()->GetWhiteTextureBindlessIndex();
-        const Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
-
-        mGPUData.AlbedoTexIndex = h.IsNull() ? whiteTextureIndex : rhi->GetBindlessTextureIndex(h);
-        mDirty = true;
+        //Uint whiteTextureIndex = Core::GetRenderer()->GetWhiteTextureBindlessIndex();
+        //const Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        //mGPUData.AlbedoTexIndex = h.IsNull() ? whiteTextureIndex : rhi->GetBindlessTextureIndex(h);
+        //mDirty = true;
         return *this;
     }
 
     Material& Material::SetNormalTexture(ImageHandle h)
     {
-        Uint whiteTextureIndex = Core::GetRenderer()->GetWhiteTextureBindlessIndex();
-        const Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
-
-        mGPUData.NormalTexIndex = h.IsNull() ? whiteTextureIndex : rhi->GetBindlessTextureIndex(h);
-        mDirty = true;
+        //Uint whiteTextureIndex = Core::GetRenderer()->GetWhiteTextureBindlessIndex();
+        //const Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        //mGPUData.NormalTexIndex = h.IsNull() ? whiteTextureIndex : rhi->GetBindlessTextureIndex(h);
+        //mDirty = true;
         return *this;
     }
 

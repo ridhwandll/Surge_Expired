@@ -14,15 +14,23 @@ namespace Surge
     class Renderer2D
     {
     public:
+        static constexpr Uint MAX_BATCHES_PER_FRAME = 10;
         static constexpr Uint MAX_QUADS_TOTAL = 100000;    // 100k quads total, across all(10) batches
         static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
+
+        struct Data
+        {
+            // FrameUBO
+            DescriptorSetHandle FrameDescriptorSet;
+            BufferHandle FrameUBO;
+        };
 
         struct QuadVertex
         {
             glm::vec3 Position;
             Uint Color; // Packed glm::vec4 color
             glm::vec2 UV;
-            Uint TextureIndex; // Bindless index
+            Uint TextureIndex;
         };
 
     public:
@@ -69,6 +77,10 @@ namespace Surge
         BatchData mCurrentBatch;
         Vector<QuadDrawCmd> mDrawCommands; // We store the draw commands for each batch, and execute them all at the end of the frame in one go
 
+        // TODO: Textures in Renderer2D
+        //DescriptorSetHandle mTexDescriptorSets[MAX_BATCHES_PER_FRAME];
+
+        Uint mCurrentBatchIndex = 0;
         Uint mTotalVertexCount = 0;
         Uint mTotalQuadCount = 0;
         Uint mCurrentFrameVertexOffset = 0;
@@ -80,6 +92,7 @@ namespace Surge
 
         GraphicsRHI* mRHI;
         RendererData* mData;
+        Data m2DData;
 
         friend class Renderer;
     };

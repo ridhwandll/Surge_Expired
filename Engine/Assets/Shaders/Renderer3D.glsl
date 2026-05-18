@@ -1,52 +1,5 @@
-//SURGE:[Shader: Vertex]
-#version 450
-
-layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aNormal;
-layout(location = 2) in vec3 aTangent;
-layout(location = 3) in vec3 aBiTangent;
-layout(location = 4) in vec2 aTexCoord;
-
-layout(set = 0, binding = 0) uniform FrameUBO
-{
-    mat4 ViewProjection;
-    vec3 CameraPos;
-    float _pad;
-
-} uFrame;
-
-layout(push_constant) uniform PushConstants
-{
-    mat4 Transform;
-    uint LightBufferIndex;
-    uint LightCount;
-    uint MaterialBufferIndex;
-    uint MaterialIndex;
-} uMesh;
-
-struct VertexOutput
-{
-    vec3 Normal;
-    vec2 TexCoord;
-    vec3 Tangent;
-    vec3 BiTangent;
-    vec3 WorldPos;
-};
-layout(location = 0) out VertexOutput vOutput;
-
-void main()
-{
-    vOutput.WorldPos = (uMesh.Transform * vec4(aPosition, 1.0)).xyz;
-    vOutput.TexCoord = aTexCoord;
-    vOutput.Tangent = mat3(uMesh.Transform) * normalize(aTangent);
-    vOutput.BiTangent = mat3(uMesh.Transform) * normalize(aBiTangent);
-    vOutput.Normal = mat3(uMesh.Transform) * normalize(aNormal);
-    gl_Position = uFrame.ViewProjection * uMesh.Transform * vec4(aPosition, 1.0);
-}
-
 //SURGE:[Shader: Fragment]
 #version 450
-#extension GL_EXT_nonuniform_qualifier : require
 
 struct VertexOutput
 {
@@ -58,16 +11,6 @@ struct VertexOutput
 };
 layout(location = 0) in VertexOutput vInput;
 layout(location = 0) out vec4 FinalColor;
-
-
-struct Material
-{
-    vec4 AlbedoMetallic;    // xyz=albedo, w=metallic
-    float Roughness;
-    float Reflectance;
-    uint AlbedoTexIndex;
-    uint NormalTexIndex;
-};
 
 struct Light
 {
@@ -85,56 +28,54 @@ struct Light
 layout(push_constant) uniform PushConstants
 {
     mat4 Transform;
-    uint LightBufferIndex; // bindless index into uBuffers[]
     uint LightCount;
-    uint MaterialBufferIndex;
-    uint MaterialIndex;
 } uMesh;
 
 // --------------------------
-// Set 0: Scene Uniform 
+// Set 0: Scene
 // --------------------------
-layout(set = 0, binding = 0) uniform FrameUBO
+layout(std140, set = 0, binding = 0) uniform FrameUBO
 {
     mat4 ViewProjection;
     vec3 CameraPos;
     float _pad;
 
 } uFrame;
-
-// --------------------------
-// Set 1: Bindless Resources
-// --------------------------
-layout(set = 1, binding = 0) readonly buffer LightBufferBINDLESS
+layout(std140,set = 0, binding = 1) readonly buffer Lights
 {
-    Light lights[];
+    Light Lights[256];
+} uLights;
 
-} sLights[];
-layout(set = 1, binding = 0) readonly buffer MaterialBufferBINDLESS
-{
-    Material materials[];
-
-} sMaterialBuffers[];
-
-//Bindless texture array: 
-layout(set = 1, binding = 1) uniform sampler2D uTexture[4096];
-
-
-//layout(set = 1, binding = 1) uniform SceneUBO
+//layout(set = 1, binding = 0) uniform Material
 //{
-//    vec3  ambientColor;
-//    float ambientStrength;
-//    uint  lightCount;
-//} scene;
+//    vec4 AlbedoMetallic;   // xyz = albedo, w = metallic
+//    float Roughness;
+//    float Reflectance;
+//    int UseNormalMap;
+//
+//    int _pad;
+//
+//} uMaterial;
+// TODO: Textures at set = 1, binding = 1 to 5
 
+struct Material
+{
+    vec4 AlbedoMetallic;
+    float Roughness;
+    float Reflectance;
+    int UseNormalMap;
+
+    int _pad;
+
+} uMaterial;
 
 // Energy conserving Blinn-Phong?
-vec3 CalculateMobilePBR(Light light, Material mat, vec3 N, vec3 V, vec3 fragPos)
+vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
 {   
     vec3 L; // Light Vector
     float attenuation = 1.0;
 
-    if (light.PositionType.w == 0.0)     
+    if (light.PositionType.w == 0.0)
         L = normalize(-light.PositionType.xyz); // Directional Light
     else 
     {
@@ -164,15 +105,15 @@ vec3 CalculateMobilePBR(Light light, Material mat, vec3 N, vec3 V, vec3 fragPos)
 
     // Map Roughness to Blinn-Phong exponent (Shininess)
     // Roughness^4 for a more linear artistic feel
-    float alpha = max(mat.Roughness, 0.04); 
+    float alpha = max(uMaterial.Roughness, 0.04); 
     float shininess = 2.0 / (pow(alpha, 4.0)) - 2.0;
 
     // Energy Conservation: Metals have no Diffuse
     // f0 represents the base reflectivity (at 0 degrees)
     // Non-metals (dielectrics) use a constant (usually 0.04), metals use Albedo
-    vec3 f0 = vec3(0.04) * mat.Reflectance;
-    vec3 specColor = mix(f0, mat.AlbedoMetallic.rgb, mat.AlbedoMetallic.a);
-    vec3 diffuseColor = mat.AlbedoMetallic.rgb * (1.0 - mat.AlbedoMetallic.a);
+    vec3 f0 = vec3(0.04) * uMaterial.Reflectance;
+    vec3 specColor = mix(f0, uMaterial.AlbedoMetallic.rgb, uMaterial.AlbedoMetallic.a);
+    vec3 diffuseColor = uMaterial.AlbedoMetallic.rgb * (1.0 - uMaterial.AlbedoMetallic.a);
 
     // Normalized Blinn-Phong Specular
     // The (shininess + 8)/8 factor ensures the light energy stays consistent
@@ -200,18 +141,21 @@ vec3 ACESFilmic(vec3 x)
 
 void main()
 {
-    Material mat = sMaterialBuffers[uMesh.MaterialBufferIndex].materials[uMesh.MaterialIndex];
+    uMaterial.AlbedoMetallic = vec4(0.8, 0.6, 0.4, 0.5);
+    uMaterial.Roughness = 0.5;
+    uMaterial.Reflectance = 0.5;
+    uMaterial.UseNormalMap = 0;
 
     vec3 N = normalize(vInput.Normal);
     vec3 V = normalize(uFrame.CameraPos - vInput.WorldPos);
 
     // TODO: GI
-    vec3 ambient = vec3(0.05) * mat.AlbedoMetallic.rgb;
+    vec3 ambient = vec3(0.05) * uMaterial.AlbedoMetallic.rgb;
 
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);
-    for (uint i = 0; i < uMesh.LightCount; i++)       
-        directAccumulation += CalculateMobilePBR(sLights[uMesh.LightBufferIndex].lights[i], mat, N, V, vInput.WorldPos);        
+    for (uint i = 0; i < uMesh.LightCount; i++)
+        directAccumulation += CalculateMobilePBR(uLights.Lights[i], N, V, vInput.WorldPos);
 
     vec3 HDRColor  = ambient + directAccumulation;
 
@@ -223,4 +167,48 @@ void main()
     color = pow(color, vec3(1.0 / 2.2));
 
     FinalColor = vec4(color, 1.0);
+}
+
+//SURGE:[Shader: Vertex]
+#version 450
+
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec3 aTangent;
+layout(location = 3) in vec3 aBiTangent;
+layout(location = 4) in vec2 aTexCoord;
+
+layout(set = 0, binding = 0) uniform FrameUBO
+{
+    mat4 ViewProjection;
+    vec3 CameraPos;
+    float _pad;
+
+} uFrame;
+
+layout(push_constant) uniform PushConstants
+{
+    mat4 Transform;
+    uint LightCount;
+
+} uMesh;
+
+struct VertexOutput
+{
+    vec3 Normal;
+    vec2 TexCoord;
+    vec3 Tangent;
+    vec3 BiTangent;
+    vec3 WorldPos;
+};
+layout(location = 0) out VertexOutput vOutput;
+
+void main()
+{
+    vOutput.WorldPos = (uMesh.Transform * vec4(aPosition, 1.0)).xyz;
+    vOutput.TexCoord = aTexCoord;
+    vOutput.Tangent = mat3(uMesh.Transform) * normalize(aTangent);
+    vOutput.BiTangent = mat3(uMesh.Transform) * normalize(aBiTangent);
+    vOutput.Normal = mat3(uMesh.Transform) * normalize(aNormal);
+    gl_Position = uFrame.ViewProjection * uMesh.Transform * vec4(aPosition, 1.0);
 }

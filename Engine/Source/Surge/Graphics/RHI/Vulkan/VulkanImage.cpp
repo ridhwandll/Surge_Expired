@@ -94,11 +94,9 @@ namespace Surge
         viewInfo.subresourceRange.layerCount = desc.Layers;
         VK_CALL(vkCreateImageView(rhi.GetDevice(), &viewInfo, nullptr, &entry.View));
 
-#if defined(SURGE_DEBUG)
-            rhi.SetDebugName(VK_OBJECT_TYPE_IMAGE, (uint64_t)entry.Image, desc.DebugName);
-            rhi.SetDebugName(VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)entry.View, desc.DebugName);
-            vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName.c_str());
-#endif
+        SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_IMAGE, (uint64_t)entry.Image, desc.DebugName);
+        SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)entry.View, desc.DebugName);
+        SET_VMA_DEBUG_NAME(rhi, entry.Allocation, desc.DebugName.c_str());
 
         return entry;
     }

@@ -214,7 +214,7 @@ namespace Surge
         float MipBias = 0.0f;
         float MaxAniso = 1.0f;
         bool Anisotropy = false;
-        String DebugName = "";
+        String DebugName;
     };
 
     enum class DescriptorType : Uint
@@ -224,21 +224,6 @@ namespace Surge
         UNIFORM_BUFFER,  // small read-only buffer
         STORAGE_BUFFER,  // large read/write buffer
         SAMPLER,         // separate sampler
-    };
-
-    struct DescriptorBinding
-    {
-        Uint Binding = 0;
-        DescriptorType Type = DescriptorType::TEXTURE;
-        Uint Count = 1; // >1 for arrays
-        ShaderType Stage = ShaderType::FRAGMENT;
-        bool Partial = false; // allow partially bound arrays
-    };
-    struct DescriptorLayoutDesc
-    {
-        DescriptorBinding Bindings[16] = {};
-        Uint BindingCount = 0;
-        String DebugName;
     };
 
     struct DescriptorWrite
@@ -251,6 +236,6 @@ namespace Surge
         SamplerHandle Sampler = SamplerHandle::Invalid();
         BufferHandle Buffer = BufferHandle::Invalid();
         uint64_t BufferOffset = 0;
-        uint64_t BufferRange = 0;  // 0 = whole buffer
+        uint64_t BufferRange = 0; // 0 = whole buffer
     };
 }

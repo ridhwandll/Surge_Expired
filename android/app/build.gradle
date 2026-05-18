@@ -41,6 +41,7 @@ android {
         debug {
             debuggable = true
             jniDebuggable = true
+            minifyEnabled = false
 
             externalNativeBuild {
                 cmake {
@@ -52,7 +53,7 @@ android {
         release {
             debuggable = false
             jniDebuggable = false
-            minifyEnabled = false
+            minifyEnabled = true
 
             externalNativeBuild {
                 cmake {

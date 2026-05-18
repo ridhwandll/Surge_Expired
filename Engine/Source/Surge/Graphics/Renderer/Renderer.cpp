@@ -66,27 +66,6 @@ namespace Surge
         fbDesc.DebugName = "Offscreen Framebuffer";
         mData->mOffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
-        // Frame UBO
-        BufferDesc frameUBODesc = {};
-        frameUBODesc.Usage = BufferUsage::UNIFORM;
-        frameUBODesc.HostVisible = true;
-        frameUBODesc.DebugName = "FrameUBO";
-        frameUBODesc.Size = sizeof(FrameUBO);
-        mData->mFrameUBO = mRHI->CreateBuffer(frameUBODesc);
-
-        mRenderer2D.Initialize(mRHI.get(), mData.get());
-        mRenderer3D.Initialize(mRHI.get(), mData.get());
-
-        // 2D and 3D share the same frame descriptor set since they have the same FrameUBO layout, but they can also have their own if needed
-        DescriptorLayoutHandle frameDescriptorLayout = mRHI->GetDescriptorLayout(mRenderer3D.m3DPipeline);
-        mData->mFrameDescriptorSet = mRHI->CreateDescriptorSet(frameDescriptorLayout, DescriptorUpdateFrequency::STATIC, "Frame DescriptorSet");
-
-        DescriptorWrite frameDescriptorWrite = {};
-        frameDescriptorWrite.Binding = 0;
-        frameDescriptorWrite.Type = DescriptorType::UNIFORM_BUFFER;
-        frameDescriptorWrite.Buffer = mData->mFrameUBO;
-        mRHI->UpdateDescriptorSet(mData->mFrameDescriptorSet, &frameDescriptorWrite, 1);
-
         uint8_t whitePixel[] = { 255, 255, 255, 255 };
         ImageDesc texDesc = {};
         texDesc.Width = 1;
@@ -98,6 +77,9 @@ namespace Surge
         texDesc.DataSize = sizeof(whitePixel);
         texDesc.Sampler = mData->mDefaultSampler;
         mData->mWhiteImage = mRHI->CreateTexture(texDesc);
+
+        mRenderer2D.Initialize(mRHI.get(), mData.get());
+        mRenderer3D.Initialize(mRHI.get(), mData.get());
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera, Uint submitCount3D)
@@ -108,19 +90,11 @@ namespace Surge
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = camera.GetPosition();
 
-        FrameUBO frameData = {};
-        frameData.ViewProjection = mData->ViewProjection;
-        frameData.CameraPos = mData->CameraPosition;
-        mRHI->UploadBuffer(mData->mFrameUBO, &frameData, sizeof(FrameUBO));
-
         mCurrentFrameCtx = mRHI->BeginFrame();
         mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
         mRenderer2D.BeginFrame(mCurrentFrameCtx);
         mRenderer3D.BeginFrame(mCurrentFrameCtx, submitCount3D);
-
-        // Binding with the 3D pipeline? is it ok?
-        mRHI->BindDescriptorSet(mCurrentFrameCtx, mRenderer3D.m3DPipeline, mData->mFrameDescriptorSet, 0);
     }
 
     void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
@@ -131,18 +105,11 @@ namespace Surge
         mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
         mData->CameraPosition = transform[3];
     
-        FrameUBO frameData = {};
-        frameData.ViewProjection = mData->ViewProjection;
-        frameData.CameraPos = mData->CameraPosition;
-        mRHI->UploadBuffer(mData->mFrameUBO, &frameData, sizeof(FrameUBO));
-
         mCurrentFrameCtx = mRHI->BeginFrame();
         mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->mOffscreenFramebuffer, mData->mClearColor);
 
         mRenderer2D.BeginFrame(mCurrentFrameCtx);
         mRenderer3D.BeginFrame(mCurrentFrameCtx, submitCount3D);
-
-        mRHI->BindDescriptorSet(mCurrentFrameCtx, mRenderer3D.m3DPipeline, mData->mFrameDescriptorSet, 0);
     }
 
     void Renderer::EndFrame()
@@ -209,9 +176,7 @@ namespace Surge
         mRenderer3D.Shutdown();
 
         mRHI->DestroyTexture(mData->mWhiteImage);
-        mRHI->DestroyDescriptorSet(mData->mFrameDescriptorSet);
 
-        mRHI->DestroyBuffer(mData->mFrameUBO);
         mRHI->DestroySampler(mData->mDefaultSampler);
         mRHI->DestroyFramebuffer(mData->mOffscreenFramebuffer);
         mRHI->DestroyTexture(mData->mFinalImage);

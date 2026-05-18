@@ -13,7 +13,6 @@ namespace Surge
     {
         VkImage Image = VK_NULL_HANDLE;
         VkImageView View = VK_NULL_HANDLE;
-        Uint BindlessIndex = UINT32_MAX;
 
         ImTextureID ImGuiID = NULL;
         VkDeviceSize Size = 0; //bytes
@@ -28,7 +27,7 @@ namespace Surge
         VkBuffer Buffer = VK_NULL_HANDLE;
         VmaAllocation Allocation = VK_NULL_HANDLE;
         void* MappedPtr = nullptr;
-        Uint BindlessIndex = UINT32_MAX;
+
         BufferDesc Desc = {};
     };
 
@@ -37,7 +36,10 @@ namespace Surge
         VkPipeline Pipeline = VK_NULL_HANDLE;
         VkPipelineLayout Layout = VK_NULL_HANDLE;
 
-        DescriptorLayoutHandle DescriptorSetLayout = {};
+        //  Guaranteed minimum is 4 VkDescriptorSetLayout per pipeline, guaranteed to be able to simultaneously use sets 0 through 3 across all Vulkan 1.1 compliant hardware         
+        VkDescriptorSetLayout DescSetLayouts[4];
+        Uint DescSetLayoutsCount = 0;
+
         PipelineDesc Desc = {};
     };
 
@@ -56,28 +58,20 @@ namespace Surge
     struct SamplerEntry
     {
         VkSampler Sampler = VK_NULL_HANDLE;
-
         SamplerDesc Desc = {};
-    };
-
-    struct DescriptorLayoutEntry
-    {
-        VkDescriptorSetLayout Layout = VK_NULL_HANDLE;		
-        DescriptorLayoutDesc Desc = {};
     };
 
     enum class DescriptorUpdateFrequency
     {
-        STATIC,  // set once, never updated, skybox, font atlas, LUTs
-        DYNAMIC, // updated per frame. per-object params, animated materials
+        STATIC,  // Set once, never updated, skybox, font atlas, LUTs
+        DYNAMIC, // Updated per frame. per-object params, animated materials
     };
 
     struct DescriptorSetEntry
     {
-        VkDescriptorSet Sets[RHISettings::FRAMES_IN_FLIGHT] = {};
-        VkDescriptorPool Pool = VK_NULL_HANDLE; // owns its own pool
-        DescriptorLayoutHandle Layout = DescriptorLayoutHandle::Invalid();
         DescriptorUpdateFrequency Frequency = DescriptorUpdateFrequency::STATIC;
-        Uint Count = 1; // 1 if Static, FRAMES_IN_FLIGHT if Dynamic
+
+        VkDescriptorSet Sets[RHISettings::FRAMES_IN_FLIGHT] = {};
+        Uint Count = 1; // 1 if DescriptorUpdateFrequency::STATIC, FRAMES_IN_FLIGHT if DescriptorUpdateFrequency::DYNAMIC
     };
 }

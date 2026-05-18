@@ -95,10 +95,8 @@ namespace Surge
             vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
         }
 
-#if defined(SURGE_DEBUG)
-        rhi.SetDebugName(VK_OBJECT_TYPE_BUFFER, (uint64_t)entry.Buffer, desc.DebugName);
-        vmaSetAllocationName(allocator, entry.Allocation, desc.DebugName.c_str());
-#endif
+        SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_BUFFER, (uint64_t)entry.Buffer, desc.DebugName);
+        SET_VMA_DEBUG_NAME(rhi, entry.Allocation, desc.DebugName.c_str());
 
         return entry;
     }

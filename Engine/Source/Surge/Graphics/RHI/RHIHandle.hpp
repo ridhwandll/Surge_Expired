@@ -35,9 +35,6 @@ namespace Surge
     struct SamplerTag {};
     using SamplerHandle = RHIHandle<SamplerTag>;
 
-    struct DescriptorLayoutTag {};
-    using DescriptorLayoutHandle = RHIHandle<DescriptorLayoutTag>;
-
     struct DescriptorSetTag {};
     using DescriptorSetHandle = RHIHandle<DescriptorSetTag>;
 

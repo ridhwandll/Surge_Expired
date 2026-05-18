@@ -41,7 +41,7 @@ namespace Surge
         BufferDesc vbDesc = {};
         vbDesc.Size = sizeof(QuadVertex) * MAX_VERTICES;
         vbDesc.Usage = BufferUsage::VERTEX;
-        vbDesc.HostVisible = true;
+        vbDesc.HostVisible = true; //>Host visible as we memcpy data from CPU every frame
         for (Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
         {
             vbDesc.DebugName = std::format("BatchVB Frame: {}", i).c_str();
@@ -64,6 +64,19 @@ namespace Surge
         desc.Blend.Enable = true;
         m2DPipeline = mRHI->CreatePipeline(desc);
 
+        // Textures TODO
+        //for (Uint i = 0; i < MAX_BATCHES_PER_FRAME; i++)
+        //    mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(m2DPipeline, 1, DescriptorUpdateFrequency::DYNAMIC, "Renderer2D_TexDescriptorSet");
+
+        // Frame UBO
+        BufferDesc frameUBODesc = {};
+        frameUBODesc.Usage = BufferUsage::UNIFORM;
+        frameUBODesc.HostVisible = true;
+        frameUBODesc.DebugName = "FrameUBO";
+        frameUBODesc.Size = sizeof(FrameUBO);
+        m2DData.FrameUBO = mRHI->CreateBuffer(frameUBODesc);
+        m2DData.FrameDescriptorSet = mRHI->CreateDescriptorSet(m2DPipeline, 0, DescriptorUpdateFrequency::DYNAMIC, "2D_FrameData [Set0]");
+
         // Amount of max draw calls
         mDrawCommands.reserve(MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH);
     }
@@ -71,7 +84,8 @@ namespace Surge
     void Renderer2D::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
-
+        mRHI->DestroyDescriptorSet(m2DData.FrameDescriptorSet);
+        mRHI->DestroyBuffer(m2DData.FrameUBO);
         mRHI->DestroyPipeline(m2DPipeline);
 
         for (Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
@@ -83,7 +97,8 @@ namespace Surge
     void Renderer2D::BeginFrame(const FrameContext& frameCtx)
     {
         SURGE_PROFILE_FUNC("Renderer2D::BeginFrame(Camera)");
-    
+
+        mCurrentBatchIndex = 0;
         mTotalVertexCount = 0;
         mTotalQuadCount = 0;
 
@@ -91,6 +106,18 @@ namespace Surge
         // [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
         mCurrentFrameCtx = frameCtx;
         mCurrentFrameVertexOffset = 0;
+
+        // Update 2D Data UBO
+        FrameUBO frameData = {};
+        frameData.ViewProjection = mData->ViewProjection;
+        frameData.CameraPos = mData->CameraPosition;
+        mRHI->UploadBuffer(m2DData.FrameUBO, &frameData, sizeof(FrameUBO));
+
+        DescriptorWrite frameDescriptorWrite = {};
+        frameDescriptorWrite.Binding = 0;
+        frameDescriptorWrite.Type = DescriptorType::UNIFORM_BUFFER;
+        frameDescriptorWrite.Buffer = m2DData.FrameUBO;
+        mRHI->UpdateDescriptorSet(m2DData.FrameDescriptorSet, &frameDescriptorWrite, 1);
     }
 
     void Renderer2D::Submit(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture)
@@ -105,7 +132,7 @@ namespace Surge
             return;
         }
         mMaxQuadCountReached = false;
-        Uint texIndex = mRHI->GetBindlessTextureIndex(texture.IsNull() ? mData->mWhiteImage : texture);
+        Uint texIndex = 0;//mData->mWhiteImage;
 
         static constexpr glm::vec4 sLocalPositions[4] = {
             { 0.5f, -0.5f, 0.0f, 1.0f},
@@ -134,23 +161,20 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Renderer2D::EndFrame()");
 
-        mRHI->BindBindlessSet(mCurrentFrameCtx, m2DPipeline);
-
         WriteToGPUBuffer();
 
         if (mDrawCommands.empty())
             return;
 
         mRHI->CmdBindPipeline(mCurrentFrameCtx, m2DPipeline);
+        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, m2DData.FrameDescriptorSet, 0);
         mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
         mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
 
-        // quadData is just a placeholder to match the 3D shader
-        PushConstantData pushConstants = { .Transform = glm::mat4(1.0f), .LightCount = 0};
-        mRHI->CmdPushConstants(mCurrentFrameCtx, m2DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
-
-        for (const QuadDrawCmd& cmd : mDrawCommands)
+        for(const QuadDrawCmd& cmd : mDrawCommands)
+        {
             mRHI->CmdDrawIndexed(mCurrentFrameCtx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
+        }
 
         mDrawCommands.clear();
     }

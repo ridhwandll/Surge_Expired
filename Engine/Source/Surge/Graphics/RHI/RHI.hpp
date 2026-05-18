@@ -62,16 +62,9 @@ namespace Surge
         SamplerHandle CreateSampler(const SamplerDesc& desc) { return mBackendRHI.CreateSampler(desc); }
         void DestroySampler(SamplerHandle h) { mBackendRHI.DestroySampler(h); }
 
-        DescriptorLayoutHandle CreateDescriptorLayout(const DescriptorLayoutDesc& desc) { return mBackendRHI.CreateDescriptorLayout(desc); }
-        DescriptorLayoutHandle GetDescriptorLayout(PipelineHandle h) const { return mBackendRHI.GetDescriptorLayout(h); }
-        void DestroyDescriptorLayout(DescriptorLayoutHandle h) { mBackendRHI.DestroyDescriptorLayout(h); }
-
-        void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline) { mBackendRHI.BindBindlessSet(ctx, pipeline); }
-
-        Uint GetBindlessTextureIndex(ImageHandle h) const { return mBackendRHI.GetBindlessTextureIndex(h); }
-        Uint GetBindlessBufferIndex(BufferHandle h) const { return mBackendRHI.GetBindlessBufferIndex(h); }
-        DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(layoutHandle, frequency, debugName); }
-        void BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.BindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
+        // Descriptor sets
+        DescriptorSetHandle CreateDescriptorSet(PipelineHandle pipelineHandle, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(pipelineHandle, setNumber, frequency, debugName); }
+        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
         void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount) { mBackendRHI.UpdateDescriptorSet(setHandle, writes, writeCount); }
         void DestroyDescriptorSet(DescriptorSetHandle h) { mBackendRHI.DestroyDescriptorSet(h); }
 
@@ -92,9 +85,6 @@ namespace Surge
         void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdEndRenderPass(ctx, h); }
         void CmdTransitionTextureLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
-
-        // setIndex maps to layout(set = N) in GLSL
-        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
 
         void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
 

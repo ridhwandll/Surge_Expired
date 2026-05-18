@@ -8,12 +8,15 @@
 
 namespace Surge
 {
-	class VulkanRHI;
-	class VulkanPipeline
-	{
-	public:
-		static PipelineEntry Create(VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass);
-		static void Destroy(VulkanRHI& rhi, PipelineEntry& entry);
-	};
-
+    class VulkanRHI;
+    class VulkanPipeline
+    {
+    public:
+        static PipelineEntry Create(VulkanRHI& rhi, const PipelineDesc& desc, VkRenderPass renderPass);
+        static void Destroy(VulkanRHI& rhi, PipelineEntry& entry);
+    private:
+        static Vector<VkDescriptorSetLayout> CreateDescriptorSetLayouts(VkDevice device, const ShaderReflectionData& reflectedData);
+        static Vector<VkPushConstantRange> CreatePushConstantRanges(const ShaderReflectionData& reflectedData);
+        static Pair<VkVertexInputBindingDescription, Vector<VkVertexInputAttributeDescription>> CreateVertexAttributes(const ShaderReflectionData& reflectedData);
+    };
 }

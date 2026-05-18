@@ -17,6 +17,20 @@ namespace Surge
     {
     public:
         static constexpr Uint MAX_LIGHTS = 256;
+        struct PushConstantData
+        {
+            glm::mat4 Transform;
+            Uint LightCount;
+        };
+
+        struct Data
+        {
+            // FrameUBO
+            DescriptorSetHandle FrameDescriptorSet;
+            BufferHandle FrameUBO;
+            BufferHandle LightUBO;
+        };
+
     public:
         Renderer3D() = default;
         ~Renderer3D() = default;
@@ -47,17 +61,12 @@ namespace Surge
         FrameContext mCurrentFrameCtx;
         GraphicsRHI* mRHI;
         RendererData* mData;
+        Data m3DData;
 
         Vector<MeshDrawCmd> mMeshDrawCommands;
 
-        struct LightData
-        {
-            GPULight Lights[MAX_LIGHTS];
-            Uint Count = 0;
-        };
-        BufferHandle mGPULightBuffer = BufferHandle::Invalid();
         Uint mLightBufferIndex = UINT32_MAX;
-        LightData mLightCPU = {};
+        Vector<Light> mLightCPU = {};
         PipelineHandle m3DPipeline;
 
         friend class Renderer;

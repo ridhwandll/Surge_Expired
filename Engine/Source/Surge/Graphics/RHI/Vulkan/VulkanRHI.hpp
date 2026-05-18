@@ -11,7 +11,7 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanFramebuffer.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
-#include "Surge/Graphics/RHI/Vulkan/VulkanBindlessRegistry.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanDescriptorSet.hpp"
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -66,16 +66,7 @@ namespace Surge
         SamplerHandle CreateSampler(const SamplerDesc& desc);
         void DestroySampler(SamplerHandle h);
 
-        DescriptorLayoutHandle CreateDescriptorLayout(const DescriptorLayoutDesc& desc);
-        DescriptorLayoutHandle GetDescriptorLayout(PipelineHandle h) const;
-        void DestroyDescriptorLayout(DescriptorLayoutHandle h);
-
-        Uint GetBindlessTextureIndex(ImageHandle h) const;
-        Uint GetBindlessBufferIndex(BufferHandle h) const;
-        void BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline);
-
-        void BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex);
-        DescriptorSetHandle CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
+        DescriptorSetHandle CreateDescriptorSet(PipelineHandle pipelineHandle, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
         void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount);
         void DestroyDescriptorSet(DescriptorSetHandle h);
 
@@ -124,7 +115,11 @@ namespace Surge
         VmaAllocator GetAllocator() const { return mDevice.GetAllocator(); }
         int32_t GetQueueIndex() const { return mDevice.GetQueueIndex(); }
 
+        const Vector<VkDescriptorPool>& GetDescriptorPools() const { return mVkDescriptorPools; }
+        const Vector<VkDescriptorPool>& GetNonResetableDescriptorPools() const { return mNonResetableVkDescriptorPools; }
+
         void ShowPoolDebugImGuiWindow();
+
     private:
         void CreateInstance();
         void FillStats();
@@ -139,6 +134,7 @@ namespace Surge
         void DestroySwapchainRenderpass();
 
         void ResizeInternal();
+        void CreateDescriptorPools();
 
         Vector<const char*> GetRequiredInstanceExtensions();
         Vector<const char*> GetRequiredInstanceLayers();
@@ -152,7 +148,6 @@ namespace Surge
         VulkanSwapchain mSwapchain;
         VulkanImGuiContext mImGuiContext;
         VulkanRenderpassFactory mRenderPassCache;
-        VulkanBindlessRegistry mBindlessRegistry;
 
         Vector<VkFramebuffer> mSwapchainFramebuffers;
         VkRenderPass mRenderPass = VK_NULL_HANDLE;
@@ -160,17 +155,20 @@ namespace Surge
         VkInstance mInstance { VK_NULL_HANDLE };
         VkSurfaceKHR mSurface { VK_NULL_HANDLE };
 
+        Vector<VkDescriptorPool> mVkDescriptorPools;
+        Vector<VkDescriptorPool> mNonResetableVkDescriptorPools;
+
         //Pools
         HandlePool<PipelineHandle, PipelineEntry> mPipelinePool;
         HandlePool<BufferHandle, BufferEntry> mBufferPool;
         HandlePool<FramebufferHandle, FramebufferEntry> mFramebufferPool;
         HandlePool<ImageHandle, ImageEntry> mTexturePool;
         HandlePool<SamplerHandle, SamplerEntry> mSamplerPool;
-        HandlePool<DescriptorLayoutHandle, DescriptorLayoutEntry> mDescriptorLayoutPool;
         HandlePool<DescriptorSetHandle, DescriptorSetEntry> mDescriptorSetPool;
 
         friend class VulkanPipeline;
         friend class VulkanImage;
+        friend class VulkanDescriptorSet;
     };
 
 }

@@ -65,10 +65,7 @@ namespace Surge
         fbInfo.height = desc.Height;
         fbInfo.layers = 1;
         VK_CALL(vkCreateFramebuffer(rhi.GetDevice(), &fbInfo, nullptr, &entry.Framebuffer));
-
-#if defined(SURGE_DEBUG)
-        rhi.SetDebugName(VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)entry.Framebuffer, desc.DebugName);
-#endif
+        SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)entry.Framebuffer, desc.DebugName);
 
         return entry;
     }

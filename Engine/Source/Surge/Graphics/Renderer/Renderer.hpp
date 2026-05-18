@@ -9,7 +9,7 @@
 #include "Surge/Graphics/Material/Material.hpp"
 
 namespace Surge
-{   
+{
     // GPU Data
     struct FrameUBO
     {
@@ -19,15 +19,6 @@ namespace Surge
     };
     static_assert(sizeof(FrameUBO) % 16 == 0, "Size of 'FrameUBO' struct must be 16 bytes aligned!");
 
-    struct PushConstantData
-    {
-        glm::mat4 Transform;
-        Uint LightBufferIndex = 0;
-        Uint LightCount; // TODO Move this somewhere else
-        Uint MaterialBufferIndex;
-        Uint MaterialIndex;
-    };
-
     class Scene;
     struct RendererData
     {
@@ -36,11 +27,6 @@ namespace Surge
         glm::mat4 ViewMatrix;
         glm::mat4 ProjectionMatrix;
         glm::mat4 ViewProjection;
-
-        // FrameUBO
-
-        DescriptorSetHandle mFrameDescriptorSet;
-        BufferHandle mFrameUBO;
 
         ImageHandle mWhiteImage;
         ImageHandle mFinalImage;
@@ -67,14 +53,14 @@ namespace Surge
         void BeginFrame(const EditorCamera& camera, Uint submitCount3D = 0);
         void EndFrame();
 
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material) { mRenderer3D.SubmitMesh(transform, mesh, material); }
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid()) { mRenderer2D.Submit(transform, color, texture); }
+        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material) { mRenderer3D.SubmitMesh(transform, mesh, material); }
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation) { mRenderer3D.SubmitLight(light, position, rotation); }
 
         void OnWindowResize(Uint width, Uint height);
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
-        Uint GetWhiteTextureBindlessIndex() const { return mRHI->GetBindlessTextureIndex(mData->mWhiteImage); }
+        ImageHandle GetWhiteTexture() const { return mData->mWhiteImage; }
         ImageHandle GetFinalImage() const { return mData->mFinalImage; }
         FramebufferHandle GetFinalFramebuffer() const { return mData->mOffscreenFramebuffer; }
         ImTextureID GetFinalImageImGuiID() const

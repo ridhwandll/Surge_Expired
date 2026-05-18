@@ -24,27 +24,29 @@
 
 namespace Surge
 {
-    static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
+    static Vector<String> ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
     {
-        for (auto extension : required)
+        Vector<String> missingExtensions;
+
+        for(auto extension : required)
         {
             bool found = false;
-            for (auto& availableExtension : available)
+            for(auto& availableExtension : available)
             {
-                if (strcmp(availableExtension.extensionName, extension) == 0)
+                if(strcmp(availableExtension.extensionName, extension) == 0)
                 {
                     found = true;
                     break;
                 }
             }
 
-            if (!found)
+            if(!found)
             {
-                return false;
+                missingExtensions.push_back(extension);
             }
         }
 
-        return true;
+        return missingExtensions;
     }
 
     static String GetVendorName(Uint vendorID)
@@ -62,6 +64,8 @@ namespace Surge
 
     void VulkanRHI::Initialize(Window* window)
     {
+        SCOPED_TIMER("VulkanRHI::Initialize");
+
         CreateInstance();
         CreateSurface(window);
         mDevice.Initialize(mInstance, mSurface);
@@ -73,7 +77,9 @@ namespace Surge
 
         mImGuiContext.Init(*this);
         FillStats();
-        mBindlessRegistry.Init(*this);
+        Log<Severity::Debug>("kekw");
+        CreateDescriptorPools();
+        Log<Severity::Debug>("not kekw");
     }
 
     void VulkanRHI::WaitIdle() const
@@ -82,13 +88,19 @@ namespace Surge
     }
 
     void VulkanRHI::Shutdown()
-    {	
-        mBindlessRegistry.Shutdown(*this);
+    {
+        SCOPED_TIMER("VulkanRHI::Shutdown");
+
+        // Destroy the descriptor pools
+        for(VkDescriptorPool& pool : mVkDescriptorPools)
+            vkDestroyDescriptorPool(mDevice, pool, nullptr);
+        for(VkDescriptorPool& pool : mNonResetableVkDescriptorPools)
+            vkDestroyDescriptorPool(mDevice, pool, nullptr);
+
         mRenderPassCache.Shutdown(*this);
         mImGuiContext.Shutdown(*this);
 
         mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry& entry) { DestroyDescriptorSet(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
-        mDescriptorLayoutPool.ForEachAlive([&](const DescriptorLayoutHandle& h, DescriptorLayoutEntry& entry) { DestroyDescriptorLayout(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
         mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry& entry){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
         mFramebufferPool.ForEachAlive([&](const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
         mTexturePool.ForEachAlive([&](const ImageHandle& h, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
@@ -151,12 +163,14 @@ namespace Surge
         vkResetFences(device, 1, &frame.Fence);
         vkResetCommandPool(device, frame.CmdPool, 0);
 
+        // Reset descriptor pool
+        VK_CALL(vkResetDescriptorPool(mDevice, mVkDescriptorPools[outCtx.FrameIndex], 0));
+
         // Begin recording
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(frame.CmdBuffer, &beginInfo);
-
     }
 
     void VulkanRHI::EndFrame(const FrameContext& ctx)
@@ -220,12 +234,6 @@ namespace Surge
     {
         VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateBuffer: Name: {0} Size: {1} bytes", desc.DebugName ? desc.DebugName : "Unnamed", desc.Size));
         BufferEntry entry = VulkanBuffer::Create(*this, desc);
-
-        // Currently we support bindless access for STORAGE buffers
-        bool isShaderAccessible = desc.Usage == BufferUsage::STORAGE;
-        if (isShaderAccessible)
-            entry.BindlessIndex = mBindlessRegistry.RegisterBuffer(*this, entry.Buffer, 0, entry.Desc.Size);		
-
         return mBufferPool.Allocate(std::move(entry));
     }
 
@@ -240,15 +248,10 @@ namespace Surge
     void VulkanRHI::DestroyBuffer(BufferHandle buffer)
     {
         BufferEntry* entry = mBufferPool.Get(buffer);
-        if (!entry)		
+        if (!entry)
             return;
-        
+
         VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));		
-
-        bool isShaderAccessible = entry->Desc.Usage == BufferUsage::STORAGE;
-        if (isShaderAccessible)
-            mBindlessRegistry.UnregisterBuffer(entry->BindlessIndex);
-
         VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
         mBufferPool.Free(buffer); // Return slot to free list
     }
@@ -264,13 +267,6 @@ namespace Surge
             entry.ImGuiID = mImGuiContext.AddImage(entry.View);
 
         ImageHandle h = mTexturePool.Allocate(std::move(entry));
-
-        if (desc.Usage & ImageUsage::SAMPLED)
-        {
-            SamplerEntry* samplerEntry = mSamplerPool.Get(desc.Sampler);
-            SG_ASSERT(samplerEntry, "Null sampler, please provide a valid Sampler Handle in TextureDesc to sample the texture in Shader");
-            mTexturePool.Get(h)->BindlessIndex = mBindlessRegistry.RegisterTexture(*this, entry.View, samplerEntry->Sampler);
-        }
 
         if (desc.InitialData && desc.DataSize > 0)
             UploadImageData(h, desc.InitialData, desc.DataSize);
@@ -291,7 +287,6 @@ namespace Surge
         if (entry->Desc.GenerateImGuiID)
             DestroyImGuiImage(h);
 
-        mBindlessRegistry.UnregisterTexture(entry->BindlessIndex);
         VulkanImage::Destroy(*this, *entry);
         mTexturePool.Free(h);		
     }
@@ -450,141 +445,25 @@ namespace Surge
         mSamplerPool.Free(h);
     }
 
-    DescriptorLayoutHandle VulkanRHI::CreateDescriptorLayout(const DescriptorLayoutDesc& desc)
-    {
-        DescriptorLayoutEntry entry = {};
-        entry.Desc = desc;
-
-        VkDescriptorSetLayoutBinding vkBindings[16] = {};
-
-        for (Uint i = 0; i < desc.BindingCount; i++)
-        {
-            const DescriptorBinding& b = desc.Bindings[i];
-            vkBindings[i].binding = b.Binding;
-            vkBindings[i].descriptorType = VulkanUtils::ToVkDescriptorType(b.Type);
-            vkBindings[i].descriptorCount = b.Count;
-            vkBindings[i].stageFlags = VulkanUtils::ShaderTypeToVulkanShaderStage(b.Stage);
-        }
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.pNext = nullptr;
-        layoutInfo.bindingCount = desc.BindingCount;
-        layoutInfo.pBindings = vkBindings;
-
-        VK_CALL(vkCreateDescriptorSetLayout(mDevice, &layoutInfo, nullptr, &entry.Layout));
-        return mDescriptorLayoutPool.Allocate(std::move(entry));
-    }
-
-    DescriptorLayoutHandle VulkanRHI::GetDescriptorLayout(PipelineHandle h) const
-    {
-        const PipelineEntry* entry = mPipelinePool.Get(h);
-        SG_ASSERT(entry, "GetDescriptorLayout: invalid pipeline handle");
-        return entry->DescriptorSetLayout;
-    }
-
-    void VulkanRHI::DestroyDescriptorLayout(DescriptorLayoutHandle h)
-    {
-        VK_RHI_LOG(Log<Severity::Info>("Destroying descriptor layout with handle index {0} and generation {1}", h.Index, h.Generation));
-        DescriptorLayoutEntry* entry = mDescriptorLayoutPool.Get(h);
-        if (!entry)
-            return;
-
-        vkDestroyDescriptorSetLayout(mDevice, entry->Layout, nullptr);
-        mDescriptorLayoutPool.Free(h);
-    }
-
-    Uint VulkanRHI::GetBindlessTextureIndex(ImageHandle h) const
-    {
-        const ImageEntry* entry = mTexturePool.Get(h);
-        SG_ASSERT(entry, "GetBindlessTextureIndex: invalid TextureHandle");
-
-        return entry->BindlessIndex;
-    }
-
-    Uint VulkanRHI::GetBindlessBufferIndex(BufferHandle h) const
-    {
-        const BufferEntry* entry = mBufferPool.Get(h);
-        SG_ASSERT(entry, "GetBindlessBufferIndex: invalid BufferHandle");
-        return entry->BindlessIndex;
-    }
-
-    void VulkanRHI::BindBindlessSet(const FrameContext& ctx, PipelineHandle pipeline)
-    {
-        VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-
-        PipelineEntry* entry = mPipelinePool.Get(pipeline);
-        SG_ASSERT(entry, "BindBindlessSet: invalid PipelineHandle");
-
-        mBindlessRegistry.Bind(cmd, entry->Layout);
-    }
-
-    void VulkanRHI::BindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex)
+    void VulkanRHI::CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex)
     {
         PipelineEntry* entry = mPipelinePool.Get(pipeline);
-        SG_ASSERT(entry, "BindDescriptorSet: invalid PipelineHandle");
-
         DescriptorSetEntry* setEntry = mDescriptorSetPool.Get(setHandle);
+
+        SG_ASSERT(entry, "BindDescriptorSet: invalid PipelineHandle");
         SG_ASSERT(setEntry, "BindDescriptorSet: invalid DescriptorSetHandle");
 
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-
         Uint setToBind = (setEntry->Frequency == DescriptorUpdateFrequency::DYNAMIC) ? ctx.FrameIndex : 0;
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, entry->Layout, setIndex, 1, &setEntry->Sets[setToBind], 0, nullptr);
+        VulkanDescriptorSet::Bind(cmd, entry->Layout, setEntry->Sets[setToBind], setIndex);
     }
 
-    DescriptorSetHandle VulkanRHI::CreateDescriptorSet(DescriptorLayoutHandle layoutHandle, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
+    DescriptorSetHandle VulkanRHI::CreateDescriptorSet(PipelineHandle pipelineHandle, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
     {
-        DescriptorLayoutEntry* layout = mDescriptorLayoutPool.Get(layoutHandle);
-        SG_ASSERT(layout, "CreateDescriptorSet: invalid DescriptorLayoutHandle");
+        const PipelineEntry* pipelineEntry = mPipelinePool.Get(pipelineHandle);
+        SG_ASSERT(pipelineEntry, "CreateDescriptorSet: invalid PipelineHandle");
 
-        DescriptorSetEntry entry = {};
-        entry.Layout = layoutHandle;
-        entry.Frequency = frequency;
-        entry.Count = (frequency == DescriptorUpdateFrequency::DYNAMIC) ? RHISettings::FRAMES_IN_FLIGHT : 1;
-
-        // Build pool sizes from cached layout bindings
-        // Pool must hold entry.Count sets worth of descriptors
-        std::unordered_map<VkDescriptorType, Uint> typeCounts;
-        for (Uint i = 0; i < layout->Desc.BindingCount; i++)
-        {
-            VkDescriptorType vkType = VulkanUtils::ToVkDescriptorType(layout->Desc.Bindings[i].Type);
-            typeCounts[vkType] += layout->Desc.Bindings[i].Count * entry.Count;
-        }
-
-        Vector<VkDescriptorPoolSize> poolSizes;
-        poolSizes.reserve(typeCounts.size());
-        for (auto& [type, count] : typeCounts)
-            poolSizes.push_back({ type, count });
-
-        VkDescriptorPoolCreateInfo poolInfo = {};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.maxSets = entry.Count;
-        poolInfo.poolSizeCount = (Uint)poolSizes.size();
-        poolInfo.pPoolSizes = poolSizes.data();
-
-        VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &entry.Pool));
-
-        // Allocate entry.Count sets from the pool
-        VkDescriptorSetLayout layouts[RHISettings::FRAMES_IN_FLIGHT] = {};
-        for (Uint i = 0; i < entry.Count; i++)
-            layouts[i] = layout->Layout;
-
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = entry.Pool;
-        allocInfo.descriptorSetCount = entry.Count;
-        allocInfo.pSetLayouts = layouts;
-
-        VK_CALL(vkAllocateDescriptorSets(mDevice, &allocInfo, entry.Sets));
-
-#if defined(SURGE_DEBUG)
-        for (Uint i = 0; i < entry.Count; i++)
-        {
-            String name = String(debugName) + (entry.Count > 1 ? " [Frame " + std::to_string(i) + "]" : "");
-            SetDebugName(VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)entry.Sets[i], name.c_str());
-        }
-#endif
+        DescriptorSetEntry entry = VulkanDescriptorSet::Create(*this, pipelineEntry, setNumber, frequency, debugName);
         return mDescriptorSetPool.Allocate(std::move(entry));
     }
 
@@ -592,89 +471,16 @@ namespace Surge
     {
         DescriptorSetEntry* entry = mDescriptorSetPool.Get(setHandle);
         SG_ASSERT(entry, "UpdateDescriptorSet: invalid DescriptorSetHandle");
-
-        // Dynamic: write into current frame's copy
-        // Static: write into the single copy
-        VkDescriptorSet targetSet = (entry->Frequency == DescriptorUpdateFrequency::DYNAMIC) ? entry->Sets[mFrame.GetCurrentFrameIndex()] : entry->Sets[0];
-
-        Vector<VkDescriptorImageInfo>  imageInfos;
-        Vector<VkDescriptorBufferInfo> bufferInfos;
-        Vector<VkWriteDescriptorSet>   vkWrites;
-        imageInfos.reserve(writeCount);
-        bufferInfos.reserve(writeCount);
-        vkWrites.reserve(writeCount);
-
-        for (Uint i = 0; i < writeCount; i++)
-        {
-            const DescriptorWrite& w = writes[i];
-
-            VkWriteDescriptorSet vkWrite = {};
-            vkWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            vkWrite.dstSet = targetSet;
-            vkWrite.dstBinding = w.Binding;
-            vkWrite.dstArrayElement = w.ArrayIndex;
-            vkWrite.descriptorCount = 1;
-            vkWrite.descriptorType = VulkanUtils::ToVkDescriptorType(w.Type);
-
-            switch (w.Type)
-            {
-            case DescriptorType::TEXTURE:
-            case DescriptorType::STORAGE_TEXTURE:
-            {
-                ImageEntry* tex = mTexturePool.Get(w.Texture);
-                SG_ASSERT(tex, "UpdateDescriptorSet: invalid TextureHandle at slot");
-
-                SamplerEntry* smp = mSamplerPool.Get(w.Sampler);
-
-                VkDescriptorImageInfo img = {};
-                img.sampler = smp ? smp->Sampler : VK_NULL_HANDLE;
-                img.imageView = tex->View;
-                img.imageLayout = (w.Type == DescriptorType::STORAGE_TEXTURE) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfos.push_back(img);
-                vkWrite.pImageInfo = &imageInfos.back();
-                break;
-            }
-            case DescriptorType::UNIFORM_BUFFER:
-            case DescriptorType::STORAGE_BUFFER:
-            {
-                BufferEntry* buf = mBufferPool.Get(w.Buffer);
-                SG_ASSERT(buf, "UpdateDescriptorSet: invalid BufferHandle at slot");
-
-                VkDescriptorBufferInfo bufInfo = {};
-                bufInfo.buffer = buf->Buffer;
-                bufInfo.offset = w.BufferOffset;
-                bufInfo.range = (w.BufferRange == 0) ? buf->Desc.Size : w.BufferRange;
-                bufferInfos.push_back(bufInfo);
-                vkWrite.pBufferInfo = &bufferInfos.back();
-                break;
-            }
-            default:
-                SG_ASSERT(false, "UpdateDescriptorSet: unhandled DescriptorType");
-                break;
-            }
-            vkWrites.push_back(vkWrite);
-        }
-
-        vkUpdateDescriptorSets(mDevice, (Uint)vkWrites.size(), vkWrites.data(), 0, nullptr);
+        VulkanDescriptorSet::Update(*this, *entry, writes, writeCount);
     }
 
     void VulkanRHI::DestroyDescriptorSet(DescriptorSetHandle h)
     {
-        VK_RHI_LOG(Log<Severity::Info>("Destroying descriptor set with handle index {0} and generation {1}", h.Index, h.Generation));
         DescriptorSetEntry* entry = mDescriptorSetPool.Get(h);
-        if (!entry)
+        if(!entry)
             return;
 
-        // Pool destruction implicitly frees all allocated sets
-        if (entry->Pool != VK_NULL_HANDLE)
-        {
-            vkDestroyDescriptorPool(mDevice, entry->Pool, nullptr);
-            entry->Pool = VK_NULL_HANDLE;
-        }
-
-        for (auto& s : entry->Sets)
-            s = VK_NULL_HANDLE;
-
+        VulkanDescriptorSet::Destroy(*this, *entry);
         mDescriptorSetPool.Free(h);
     }
 
@@ -899,18 +705,6 @@ namespace Surge
             }
         }
 
-    }
-
-    void VulkanRHI::CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex /*= 0*/)
-    {
-        DescriptorSetEntry* set = mDescriptorSetPool.Get(setHandle);
-        PipelineEntry* pipe = mPipelinePool.Get(pipeline);
-        VkCommandBuffer     cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-        SG_ASSERT(set && pipe, "CmdBindDescriptorSet: invalid handle");
-
-        // Dynamic: bind this frame's copy, Static: bind the only copy
-        VkDescriptorSet targetSet = (set->Frequency == DescriptorUpdateFrequency::DYNAMIC) ? set->Sets[ctx.FrameIndex] : set->Sets[0];
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->Layout, setIndex, 1, &targetSet, 0, nullptr);
     }
 
     VkCommandBuffer VulkanRHI::BeginOneTimeCommands() const
@@ -1352,6 +1146,42 @@ namespace Surge
         CreateSwapchainFramebuffers();
     }
 
+    void VulkanRHI::CreateDescriptorPools()
+    {
+        VkDescriptorPoolSize poolSizes[] =
+        { {VK_DESCRIPTOR_TYPE_SAMPLER, 10000},
+         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10000},
+         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 10000},
+         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10000},
+         {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 10000},
+         {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 10000},
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10000},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10000},
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10000},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10000},
+         {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 10000} };
+
+        VkDescriptorPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 100 * (sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
+        poolInfo.poolSizeCount = (Uint)(sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
+        poolInfo.pPoolSizes = poolSizes;
+
+        mVkDescriptorPools.resize(RHISettings::FRAMES_IN_FLIGHT);
+        for(auto& descriptorPool : mVkDescriptorPools)
+        {
+            VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &descriptorPool));
+            SET_VK_DEBUG_NAME((*this), VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)descriptorPool, "DescriptorPool");
+        }
+
+        mNonResetableVkDescriptorPools.resize(RHISettings::FRAMES_IN_FLIGHT);
+        for(auto& descriptorPool : mNonResetableVkDescriptorPools)
+        {
+            VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &descriptorPool));
+            SET_VK_DEBUG_NAME((*this), VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)descriptorPool, "NonResetable DescriptorPool");
+        }
+    }
+
     Vector<const char*> VulkanRHI::GetRequiredInstanceExtensions()
     {
         Vector<const char*> requiredInstanceExtensions;
@@ -1371,9 +1201,18 @@ namespace Surge
         VK_CALL(vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr));
         Vector<VkExtensionProperties> availableInstanceExtensions(instanceExtensionCount);
         VK_CALL(vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableInstanceExtensions.data()));
-        if (!ValidateExtensions(requiredInstanceExtensions, availableInstanceExtensions))
+
+        Vector<String> missingExtensions = ValidateExtensions(requiredInstanceExtensions, availableInstanceExtensions);
+        if (!missingExtensions.empty())
         {
-            throw std::runtime_error("Required instance extensions are missing!");
+            for(const auto& ext : missingExtensions)
+            {
+                Log<Severity::Error>("Missing extension: {}", ext);
+                if (ext == VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
+                    continue; // Lower android devices doesnt have VK_EXT_debug_utils, they have VK_EXT_debug_report instead, but we can still run without debug utils
+
+                throw std::runtime_error("Required instance extensions are missing!");
+            }
         }
 
         return requiredInstanceExtensions;

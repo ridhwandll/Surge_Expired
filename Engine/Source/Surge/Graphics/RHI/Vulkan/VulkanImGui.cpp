@@ -88,6 +88,7 @@ namespace Surge
 
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        auto& style = ImGui::GetStyle(); //Do not remove
 
         // Style
         ImGui::StyleColorsDark();
@@ -149,7 +150,6 @@ namespace Surge
         ImGui_ImplVulkan_Init(&vkInfo);
 
         // Load Fonts
-        ImGuiStyle& style = ImGui::GetStyle();
         style.FontSizeBase = 17.0f;
         
         // ----------------------- ImGui Font Management ----------------------- 
