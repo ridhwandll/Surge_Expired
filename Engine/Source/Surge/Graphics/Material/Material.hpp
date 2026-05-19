@@ -2,51 +2,66 @@
 #pragma once
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Memory.hpp"
-#include <glm/glm.hpp>
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/Material/MaterialRegistry.hpp"
+#include "Surge/Graphics/RHI/RHISettings.hpp"
+#include "Surge/Graphics/RHI/RHIFrameContext.hpp"
+#include "Surge/Graphics/Shader/Shader.hpp"
+#include "Surge/Core/MemoryBlock.hpp"
 
 namespace Surge
 {
-    struct GPUMaterial
-    {
-        glm::vec4 AlbedoMetallic = { 1.0f, 1.0f, 1.0f, 0.0f }; // xyz=albedo, w=metallic
-        float Roughness = 0.5f;
-        float Reflectance = 0.5f;
-        Uint AlbedoTexIndex = 0;    // 0 = white texture in bindless array
-        Uint NormalTexIndex = 0;    // 0 = flat normal
-    };
-    static_assert(sizeof(GPUMaterial) == 32, "GPUMaterial size must match GLSL std430");
-
     class GraphicsRHI;
     class Material : public RefCounted
     {
-        public:
-        Material(MaterialRegistry& registry, const String& debugName);
+    public:
+        Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
         ~Material();
 
-        Material& SetAlbedo(const glm::vec3& color);
-        Material& SetMetallic(float v);
-        Material& SetRoughness(float v);
-        Material& SetReflectance(float v);
-        Material& SetAlbedoTexture(ImageHandle h);
-        Material& SetNormalTexture(ImageHandle h);
+        template <typename T>
+        void Set(const String& name, const T& value)
+        {
+            static_assert(std::is_trivially_copyable_v<T>, "Material::Set can only be used with trivially copyable types!");
 
-        glm::vec3 GetAlbedo() const { return glm::vec3(mGPUData.AlbedoMetallic); }
-        float GetMetallic() const { return mGPUData.AlbedoMetallic.w; }
-        float GetRoughness() const { return mGPUData.Roughness; }
-        float GetReflectance() const { return mGPUData.Reflectance; }
+            const ShaderBufferMember* member = mRefletedBuffer.GetMember(name);
+            SG_ASSERT(member, "Invalid shader member name!");
+            SG_ASSERT(sizeof(T) <= member->Size, "The data type you are passing is larger than the allocated shader property block size!");
+
+            mCPUData.Write((void*)&value, sizeof(T), member->MemoryOffset);
+            MarkDirty();
+        }
+
+        template <typename T>
+        const T& Get(const String& name) const
+        {
+            static_assert(std::is_trivially_copyable_v<T>, "Material::Get can only be used with trivially copyable types!");
+
+            const ShaderBufferMember* member = mRefletedBuffer.GetMember(name);
+            SG_ASSERT(member, "Invalid shader member name!");
+            SG_ASSERT(sizeof(T) <= member->Size, "The data type requested is larger than the actual shader property block size!");
+
+            return mCPUData.Read<T>(member->MemoryOffset);
+        }
+
+        void Bind(const FrameContext& ctx, PipelineHandle pipeline);
 
         // Uploads pending GPU data to the registry buffer
-        void Apply();
+        void UpdateForRendering(const FrameContext& ctx);
+        void MarkDirty()
+        {
+            for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+                mIsDirty[i] = true;
+        }
+    private:
+        ShaderBuffer mRefletedBuffer;
+        Uint mBufferBinding;
 
-        Uint GetMaterialIndex() const { return mSlot; }
+        MemoryBlock mCPUData;
+        BufferHandle mGPUBuffers[RHISettings::FRAMES_IN_FLIGHT];
 
-        private:
-        MaterialRegistry* mRegistry = nullptr;
-        Uint mSlot = UINT32_MAX;
-        GPUMaterial mGPUData = {};
-        bool mDirty = false;
+        DescriptorSetHandle mDescriptorSet;
+
+        bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
+        GraphicsRHI* mRHI;
     };
 
 } // namespace Surge

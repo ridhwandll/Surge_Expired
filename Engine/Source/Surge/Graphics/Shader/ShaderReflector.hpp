@@ -83,11 +83,11 @@ namespace Surge
         Uint Binding = 0;
         String BufferName;
         Uint Size = 0;
-        Vector<ShaderBufferMember> Members = {};
+        Vector<ShaderBufferMember> Members;
         ShaderBuffer::Usage ShaderUsage;
         ShaderType ShaderStages{}; // Specifies what shader stages the buffer is being used for
 
-        const ShaderBufferMember* GetMember(const String& name)
+        const ShaderBufferMember* GetMember(const String& name) const
         {
             for (const ShaderBufferMember& member : Members)
             {
@@ -111,6 +111,7 @@ namespace Surge
         ShaderReflectionData() = default;
         ~ShaderReflectionData() = default;
 
+        const String& GetShaderName() const { return mShaderName; }
         const ShaderBuffer& GetBuffer(const String& name) const;
         const Vector<ShaderBuffer>& GetBuffers() const { return mShaderBuffers; }
         const Vector<ShaderPushConstant> GetPushConstantBuffers() const { return mPushConstants; }
@@ -120,7 +121,7 @@ namespace Surge
         //Returns HashMap<ShaderType, std::map<location, Input>>
         const HashMap<ShaderType, std::map<Uint, ShaderStageInput>>& GetStageInputs() const { return mStageInputs; }
 
-        void LogAll();
+        void LogAll() const;
     private:
         void SetShaderName(const String& name) { mShaderName = name; }
         void PushResource(const ShaderResource& res) { mShaderResources.push_back(res); }

@@ -10,24 +10,21 @@ namespace Surge
     class Shader
     {
     public:
-        static constexpr const char* ENGINE_SHADER_PATH = "Engine/Assets/Shaders";
-
-    public:
         Shader() = default;
         ~Shader() = default;
 
-        //Must be located at ENGINE_SHADER_PATH + "/" + name
-        void Load(const String& name, ShaderType type);
+        void Load(const String& glslPath, ShaderType type);
 
         const ShaderReflectionData& GetReflectionData() const { return mReflectionData; }
         const Vector<SPIRVHandle>& GetSPIRVs() const { return mShaderSPIRVs; }
-        const String& GetName() const { return mName; }
+        const String& GetPath() const { return mPath; }
+        const String& GetName() const { return mReflectionData.GetShaderName(); }
     private:
         void ParseShader();
         void Compile();
         String GetShaderCachePath(ShaderType type);
     private:
-        String mName;
+        String mPath;
         HashMap<ShaderType, String> mShaderSources;
         Vector<SPIRVHandle> mShaderSPIRVs;
         ShaderType mTypesBit;

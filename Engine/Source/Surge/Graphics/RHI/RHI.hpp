@@ -63,9 +63,8 @@ namespace Surge
         void DestroySampler(SamplerHandle h) { mBackendRHI.DestroySampler(h); }
 
         // Descriptor sets
-        DescriptorSetHandle CreateDescriptorSet(PipelineHandle pipelineHandle, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(pipelineHandle, setNumber, frequency, debugName); }
-        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
-        void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount) { mBackendRHI.UpdateDescriptorSet(setHandle, writes, writeCount); }
+        DescriptorSetHandle CreateDescriptorSet(PipelineHandle pipelineHandle, DescriptorSetSlot slot, DescriptorUpdateFrequency frequency, const char* debugName = nullptr) { return mBackendRHI.CreateDescriptorSet(pipelineHandle, slot, frequency, debugName); }
+        void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex) { mBackendRHI.UpdateDescriptorSet(setHandle, writes, writeCount, frameIndex); }
         void DestroyDescriptorSet(DescriptorSetHandle h) { mBackendRHI.DestroyDescriptorSet(h); }
 
         // Commands
@@ -75,6 +74,7 @@ namespace Surge
         void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }
         void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }
         void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
+        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex /*setIndex -> layout(set = N) in GLSL*/) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
 
         void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data) { mBackendRHI.CmdPushConstants(ctx, h, shaderStage, offset, size, data); }
         void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }

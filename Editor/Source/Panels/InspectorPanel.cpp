@@ -191,17 +191,21 @@ namespace Surge
                 String kek = "TODO: Implement Asset Manager";
                 ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
 
-                glm::vec3 albedoColor = component.Material_->GetAlbedo();
-                if (ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &albedoColor))
-                    component.Material_->SetAlbedo(albedoColor);
+                glm::vec3 albedo = component.Material_->Get<glm::vec3>("Albedo");
+                if (ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Albedo", &albedo))
+                    component.Material_->Set<glm::vec3>("Albedo", albedo);
 
-                float metallic = component.Material_->GetMetallic();
+                float metallic = component.Material_->Get<float>("Metallic");
                 if (ImGuiAux::TSlider<float>("Metallic", metallic, 0.0f, 1.0f))
-                    component.Material_->SetMetallic(metallic);
+                    component.Material_->Set<float>("Metallic", metallic);
 
-                float roughness = component.Material_->GetRoughness();
+                float roughness = component.Material_->Get<float>("Roughness");
                 if (ImGuiAux::TSlider<float>("Roughness", roughness, 0.0f, 1.0f))
-                    component.Material_->SetRoughness(roughness);
+                    component.Material_->Set<float>("Roughness", roughness);
+
+                float reflectance = component.Material_->Get<float>("Reflectance");
+                if (ImGuiAux::TSlider<float>("Reflectance", reflectance, 0.1f, 1.0f))
+                    component.Material_->Set<float>("Reflectance", reflectance);
                 });
         }
 

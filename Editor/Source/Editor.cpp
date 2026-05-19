@@ -77,12 +77,11 @@ namespace Surge
 
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
                 meshComp.Material_ = mRenderer->CreateMaterial("FloorMat");
-                meshComp.Material_->SetAlbedo({ 0.8f, 0.6f, 0.4f })
-                    .SetRoughness(0.85f)
-                    .SetMetallic(0.0f)
-                    .SetReflectance(0.04f)
-                    .Apply();
-
+                meshComp.Material_->Set<glm::vec3>("Albedo", glm::vec3(0.8, 0.6, 0.4));
+                meshComp.Material_->Set<float>("Metallic", 0.5f);
+                meshComp.Material_->Set<float>("Roughness", 0.5f);
+                meshComp.Material_->Set<float>("Reflectance", 0.5f);
+                meshComp.Material_->Set<float>("UseNormalMap", 0);
                 TransformComponent& t = floor.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
                 t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
@@ -95,12 +94,11 @@ namespace Surge
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
 
                 meshComp.Material_ = mRenderer->CreateMaterial("SphereMat");
-                meshComp.Material_->SetAlbedo({ 0.8f, 0.2f, 0.2f })
-                    .SetRoughness(0.8f)
-                    .SetMetallic(0.2f)
-                    .SetReflectance(0.04f)
-                    .SetAlbedoTexture(mRidTex) //Currently not working
-                    .Apply();
+                meshComp.Material_->Set<glm::vec3>("Albedo", glm::vec3(0.8, 0.6, 0.4));
+                meshComp.Material_->Set<float>("Metallic", 0.5f);
+                meshComp.Material_->Set<float>("Roughness", 0.5f);
+                meshComp.Material_->Set<float>("Reflectance", 0.5f);
+                meshComp.Material_->Set<float>("UseNormalMap", 0);
 
                 TransformComponent& t = cube.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -112,15 +110,12 @@ namespace Surge
                 mActiveScene->CreateEntity(e, "Vulkan Scene");
                 MeshComponent& meshComp = e.AddComponent<MeshComponent>();
                 meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-
                 meshComp.Material_ = mRenderer->CreateMaterial("TorusMat");
-                meshComp.Material_->SetAlbedo({ 0.8f, 0.2f, 0.2f })
-                    .SetRoughness(0.8f)
-                    .SetMetallic(0.2f)
-                    .SetReflectance(0.04f)
-                    .SetAlbedoTexture(mRidTex) //Currently not working
-                    .Apply();
-
+                meshComp.Material_->Set<glm::vec3>("Albedo", glm::vec3(0.8, 0.2, 0.2));
+                meshComp.Material_->Set<float>("Metallic", 0.5f);
+                meshComp.Material_->Set<float>("Roughness", 0.5f);
+                meshComp.Material_->Set<float>("Reflectance", 0.5f);
+                meshComp.Material_->Set<float>("UseNormalMap", 0);
                 TransformComponent& t = e.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);

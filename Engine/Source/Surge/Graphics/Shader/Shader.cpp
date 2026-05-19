@@ -18,7 +18,7 @@ namespace Surge
     void Shader::ParseShader()
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
-        String source = Filesystem::ReadFile<String>(String(ENGINE_SHADER_PATH) + "/" + mName);
+        String source = Filesystem::ReadFile<String>(mPath);
         const char* typeToken = "//SURGE:[Shader:";
         size_t typeTokenLength = strlen(typeToken);
         size_t pos = source.find(typeToken, 0);
@@ -59,8 +59,6 @@ namespace Surge
     void Shader::Compile()
     {
         // We compile only on windows, on android we load the precompiled SPIRV from the assets folder
-        //const VulkanRHI& vulkanRHI = Core::GetRenderer()->GetRHI()->GetBackendRHI();
-
 #ifdef SURGE_PLATFORM_WINDOWS
         shaderc::Compiler compiler;
         shaderc::CompileOptions options;
@@ -74,10 +72,10 @@ namespace Surge
             SPIRVHandle spirvHandle;
             spirvHandle.Type = stage;
 
-            shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), mName.c_str(), options);
+            shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), Filesystem::GetNameWithoutExtension(mPath).c_str(), options);
             if (result.GetCompilationStatus() != shaderc_compilation_status_success)
             {
-                Log<Severity::Error>("{}:{} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage), mName);
+                Log<Severity::Error>("{}:{} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage), mPath);
                 Log<Severity::Error>("{} Error(s): \n{}", result.GetNumErrors(), result.GetErrorMessage());
                 SG_ASSERT_INTERNAL("Shader Compilation failure!");
             }
@@ -117,7 +115,7 @@ namespace Surge
             size_t size = AAsset_getLength(asset);
             if (size % 4 != 0)
             {
-                Log<Severity::Error>("Shader %s size is not a multiple of 4!", mName);
+                Log<Severity::Error>("Shader %s size is not a multiple of 4!", mPath);
                 AAsset_close(asset);
             }
 
@@ -133,22 +131,22 @@ namespace Surge
         }
 #endif
         ShaderReflector reflector;
-        mReflectionData = reflector.Reflect(mName, mShaderSPIRVs);
+        mReflectionData = reflector.Reflect(Filesystem::GetNameWithExtension(mPath), mShaderSPIRVs);
         mReflectionData.LogAll();
     }
 
     String Shader::GetShaderCachePath(ShaderType type)
     {
-        String path = std::format("{0}/{1}_{2}.spv", ENGINE_SHADER_PATH, mName, VulkanUtils::ShaderTypeToString(type));
+        String path = std::format("{0}_{1}.spv", mPath, VulkanUtils::ShaderTypeToString(type));
         return path;
     }
 
-    void Shader::Load(const String& name, ShaderType type)
+    void Shader::Load(const String& glslPath, ShaderType type)
     {
-        mName = name;
+        mPath = glslPath;
         mTypesBit = ShaderType::NONE;
         ParseShader();
-#ifdef SURGE_PLATFORM_WINDOWS		
+#ifdef SURGE_PLATFORM_WINDOWS
         //On android we directly laod SPIRV from the assets folder, so we don't need to check if the shader type is present in the shader file
         SG_ASSERT(type == mTypesBit, "Given shader type does not match the types present in the shader file! Make sure to use proper ShaderType in Shader::Load");
 #endif

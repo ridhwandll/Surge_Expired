@@ -226,6 +226,12 @@ namespace Surge
         SAMPLER,         // separate sampler
     };
 
+    enum class DescriptorUpdateFrequency
+    {
+        STATIC,  // Set once, never updated, skybox, font atlas, LUTs
+        DYNAMIC, // Updated per frame. per-object params, animated materials
+    };
+
     struct DescriptorWrite
     {
         Uint Binding = 0;
@@ -237,5 +243,13 @@ namespace Surge
         BufferHandle Buffer = BufferHandle::Invalid();
         uint64_t BufferOffset = 0;
         uint64_t BufferRange = 0; // 0 = whole buffer
+    };
+
+    enum DescriptorSetSlot : Uint
+    {
+        ZERO = 0,
+        ONE = 1,
+        TWO = 2,
+        THREE = 3,
     };
 }

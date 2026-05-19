@@ -25,10 +25,8 @@ namespace Surge
 
         struct Data
         {
-            // FrameUBO
             DescriptorSetHandle FrameDescriptorSet;
-            BufferHandle FrameUBO;
-            BufferHandle LightUBO;
+            BufferHandle LightUBOs[RHISettings::FRAMES_IN_FLIGHT];
         };
 
     public:

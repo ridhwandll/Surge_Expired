@@ -52,14 +52,11 @@ namespace Surge
         // CPU side staging array for 1 batch fill this, then memcpy-ied to GPU buffer
         mCurrentBatch.VertexData.resize(MAX_QUADS_PER_BATCH * 4);
     
-        Shader shader;
-        shader.Load("Renderer2D.glsl", ShaderType::VERTEX | ShaderType::FRAGMENT);
-
         PipelineDesc desc = {};
-        desc.Shader_ = shader;
+        desc.Shader_ = mData->ShaderManager_.Get("Renderer2D.glsl");
         desc.Raster.Cull = CullMode::NONE;
         desc.DebugName = "Renderer2D Pipeline";
-        desc.TargetFramebuffer = mData->mOffscreenFramebuffer;
+        desc.TargetFramebuffer = mData->OffscreenFramebuffer;
         desc.TargetSwapchain = false;
         desc.Blend.Enable = true;
         m2DPipeline = mRHI->CreatePipeline(desc);
@@ -69,13 +66,17 @@ namespace Surge
         //    mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(m2DPipeline, 1, DescriptorUpdateFrequency::DYNAMIC, "Renderer2D_TexDescriptorSet");
 
         // Frame UBO
-        BufferDesc frameUBODesc = {};
-        frameUBODesc.Usage = BufferUsage::UNIFORM;
-        frameUBODesc.HostVisible = true;
-        frameUBODesc.DebugName = "FrameUBO";
-        frameUBODesc.Size = sizeof(FrameUBO);
-        m2DData.FrameUBO = mRHI->CreateBuffer(frameUBODesc);
-        m2DData.FrameDescriptorSet = mRHI->CreateDescriptorSet(m2DPipeline, 0, DescriptorUpdateFrequency::DYNAMIC, "2D_FrameData [Set0]");
+
+        mFrameDescriptorSet = mRHI->CreateDescriptorSet(m2DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "2D_FrameData [Set0]");
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            DescriptorWrite frameDescriptorWrite = {};
+            frameDescriptorWrite.Binding = 0;
+            frameDescriptorWrite.Type = DescriptorType::UNIFORM_BUFFER;
+            frameDescriptorWrite.Buffer = mData->FrameUBOs[i];
+            mRHI->UpdateDescriptorSet(mFrameDescriptorSet, &frameDescriptorWrite, 1, i);
+        }
 
         // Amount of max draw calls
         mDrawCommands.reserve(MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH);
@@ -84,8 +85,7 @@ namespace Surge
     void Renderer2D::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
-        mRHI->DestroyDescriptorSet(m2DData.FrameDescriptorSet);
-        mRHI->DestroyBuffer(m2DData.FrameUBO);
+        mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
         mRHI->DestroyPipeline(m2DPipeline);
 
         for (Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
@@ -106,18 +106,6 @@ namespace Surge
         // [WE MUST HAVE JUST ONE PRIMARY COMMAND BUFFER PER FRAME as we are targetting mobile]
         mCurrentFrameCtx = frameCtx;
         mCurrentFrameVertexOffset = 0;
-
-        // Update 2D Data UBO
-        FrameUBO frameData = {};
-        frameData.ViewProjection = mData->ViewProjection;
-        frameData.CameraPos = mData->CameraPosition;
-        mRHI->UploadBuffer(m2DData.FrameUBO, &frameData, sizeof(FrameUBO));
-
-        DescriptorWrite frameDescriptorWrite = {};
-        frameDescriptorWrite.Binding = 0;
-        frameDescriptorWrite.Type = DescriptorType::UNIFORM_BUFFER;
-        frameDescriptorWrite.Buffer = m2DData.FrameUBO;
-        mRHI->UpdateDescriptorSet(m2DData.FrameDescriptorSet, &frameDescriptorWrite, 1);
     }
 
     void Renderer2D::Submit(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture)
@@ -167,7 +155,7 @@ namespace Surge
             return;
 
         mRHI->CmdBindPipeline(mCurrentFrameCtx, m2DPipeline);
-        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, m2DData.FrameDescriptorSet, 0);
+        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, mFrameDescriptorSet, 0);
         mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
         mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
 
@@ -233,7 +221,7 @@ namespace Surge
         ImGui::ProgressBar(usageRatio, ImVec2(-1.0f, 0.0f));
         ImGui::Text("%u / %u Vertices", mTotalVertexCount, MAX_VERTICES);
         ImGui::PopStyleColor();
-        ImGui::ColorEdit4("Clear Color", (float*)&mData->mClearColor);
+        ImGui::ColorEdit4("Clear Color", (float*)&mData->ClearColor);
     }
 
 } // namespace Surge

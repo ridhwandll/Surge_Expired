@@ -18,13 +18,6 @@ namespace Surge
         static constexpr Uint MAX_QUADS_TOTAL = 100000;    // 100k quads total, across all(10) batches
         static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
-        struct Data
-        {
-            // FrameUBO
-            DescriptorSetHandle FrameDescriptorSet;
-            BufferHandle FrameUBO;
-        };
-
         struct QuadVertex
         {
             glm::vec3 Position;
@@ -89,10 +82,10 @@ namespace Surge
         PipelineHandle m2DPipeline;
         BufferHandle mVertexBuffers[RHISettings::FRAMES_IN_FLIGHT];
         BufferHandle mIndexBuffer;
+        DescriptorSetHandle mFrameDescriptorSet;
 
         GraphicsRHI* mRHI;
         RendererData* mData;
-        Data m2DData;
 
         friend class Renderer;
     };

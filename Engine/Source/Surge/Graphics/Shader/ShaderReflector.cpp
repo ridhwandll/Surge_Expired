@@ -41,9 +41,9 @@ namespace Surge
     static ShaderBuffer sDummyBuffer = ShaderBuffer();
     static ShaderBufferMember sDummyBufferMember = ShaderBufferMember();
 
-    /////	
+    /////
     // ShaderReflectionData
-    /////	
+    /////
 
     const ShaderBuffer& ShaderReflectionData::GetBuffer(const String& name) const
     {
@@ -65,7 +65,7 @@ namespace Surge
         return sDummyBufferMember;
     }
 
-    void ShaderReflectionData::LogAll()
+    void ShaderReflectionData::LogAll() const
     {
         String header = std::format("------------------ {} ------------------", mShaderName);
         Log<Severity::Debug>(header);
@@ -177,6 +177,7 @@ namespace Surge
     {
         ShaderReflectionData result;
         result.SetShaderName(shaderName);
+
         for (auto& handle : spirvHandles)
         {
             spirv_cross::Compiler compiler(handle.SPIRV);
@@ -236,7 +237,7 @@ namespace Surge
                     const spirv_cross::SPIRType& spvType = compiler.get_type(bufferType.member_types[i]);
 
                     ShaderBufferMember bufferMember;
-                    bufferMember.Name = buffer.BufferName + '.' + compiler.get_member_name(bufferType.self, i);
+                    bufferMember.Name = compiler.get_member_name(bufferType.self, i);
                     bufferMember.MemoryOffset = compiler.type_struct_member_offset(bufferType, i); // In bytes
                     bufferMember.DataType = SPVTypeToShaderDataType(spvType);
                     bufferMember.Size = VulkanUtils::ShaderDataTypeSize(bufferMember.DataType);
@@ -263,7 +264,7 @@ namespace Surge
                     const spirv_cross::SPIRType& spvType = compiler.get_type(bufferType.member_types[i]);
 
                     ShaderBufferMember bufferMember;
-                    bufferMember.Name = buffer.BufferName + '.' + compiler.get_member_name(bufferType.self, i);
+                    bufferMember.Name = compiler.get_member_name(bufferType.self, i);
                     bufferMember.MemoryOffset = compiler.type_struct_member_offset(bufferType, i); // In bytes
                     bufferMember.DataType = SPVTypeToShaderDataType(spvType);
                     bufferMember.Size = VulkanUtils::ShaderDataTypeSize(bufferMember.DataType);

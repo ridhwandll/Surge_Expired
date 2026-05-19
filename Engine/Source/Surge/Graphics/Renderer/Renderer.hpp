@@ -5,7 +5,7 @@
 #include "Surge/Graphics/Renderer/Renderer2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer3D.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "Surge/Graphics/Material/MaterialRegistry.hpp"
+#include "Surge/Graphics/Shader/ShaderManager.hpp"
 #include "Surge/Graphics/Material/Material.hpp"
 
 namespace Surge
@@ -28,15 +28,15 @@ namespace Surge
         glm::mat4 ProjectionMatrix;
         glm::mat4 ViewProjection;
 
-        ImageHandle mWhiteImage;
-        ImageHandle mFinalImage;
-        ImageHandle mDepthImage;
+        ImageHandle WhiteImage;
+        ImageHandle FinalImage;
+        ImageHandle DepthImage;
+        BufferHandle FrameUBOs[RHISettings::FRAMES_IN_FLIGHT];
 
-        MaterialRegistry mMaterialRegistry;
-
-        SamplerHandle mDefaultSampler;
-        FramebufferHandle mOffscreenFramebuffer;
-        glm::vec4 mClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
+        ShaderManager ShaderManager_;
+        SamplerHandle DefaultSampler;
+        FramebufferHandle OffscreenFramebuffer;
+        glm::vec4 ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
     };
 
     class EditorCamera;
@@ -60,17 +60,17 @@ namespace Surge
         void OnWindowResize(Uint width, Uint height);
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
-        ImageHandle GetWhiteTexture() const { return mData->mWhiteImage; }
-        ImageHandle GetFinalImage() const { return mData->mFinalImage; }
-        FramebufferHandle GetFinalFramebuffer() const { return mData->mOffscreenFramebuffer; }
+        ImageHandle GetWhiteTexture() const { return mData->WhiteImage; }
+        ImageHandle GetFinalImage() const { return mData->FinalImage; }
+        FramebufferHandle GetFinalFramebuffer() const { return mData->OffscreenFramebuffer; }
         ImTextureID GetFinalImageImGuiID() const
         {
             SG_ASSERT(!RHISettings::BLIT_TO_SWAPCHAIN, "Renderer is blitting to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
-            return mRHI->GetImGuiImage(mData->mFinalImage);
+            return mRHI->GetImGuiImage(mData->FinalImage);
         }
 
         const Renderer2D& GetRenderer2D() const { return mRenderer2D; }
-        SamplerHandle GetDefaultSampler() const { return mData->mDefaultSampler; }
+        SamplerHandle GetDefaultSampler() const { return mData->DefaultSampler; }
 
         const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
         Scope<GraphicsRHI>& GetRHI() { return mRHI; }

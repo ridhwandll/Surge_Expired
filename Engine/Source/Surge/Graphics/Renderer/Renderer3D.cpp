@@ -21,41 +21,46 @@ namespace Surge
         mRHI = rhi;
         mData = data;
 
-        Shader shader;
-        shader.Load("Renderer3D.glsl", ShaderType::VERTEX | ShaderType::FRAGMENT);
-
         DepthDesc depth;
         depth.TestEnable = true;
         depth.WriteEnable = true;
         depth.Op = CompareOp::LESS;
 
         PipelineDesc desc = {};
-        desc.Shader_ = shader;
+        desc.Shader_ = mData->ShaderManager_.Get("Renderer3D.glsl");
         desc.Raster.Topo = Topology::TRIANGLE_LIST;
         desc.Raster.Polygon = PolygonMode::FILL;
         desc.Raster.Cull = CullMode::BACK;
         desc.Blend.Enable = false;
         desc.Depth = depth;
         desc.DebugName = "Renderer3D Pipeline";
-        desc.TargetFramebuffer = mData->mOffscreenFramebuffer;
+        desc.TargetFramebuffer = mData->OffscreenFramebuffer;
         desc.TargetSwapchain = false;
         m3DPipeline = mRHI->CreatePipeline(desc);
 
-
-        BufferDesc frameUBODesc = {};
-        frameUBODesc.Usage = BufferUsage::UNIFORM;
-        frameUBODesc.HostVisible = true;
-        frameUBODesc.DebugName = "Renderer3D_FrameUBO";
-        frameUBODesc.Size = sizeof(FrameUBO);
-        m3DData.FrameUBO = mRHI->CreateBuffer(frameUBODesc);
         BufferDesc gpuLightDesc = {};
-
         gpuLightDesc.Usage = BufferUsage::STORAGE;
         gpuLightDesc.HostVisible = true;
         gpuLightDesc.DebugName = "Renderer3D_Lights";
         gpuLightDesc.Size = sizeof(LightUBOData) * MAX_LIGHTS;
-        m3DData.LightUBO = mRHI->CreateBuffer(gpuLightDesc);
-        m3DData.FrameDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, 0, DescriptorUpdateFrequency::DYNAMIC, "3D_FrameData [Set0]");
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            m3DData.LightUBOs[i] = mRHI->CreateBuffer(gpuLightDesc);
+
+        m3DData.FrameDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "3D_FrameData [Set0]");
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            DescriptorWrite frameDescriptorWrite[2] = {};
+            frameDescriptorWrite[0].Binding = 0;
+            frameDescriptorWrite[0].Type = DescriptorType::UNIFORM_BUFFER;
+            frameDescriptorWrite[0].Buffer = mData->FrameUBOs[i];
+
+            frameDescriptorWrite[1].Binding = 1;
+            frameDescriptorWrite[1].Type = DescriptorType::STORAGE_BUFFER;
+            frameDescriptorWrite[1].Buffer = m3DData.LightUBOs[i];
+            frameDescriptorWrite[1].BufferRange = sizeof(LightUBOData);
+            mRHI->UpdateDescriptorSet(m3DData.FrameDescriptorSet, frameDescriptorWrite, 2, i);
+        }
     }
 
     void Renderer3D::BeginFrame(const FrameContext& frameCtx, Uint submitCount)
@@ -70,30 +75,17 @@ namespace Surge
     void Renderer3D::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer3D::EndFrame()");
+        // FRAME UBO is uploaded by Renderer, so we only need to upload light data here
+        // TODO: We could optimize this by only uploading when lights have changed, but for simplicity we upload every frame for now
 
-        FrameUBO frameData = {};
-        frameData.ViewProjection = mData->ViewProjection;
-        frameData.CameraPos = mData->CameraPosition;
-        mRHI->UploadBuffer(m3DData.FrameUBO, &frameData, sizeof(FrameUBO));
         if(!mLightCPU.empty())
         {
             LightUBOData lightData = {};
             for(Uint i = 0; i < mLightCPU.size(); i++)
                 lightData.Lights[i] = mLightCPU[i];
 
-            mRHI->UploadBuffer(m3DData.LightUBO, &lightData, sizeof(LightUBOData), 0);
+            mRHI->UploadBuffer(m3DData.LightUBOs[mCurrentFrameCtx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
         }
-
-        DescriptorWrite frameDescriptorWrite[2] = {};
-        frameDescriptorWrite[0].Binding = 0;
-        frameDescriptorWrite[0].Type = DescriptorType::UNIFORM_BUFFER;
-        frameDescriptorWrite[0].Buffer = m3DData.FrameUBO;
-
-        frameDescriptorWrite[1].Binding = 1;
-        frameDescriptorWrite[1].Type = DescriptorType::STORAGE_BUFFER;
-        frameDescriptorWrite[1].Buffer = m3DData.LightUBO;
-        frameDescriptorWrite[1].BufferRange = sizeof(LightUBOData);
-        mRHI->UpdateDescriptorSet(m3DData.FrameDescriptorSet, frameDescriptorWrite, 2);
 
         mRHI->CmdBindPipeline(mCurrentFrameCtx, m3DPipeline);
         mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m3DPipeline, m3DData.FrameDescriptorSet, 0);
@@ -111,9 +103,10 @@ namespace Surge
 
                 PushConstantData pushConstants = {};
                 pushConstants.Transform = cmd.Transform * submesh.Transform,
-                pushConstants.LightCount = (Uint)mLightCPU.size(),
+                    pushConstants.LightCount = (Uint)mLightCPU.size(),
 
-                cmd.Material->Apply();
+                cmd.Material->UpdateForRendering(mCurrentFrameCtx);
+                cmd.Material->Bind(mCurrentFrameCtx, m3DPipeline);
                 mRHI->CmdPushConstants(mCurrentFrameCtx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
                 mRHI->CmdDrawIndexed(mCurrentFrameCtx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
             }
@@ -146,8 +139,10 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Renderer3D::Shutdown()");
         mRHI->DestroyPipeline(m3DPipeline);
-        mRHI->DestroyBuffer(m3DData.FrameUBO);
-        mRHI->DestroyBuffer(m3DData.LightUBO);
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            mRHI->DestroyBuffer(m3DData.LightUBOs[i]);
+
         mRHI->DestroyDescriptorSet(m3DData.FrameDescriptorSet);
     }
 

@@ -61,12 +61,6 @@ namespace Surge
         SamplerDesc Desc = {};
     };
 
-    enum class DescriptorUpdateFrequency
-    {
-        STATIC,  // Set once, never updated, skybox, font atlas, LUTs
-        DYNAMIC, // Updated per frame. per-object params, animated materials
-    };
-
     struct DescriptorSetEntry
     {
         DescriptorUpdateFrequency Frequency = DescriptorUpdateFrequency::STATIC;

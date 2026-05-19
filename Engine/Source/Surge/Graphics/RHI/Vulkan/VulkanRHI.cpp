@@ -458,20 +458,20 @@ namespace Surge
         VulkanDescriptorSet::Bind(cmd, entry->Layout, setEntry->Sets[setToBind], setIndex);
     }
 
-    DescriptorSetHandle VulkanRHI::CreateDescriptorSet(PipelineHandle pipelineHandle, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
+    DescriptorSetHandle VulkanRHI::CreateDescriptorSet(PipelineHandle pipelineHandle, DescriptorSetSlot slot, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
     {
         const PipelineEntry* pipelineEntry = mPipelinePool.Get(pipelineHandle);
         SG_ASSERT(pipelineEntry, "CreateDescriptorSet: invalid PipelineHandle");
 
-        DescriptorSetEntry entry = VulkanDescriptorSet::Create(*this, pipelineEntry, setNumber, frequency, debugName);
+        DescriptorSetEntry entry = VulkanDescriptorSet::Create(*this, pipelineEntry, slot, frequency, debugName);
         return mDescriptorSetPool.Allocate(std::move(entry));
     }
 
-    void VulkanRHI::UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount)
+    void VulkanRHI::UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex)
     {
         DescriptorSetEntry* entry = mDescriptorSetPool.Get(setHandle);
         SG_ASSERT(entry, "UpdateDescriptorSet: invalid DescriptorSetHandle");
-        VulkanDescriptorSet::Update(*this, *entry, writes, writeCount);
+        VulkanDescriptorSet::Update(*this, *entry, writes, writeCount, frameIndex);
     }
 
     void VulkanRHI::DestroyDescriptorSet(DescriptorSetHandle h)

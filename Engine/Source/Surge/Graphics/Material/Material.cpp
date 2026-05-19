@@ -5,72 +5,65 @@
 
 namespace Surge
 {
-    Material::Material(MaterialRegistry& registry, const String& debugName /*= "DefaultMat"*/)
+    Material::Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName)
     {
-        mRegistry = &registry;
-        mSlot = registry.Allocate();
-        mDirty = true;
-        Apply(); // upload defaults immediately
+        mRHI = Core::GetRenderer()->GetRHI().get();
+        mRefletedBuffer = shader.GetReflectionData().GetBuffer(materialBufferName);
+        mBufferBinding = mRefletedBuffer.Binding;
+        mCPUData.Allocate(mRefletedBuffer.Size);
+        mDescriptorSet = mRHI->CreateDescriptorSet(pipeline, DescriptorSetSlot::ONE, DescriptorUpdateFrequency::DYNAMIC, materialBufferName.c_str());
+
+        BufferDesc bufferDesc = {};
+        bufferDesc.Size = mRefletedBuffer.Size;
+        bufferDesc.InitialData = nullptr;
+        bufferDesc.Usage = BufferUsage::UNIFORM;
+        bufferDesc.HostVisible = true;
+        bufferDesc.DebugName = materialBufferName;
+
+
+        // (RID) Instead of creating RHISettings::FRAMES_IN_FLIGHT amount of VkBuffer for each material, we could have a
+        // global giant VkBuffer for each shader buffer block, and suballocate from that for each material. This would
+        // reduce memory fragmentation and the number of buffers we have to manage, but it would add complexity to buffer
+        // management and synchronization. For now we will stick with the simpler approach of one buffer per material per frame.
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            mGPUBuffers[i] = mRHI->CreateBuffer(bufferDesc);
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            DescriptorWrite write = {};
+            write.Binding = mBufferBinding;
+            write.Buffer = mGPUBuffers[i];
+            write.Type = DescriptorType::UNIFORM_BUFFER;
+            write.BufferRange = mRefletedBuffer.Size;
+            mRHI->UpdateDescriptorSet(mDescriptorSet, &write, 1, i);
+        }
+        MarkDirty();
     }
 
     Material::~Material()
     {
-        if (mSlot != UINT32_MAX)
-            mRegistry->Free(mSlot);
+        mRHI->WaitIdle();
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            mRHI->DestroyBuffer(mGPUBuffers[i]);
+
+        mRHI->DestroyDescriptorSet(mDescriptorSet);
     }
 
-    Material& Material::SetAlbedo(const glm::vec3& color)
+    void Material::Bind(const FrameContext& ctx, PipelineHandle pipeline)
     {
-        mGPUData.AlbedoMetallic = glm::vec4(color, mGPUData.AlbedoMetallic.w);
-        mDirty = true;
-        return *this;
+        UpdateForRendering(ctx);
+        // TODO: remove 1 from here
+        mRHI->CmdBindDescriptorSet(ctx, pipeline, mDescriptorSet, 1);
     }
 
-    Material& Material::SetMetallic(float v)
+    void Material::UpdateForRendering(const FrameContext& ctx)
     {
-        mGPUData.AlbedoMetallic.w = v;
-        mDirty = true;
-        return *this;
-    }    
-
-    Material& Material::SetRoughness(float v)
-    {
-        mGPUData.Roughness = v;
-        mDirty = true;
-        return *this;
-    }
-
-    Material& Material::SetReflectance(float v)
-    {
-        mGPUData.Reflectance = v;
-        mDirty = true;
-        return *this;
-    }
-
-    Material& Material::SetAlbedoTexture(ImageHandle h)
-    {
-        //Uint whiteTextureIndex = Core::GetRenderer()->GetWhiteTextureBindlessIndex();
-        //const Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
-        //mGPUData.AlbedoTexIndex = h.IsNull() ? whiteTextureIndex : rhi->GetBindlessTextureIndex(h);
-        //mDirty = true;
-        return *this;
-    }
-
-    Material& Material::SetNormalTexture(ImageHandle h)
-    {
-        //Uint whiteTextureIndex = Core::GetRenderer()->GetWhiteTextureBindlessIndex();
-        //const Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
-        //mGPUData.NormalTexIndex = h.IsNull() ? whiteTextureIndex : rhi->GetBindlessTextureIndex(h);
-        //mDirty = true;
-        return *this;
-    }
-
-    void Material::Apply()
-    {
-        if (!mDirty)
-            return;
-
-        mRegistry->Upload(mSlot, mGPUData);
-        mDirty = false;
+        if (mIsDirty[ctx.FrameIndex])
+        {
+            mRHI->UploadBuffer(mGPUBuffers[ctx.FrameIndex], mCPUData.As<void>(), mCPUData.GetSize());
+            mIsDirty[ctx.FrameIndex] = false;
+        }
     }
 }

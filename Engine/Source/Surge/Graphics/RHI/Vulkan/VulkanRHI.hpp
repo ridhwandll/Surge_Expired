@@ -66,8 +66,8 @@ namespace Surge
         SamplerHandle CreateSampler(const SamplerDesc& desc);
         void DestroySampler(SamplerHandle h);
 
-        DescriptorSetHandle CreateDescriptorSet(PipelineHandle pipelineHandle, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
-        void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount);
+        DescriptorSetHandle CreateDescriptorSet(PipelineHandle pipelineHandle, DescriptorSetSlot slot, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
+        void UpdateDescriptorSet(DescriptorSetHandle setHandle, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex);
         void DestroyDescriptorSet(DescriptorSetHandle h);
 
         // Commands

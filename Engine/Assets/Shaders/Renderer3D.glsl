@@ -46,28 +46,17 @@ layout(std140,set = 0, binding = 1) readonly buffer Lights
     Light Lights[256];
 } uLights;
 
-//layout(set = 1, binding = 0) uniform Material
-//{
-//    vec4 AlbedoMetallic;   // xyz = albedo, w = metallic
-//    float Roughness;
-//    float Reflectance;
-//    int UseNormalMap;
-//
-//    int _pad;
-//
-//} uMaterial;
-// TODO: Textures at set = 1, binding = 1 to 5
-
-struct Material
+layout(set = 1, binding = 0) uniform Material
 {
-    vec4 AlbedoMetallic;
+    vec3 Albedo;
+    float Metallic;
     float Roughness;
     float Reflectance;
     int UseNormalMap;
-
     int _pad;
 
 } uMaterial;
+// TODO: Textures at set = 1, binding = 1 to 5
 
 // Energy conserving Blinn-Phong?
 vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
@@ -112,8 +101,8 @@ vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
     // f0 represents the base reflectivity (at 0 degrees)
     // Non-metals (dielectrics) use a constant (usually 0.04), metals use Albedo
     vec3 f0 = vec3(0.04) * uMaterial.Reflectance;
-    vec3 specColor = mix(f0, uMaterial.AlbedoMetallic.rgb, uMaterial.AlbedoMetallic.a);
-    vec3 diffuseColor = uMaterial.AlbedoMetallic.rgb * (1.0 - uMaterial.AlbedoMetallic.a);
+    vec3 specColor = mix(f0, uMaterial.Albedo, uMaterial.Metallic);
+    vec3 diffuseColor = uMaterial.Albedo * (1.0 - uMaterial.Metallic);
 
     // Normalized Blinn-Phong Specular
     // The (shininess + 8)/8 factor ensures the light energy stays consistent
@@ -141,16 +130,16 @@ vec3 ACESFilmic(vec3 x)
 
 void main()
 {
-    uMaterial.AlbedoMetallic = vec4(0.8, 0.6, 0.4, 0.5);
-    uMaterial.Roughness = 0.5;
-    uMaterial.Reflectance = 0.5;
-    uMaterial.UseNormalMap = 0;
+    //uMaterial.AlbedoMetallic = vec4(0.8, 0.6, 0.4, 0.5);
+    //uMaterial.Roughness = 0.5;
+    //uMaterial.Reflectance = 0.5;
+    //uMaterial.UseNormalMap = 0;
 
     vec3 N = normalize(vInput.Normal);
     vec3 V = normalize(uFrame.CameraPos - vInput.WorldPos);
 
     // TODO: GI
-    vec3 ambient = vec3(0.05) * uMaterial.AlbedoMetallic.rgb;
+    vec3 ambient = vec3(0.05) * uMaterial.Albedo;
 
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);

@@ -4,12 +4,12 @@
 
 namespace Surge
 {
-	struct FrameContext
-	{
-		Uint FrameIndex = 0;
-		Uint SwapchainIndex = 0;
-		Uint Width = 0;
-		Uint Height = 0;
-	};
+    struct FrameContext
+    {
+        Uint FrameIndex = 0;
+        Uint SwapchainIndex = 0;
+        Uint Width = 0;
+        Uint Height = 0;
+    };
 
 } // namespace Surge

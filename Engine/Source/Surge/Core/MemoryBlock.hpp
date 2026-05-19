@@ -4,16 +4,44 @@
 
 namespace Surge
 {
-    struct Buffer
+    struct MemoryBlock
     {
         void* Data;
         Uint Size;
 
-        Buffer()
+        MemoryBlock()
             : Data(nullptr), Size(0) {}
 
-        Buffer(void* data, Uint size)
+        MemoryBlock(void* data, Uint size)
             : Data(data), Size(size) {}
+
+        ~MemoryBlock()
+        {
+            Release();
+        }
+
+        SURGE_DISABLE_COPY(MemoryBlock);
+
+        MemoryBlock(MemoryBlock&& other) noexcept
+            : Data(other.Data), Size(other.Size)
+        {
+            other.Data = nullptr;
+            other.Size = 0;
+        }
+
+        MemoryBlock& operator=(MemoryBlock&& other) noexcept
+        {
+            if(this != &other)
+            {
+                Release();
+                Data = other.Data;
+                Size = other.Size;
+                other.Data = nullptr;
+                other.Size = 0;
+            }
+            return *this;
+        }
+
 
         void Allocate(Uint size)
         {
@@ -41,17 +69,15 @@ namespace Surge
         }
 
         template <typename T>
-        T& Read(Uint offset = 0)
+        const T& Read(Uint offset = 0) const
         {
             return *(T*)((Byte*)Data + offset);
         }
 
-        Byte* ReadBytes(Uint size, Uint offset)
+        template <typename T>
+        T& Read(Uint offset = 0)
         {
-            SG_ASSERT(offset + size <= Size, "Buffer overflow!");
-            Byte* buffer = new Byte[size];
-            std::memcpy(buffer, (Byte*)Data + offset, size);
-            return buffer;
+            return *(T*)((Byte*)Data + offset);
         }
 
         void Write(void* data, Uint size, Uint offset = 0)
@@ -86,4 +112,5 @@ namespace Surge
             return Size;
         }
     };
+
 } // namespace Surge

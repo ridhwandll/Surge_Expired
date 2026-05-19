@@ -40,11 +40,11 @@ namespace Surge
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, setIndex, 1, &setHandle, 0, nullptr);
     }
 
-    void VulkanDescriptorSet::Update(const VulkanRHI& rhi, DescriptorSetEntry& entry, const DescriptorWrite* writes, Uint writeCount)
+    void VulkanDescriptorSet::Update(const VulkanRHI& rhi, DescriptorSetEntry& entry, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex)
     {
         // Dynamic: write into current frame's copy
         // Static: write into the single copy
-        VkDescriptorSet targetSet = (entry.Frequency == DescriptorUpdateFrequency::DYNAMIC) ? entry.Sets[rhi.mFrame.GetCurrentFrameIndex()] : entry.Sets[0];
+        VkDescriptorSet targetSet = (entry.Frequency == DescriptorUpdateFrequency::DYNAMIC) ? entry.Sets[frameIndex] : entry.Sets[0];
 
         Vector<VkDescriptorImageInfo> imageInfos;
         Vector<VkDescriptorBufferInfo> bufferInfos;
