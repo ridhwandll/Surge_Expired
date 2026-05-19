@@ -165,14 +165,8 @@ namespace Surge
                 Entity floor;
                 mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
                 MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-                meshComp.Material_ = mRenderer->CreateMaterial("FloorMat");
-                meshComp.Material_->Set<glm::vec3>("Albedo", glm::vec3(0.8, 0.6, 0.4));
-                meshComp.Material_->Set<float>("Metallic", 0.5f);
-                meshComp.Material_->Set<float>("Roughness", 0.5f);
-                meshComp.Material_->Set<float>("Reflectance", 0.5f);
-                meshComp.Material_->Set<float>("UseNormalMap", 0);
+
                 TransformComponent& t = floor.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
                 t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
@@ -184,13 +178,6 @@ namespace Surge
                 MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
 
-                meshComp.Material_ = mRenderer->CreateMaterial("SphereMat");
-                meshComp.Material_->Set<glm::vec3>("Albedo", glm::vec3(0.8, 0.6, 0.4));
-                meshComp.Material_->Set<float>("Metallic", 0.5f);
-                meshComp.Material_->Set<float>("Roughness", 0.5f);
-                meshComp.Material_->Set<float>("Reflectance", 0.5f);
-                meshComp.Material_->Set<float>("UseNormalMap", 0);
-
                 TransformComponent& t = cube.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -200,12 +187,7 @@ namespace Surge
                 mActiveScene->CreateEntity(mVkScene, "Vulkan Scene");
                 MeshComponent& meshComp = mVkScene.AddComponent<MeshComponent>();
                 meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-                meshComp.Material_ = mRenderer->CreateMaterial("TorusMat");
-                meshComp.Material_->Set<glm::vec3>("Albedo", glm::vec3(0.8, 0.2, 0.2));
-                meshComp.Material_->Set<float>("Metallic", 0.5f);
-                meshComp.Material_->Set<float>("Roughness", 0.5f);
-                meshComp.Material_->Set<float>("Reflectance", 0.5f);
-                meshComp.Material_->Set<float>("UseNormalMap", 0);
+
                 TransformComponent& t = mVkScene.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);

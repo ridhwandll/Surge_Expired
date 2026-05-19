@@ -5,6 +5,7 @@
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include "Surge/Graphics/Shader/Shader.hpp"
 #include "Surge/Core/MemoryBlock.hpp"
 
@@ -17,8 +18,11 @@ namespace Surge
         Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
         ~Material();
 
+        void SetName(const String& name) { mName = name; }
+        const String& GetName() const { return mName; }
+
         template <typename T>
-        void Set(const String& name, const T& value)
+        void Set(const String& name, const T& value) const
         {
             static_assert(std::is_trivially_copyable_v<T>, "Material::Set can only be used with trivially copyable types!");
 
@@ -42,25 +46,27 @@ namespace Surge
             return mCPUData.Read<T>(member->MemoryOffset);
         }
 
-        void Bind(const FrameContext& ctx, PipelineHandle pipeline);
+        void Bind(const FrameContext& ctx, PipelineHandle pipeline) const;
 
         // Uploads pending GPU data to the registry buffer
-        void UpdateForRendering(const FrameContext& ctx);
-        void MarkDirty()
+        void UpdateForRendering(const FrameContext& ctx) const;
+        void MarkDirty() const
         {
             for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
                 mIsDirty[i] = true;
         }
     private:
+        String mName;
         ShaderBuffer mRefletedBuffer;
+        Vector<ShaderResource> mReflectedResources;
         Uint mBufferBinding;
 
-        MemoryBlock mCPUData;
         BufferHandle mGPUBuffers[RHISettings::FRAMES_IN_FLIGHT];
-
+        DescriptorSetSlot mMaterialDescriptorSlot;
         DescriptorSetHandle mDescriptorSet;
 
-        bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
+        mutable MemoryBlock mCPUData;
+        mutable bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
         GraphicsRHI* mRHI;
     };
 

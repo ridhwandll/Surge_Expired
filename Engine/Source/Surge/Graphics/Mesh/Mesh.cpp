@@ -15,16 +15,15 @@ namespace Surge
 {
     //static void LoadTexture(const Path& meshPath, cgltf_texture_view& texView, Ref<Material>& material, const String& texName)
     //{
-    //	if (!texView.texture || !texView.texture->image || !texView.texture->image->uri)
-    //		return;
+    //    if(!texView.texture || !texView.texture->image || !texView.texture->image->uri)
+    //        return;
     //
-    //	Path texturePath = Filesystem::GetParentPath(meshPath) / String(texView.texture->image->uri);
-    //	Log<Severity::Trace>("{0} path: {1}", texName, texturePath);
-    //
-    //	TextureSpecification spec;
-    //	spec.UseMips = true;
-    //	Ref<Texture2D> texture = Texture2D::Create(texturePath, spec);
-    //	material->Set<Ref<Texture2D>>(texName, texture);
+    //    Path texturePath = Filesystem::GetParentPath(meshPath) / String(texView.texture->image->uri);
+    //    Log<Severity::Trace>("{0} path: {1}", texName, texturePath);
+    //    TextureSpecification spec;
+    //    spec.UseMips = true;
+    //    Ref<Texture2D> texture = Texture2D::Create(texturePath, spec);
+    //    material->Set<Ref<Texture2D>>(texName, texture);
     //}
 
     Mesh::Mesh(const String& filepath)
@@ -228,35 +227,38 @@ namespace Surge
         //   base_color_texture = AlbedoMap
         //   normal_texture = NormalMap
         //   metallic_roughness_texture = R = occlusion G = roughness B = metalness
-        //if (data->materials_count > 0)
-        //{
-        //	mMaterials.resize(data->materials_count);
-        //
-        //	for (size_t i = 0; i < data->materials_count; i++)
-        //	{
-        //		cgltf_material& mat = data->materials[i];
-        //		const String materialName = mat.name ? mat.name : "NoName";
-        //
-        //		Ref<Material> material = Material::Create("PBR", materialName);
-        //		mMaterials[i] = material;
-        //
-        //		if (mat.has_pbr_metallic_roughness)
-        //		{
-        //			auto& pbr = mat.pbr_metallic_roughness;
-        //
-        //			material->Set("Material.Albedo", glm::vec3(pbr.base_color_factor[0], pbr.base_color_factor[1], pbr.base_color_factor[2]));
-        //			material->Set("Material.Roughness", pbr.roughness_factor);
-        //			material->Set("Material.Metalness", pbr.metallic_factor);
-        //
-        //			LoadTexture(mPath, pbr.base_color_texture, material, "AlbedoMap");
-        //			// glTF packs roughness (G) and metalness (B) into one texture
-        //			LoadTexture(mPath, pbr.metallic_roughness_texture, material, "MetalnessMap");
-        //			LoadTexture(mPath, pbr.metallic_roughness_texture, material, "RoughnessMap");
-        //		}
-        //
-        //		LoadTexture(mPath, mat.normal_texture, material, "NormalMap");
-        //	}
-        //}
+
+        if (data->materials_count > 0)
+        {
+            mMaterials.resize(data->materials_count);
+        
+            for(size_t i = 0; i < data->materials_count; i++)
+            {
+                cgltf_material& mat = data->materials[i];
+                const String materialName = mat.name ? mat.name : "No Name";
+        
+                Ref<Material> material = Core::GetRenderer()->CreateMaterial(materialName);
+                mMaterials[i] = material;
+                material->SetName(materialName);
+
+                if(mat.has_pbr_metallic_roughness)
+                {
+                    auto& pbr = mat.pbr_metallic_roughness;
+
+                    material->Set<glm::vec3>("Albedo", glm::vec3(pbr.base_color_factor[0], pbr.base_color_factor[1], pbr.base_color_factor[2]));
+                    material->Set<float>("Roughness", pbr.roughness_factor);
+                    material->Set<float>("Metallic", pbr.metallic_factor);
+                    material->Set<float>("Reflectance", 0.5f);
+
+                    //LoadTexture(mPath, pbr.base_color_texture, material, "AlbedoMap");
+                    // glTF packs roughness (G) and metalness (B) into one texture
+                    //LoadTexture(mPath, pbr.metallic_roughness_texture, material, "MetalnessMap");
+                    //LoadTexture(mPath, pbr.metallic_roughness_texture, material, "RoughnessMap");
+                }
+        
+                //LoadTexture(mPath, mat.normal_texture, material, "NormalMap");
+            }
+        }
 
         CreateRHIObjects();
         cgltf_free(data);
@@ -294,6 +296,12 @@ namespace Surge
         }
         submesh.BoundingBox.Min = minBound;
         submesh.BoundingBox.Max = maxBound;
+
+        mMaterials.emplace_back(Core::GetRenderer()->CreateMaterial("DefaultMaterial"));
+        mMaterials[0]->Set<glm::vec3>("Albedo", glm::vec3(0.8f));
+        mMaterials[0]->Set<float>("Metallic", 0.5f);
+        mMaterials[0]->Set<float>("Roughness", 0.5f);
+        mMaterials[0]->Set<float>("Reflectance", 0.5f);
 
         CreateRHIObjects();
     }

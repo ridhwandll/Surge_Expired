@@ -15,25 +15,21 @@ layout(location = 0) out vec4 FinalColor;
 struct Light
 {
     vec4 PositionType;   // xyz = pos/dir, w = type (0=dir, 1=point)
-    vec4 Color;          // rgb = color, a = intensity
+    vec3 Color;
+    float Intensity;
     float Radius;        // point light falloff radius
     float Falloff;
     float _pad1, _pad2;
 };
 
-// --------------------------
 // Push Constants
-// --------------------------
-
 layout(push_constant) uniform PushConstants
 {
     mat4 Transform;
     uint LightCount;
 } uMesh;
 
-// --------------------------
-// Set 0: Scene
-// --------------------------
+// Set 0: Frame + Lights
 layout(std140, set = 0, binding = 0) uniform FrameUBO
 {
     mat4 ViewProjection;
@@ -41,7 +37,7 @@ layout(std140, set = 0, binding = 0) uniform FrameUBO
     float _pad;
 
 } uFrame;
-layout(std140,set = 0, binding = 1) readonly buffer Lights
+layout(std140, set = 0, binding = 1) readonly buffer Lights
 {
     Light Lights[256];
 } uLights;
@@ -52,11 +48,21 @@ layout(set = 1, binding = 0) uniform Material
     float Metallic;
     float Roughness;
     float Reflectance;
+    int UseAlbedoMap;
     int UseNormalMap;
-    int _pad;
 
 } uMaterial;
-// TODO: Textures at set = 1, binding = 1 to 5
+//layout(set = 1, binding = 1) uniform sampler2D uAlbedoMap;
+
+struct PBRParameters
+{
+    vec3 Albedo;
+    float Metalness;
+    float Roughness;
+    vec3 Normal;
+    vec3 View;
+};
+PBRParameters gPBRParams;
 
 // Energy conserving Blinn-Phong?
 vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
@@ -101,8 +107,8 @@ vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
     // f0 represents the base reflectivity (at 0 degrees)
     // Non-metals (dielectrics) use a constant (usually 0.04), metals use Albedo
     vec3 f0 = vec3(0.04) * uMaterial.Reflectance;
-    vec3 specColor = mix(f0, uMaterial.Albedo, uMaterial.Metallic);
-    vec3 diffuseColor = uMaterial.Albedo * (1.0 - uMaterial.Metallic);
+    vec3 specColor = mix(f0, gPBRParams.Albedo, uMaterial.Metallic);
+    vec3 diffuseColor = gPBRParams.Albedo * (1.0 - uMaterial.Metallic);
 
     // Normalized Blinn-Phong Specular
     // The (shininess + 8)/8 factor ensures the light energy stays consistent
@@ -114,7 +120,7 @@ vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
     vec3 diffuse = (diffuseColor / 3.14159) * dotNL;
     vec3 specular = specColor * specularTerm * dotNL;
 
-    vec3 lightIntensity = light.Color.rgb * light.Color.a;
+    vec3 lightIntensity = light.Color.rgb * light.Intensity;
     return (diffuse + specular) * lightIntensity * attenuation;
 }
 
@@ -128,15 +134,36 @@ vec3 ACESFilmic(vec3 x)
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
+vec3 CalculateNormal()
+{
+   vec3 newNormal;
+   // TODO: Normal maps
+   //if (uMaterial.UseNormalMap == 1)
+   //{
+   //     vec3 normal = normalize(vInput.Normal);
+   //     vec3 tangent = normalize(vInput.Tangent);
+   //     vec3 bitangent = normalize(vInput.BiTangent);
+   //
+   //     vec3 bumpMapNormal = texture(NormalMap, vInput.TexCoord).xyz;
+   //     bumpMapNormal = 2.0 * bumpMapNormal - vec3(1.0);
+   //
+   //     mat3 TBN = mat3(tangent, bitangent, normal);
+   //     newNormal = TBN * bumpMapNormal;
+   //     newNormal = normalize(newNormal);
+   //}
+   //else
+   //{
+        newNormal = normalize(vInput.Normal);
+   //}
+   return newNormal;
+}
+
 void main()
 {
-    //uMaterial.AlbedoMetallic = vec4(0.8, 0.6, 0.4, 0.5);
-    //uMaterial.Roughness = 0.5;
-    //uMaterial.Reflectance = 0.5;
-    //uMaterial.UseNormalMap = 0;
-
-    vec3 N = normalize(vInput.Normal);
-    vec3 V = normalize(uFrame.CameraPos - vInput.WorldPos);
+    //gPBRParams.Albedo = texture(uAlbedoMap, vInput.TexCoord).rgb * uMaterial.Albedo;
+    gPBRParams.Albedo = uMaterial.Albedo;
+    gPBRParams.Normal = CalculateNormal();
+    gPBRParams.View = normalize(uFrame.CameraPos - vInput.WorldPos);
 
     // TODO: GI
     vec3 ambient = vec3(0.05) * uMaterial.Albedo;
@@ -144,7 +171,7 @@ void main()
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);
     for (uint i = 0; i < uMesh.LightCount; i++)
-        directAccumulation += CalculateMobilePBR(uLights.Lights[i], N, V, vInput.WorldPos);
+        directAccumulation += CalculateMobilePBR(uLights.Lights[i], gPBRParams.Normal, gPBRParams.View, vInput.WorldPos);
 
     vec3 HDRColor  = ambient + directAccumulation;
 

@@ -9,7 +9,8 @@ namespace Surge
     {
         Light gpuLight{};
         gpuLight.PositionType = (light.Type == LightType::DIRECTIONAL) ? glm::vec4(rotation, 0.0f) : glm::vec4(position, 1.0f); // Directional light has w = 0, Point light has w = 1
-        gpuLight.ColorRGBIntensityA = glm::vec4(light.Color, light.Intensity);
+        gpuLight.Color = light.Color;
+        gpuLight.Intensity = light.Intensity;
         gpuLight.Radius = light.Radius;
         gpuLight.Falloff = light.Falloff;
         return gpuLight;
@@ -77,7 +78,6 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer3D::EndFrame()");
         // FRAME UBO is uploaded by Renderer, so we only need to upload light data here
         // TODO: We could optimize this by only uploading when lights have changed, but for simplicity we upload every frame for now
-
         if(!mLightCPU.empty())
         {
             LightUBOData lightData = {};
@@ -88,13 +88,14 @@ namespace Surge
         }
 
         mRHI->CmdBindPipeline(mCurrentFrameCtx, m3DPipeline);
-        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m3DPipeline, m3DData.FrameDescriptorSet, 0);
+        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m3DPipeline, m3DData.FrameDescriptorSet, DescriptorSetSlot::ZERO);
 
         for (auto& cmd : mMeshDrawCommands)
         {
             const Mesh& mesh = *cmd.Mesh;
             mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mesh.GetVertexBuffer());
             mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mesh.GetIndexBuffer());
+            const Vector<Ref<Material>>& materials = mesh.GetMaterials();
 
             const Submesh* submeshes = mesh.GetSubmeshes().data();
             for(Uint i = 0; i < mesh.GetSubmeshes().size(); i++)
@@ -102,11 +103,12 @@ namespace Surge
                 const Submesh& submesh = submeshes[i];
 
                 PushConstantData pushConstants = {};
-                pushConstants.Transform = cmd.Transform * submesh.Transform,
-                    pushConstants.LightCount = (Uint)mLightCPU.size(),
+                pushConstants.Transform = cmd.Transform * submesh.Transform;
+                pushConstants.LightCount = (Uint)mLightCPU.size();
 
-                cmd.Material->UpdateForRendering(mCurrentFrameCtx);
-                cmd.Material->Bind(mCurrentFrameCtx, m3DPipeline);
+                materials[submesh.MaterialIndex]->UpdateForRendering(mCurrentFrameCtx);
+                materials[submesh.MaterialIndex]->Bind(mCurrentFrameCtx, m3DPipeline);
+
                 mRHI->CmdPushConstants(mCurrentFrameCtx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
                 mRHI->CmdDrawIndexed(mCurrentFrameCtx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
             }
@@ -114,9 +116,9 @@ namespace Surge
         mMeshDrawCommands.clear();
     }
 
-    void Renderer3D::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material)
+    void Renderer3D::SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
     {
-        mMeshDrawCommands.emplace_back(MeshDrawCmd{ transform, mesh, material });
+        mMeshDrawCommands.emplace_back(MeshDrawCmd{ transform, mesh });
     }
 
     void Renderer3D::SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)

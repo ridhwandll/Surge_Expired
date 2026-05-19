@@ -70,14 +70,12 @@ namespace Surge
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
                         MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
-                        meshComponent.Material_ = Core::GetRenderer()->CreateMaterial("TODO Remove this");
                     }
                     else if (defMesh != -1)
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
                         MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
                         meshComponent.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(defMesh));
-                        meshComponent.Material_ = Core::GetRenderer()->CreateMaterial("TODO Remove this");
                     }
                     ImGui::EndPopup();
                 }

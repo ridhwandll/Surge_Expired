@@ -148,14 +148,13 @@ namespace Surge
     void Renderer2D::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer2D::EndFrame()");
-
         WriteToGPUBuffer();
 
         if (mDrawCommands.empty())
             return;
 
         mRHI->CmdBindPipeline(mCurrentFrameCtx, m2DPipeline);
-        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, mFrameDescriptorSet, 0);
+        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
         mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mVertexBuffers[mCurrentFrameCtx.FrameIndex], 0);
         mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mIndexBuffer, 0);
 

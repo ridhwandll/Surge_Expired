@@ -74,7 +74,7 @@ namespace Surge
         void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }
         void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }
         void CmdBindPipeline(const FrameContext& ctx, PipelineHandle h) { mBackendRHI.CmdBindPipeline(ctx, h); }
-        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex /*setIndex -> layout(set = N) in GLSL*/) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, setIndex); }
+        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, DescriptorSetSlot slot) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, slot); }
 
         void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data) { mBackendRHI.CmdPushConstants(ctx, h, shaderStage, offset, size, data); }
         void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }

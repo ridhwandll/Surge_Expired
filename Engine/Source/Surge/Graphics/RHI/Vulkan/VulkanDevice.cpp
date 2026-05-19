@@ -5,7 +5,6 @@
 
 namespace Surge
 {
-
     static void OnVmaAllocate(VmaAllocator allocator, Uint memoryType,VkDeviceMemory memory,VkDeviceSize size,void* userData)
     {
         GPUMemoryStats* stats = static_cast<GPUMemoryStats*>(userData);
@@ -18,29 +17,6 @@ namespace Surge
         GPUMemoryStats* stats = static_cast<GPUMemoryStats*>(userData);
         stats->AllocatedBytes.fetch_sub(size, std::memory_order_relaxed);
         stats->AllocationCount.fetch_sub(1, std::memory_order_relaxed);
-    }
-
-    static bool ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
-    {
-        for (auto extension : required)
-        {
-            bool found = false;
-            for (auto& availableExtension : available)
-            {
-                if (strcmp(availableExtension.extensionName, extension) == 0)
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     void VulkanDevice::Initialize(VkInstance instance, VkSurfaceKHR surface)
@@ -58,8 +34,7 @@ namespace Surge
         Vector<VkPhysicalDevice> gpus(gpuCount);
         VK_CALL(vkEnumeratePhysicalDevices(instance, &gpuCount, gpus.data()));
 
-
-        // Just grab the first GPU with a queue that supports graphics and presentation. A more robust implementation would rate each GPU and select the best one...
+        // Just grab the first GPU with a queue that supports graphics and presentation. A more robust implementation would rate each GPU and select the best one
         // TODO: Implement a more robust GPU selection algorithm that rates each GPU and selects the best one based on features, performance, etc.
         for (size_t i = 0; i < gpuCount && (mGraphicsQueueIndex < 0); i++)
         {

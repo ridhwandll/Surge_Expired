@@ -77,9 +77,7 @@ namespace Surge
 
         mImGuiContext.Init(*this);
         FillStats();
-        Log<Severity::Debug>("kekw");
         CreateDescriptorPools();
-        Log<Severity::Debug>("not kekw");
     }
 
     void VulkanRHI::WaitIdle() const
@@ -263,8 +261,11 @@ namespace Surge
 
         ImageEntry entry = VulkanImage::Create(*this, desc);
 
-        if (desc.GenerateImGuiID)
+        if(desc.GenerateImGuiID)
+        {
+            SG_ASSERT(desc.Usage & ImageUsage::SAMPLED, "ImageDesc: GenerateImGuiID is true but SAMPLED not set in Usage!");
             entry.ImGuiID = mImGuiContext.AddImage(entry.View);
+        }
 
         ImageHandle h = mTexturePool.Allocate(std::move(entry));
 
@@ -445,7 +446,7 @@ namespace Surge
         mSamplerPool.Free(h);
     }
 
-    void VulkanRHI::CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex)
+    void VulkanRHI::CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, DescriptorSetSlot slot)
     {
         PipelineEntry* entry = mPipelinePool.Get(pipeline);
         DescriptorSetEntry* setEntry = mDescriptorSetPool.Get(setHandle);
@@ -455,7 +456,7 @@ namespace Surge
 
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         Uint setToBind = (setEntry->Frequency == DescriptorUpdateFrequency::DYNAMIC) ? ctx.FrameIndex : 0;
-        VulkanDescriptorSet::Bind(cmd, entry->Layout, setEntry->Sets[setToBind], setIndex);
+        VulkanDescriptorSet::Bind(cmd, entry->Layout, setEntry->Sets[setToBind], slot);
     }
 
     DescriptorSetHandle VulkanRHI::CreateDescriptorSet(PipelineHandle pipelineHandle, DescriptorSetSlot slot, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)

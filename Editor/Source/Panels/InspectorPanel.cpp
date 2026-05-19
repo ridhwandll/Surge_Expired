@@ -75,7 +75,6 @@ namespace Surge
                     {
                         entity.AddComponent<MeshComponent>();
                         MeshComponent& meshComponent = entity.AddComponent<MeshComponent>();
-                        meshComponent.Material_ = Core::GetRenderer()->CreateMaterial("TODO Remove this");
                     }
                     if (ImGui::MenuItem("Light"))
                         entity.AddComponent<LightComponent>();
@@ -190,22 +189,80 @@ namespace Surge
             DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
                 String kek = "TODO: Implement Asset Manager";
                 ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
+                const Vector<Ref<Material>>& materials = component.Mesh->GetMaterials();
+                for(size_t i = 0; i < materials.size(); i++)
+                {
+                    ImGui::PushID(i);
+                    const Ref<Material>& material = materials[i];
+                    const String& matName = material->GetName();
 
-                glm::vec3 albedo = component.Material_->Get<glm::vec3>("Albedo");
-                if (ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Albedo", &albedo))
-                    component.Material_->Set<glm::vec3>("Albedo", albedo);
+                    // 1. Force the Tree Node to span across BOTH columns of the main table
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
 
-                float metallic = component.Material_->Get<float>("Metallic");
-                if (ImGuiAux::TSlider<float>("Metallic", metallic, 0.0f, 1.0f))
-                    component.Material_->Set<float>("Metallic", metallic);
+                    // ImGuiTreeNodeFlags_SpanAllColumns makes the background highlight stretch beautifully
+                    bool nodeOpen = ImGui::TreeNodeEx(matName.c_str(), ImGuiTreeNodeFlags_SpanAllColumns);
 
-                float roughness = component.Material_->Get<float>("Roughness");
-                if (ImGuiAux::TSlider<float>("Roughness", roughness, 0.0f, 1.0f))
-                    component.Material_->Set<float>("Roughness", roughness);
+                    if(nodeOpen)
+                    {
+                        // Name
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Name");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        ImGui::TextUnformatted(matName.c_str());
+                        ImGui::PopItemWidth();
 
-                float reflectance = component.Material_->Get<float>("Reflectance");
-                if (ImGuiAux::TSlider<float>("Reflectance", reflectance, 0.1f, 1.0f))
-                    component.Material_->Set<float>("Reflectance", reflectance);
+                        // Albedo
+                        glm::vec3 albedo = material->Get<glm::vec3>("Albedo");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Albedo");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if (ImGui::ColorEdit3("##v", &albedo.x))
+                            material->Set<glm::vec3>("Albedo", albedo);
+                        ImGui::PopItemWidth();
+
+                        // Metallic
+                        float metallic = material->Get<float>("Metallic");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Metallic");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if(ImGui::SliderFloat("##Metallic", &metallic, 0.0f, 1.0f))
+                            material->Set<float>("Metallic", metallic);
+                        ImGui::PopItemWidth();
+
+                        // Roughness
+                        float roughness = material->Get<float>("Roughness");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Roughness");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if(ImGui::SliderFloat("##Roughness", &roughness, 0.0f, 1.0f))
+                            material->Set<float>("Roughness", roughness);
+                        ImGui::PopItemWidth();
+
+                        // Reflectance 
+                        float reflectance = material->Get<float>("Reflectance");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Reflectance");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if(ImGui::SliderFloat("##Reflectance", &reflectance, 0.1f, 1.0f))
+                            material->Set<float>("Reflectance", reflectance);
+                        ImGui::PopItemWidth();
+
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+
                 });
         }
 

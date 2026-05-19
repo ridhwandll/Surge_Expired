@@ -11,7 +11,7 @@ namespace Surge
     {
     public:
         static DescriptorSetEntry Create(const VulkanRHI& rhi, const PipelineEntry* pipeline, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName = nullptr);
-        static void Bind(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkDescriptorSet setHandle, Uint setIndex);
+        static void Bind(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkDescriptorSet setHandle, DescriptorSetSlot slot);
         static void Update(const VulkanRHI& rhi, DescriptorSetEntry& entry, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex);
         static void Destroy(const VulkanRHI& rhi, DescriptorSetEntry& entry);
     };

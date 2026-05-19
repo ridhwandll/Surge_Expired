@@ -51,7 +51,7 @@ namespace Surge
             for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
             {
                 if(mesh.Mesh)
-                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
+                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
             }
         }
         renderer->EndFrame();
@@ -85,7 +85,7 @@ namespace Surge
                 for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
                 {
                     if(mesh.Mesh)
-                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.Material_);
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
                 }
             }
             renderer->EndFrame();

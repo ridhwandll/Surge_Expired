@@ -54,7 +54,7 @@ namespace Surge
         void EndFrame();
 
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid()) { mRenderer2D.Submit(transform, color, texture); }
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, const Ref<Material>& material) { mRenderer3D.SubmitMesh(transform, mesh, material); }
+        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh) { mRenderer3D.SubmitMesh(transform, mesh); }
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation) { mRenderer3D.SubmitLight(light, position, rotation); }
 
         void OnWindowResize(Uint width, Uint height);

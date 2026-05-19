@@ -35,9 +35,9 @@ namespace Surge
         return entry;
     }
 
-    void VulkanDescriptorSet::Bind(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkDescriptorSet setHandle, Uint setIndex)
+    void VulkanDescriptorSet::Bind(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkDescriptorSet setHandle, DescriptorSetSlot slot)
     {
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, setIndex, 1, &setHandle, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (Uint)slot, 1, &setHandle, 0, nullptr);
     }
 
     void VulkanDescriptorSet::Update(const VulkanRHI& rhi, DescriptorSetEntry& entry, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex)

@@ -29,7 +29,7 @@ namespace Surge
             String type = source.substr(begin, eol - begin);
             type.pop_back(); // Remove the closing ']' character
             size_t nextLinePos = source.find_first_not_of("\r\n", eol);
-            Log<Severity::Info>("Parsing shader type: {0}", type);
+            //Log<Severity::Info>("Parsing shader type: {0}", type);
             ShaderType shaderType = VulkanUtils::ShaderTypeFromString(type);
             SG_ASSERT((int)shaderType, "Invalid shader type!");
             pos = source.find(typeToken, nextLinePos);
@@ -89,7 +89,7 @@ namespace Surge
             {
                 fwrite(spirvHandle.SPIRV.data(), sizeof(Uint), spirvHandle.SPIRV.size(), f);
                 fclose(f);
-                Log<Severity::Info>("Cached Shader at: {0}", path);
+                //Log<Severity::Info>("Cached Shader at: {0}", path);
             }
 
             SG_ASSERT(!spirvHandle.SPIRV.empty(), "Invalid SPIRV!");
@@ -132,7 +132,7 @@ namespace Surge
 #endif
         ShaderReflector reflector;
         mReflectionData = reflector.Reflect(Filesystem::GetNameWithExtension(mPath), mShaderSPIRVs);
-        mReflectionData.LogAll();
+        //mReflectionData.LogAll();
     }
 
     String Shader::GetShaderCachePath(ShaderType type)

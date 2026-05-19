@@ -88,8 +88,8 @@ namespace Surge
         void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor);
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h);
 
-        // setIndex maps to layout(set = N) in GLSL
-        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, Uint setIndex);
+        // slot maps to layout(set = N) in GLSL
+        void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, DescriptorSetSlot slot);
 
         VkCommandBuffer BeginOneTimeCommands() const;
         void EndOneTimeCommands(VkCommandBuffer cmd) const;

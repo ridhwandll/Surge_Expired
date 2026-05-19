@@ -253,7 +253,6 @@ namespace Surge
         std::map<Uint/*SetNumber*/, VkDescriptorSetLayout> descriptorSetLayoutsMap;
         for(const Uint& descriptorSet : descriptorSetCount)
         {
-            Log<Severity::Debug>("Creating descriptor set layout for Set: {}", descriptorSet);
             Vector<VkDescriptorSetLayoutBinding> layoutBindings;
             for(const ShaderBuffer& buffer : shaderBuffers)
             {
@@ -266,7 +265,6 @@ namespace Surge
                 layoutBinding.descriptorCount = 1; // TODO: Need to add arrays
                 layoutBinding.descriptorType = ShaderBufferTypeToVulkan(buffer.ShaderUsage);
                 layoutBinding.stageFlags = VulkanUtils::ShaderTypeToVulkanShaderStage(buffer.ShaderStages);
-                Log<Severity::Debug>("LayoutBinding: {} Binding: {}", buffer.BufferName, layoutBinding.binding);
             }
 
             for(const ShaderResource& texture : shaderResources)
@@ -280,7 +278,6 @@ namespace Surge
                 layoutBinding.descriptorCount = texture.ArraySize;
                 layoutBinding.descriptorType = ShaderImageUsageToVulkan(texture.ShaderUsage);
                 layoutBinding.stageFlags = VulkanUtils::ShaderTypeToVulkanShaderStage(texture.ShaderStages);
-                Log<Severity::Debug>("LayoutBinding: {} Binding: {}", texture.Name, layoutBinding.binding);
             }
 
             VkDescriptorSetLayoutCreateInfo layoutInfo { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
@@ -355,6 +352,9 @@ namespace Surge
 
     Pair<VkVertexInputBindingDescription, Vector<VkVertexInputAttributeDescription>> VulkanPipeline::CreateVertexAttributes(const ShaderReflectionData& reflectedData)
     {
+        if(reflectedData.GetStageInputs().find(ShaderType::VERTEX) == reflectedData.GetStageInputs().end())
+            return {};
+
         const std::map<Uint, ShaderStageInput>& stageInputs = reflectedData.GetStageInputs().at(ShaderType::VERTEX);
 
         Uint stride = 0;
