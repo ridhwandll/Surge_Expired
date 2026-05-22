@@ -12,7 +12,7 @@ namespace Surge
         case BufferUsage::INDEX:   return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
         case BufferUsage::UNIFORM: return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         case BufferUsage::STORAGE: return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        case BufferUsage::STAGING: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        //case BufferUsage::STAGING: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
         default:
             SG_ASSERT_INTERNAL("Tf you doin bruh? Unknown BufferUsage");
             return 0;
@@ -31,11 +31,8 @@ namespace Surge
         bufferInfo.size = desc.Size;
         bufferInfo.usage = ToVkBufferUsage(desc.Usage);
 
-        bool isStaging = desc.Usage == BufferUsage::STAGING;
-        if (isStaging)
-            bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-        if (!desc.HostVisible && !isStaging)
+        // If the buffer is GPU only we need this flag for transfer operations
+        if(!desc.HostVisible)
             bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
         VmaAllocationCreateInfo allocInfo = {};

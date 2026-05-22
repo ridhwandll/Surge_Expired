@@ -310,7 +310,7 @@ namespace Surge
     {
         Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
 
-        rhi->WaitIdle();
+        //rhi->WaitIdle();
         rhi->DestroyBuffer(mVertexBuffer);
         rhi->DestroyBuffer(mIndexBuffer);
     }

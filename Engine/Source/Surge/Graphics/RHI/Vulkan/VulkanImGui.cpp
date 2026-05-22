@@ -80,7 +80,7 @@ namespace Surge
         poolInfo.pPoolSizes = poolSizes;
         VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &mDescriptorPool));
 
-        vkDeviceWaitIdle(device);
+        //rhi.WaitIdle();
 
         // ImGui context
         IMGUI_CHECKVERSION();
@@ -183,7 +183,7 @@ namespace Surge
 
         VkDevice device = rhi.GetDevice();
 
-        vkDeviceWaitIdle(device);
+        rhi.WaitIdle();
 
         ImGui_ImplVulkan_Shutdown();
 

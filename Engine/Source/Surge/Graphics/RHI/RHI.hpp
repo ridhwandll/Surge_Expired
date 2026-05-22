@@ -44,9 +44,9 @@ namespace Surge
         void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
 
         // Texture
-        ImageHandle CreateTexture(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
-        void DestroyTexture(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
-        void ResizeTexture(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }
+        ImageHandle CreateImage(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
+        void DestroyImage(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
+        void ResizeImage(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }
 
         // Framebuffer
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }

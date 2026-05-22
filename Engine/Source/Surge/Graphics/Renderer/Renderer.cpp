@@ -40,7 +40,7 @@ namespace Surge
         // TRANSFER_SRC needed for blit
         RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.Usage |= ImageUsage::TRANSFER_SRC : colorDesc.Usage |= ImageUsage::SAMPLED;
         RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
-        mData->FinalImage = mRHI->CreateTexture(colorDesc);
+        mData->FinalImage = mRHI->CreateImage(colorDesc);
 
         ImageDesc depthDesc = {};
         depthDesc.Width = size.x;
@@ -48,7 +48,7 @@ namespace Surge
         depthDesc.Format = ImageFormat::D32_SFLOAT;
         depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
         depthDesc.DebugName = "Final Depth Texture";
-        mData->DepthImage = mRHI->CreateTexture(depthDesc);
+        mData->DepthImage = mRHI->CreateImage(depthDesc);
 
         // Offscreen framebuffer
         FramebufferAttachment colorAttachment = {};
@@ -82,7 +82,7 @@ namespace Surge
         texDesc.GenerateImGuiID = true;
         texDesc.DataSize = sizeof(whitePixel);
         texDesc.Sampler = mData->DefaultSampler;
-        mData->WhiteImage = mRHI->CreateTexture(texDesc);
+        mData->WhiteImage = mRHI->CreateImage(texDesc);
 
         BufferDesc frameUBODesc = {};
         frameUBODesc.Usage = BufferUsage::UNIFORM;
@@ -201,15 +201,15 @@ namespace Surge
         mRenderer2D.Shutdown();
         mRenderer3D.Shutdown();
 
-        mRHI->DestroyTexture(mData->WhiteImage);
+        mRHI->DestroyImage(mData->WhiteImage);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mRHI->DestroyBuffer(mData->FrameUBOs[i]);
 
         mRHI->DestroySampler(mData->DefaultSampler);
         mRHI->DestroyFramebuffer(mData->OffscreenFramebuffer);
-        mRHI->DestroyTexture(mData->FinalImage);
-        mRHI->DestroyTexture(mData->DepthImage);
+        mRHI->DestroyImage(mData->FinalImage);
+        mRHI->DestroyImage(mData->DepthImage);
 
         mRHI->Shutdown();
     }

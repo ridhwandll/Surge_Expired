@@ -93,6 +93,9 @@ namespace Surge::Core
     {
         SCOPED_TIMER("Core::Shutdown");
 
+        // TODO: Remove this
+        GCoreData.SurgeRenderer->GetRHI()->WaitIdle();
+
         // NOTE(Rid): Order Matters here
         GCoreData.SurgeClient->OnShutdown();
         delete GCoreData.SurgeClient;

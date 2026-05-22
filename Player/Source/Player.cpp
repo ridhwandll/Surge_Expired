@@ -87,14 +87,12 @@ namespace Surge
                 desc.InitialData = data;
                 desc.DataSize = width * height * 4;
                 desc.Sampler = defautSampler;
-                ImageHandle texture = mRenderer->GetRHI()->CreateTexture(desc);
+                ImageHandle texture = mRenderer->GetRHI()->CreateImage(desc);
                 mTextures.push_back(texture);
                 stbi_image_free(data);
             }
             else
-            {
                 Log<Severity::Error>("Failed to load texture at path: {0}", path);
-            }
         }
     }
 
@@ -351,7 +349,7 @@ namespace Surge
     void Player::OnShutdown()
     {
         for (auto& texture : mTextures)
-            mRenderer->GetRHI()->DestroyTexture(texture);
+            mRenderer->GetRHI()->DestroyImage(texture);
     }
 
 } // namespace Surge

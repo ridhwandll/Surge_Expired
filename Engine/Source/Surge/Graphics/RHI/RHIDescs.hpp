@@ -30,7 +30,6 @@ namespace Surge
         INDEX,
         UNIFORM,
         STORAGE,
-        STAGING
     };
 
     enum class ImageFormat
@@ -59,7 +58,7 @@ namespace Surge
     enum class LoadOp { CLEAR, LOAD, DONT_CARE };
     enum class StoreOp { STORE, DONT_CARE };
 
-    //Descriptors 
+    //Descriptors
 
     struct BufferDesc
     {
@@ -122,20 +121,6 @@ namespace Surge
         INT4,    // R32G32B32A32_SINT
     };
 
-    struct VertexAttribute
-    {
-        Uint Location = 0;
-        Uint Binding = 0;
-        VertexFormat Format = VertexFormat::FLOAT3;
-        Uint Offset = 0;
-    };
-
-    struct VertexBinding
-    {
-        Uint Binding = 0;
-        Uint Stride = 0;
-    };
-
     enum class CullMode { NONE, FRONT, BACK };
     enum class FrontFace { CLOCKWISE, COUNTER_CLOCKWISE };
     enum class Topology { TRIANGLE_LIST, TRIANGLE_STRIP, LINE_LIST, POINT_LIST };
@@ -161,6 +146,7 @@ namespace Surge
     {
         bool TestEnable = false;
         bool WriteEnable = false;
+        bool EnableStencil = false;
         CompareOp Op = CompareOp::LESS;
     };
 

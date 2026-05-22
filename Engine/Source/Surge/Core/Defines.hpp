@@ -2,7 +2,6 @@
 #pragma once
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Time/Timer.hpp"
-#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -126,9 +125,6 @@ namespace Surge
 
     template <typename T>
     using Vector = std::vector<T>; // TODO(Rid): Have a dedicated vector class SURGE_API
-
-    template <typename T>
-    using Deque = std::deque<T>;
 
     template <typename T>
     using Scope = std::unique_ptr<T>;

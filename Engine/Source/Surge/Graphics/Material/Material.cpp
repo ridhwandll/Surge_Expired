@@ -46,7 +46,7 @@ namespace Surge
 
     Material::~Material()
     {
-        mRHI->WaitIdle();
+        //mRHI->WaitIdle();
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mRHI->DestroyBuffer(mGPUBuffers[i]);

@@ -103,7 +103,7 @@ namespace Surge
 
     void VulkanImage::Destroy(const VulkanRHI& rhi, ImageEntry& entry)
     {
-        rhi.WaitIdle();
+        //rhi.WaitIdle();
         if (entry.View != VK_NULL_HANDLE)
         {
             vkDestroyImageView(rhi.GetDevice(), entry.View, nullptr);
@@ -127,22 +127,32 @@ namespace Surge
         ImageEntry* entry = rhi.mTexturePool.Get(h);
         SG_ASSERT(entry, "UploadTextureData: invalid TextureHandle");
         SG_ASSERT(data && size > 0, "UploadTextureData: data is null or size is 0");
+        VmaAllocator allocator = rhi.GetAllocator();
 
-        // Staging buffer
-        BufferDesc stagingDesc = {};
-        stagingDesc.Size = size;
-        stagingDesc.Usage = BufferUsage::STAGING;
-        stagingDesc.HostVisible = true;
-        stagingDesc.InitialData = data;
-        stagingDesc.DebugName = "TextureUploadStaging";
-        BufferHandle stagingHandle = rhi.CreateBuffer(stagingDesc);
-        BufferEntry* staging = rhi.mBufferPool.Get(stagingHandle);
+        VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        stagingInfo.size = size;
 
-        // One-time command buffer
-        VkCommandBuffer cmd = rhi.BeginOneTimeCommands();
+        stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        VmaAllocationCreateInfo stagingAllocInfo = {};
+        stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        stagingAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; // TODO(Rid) Do we need this requiredFlags?
+
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VmaAllocation stagingAllocation {};
+        VmaAllocationInfo stagingResultInfo;
+
+        VK_CALL(vmaCreateBuffer(allocator, &stagingInfo, &stagingAllocInfo, &stagingBuffer, &stagingAllocation, &stagingResultInfo));
+        SG_ASSERT(stagingResultInfo.pMappedData != nullptr, "Staging buffer failed to map");
+        memcpy(stagingResultInfo.pMappedData, data, size);
+
+        const VkCommandBuffer cb = rhi.BeginOneTimeCommands();
 
         // Transition: UNDEFINED to TRANSFER_DST
-        TransitionLayout(cmd, *entry, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkBufferCopy copyRegion = {};
+        copyRegion.size = size;
 
         // Copy staging buffer to image, one region per mip 0
         VkBufferImageCopy region = {};
@@ -155,23 +165,24 @@ namespace Surge
         region.imageSubresource.layerCount = 1;
         region.imageOffset = { 0, 0, 0 };
         region.imageExtent = { entry->Desc.Width, entry->Desc.Height, 1 };
-
-        vkCmdCopyBufferToImage(cmd, staging->Buffer, entry->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(cb, stagingBuffer, entry->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
         // Transition: TRANSFER_DST to SHADER_READ_ONLY
-        TransitionLayout(cmd, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-        rhi.EndOneTimeCommands(cmd);
+        rhi.EndOneTimeCommands(cb);
 
-        // Cleanup staging buffer
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
         vkQueueWaitIdle(rhi.GetQueue());
-        rhi.DestroyBuffer(stagingHandle);
     }
 
     void VulkanImage::TransitionLayout(VkCommandBuffer cmd, ImageEntry& entry, VkImageLayout newLayout)
     {
-        if (entry.Layout == newLayout)
+        if(entry.Layout == newLayout)
+        {
+            Log<Severity::Warn>("Trying to call VulkanImage::TransitionLayout while entry.Layout = newLayout!");
             return;
+        }
 
         VkImageMemoryBarrier barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -202,32 +213,32 @@ namespace Surge
 
         case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            srcStage              = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            srcStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            srcStage              = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            srcStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            srcStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_GENERAL:
             barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            srcStage              = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             break;
 
         default:
@@ -239,22 +250,18 @@ namespace Surge
         switch (newLayout)
         {
         case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-            dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+            dstStage              = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-            barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-                | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-            dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-                | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+            dstStage              = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT   | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-                | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
@@ -268,10 +275,8 @@ namespace Surge
             break;
 
         case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT
-                | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-                | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT  | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
@@ -280,9 +285,8 @@ namespace Surge
             break;
 
         case VK_IMAGE_LAYOUT_GENERAL:
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT
-                | VK_ACCESS_SHADER_WRITE_BIT;
-            dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            dstStage              = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             break;
 
         default:
@@ -290,13 +294,7 @@ namespace Surge
             break;
         }
 
-        vkCmdPipelineBarrier(cmd,
-            srcStage, dstStage,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
+        vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         entry.Layout = newLayout;
     }
 }

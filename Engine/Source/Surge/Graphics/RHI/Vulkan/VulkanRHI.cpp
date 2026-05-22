@@ -282,7 +282,6 @@ namespace Surge
         if (!entry)
             return;
 
-        WaitIdle();
         VK_RHI_LOG(Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation));
 
         if (entry->Desc.GenerateImGuiID)
@@ -300,7 +299,7 @@ namespace Surge
 
     void VulkanRHI::ResizeImage(ImageHandle h, Uint width, Uint height)
     {
-        vkDeviceWaitIdle(mDevice.GetDevice());
+        //WaitIdle();
 
         ImageEntry* entry = mTexturePool.Get(h);
         if (!entry)
@@ -339,7 +338,7 @@ namespace Surge
 
     void VulkanRHI::ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height)
     {
-        vkDeviceWaitIdle(mDevice.GetDevice());
+        WaitIdle();
 
         FramebufferEntry* entry = mFramebufferPool.Get(h);
         if (!entry)
@@ -1141,7 +1140,7 @@ namespace Surge
 
     void VulkanRHI::ResizeInternal()
     {
-        vkDeviceWaitIdle(mDevice);
+        //WaitIdle();
         DestroySwapchainFramebuffers();
         mSwapchain.Resize(*this, 0, 0);
         CreateSwapchainFramebuffers();

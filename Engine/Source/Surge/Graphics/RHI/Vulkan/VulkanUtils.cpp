@@ -202,7 +202,7 @@ namespace Surge::VulkanUtils
         if (bits & (Uint)BufferUsage::INDEX)    append("INDEX");
         if (bits & (Uint)BufferUsage::UNIFORM)  append("UNIFORM");
         if (bits & (Uint)BufferUsage::STORAGE)  append("STORAGE");
-        if (bits & (Uint)BufferUsage::STAGING)  append("STAGING");
+        //if (bits & (Uint)BufferUsage::STAGING)  append("STAGING");
 
         if (first)
             append("NONE");

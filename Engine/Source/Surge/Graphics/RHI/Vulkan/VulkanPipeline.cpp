@@ -138,6 +138,17 @@ namespace Surge
         depthStencil.depthWriteEnable = desc.Depth.WriteEnable ? VK_TRUE : VK_FALSE;
         depthStencil.depthCompareOp = VulkanUtils::ToVkCompareOp(desc.Depth.Op);
 
+        // Configure Stencil // TODO(Rid): Stencil
+        depthStencil.stencilTestEnable = desc.Depth.EnableStencil ? VK_TRUE : VK_FALSE;
+        //depthStencil.front.failOp = VK_STENCIL_OP_KEEP; //TODO
+        //depthStencil.front.depthFailOp = VK_STENCIL_OP_KEEP;
+        //depthStencil.front.passOp = VK_STENCIL_OP_REPLACE;     // Write reference value on pass
+        //depthStencil.front.compareOp = VK_COMPARE_OP_ALWAYS;   // Always pass and write
+        //depthStencil.front.compareMask = 0xFF;
+        //depthStencil.front.writeMask = 0xFF;                   // Allow writing to the buffer
+        //depthStencil.front.reference = 1;                      // The mask value
+        //depthStencil.back = depthStencil.front;
+
         // Blend
         VkPipelineColorBlendAttachmentState blendAttachment = {};
         blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;

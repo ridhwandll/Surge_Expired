@@ -31,7 +31,7 @@ namespace Surge
             desc.InitialData = data;
             desc.DataSize = width * height * 4;
             desc.Sampler = defautSampler;
-            texture = mRenderer->GetRHI()->CreateTexture(desc);
+            texture = mRenderer->GetRHI()->CreateImage(desc);
             stbi_image_free(data);
         }
         else		
@@ -187,7 +187,7 @@ namespace Surge
     void Editor::OnShutdown()
     {
         auto& rhi = mRenderer->GetRHI();
-        rhi->DestroyTexture(mRidTex);
+        rhi->DestroyImage(mRidTex);
     }
 
 } // namespace Surge
