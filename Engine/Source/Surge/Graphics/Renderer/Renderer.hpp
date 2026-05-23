@@ -1,44 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Memory.hpp"
-#include "Surge/Graphics/Renderer/Lights.hpp"
-#include "Surge/Graphics/Renderer/Renderer2D.hpp"
-#include "Surge/Graphics/Renderer/Renderer3D.hpp"
+#include "Surge/Graphics/RenderGraph/RenderGraph.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Surge/Graphics/Shader/ShaderManager.hpp"
-#include "Surge/Graphics/Material/Material.hpp"
+#include "Surge/Graphics/RHI/RHI.hpp"
+#include <imgui.h>
 
 namespace Surge
 {
-    // GPU Data
-    struct FrameUBO
-    {
-        glm::mat4 ViewProjection;  // 64 bytes
-        glm::vec3 CameraPos;       // 12 bytes
-        float _pad0;               // 4 bytes pads to 16-byte boundary
-    };
-    static_assert(sizeof(FrameUBO) % 16 == 0, "Size of 'FrameUBO' struct must be 16 bytes aligned!");
-
     class Scene;
-    struct RendererData
-    {
-        // Camera
-        glm::vec3 CameraPosition;
-        glm::mat4 ViewMatrix;
-        glm::mat4 ProjectionMatrix;
-        glm::mat4 ViewProjection;
-
-        ImageHandle WhiteImage;
-        ImageHandle FinalImage;
-        ImageHandle DepthImage;
-        BufferHandle FrameUBOs[RHISettings::FRAMES_IN_FLIGHT];
-
-        ShaderManager ShaderManager_;
-        SamplerHandle DefaultSampler;
-        FramebufferHandle OffscreenFramebuffer;
-        glm::vec4 ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
-    };
-
     class EditorCamera;
     class Renderer
     {
@@ -53,30 +24,49 @@ namespace Surge
         void BeginFrame(const EditorCamera& camera, Uint submitCount3D = 0);
         void EndFrame();
 
-        void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid()) { mRenderer2D.Submit(transform, color, texture); }
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh) { mRenderer3D.SubmitMesh(transform, mesh); }
-        void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation) { mRenderer3D.SubmitLight(light, position, rotation); }
+        void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())
+        {
+            FrameBlackboard& bb = mGraph.GetBlackboard();
+            bb.QuadList.push_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture });
+        }
+        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
+        {
+            FrameBlackboard& bb = mGraph.GetBlackboard();
+            bb.MeshList.emplace_back(MeshSubmitCmd { transform, mesh });
+        }
+        void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)
+        {
+            FrameBlackboard& bb = mGraph.GetBlackboard();
+
+            Light gpuLight {};
+            gpuLight.PositionType = (light.Type == LightType::DIRECTIONAL) ? glm::vec4(rotation, 0.0f) : glm::vec4(position, 1.0f); // Directional light has w = 0, Point light has w = 1
+            gpuLight.Color = light.Color;
+            gpuLight.Intensity = light.Intensity;
+            gpuLight.Radius = light.Radius;
+            gpuLight.Falloff = light.Falloff;
+            bb.LightList.emplace_back(gpuLight);
+        }
 
         void OnWindowResize(Uint width, Uint height);
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
-        ImageHandle GetWhiteTexture() const { return mData->WhiteImage; }
-        ImageHandle GetFinalImage() const { return mData->FinalImage; }
-        FramebufferHandle GetFinalFramebuffer() const { return mData->OffscreenFramebuffer; }
+        const FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
+        ImageHandle GetWhiteTexture() const { return mGraph.GetBlackboard().WhiteImage; }
+        ImageHandle GetFinalImage() const { return mGraph.GetBlackboard().FinalImage; }
+        FramebufferHandle GetFinalFramebuffer() const { return mGraph.GetBlackboard().OffscreenFramebuffer; }
         ImTextureID GetFinalImageImGuiID() const
         {
             SG_ASSERT(!RHISettings::BLIT_TO_SWAPCHAIN, "Renderer is blitting to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
-            return mRHI->GetImGuiImage(mData->FinalImage);
+            return mRHI->GetImGuiImage(mGraph.GetBlackboard().FinalImage);
         }
 
-        const Renderer2D& GetRenderer2D() const { return mRenderer2D; }
-        SamplerHandle GetDefaultSampler() const { return mData->DefaultSampler; }
+        ShaderManager& GetShaderManager() { return mShaderManager; }
+        SamplerHandle GetDefaultSampler() const { return mGraph.GetBlackboard().DefaultSampler; }
 
         const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
         Scope<GraphicsRHI>& GetRHI() { return mRHI; }
 
         void AddImGuiRenderCallback(std::function<void()> callback) { if (callback) { mImGuiRenderCallbacks.push_back(callback); } }
-        RendererData* GetData() { return mData.get(); }
     private:
         void OnImGuiRender();
 
@@ -84,10 +74,9 @@ namespace Surge
         FrameContext mCurrentFrameCtx;
         Vector<std::function<void()>> mImGuiRenderCallbacks;
 
-        Renderer2D mRenderer2D;
-        Renderer3D mRenderer3D;
+        RenderGraph mGraph;
 
+        ShaderManager mShaderManager;
         Scope<GraphicsRHI> mRHI;
-        Scope<RendererData> mData;
     };
 } // namespace Surge

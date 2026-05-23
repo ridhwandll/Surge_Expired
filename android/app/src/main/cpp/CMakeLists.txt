@@ -35,7 +35,6 @@ file(GLOB PLAYER_SOURCES
     "${PLAYER_SRC_ROOT}/*.cpp"
 )
 
-# -----------------------------------------------------------------------
 # Shared library target (APK packages .so files, not executables)
 add_library(SurgePlayer SHARED
     ${ENGINE_SOURCES}

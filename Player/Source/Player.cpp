@@ -11,6 +11,7 @@
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <android/asset_manager.h>
 #endif
+#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 
 
 namespace Surge
@@ -284,12 +285,15 @@ namespace Surge
             ImGui::EndMenuBar();
         }
 
-        ImGui::Text("Vertices: %i\n%.1fms (FPS: %.1f)", Core::GetRenderer()->GetRenderer2D().GetvertexCount(), clock.GetMilliseconds(), 1 / clock.GetSeconds());
+        const FrameBlackboard& bb = mRenderer->GetRenderGraphBlackBoard();
+
+        ImGui::Text("Vertices: %i\n%.1fms (FPS: %.1f)", bb.QuadList.size() * 4, clock.GetMilliseconds(), 1 / clock.GetSeconds());
         ImGui::Text("Textured Quads: %d", mTexturedQuadCount);
         ImGui::Text("Non-Textured Quads: %d", mColoredQuads.size());
-        ImGui::Text("Total Quads: %d", Core::GetRenderer()->GetRenderer2D().GetQuadCount());
+        ImGui::Text("Total Quads: %d", bb.QuadList.size());
         ImGui::Checkbox("Move quads", &mMoveEnabled);
-        if (ImGui::SliderInt("ColorQuads", &mChangeQuadAmount, mTexturedQuadCount, Renderer2D::MAX_QUADS_TOTAL))
+
+        if(ImGui::SliderInt("ColorQuads", &mChangeQuadAmount, mTexturedQuadCount, Renderer2DPass::MAX_QUADS_TOTAL))
         {
             RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
             float size = cam->GetOrthographicSize();
@@ -297,7 +301,7 @@ namespace Surge
             float halfWidth = size * aspect * 0.5f;
             float halfHeight = size * 0.5f;
 
-            Uint currentQuadCount = Core::GetRenderer()->GetRenderer2D().GetQuadCount();
+            Uint currentQuadCount = bb.QuadList.size();
             if (currentQuadCount > mChangeQuadAmount)
             {
                 Uint toRemove = currentQuadCount - mChangeQuadAmount;

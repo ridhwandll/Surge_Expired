@@ -1,22 +1,35 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Core/Memory.hpp"
-#include "Surge/Graphics/RHI/RHI.hpp"
-#include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Surge/Graphics/RHI/RHISettings.hpp"
+#include "Surge/Graphics/RenderGraph/RenderPass.hpp"
 
 namespace Surge
 {
-    class Scene;
-    class EditorCamera;
-    struct RendererData;
-    struct RHISettings;
-    class Renderer2D
+    class GraphicsRHI;
+    class Renderer2DPass : public RenderPass
     {
+    public:
+        Renderer2DPass() { mName = "Renderer2DPass"; }
+        virtual ~Renderer2DPass() = default;
+
+        virtual void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
+        virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackboard) override;
+        virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
+        virtual void Shutdown() override;
+        virtual void OnImGuiRender(FrameBlackboard& blackBoard) override;
     public:
         static constexpr Uint MAX_BATCHES_PER_FRAME = 10;
         static constexpr Uint MAX_QUADS_TOTAL = 100000;    // 100k quads total, across all(10) batches
         static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
+
+    private:
+        void RegisterDrawcall();
+
+    private:
+        struct QuadDrawCmd
+        {
+            Uint VertexOffset = 0;
+            Uint QuadCount = 0;
+        };
 
         struct QuadVertex
         {
@@ -26,39 +39,11 @@ namespace Surge
             Uint TextureIndex;
         };
 
-    public:
-        Renderer2D() = default;
-        ~Renderer2D() = default;
-
-        int GetQuadCount() const { return mTotalQuadCount; }
-        int GetvertexCount() const { return mTotalVertexCount; }
-
-    private:
-        void Initialize(GraphicsRHI* rhi, RendererData* data);
-        void Shutdown();
-
-        // Called by Renderer, not meant to be called directly
-        void BeginFrame(const FrameContext& frameCtx);
-        void Submit(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid());
-        void EndFrame();
-
-        void WriteToGPUBuffer();
-
-        void OnWindowResize(Uint width, Uint height);
-        void OnImGuiRender();
-    private:
-        struct QuadDrawCmd
-        {
-            Uint VertexOffset = 0;
-            Uint QuadCount = 0;
-        };
-
         struct BatchData
         {
             Vector<QuadVertex> VertexData;
             Uint VertexCount = 0;
             Uint QuadCount = 0;
-
             void Reset()
             {
                 VertexCount = 0;
@@ -66,6 +51,7 @@ namespace Surge
             }
         };
     private:
+        GraphicsRHI* mRHI = nullptr;
         FrameContext mCurrentFrameCtx;
         BatchData mCurrentBatch;
         Vector<QuadDrawCmd> mDrawCommands; // We store the draw commands for each batch, and execute them all at the end of the frame in one go
@@ -84,9 +70,5 @@ namespace Surge
         BufferHandle mIndexBuffer;
         DescriptorSetHandle mFrameDescriptorSet;
 
-        GraphicsRHI* mRHI;
-        RendererData* mData;
-
-        friend class Renderer;
     };
-} // namespace Surge
+}

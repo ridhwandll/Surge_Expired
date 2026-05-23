@@ -2,6 +2,9 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Core.hpp"
+#include "../RHI/RHI.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
+#include <Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp>
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -10,22 +13,23 @@ namespace Surge
     void Renderer::Initialize()
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
-        mData = CreateScope<RendererData>();
 
         const ClientOptions& clientOptions = Core::GetClient()->GetClientOptions();
         RHISettings::BLIT_TO_SWAPCHAIN = clientOptions.RenderFinalImageToSwapchian;
 
+        mShaderManager.Initialize(ENGINE_SHADER_PATH);
+        mShaderManager.Load("Renderer2D.glsl");
+        mShaderManager.Load("Renderer3D.glsl");
+
         mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
 
-        mData->ShaderManager_.Initialize(ENGINE_SHADER_PATH);
-        mData->ShaderManager_.Load("Renderer2D.glsl");
-        mData->ShaderManager_.Load("Renderer3D.glsl");
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
 
         //Sampler
         SamplerDesc samplerDesc = {};
         samplerDesc.DebugName = "Renderer DefaultSampler";
-        mData->DefaultSampler = mRHI->CreateSampler(samplerDesc);
+        blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
 
         // Offscreen color texture
         glm::vec2 size = Core::GetWindow()->GetSize();
@@ -35,12 +39,12 @@ namespace Surge
         colorDesc.Format = ImageFormat::B10G11R11_UFLOAT_PACK32;
         colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT;
         colorDesc.DebugName = "Final Texture";
-        colorDesc.Sampler = mData->DefaultSampler;
+        colorDesc.Sampler = blackBoard.DefaultSampler;
 
         // TRANSFER_SRC needed for blit
         RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.Usage |= ImageUsage::TRANSFER_SRC : colorDesc.Usage |= ImageUsage::SAMPLED;
         RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
-        mData->FinalImage = mRHI->CreateImage(colorDesc);
+        blackBoard.FinalImage = mRHI->CreateImage(colorDesc);
 
         ImageDesc depthDesc = {};
         depthDesc.Width = size.x;
@@ -48,16 +52,16 @@ namespace Surge
         depthDesc.Format = ImageFormat::D32_SFLOAT;
         depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
         depthDesc.DebugName = "Final Depth Texture";
-        mData->DepthImage = mRHI->CreateImage(depthDesc);
+        blackBoard.DepthImage = mRHI->CreateImage(depthDesc);
 
         // Offscreen framebuffer
         FramebufferAttachment colorAttachment = {};
-        colorAttachment.Handle = mData->FinalImage;
+        colorAttachment.Handle = blackBoard.FinalImage;
         colorAttachment.Load = LoadOp::CLEAR;
         colorAttachment.Store = StoreOp::STORE;
 
         FramebufferAttachment depthAttachment = {};
-        depthAttachment.Handle = mData->DepthImage;
+        depthAttachment.Handle = blackBoard.DepthImage;
         depthAttachment.Load = LoadOp::CLEAR;
         depthAttachment.Store = StoreOp::DONT_CARE;
 
@@ -69,7 +73,7 @@ namespace Surge
         fbDesc.Width = size.x;
         fbDesc.Height = size.y;
         fbDesc.DebugName = "Offscreen Framebuffer";
-        mData->OffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
+        blackBoard.OffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
         uint8_t whitePixel[] = { 255, 255, 255, 255 };
         ImageDesc texDesc = {};
@@ -81,8 +85,8 @@ namespace Surge
         texDesc.InitialData = whitePixel;
         texDesc.GenerateImGuiID = true;
         texDesc.DataSize = sizeof(whitePixel);
-        texDesc.Sampler = mData->DefaultSampler;
-        mData->WhiteImage = mRHI->CreateImage(texDesc);
+        texDesc.Sampler = blackBoard.DefaultSampler;
+        blackBoard.WhiteImage = mRHI->CreateImage(texDesc);
 
         BufferDesc frameUBODesc = {};
         frameUBODesc.Usage = BufferUsage::UNIFORM;
@@ -90,67 +94,65 @@ namespace Surge
         frameUBODesc.DebugName = "FrameUBO";
         frameUBODesc.Size = sizeof(FrameUBO);
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
-            mData->FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
+            blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
 
-        mRenderer2D.Initialize(mRHI.get(), mData.get());
-        mRenderer3D.Initialize(mRHI.get(), mData.get());
-
+        mGraph.AddPass<GeometryPass>();
+        mGraph.AddPass<Renderer2DPass>();
+        mGraph.Setup(mRHI.get());
+        mGraph.Compile(); // TODO: Implement
     }
 
     void Renderer::BeginFrame(const EditorCamera& camera, Uint submitCount3D)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
-        mData->ViewMatrix = camera.GetViewMatrix();
-        mData->ProjectionMatrix = camera.GetProjectionMatrix();
-        mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
-        mData->CameraPosition = camera.GetPosition();
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+
+        blackBoard.ViewMatrix = camera.GetViewMatrix();
+        blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
+        blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
+        blackBoard.CameraPosition = camera.GetPosition();
 
         FrameUBO frameData = {};
-        frameData.ViewProjection = mData->ViewProjection;
-        frameData.CameraPos = mData->CameraPosition;
-        mRHI->UploadBuffer(mData->FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
+        frameData.ViewProjection = blackBoard.ViewProjection;
+        frameData.CameraPos = blackBoard.CameraPosition;
+        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
 
         mCurrentFrameCtx = mRHI->BeginFrame();
-        mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->OffscreenFramebuffer, mData->ClearColor);
-
-        mRenderer2D.BeginFrame(mCurrentFrameCtx);
-        mRenderer3D.BeginFrame(mCurrentFrameCtx, submitCount3D);
+        mRHI->CmdBeginRenderPass(mCurrentFrameCtx, blackBoard.OffscreenFramebuffer, blackBoard.ClearColor);
     }
 
     void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
-        mData->ViewMatrix = glm::inverse(transform);
-        mData->ProjectionMatrix = camera.GetProjectionMatrix();
-        mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
-        mData->CameraPosition = transform[3];
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+
+        blackBoard.ViewMatrix = glm::inverse(transform);
+        blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
+        blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
+        blackBoard.CameraPosition = transform[3];
 
         FrameUBO frameData = {};
-        frameData.ViewProjection = mData->ViewProjection;
-        frameData.CameraPos = mData->CameraPosition;
-        mRHI->UploadBuffer(mData->FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
+        frameData.ViewProjection = blackBoard.ViewProjection;
+        frameData.CameraPos = blackBoard.CameraPosition;
+        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
 
         mCurrentFrameCtx = mRHI->BeginFrame();
-        mRHI->CmdBeginRenderPass(mCurrentFrameCtx, mData->OffscreenFramebuffer, mData->ClearColor);
-
-        mRenderer2D.BeginFrame(mCurrentFrameCtx);
-        mRenderer3D.BeginFrame(mCurrentFrameCtx, submitCount3D);
+        mRHI->CmdBeginRenderPass(mCurrentFrameCtx, blackBoard.OffscreenFramebuffer, blackBoard.ClearColor);
     }
 
     void Renderer::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
 
-        mRenderer3D.EndFrame();
-        mRenderer2D.EndFrame();
-
-        mRHI->CmdEndRenderPass(mCurrentFrameCtx, mData->OffscreenFramebuffer);
+        mGraph.Execute(mCurrentFrameCtx);
+        mRHI->CmdEndRenderPass(mCurrentFrameCtx, blackBoard.OffscreenFramebuffer);
 
         // Swapchain
         if (RHISettings::BLIT_TO_SWAPCHAIN) // Copy the Final Image to the swapchain (Used in Player)
-            mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, mData->FinalImage);
+            mRHI->CmdBlitToSwapchain(mCurrentFrameCtx, blackBoard.FinalImage);
         else // If not blitting, we need to transition the final image to SAMPLED for ImGui rendering(Used in Editor)
-            mRHI->GetBackendRHI().CmdTransitionImageLayout(mCurrentFrameCtx, mData->FinalImage, ImageUsage::SAMPLED);
+            mRHI->GetBackendRHI().CmdTransitionImageLayout(mCurrentFrameCtx, blackBoard.FinalImage, ImageUsage::SAMPLED);
         
         mRHI->CmdBeginSwapchainRenderpass(mCurrentFrameCtx);
 
@@ -159,17 +161,17 @@ namespace Surge
             callback();
         
         OnImGuiRender();
-    
+        mGraph.OnImGuiRender();
+
         mRHI->CmdEndSwapchainRenderpass(mCurrentFrameCtx);
 
         mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
+        mGraph.ClearLists();
     }
 
     void Renderer::OnImGuiRender()
     {
         ImGui::Begin("Renderer");
-        mRenderer2D.OnImGuiRender();
-        mRenderer3D.OnImGuiRender();
         mRHI->ShowMetricsWindow();
         ImGui::End();
     }
@@ -180,37 +182,38 @@ namespace Surge
         {
             Core::AddFrameEndCallback([this, width, height]()
                 {
-                    mRHI->ResizeFramebuffer(mData->OffscreenFramebuffer, width, height);
+                    FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+                    mRHI->ResizeFramebuffer(blackBoard.OffscreenFramebuffer, width, height);
                 });
         }
 
-        mRenderer2D.OnWindowResize(width, height);
-        mRenderer3D.OnWindowResize(width, height);
+        mGraph.Resize(width, height);
     }
 
     Ref<Material> Renderer::CreateMaterial(const String& debugName)
     {
-        Ref<Material> material = Ref<Material>::Create(mRenderer3D.m3DPipeline, mData->ShaderManager_.Get("Renderer3D.glsl"), "Material");
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+        Ref<Material> material = Ref<Material>::Create(blackBoard.MaterialPipeline, mShaderManager.Get("Renderer3D.glsl"), "Material");
         return material;
     }
 
     void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
-        mRHI->WaitIdle();
-        mRenderer2D.Shutdown();
-        mRenderer3D.Shutdown();
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
 
-        mRHI->DestroyImage(mData->WhiteImage);
+        mRHI->WaitIdle();
+        mGraph.Shutdown();
+
+        mRHI->DestroyImage(blackBoard.WhiteImage);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
-            mRHI->DestroyBuffer(mData->FrameUBOs[i]);
+            mRHI->DestroyBuffer(blackBoard.FrameUBOs[i]);
 
-        mRHI->DestroySampler(mData->DefaultSampler);
-        mRHI->DestroyFramebuffer(mData->OffscreenFramebuffer);
-        mRHI->DestroyImage(mData->FinalImage);
-        mRHI->DestroyImage(mData->DepthImage);
-
+        mRHI->DestroySampler(blackBoard.DefaultSampler);
+        mRHI->DestroyFramebuffer(blackBoard.OffscreenFramebuffer);
+        mRHI->DestroyImage(blackBoard.FinalImage);
+        mRHI->DestroyImage(blackBoard.DepthImage);
         mRHI->Shutdown();
     }
 
