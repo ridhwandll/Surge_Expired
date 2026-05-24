@@ -84,6 +84,7 @@ namespace Surge
                 desc.Height = height;
                 desc.Format = ImageFormat::RGBA8_SRGB;
                 desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
+                desc.GenerateImGuiID = true;
                 desc.DebugName = String(std::to_string(i + 1) + ".png");
                 desc.InitialData = data;
                 desc.DataSize = width * height * 4;

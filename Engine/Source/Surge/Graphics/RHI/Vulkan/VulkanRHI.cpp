@@ -122,14 +122,12 @@ namespace Surge
         mImGuiContext.BeginFrame();
         VkDevice device = mDevice.GetDevice();
 
-        // Get current frame SLOT (round-robin, predictable)
-
         const PerFrame& frame = mFrame.GetCurrentVkFrame();
         Uint swapchainWidth = mSwapchain.GetWidth();
         Uint swapchainHeight = mSwapchain.GetHeight();
 
         // Wait for this SLOT's fence
-        // This slot was used N frames ago, wait until the GPU is done with it		
+        // This slot was used N frames ago, wait until the GPU is done with it
         {
             //Timer fenceTimer("vkWaitForFences", true);
             vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
@@ -173,10 +171,11 @@ namespace Surge
 
     void VulkanRHI::EndFrame(const FrameContext& ctx)
     {
+        // End recording
         const PerFrame& frame = mFrame.GetCurrentVkFrame();
         vkEndCommandBuffer(frame.CmdBuffer);
-        //Log<Severity::Debug>("-------------Ending CPU frame: FrameIndex: {}-------------", ctx.FrameIndex);
 
+        //Log<Severity::Debug>("-------------Ending CPU frame: FrameIndex: {}-------------", ctx.FrameIndex);
         // Submit: frame slot semaphores sync with swapchain image
         // Wait on AcquireSemaphore -> GPU waits until compositor releases the image
         // Signal ReleaseSemaphore -> tells compositor GPU is done writing to it
@@ -207,6 +206,7 @@ namespace Surge
     void VulkanRHI::Resize()
     {
 #ifdef SURGE_PLATFORM_ANDROID
+        // TODO: Android destroys and creates surface when window is minimized!
         //VulkanRHI& rhi = Core::GetRenderer()->GetRHI()->GetBackendRHI();
         //vkDestroySurfaceKHR(rhi.GetInstance(), rhi.GetSurface(), nullptr);
         //CreateSurface(Core::GetWindow());
@@ -361,16 +361,16 @@ namespace Surge
         *entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
     }
 
-    FramebufferDesc VulkanRHI::GetDesc(FramebufferHandle h)
+    const FramebufferDesc& VulkanRHI::GetDesc(FramebufferHandle h) const
     {
-        FramebufferEntry* entry = mFramebufferPool.Get(h);
+        const FramebufferEntry* entry = mFramebufferPool.Get(h);
         SG_ASSERT(entry, "GetDesc: invalid FramebufferHandle");
         return entry->Desc;
     }
 
-    ImageDesc VulkanRHI::GetDesc(ImageHandle h)
+    const ImageDesc& VulkanRHI::GetDesc(ImageHandle h) const
     {
-        ImageEntry* entry = mTexturePool.Get(h);
+        const ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "GetDesc: invalid TextureHandle");
         return entry->Desc;
     }
@@ -568,11 +568,7 @@ namespace Surge
         dstBarrier.subresourceRange.layerCount = 1;
 
         VkImageMemoryBarrier preBlit[2] = { srcBarrier, dstBarrier };
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            0, 0, nullptr, 0, nullptr,
-            2, preBlit);
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 2, preBlit);
 
         // Blit
         VkImageBlit region = {};
@@ -584,7 +580,6 @@ namespace Surge
         region.dstSubresource.layerCount = 1;
         region.dstOffsets[0] = { 0, 0, 0 };
         region.dstOffsets[1] = { (int32_t)w, (int32_t)h, 1 };
-
         vkCmdBlitImage(cmd, src->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST);
 
         // Transition swapchain: TRANSFER_DST to COLOR_ATTACHMENT
@@ -704,7 +699,6 @@ namespace Surge
                     depth->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             }
         }
-
     }
 
     VkCommandBuffer VulkanRHI::BeginOneTimeCommands() const
@@ -774,7 +768,7 @@ namespace Surge
         constexpr float boldFontSize = 18.0f;
         ImGui::PushFont(boldFont, boldFontSize);
         ImGui::TextUnformatted("GPU Info");
-        ImGui::PopFont();		
+        ImGui::PopFont();
         ImGui::Text("GPU: %s", mStats.GPUName.c_str());
         ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
         ImGui::Text("%s", mStats.RHIVersion.c_str());

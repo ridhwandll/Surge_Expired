@@ -5,6 +5,13 @@
 
 namespace Surge
 {
+    enum class PassGroup : uint8_t
+    {
+        //SHADOW,
+        MAIN_SCENE,
+        SWAPCHAIN
+    };
+
     class GraphicsRHI;
     class RenderPass
     {
@@ -17,8 +24,20 @@ namespace Surge
         virtual void OnImGuiRender(FrameBlackboard& blackBoard) = 0;
         virtual void Shutdown() = 0;
 
-        const String& GetName()  const { return mName; }
+        PassGroup GetGroup() const { return mGroup; }
+        const String& GetName() const { return mName; }
+        void SetEnabled(bool isEnabled) { mEnabled = isEnabled; }
+        bool IsEnabled() { return mEnabled; }
+        const Vector<ImageHandle>& GetImageReads() const { return mImageReads; }
+        const Vector<ImageHandle>& GetImageWrites() const { return mImageWrites; }
     protected:
+        
+    protected:
+        PassGroup mGroup = PassGroup::MAIN_SCENE; // each pass sets this in constructor
         String mName;
+
+        bool mEnabled = true;
+        Vector<ImageHandle> mImageReads;
+        Vector<ImageHandle> mImageWrites;
     };
 }

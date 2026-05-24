@@ -89,13 +89,13 @@ namespace Surge
 
         // Find a supported composite type
         VkCompositeAlphaFlagBitsKHR composite = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)		
-            composite = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;		
-        else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)		
-            composite = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;		
-        else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)		
-            composite = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;		
-        else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR)		
+        if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+            composite = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
+            composite = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+        else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)
+            composite = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+        else if (surfaceProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR)
             composite = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
         
         VkSwapchainCreateInfoKHR info{};

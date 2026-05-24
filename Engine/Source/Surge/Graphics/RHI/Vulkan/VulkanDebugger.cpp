@@ -33,7 +33,6 @@ namespace Surge
         mDebugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         mDebugCreateInfo.pfnUserCallback = VulkanDebugCallback;
         mDebugCreateInfo.pUserData = nullptr;
-
         vkInstanceCreateInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&mDebugCreateInfo;
     }
 
@@ -66,11 +65,9 @@ namespace Surge
     {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr)
-        {
-            Log<Severity::Info>("Creating VULKAN Debug Utils Messenger");
             return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-        }
-        
+
+        Log<Severity::Error>("Failed to call PFN_vkCreateDebugUtilsMessengerEXT");
         return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
 

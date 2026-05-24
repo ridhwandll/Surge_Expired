@@ -18,7 +18,7 @@ namespace Surge
         ~Timer()
         {
             if (mLogOnDestructor)
-                Log<Severity::Trace>("{0} took {1} ms!", mName, ElapsedMillis());
+                Log<Severity::Debug>("{0} took {1} ms!", mName, ElapsedMillis());
         }
 
         void Reset() { mStart = std::chrono::high_resolution_clock::now(); }

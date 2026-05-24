@@ -14,8 +14,9 @@ namespace Surge
 
         bool IsNull() const { return Index == INVALID_INDEX; }
 
-        bool operator==(const RHIHandle& o) const { return Index == o.Index && Generation == o.Generation; }
-        bool operator!=(const RHIHandle& o) const { return !(*this == o); }
+        //bool operator==(const RHIHandle& o) const { return Index == o.Index && Generation == o.Generation; }
+        //bool operator!=(const RHIHandle& o) const { return !(*this == o); }
+        auto operator<=>(const RHIHandle&) const = default; // Holy new spaceship operator of C++20
 
         static RHIHandle Invalid() { return {}; } // Index = ~0u, Generation = 0
     };

@@ -47,6 +47,7 @@ namespace Surge
         ImageHandle CreateImage(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
         void DestroyImage(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
         void ResizeImage(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }
+        const ImageDesc& GetDesc(ImageHandle h) const { return mBackendRHI.GetDesc(h); }
 
         // Framebuffer
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }
@@ -84,16 +85,14 @@ namespace Surge
 
         void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdEndRenderPass(ctx, h); }
-        void CmdTransitionTextureLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
+        void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
 
         void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
 
         ImTextureID AddImGuiImage(ImageHandle h) { return mBackendRHI.AddImGuiImage(h); }
         ImTextureID GetImGuiImage(ImageHandle h) { return mBackendRHI.GetImGuiImage(h); }
 
-        // TODO: REMOVE
-        BackendRHI& GetBackendRHI() { return mBackendRHI; }
-
+        //BackendRHI& GetBackendRHI() { return mBackendRHI; } // TODO: REMOVE
     private:
         BackendRHI mBackendRHI;
     };

@@ -45,7 +45,7 @@ namespace Surge
 
         const RHIStats& GetStats();
 
-        BufferHandle CreateBuffer(const BufferDesc& desc);		
+        BufferHandle CreateBuffer(const BufferDesc& desc);
         void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset);
         void DestroyBuffer(BufferHandle buffer);
 
@@ -53,12 +53,12 @@ namespace Surge
         void DestroyImage(ImageHandle h);
         void UploadImageData(ImageHandle h, const void* data, Uint size);
         void ResizeImage(ImageHandle h, Uint width, Uint height);
-        ImageDesc GetDesc(ImageHandle h);
+        const ImageDesc& GetDesc(ImageHandle h) const;
 
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
         void DestroyFramebuffer(FramebufferHandle h);
         void ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height);
-        FramebufferDesc GetDesc(FramebufferHandle h);
+        const FramebufferDesc& GetDesc(FramebufferHandle h) const;
 
         PipelineHandle CreatePipeline(const PipelineDesc& desc);
         void DestroyPipeline(PipelineHandle h);

@@ -10,3 +10,10 @@ target_include_directories(Player PRIVATE ${INCLUDE_DIRS})
 GroupSourcesByFolder(Player)
 set_property(TARGET Player PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_target_properties(Player PROPERTIES FOLDER App)
+
+add_custom_command(TARGET Player POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Binaries/shaderc_shared.dll"
+        $<TARGET_FILE_DIR:Player>
+    COMMENT "Copying shaderc_shared.dll to Player.exe directory..."
+)

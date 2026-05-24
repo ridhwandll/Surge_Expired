@@ -8,7 +8,7 @@ namespace Surge
     class Renderer2DPass : public RenderPass
     {
     public:
-        Renderer2DPass() { mName = "Renderer2DPass"; }
+        Renderer2DPass() { mGroup = PassGroup::MAIN_SCENE; mName = "Renderer2DPass"; }
         virtual ~Renderer2DPass() = default;
 
         virtual void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;

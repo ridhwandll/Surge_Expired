@@ -1,11 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "GeometryPass.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
+
 
 namespace Surge
 {
+    // Reads - nothing
+    // Writes to FinalImage
     void GeometryPass::Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard)
     {
+        SURGE_PROFILE_FUNC("GeometryPass::Setup");
         mRHI = rhi;
 
         DepthDesc depth;
@@ -13,6 +17,54 @@ namespace Surge
         depth.WriteEnable = true;
         depth.Op = CompareOp::LESS;
 
+        // Offscreen color image (blackBoard.FinalImage)
+        // 2D pass will use this image to write
+        glm::uvec2 size = Core::GetWindow()->GetSize();
+        
+        ImageDesc colorDesc = {};
+        colorDesc.Width = size.x;
+        colorDesc.Height = size.y;
+        colorDesc.Format = ImageFormat::B10G11R11_UFLOAT_PACK32;
+        colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT;
+        colorDesc.DebugName = "Final Texture";
+        colorDesc.Sampler = blackBoard.DefaultSampler;
+
+        // TRANSFER_SRC needed for blit
+        RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.Usage |= ImageUsage::TRANSFER_SRC : colorDesc.Usage |= ImageUsage::SAMPLED;
+        RHISettings::BLIT_TO_SWAPCHAIN ? colorDesc.GenerateImGuiID = false : colorDesc.GenerateImGuiID = true;
+        blackBoard.FinalImage = mRHI->CreateImage(colorDesc);
+
+        // Offscreen color image (blackBoard.DepthImage)
+        ImageDesc depthDesc = {};
+        depthDesc.Width = size.x;
+        depthDesc.Height = size.y;
+        depthDesc.Format = ImageFormat::D32_SFLOAT;
+        depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
+        depthDesc.DebugName = "Final Depth Texture";
+        blackBoard.DepthImage = mRHI->CreateImage(depthDesc);
+
+        // Offscreen framebuffer
+        FramebufferAttachment colorAttachment = {};
+        colorAttachment.Handle = blackBoard.FinalImage;
+        colorAttachment.Load = LoadOp::CLEAR;
+        colorAttachment.Store = StoreOp::STORE;
+
+        FramebufferAttachment depthAttachment = {};
+        depthAttachment.Handle = blackBoard.DepthImage;
+        depthAttachment.Load = LoadOp::CLEAR;
+        depthAttachment.Store = StoreOp::DONT_CARE;
+
+        FramebufferDesc fbDesc = {};
+        fbDesc.ColorAttachments[0] = colorAttachment;
+        fbDesc.ColorAttachmentCount = 1;
+        fbDesc.DepthAttachment = depthAttachment;
+        fbDesc.HasDepth = true;
+        fbDesc.Width = size.x;
+        fbDesc.Height = size.y;
+        fbDesc.DebugName = "Offscreen Framebuffer";
+        blackBoard.OffscreenFramebuffer = mRHI->CreateFramebuffer(fbDesc);
+
+        // Create 3D Pipeline
         PipelineDesc desc = {};
         desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Renderer3D.glsl");
         desc.Raster.Topo = Topology::TRIANGLE_LIST;
@@ -25,15 +77,16 @@ namespace Surge
         desc.TargetSwapchain = false;
         m3DPipeline = mRHI->CreatePipeline(desc);
 
+        // Create Lights Storagebuffer
         BufferDesc gpuLightDesc = {};
         gpuLightDesc.Usage = BufferUsage::STORAGE;
         gpuLightDesc.HostVisible = true;
         gpuLightDesc.DebugName = "Renderer3D_Lights";
-        gpuLightDesc.Size = sizeof(LightUBOData) * MAX_LIGHTS;
-
+        gpuLightDesc.Size = sizeof(LightUBOData);
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mLightUBOs[i] = mRHI->CreateBuffer(gpuLightDesc);
 
+        // Create DescriptorSetSlot::ZERO
         mFrameDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "3D_FrameData [Set0]");
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
         {
@@ -41,6 +94,7 @@ namespace Surge
             frameDescriptorWrite[0].Binding = 0;
             frameDescriptorWrite[0].Type = DescriptorType::UNIFORM_BUFFER;
             frameDescriptorWrite[0].Buffer = blackBoard.FrameUBOs[i];
+            frameDescriptorWrite[1].BufferRange = sizeof(FrameUBO);
 
             frameDescriptorWrite[1].Binding = 1;
             frameDescriptorWrite[1].Type = DescriptorType::STORAGE_BUFFER;
@@ -49,12 +103,15 @@ namespace Surge
             mRHI->UpdateDescriptorSet(mFrameDescriptorSet, frameDescriptorWrite, 2, i);
         }
 
-        // TODO: Remove
-        blackBoard.MaterialPipeline = m3DPipeline;
+        mImageWrites.push_back(blackBoard.FinalImage);
+        mImageWrites.push_back(blackBoard.DepthImage);
+
+        blackBoard.MaterialPipeline = m3DPipeline;// TODO: Remove
     }
 
     void GeometryPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard)
     {
+        SURGE_PROFILE_FUNC("GeometryPass::Execute");
         mCurrentFrameCtx = ctx;
 
         // FRAME UBO is uploaded by Renderer, so we only need to upload light data here
@@ -98,7 +155,11 @@ namespace Surge
 
     void GeometryPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
     {
-        Log<Severity::Debug>("GeometryPass::OnWindowResize: Latest dimensions: Width:{0} Height:{1}", width, height);
+        // blackBoard.OffscreenFramebuffer is owned by GeometryPass and thus resized by GeometryPass
+        if(RHISettings::BLIT_TO_SWAPCHAIN && (width > 0 && height > 0))
+            Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.OffscreenFramebuffer, width, height); }); // (Player)
+
+        // If not blitted to swapchain, user handles resize // (Editor)
     }
 
     void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard)
@@ -108,6 +169,7 @@ namespace Surge
 
     void GeometryPass::Shutdown()
     {
+        SURGE_PROFILE_FUNC("GeometryPass::Shutdown");
         mRHI->DestroyPipeline(m3DPipeline);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)

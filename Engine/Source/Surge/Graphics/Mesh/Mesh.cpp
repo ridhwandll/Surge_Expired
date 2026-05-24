@@ -251,7 +251,7 @@ namespace Surge
                     material->Set<float>("Reflectance", 0.5f);
 
                     //LoadTexture(mPath, pbr.base_color_texture, material, "AlbedoMap");
-                    // glTF packs roughness (G) and metalness (B) into one texture
+                    //glTF packs roughness (G) and metalness (B) into one texture
                     //LoadTexture(mPath, pbr.metallic_roughness_texture, material, "MetalnessMap");
                     //LoadTexture(mPath, pbr.metallic_roughness_texture, material, "RoughnessMap");
                 }

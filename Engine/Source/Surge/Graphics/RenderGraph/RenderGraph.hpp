@@ -1,13 +1,35 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
-#include "RenderPass.hpp"
-#include "FrameBlackboard.hpp"
-#include "ResourceRegistry.hpp"
+#include "Surge/Graphics/RenderGraph/RenderPass.hpp"
+#include "Surge/Graphics/RenderGraph/FrameBlackboard.hpp"
 
 namespace Surge
 {
     class GraphicsRHI;
+
+    struct ImageBarrier
+    {
+        ImageHandle Handle;
+        ImageUsage OldUsage;
+        ImageUsage NewUsage;
+    };
+
+    struct ExecutionGroup
+    {
+        String Name;
+        PassGroup Type;
+        Vector<RenderPass*> Passes;               // Sorted
+        Vector<ImageBarrier> BarriersBeforeGroup; // Inserted before vkBeginRenderPass
+        FramebufferHandle Framebuffer;
+        bool IsSwapchain = false;
+    };
+
+    struct CompiledGraph
+    {
+        bool IsValid = false;
+        Vector<ExecutionGroup> Groups;
+    };
 
     class RenderGraph 
     {
@@ -39,20 +61,18 @@ namespace Surge
             return raw;
         }
 
+        void AddImGuiRenderCallback(std::function<void()> callback) { if(callback) { mImGuiRenderCallbacks.push_back(std::move(callback)); } }
+
         FrameBlackboard& GetBlackboard() { return mBlackboard; }
         const FrameBlackboard& GetBlackboard() const { return mBlackboard; }
-        //const CompiledGraph& GetCompiledGraph() const { return mCompiledGraph; } // For visualizer
+        const CompiledGraph& GetCompiledGraph() const { return mCompiledGraph; } // For visualizer
     private:
-        // Topological sort within a group based on ImageReads/ImageWrites
-        void SortByDependencies(Vector<RenderPass*>& nodes);
-
-        // Derives VkImageMemoryBarriers needed between two groups
-        // void DeriveBarriers(ExecutionGroup& producer, ExecutionGroup& consumer);
-
+        void SortByDependencies(Vector<RenderPass*>& passes); // Topological sort within a group based on ImageReads/ImageWrites
     private:
         Vector<Scope<RenderPass>> mPasses;
+        Vector<std::function<void()>> mImGuiRenderCallbacks;
         FrameBlackboard mBlackboard;
-        ResourceRegistry mRegistry;
+        CompiledGraph mCompiledGraph;
         GraphicsRHI* mRHI = nullptr;
     };
 }

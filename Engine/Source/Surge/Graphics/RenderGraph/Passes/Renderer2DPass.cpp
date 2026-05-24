@@ -1,8 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Renderer2DPass.hpp"
-#include "Surge/Graphics/RHI/RHI.hpp"
-#include "../../Renderer/Renderer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
+#include "Surge/Graphics/RHI/RHI.hpp"
+#include "Surge/Graphics//Renderer/Renderer.hpp"
 
 namespace Surge
 {
@@ -11,7 +11,7 @@ namespace Surge
 
     void Renderer2DPass::Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard)
     {
-        SURGE_PROFILE_FUNC("Renderer2D::Initialize()");
+        SURGE_PROFILE_FUNC("Renderer2DPass::Setup");
         mRHI = rhi;
 
         // Create IB of 1 batch, we resue this for all batches, as the max indices per batch is fixed
@@ -66,7 +66,6 @@ namespace Surge
         //    mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(m2DPipeline, 1, DescriptorUpdateFrequency::DYNAMIC, "Renderer2D_TexDescriptorSet");
 
         // Frame UBO
-
         mFrameDescriptorSet = mRHI->CreateDescriptorSet(m2DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "2D_FrameData [Set0]");
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
@@ -78,12 +77,15 @@ namespace Surge
             mRHI->UpdateDescriptorSet(mFrameDescriptorSet, &frameDescriptorWrite, 1, i);
         }
 
-        // Amount of max draw calls
-        mDrawCommands.reserve(MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH);
+        mDrawCommands.reserve(MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH); // Amount of max draw calls
+
+        mImageWrites.push_back(blackBoard.FinalImage);
     }
 
     void Renderer2DPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackboard)
     {
+        SURGE_PROFILE_FUNC("Renderer2DPass::Execute");
+
         // Reset
         mCurrentBatchIndex = 0;
         mTotalVertexCount = 0;
@@ -128,7 +130,6 @@ namespace Surge
             mCurrentBatch.QuadCount++;
             mTotalQuadCount++;
         }
-
         RegisterDrawcall();
 
         if(mDrawCommands.empty())
@@ -170,6 +171,7 @@ namespace Surge
 
     void Renderer2DPass::Shutdown()
     {
+        SURGE_PROFILE_FUNC("Renderer2DPass::Shutdown");
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
         mRHI->DestroyPipeline(m2DPipeline);
 

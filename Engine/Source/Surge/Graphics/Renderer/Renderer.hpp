@@ -5,7 +5,6 @@
 #include "Surge/ECS/Components.hpp"
 #include "Surge/Graphics/Shader/ShaderManager.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
-#include <imgui.h>
 
 namespace Surge
 {
@@ -54,7 +53,7 @@ namespace Surge
         ImageHandle GetWhiteTexture() const { return mGraph.GetBlackboard().WhiteImage; }
         ImageHandle GetFinalImage() const { return mGraph.GetBlackboard().FinalImage; }
         FramebufferHandle GetFinalFramebuffer() const { return mGraph.GetBlackboard().OffscreenFramebuffer; }
-        ImTextureID GetFinalImageImGuiID() const
+        uint64_t GetFinalImageImGuiID() const
         {
             SG_ASSERT(!RHISettings::BLIT_TO_SWAPCHAIN, "Renderer is blitting to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
             return mRHI->GetImGuiImage(mGraph.GetBlackboard().FinalImage);
@@ -66,13 +65,10 @@ namespace Surge
         const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
         Scope<GraphicsRHI>& GetRHI() { return mRHI; }
 
-        void AddImGuiRenderCallback(std::function<void()> callback) { if (callback) { mImGuiRenderCallbacks.push_back(callback); } }
-    private:
-        void OnImGuiRender();
+        void AddImGuiRenderCallback(std::function<void()> callback) { mGraph.AddImGuiRenderCallback(std::move(callback)); }
 
     private:
         FrameContext mCurrentFrameCtx;
-        Vector<std::function<void()>> mImGuiRenderCallbacks;
 
         RenderGraph mGraph;
 
