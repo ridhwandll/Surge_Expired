@@ -3,6 +3,7 @@
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include <queue>
 #include <set>
+#include "../RHI/Vulkan/VulkanUtils.hpp"
 
 namespace Surge
 {
@@ -22,47 +23,34 @@ namespace Surge
         mCompiledGraph = {};
 
         ExecutionGroup mainGroup = { .Name = "Main Scene", .Type = PassGroup::MAIN_SCENE};
+        ExecutionGroup postProcessGroup = { .Name = "Post Process", .Type = PassGroup::POST_PROCESS };
         ExecutionGroup swapchainGroup = { .Name = "Swapchain", .Type = PassGroup::SWAPCHAIN, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .IsSwapchain = true };
 
         for(auto& pass : mPasses)
         {
             switch(pass->GetGroup())
             {
-                case PassGroup::MAIN_SCENE: mainGroup.Passes.push_back(pass.get());       break;
-                case PassGroup::SWAPCHAIN:  swapchainGroup.Passes.push_back(pass.get());  break;
+                case PassGroup::MAIN_SCENE:     mainGroup.Passes.push_back(pass.get());              break;
+                case PassGroup::POST_PROCESS:   postProcessGroup.Passes.push_back(pass.get());       break;
+                case PassGroup::SWAPCHAIN:      swapchainGroup.Passes.push_back(pass.get());         break;
             }
         }
 
         SortByDependencies(mainGroup.Passes);
+        SortByDependencies(postProcessGroup.Passes);
         SortByDependencies(swapchainGroup.Passes);
 
-        mainGroup.Framebuffer = mBlackboard.OffscreenFramebuffer;
+        postProcessGroup.Framebuffer = mBlackboard.PostProcessFramebuffer;
+        mainGroup.Framebuffer = mBlackboard.MainPassFramebuffer;
 
-        // (Rid) Derive barriers between groups
-        // These hell for loop basically answers:
-        // Does any pass in a group write an image that any pass in b group reads? If so, that image needs a barrier between them
-        // MainScene -> Swapchain: FinalImage color -> shader read
-        std::set<ImageHandle> barrierAdded;
-        for(RenderPass* a : mainGroup.Passes)
-        {
-            for(RenderPass* b : swapchainGroup.Passes)
-            {
-                for(ImageHandle write : a->GetImageWrites())
-                {
-                    for(ImageHandle read : b->GetImageReads())
-                    {
-                        if(write == read && !barrierAdded.count(write))
-                        {
-                            swapchainGroup.BarriersBeforeGroup.push_back({ write, ImageUsage::COLOR_ATTACHMENT, ImageUsage::SAMPLED });
-                            barrierAdded.insert(write);
-                        }
-                    }
-                }
-            }
-        }
+        DeriveBarrierBetweenExecutionGroups(mainGroup, postProcessGroup);
+        DeriveBarrierBetweenExecutionGroups(postProcessGroup, swapchainGroup);
 
         // Build final groups
         mCompiledGraph.Groups.push_back(std::move(mainGroup));
+
+        if (!postProcessGroup.Passes.empty())
+            mCompiledGraph.Groups.push_back(std::move(postProcessGroup));
 
         if(!swapchainGroup.Passes.empty())
             mCompiledGraph.Groups.push_back(std::move(swapchainGroup));
@@ -76,17 +64,8 @@ namespace Surge
         {
             const ExecutionGroup& group = mCompiledGraph.Groups[i];
 
-            // Swapchain Blit (TODO: Is this okay?)
-            if(i > 0 && mCompiledGraph.Groups[i - 1].Type == PassGroup::MAIN_SCENE && group.IsSwapchain)
-            {
-                if (RHISettings::BLIT_TO_SWAPCHAIN)
-                    mRHI->CmdBlitToSwapchain(ctx, mBlackboard.FinalImage);
-                else
-                {
-                    for(const ImageBarrier& barrier : group.BarriersBeforeGroup)
-                        mRHI->CmdTransitionImageLayout(ctx, barrier.Handle, barrier.NewUsage);
-                }
-            }
+            for(const ImageBarrier& barrier : group.BarriersBeforeGroup)
+                mRHI->CmdTransitionImageLayout(ctx, barrier.Handle, barrier.NewUsage);
 
             group.IsSwapchain ? mRHI->CmdBeginSwapchainRenderpass(ctx) : mRHI->CmdBeginRenderPass(ctx, group.Framebuffer, mBlackboard.ClearColor);
 
@@ -166,7 +145,7 @@ namespace Surge
     void RenderGraph::Shutdown()
     {
         for(auto& pass : mPasses)
-            pass->Shutdown();
+            pass->Shutdown(mBlackboard);
     }
 
     void RenderGraph::SortByDependencies(Vector<RenderPass*>& passes)
@@ -219,6 +198,39 @@ namespace Surge
                     // If A depends on B, swap them so B comes first
                     std::swap(passes[i], passes[i + 1]);
                     changed = true;
+                }
+            }
+        }
+    }
+
+    void RenderGraph::DeriveBarrierBetweenExecutionGroups(ExecutionGroup& groupA, ExecutionGroup& groupB)
+    {
+        // (Rid) Derive barriers between groups
+        // These hell for loop basically answers:
+        // Does any pass in a group write an image that any pass in b group reads? If so, that image needs a barrier between them
+        // Example: MainScene -> Swapchain: FinalImage color -> shader read
+        std::set<ImageHandle> barrierAdded;
+        for(RenderPass* a : groupA.Passes)
+        {
+            for(RenderPass* b : groupB.Passes)
+            {
+                for(ImageHandle write : a->GetImageWrites())
+                {
+                    for(ImageHandle read : b->GetImageReads())
+                    {
+                        if(write == read && !barrierAdded.count(write))
+                        {
+                            const ImageDesc& writeDesc = mRHI->GetDesc(write);
+                            const ImageDesc& readDesc = mRHI->GetDesc(read);
+
+                            Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
+                            Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
+                            Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", groupA.Name, groupB.Name);
+                            Log<Severity::Warn>("From: {} -> To: SAMPLED", VulkanUtils::TextureUsageToString(writeDesc.Usage)); //TODO: Remove
+                            groupB.BarriersBeforeGroup.push_back({ write, ImageUsage::SAMPLED });
+                            barrierAdded.insert(write);
+                        }
+                    }
                 }
             }
         }

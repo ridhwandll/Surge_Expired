@@ -54,13 +54,21 @@ namespace Surge
         glm::mat4 ViewMatrix;
         glm::mat4 ProjectionMatrix;
         glm::mat4 ViewProjection;
+        glm::vec2 CameraNearFarPlane;
+
         Uint FrameIndex;
         BufferHandle FrameUBOs[RHISettings::FRAMES_IN_FLIGHT];
 
-        ImageHandle FinalImage; // Written by GeometryNode (3D and 2D)
-        ImageHandle DepthImage;
         ImageHandle WhiteImage;
-        FramebufferHandle OffscreenFramebuffer;
+
+        ImageHandle MainPassColorImage;
+        ImageHandle MainPassDepthImage;
+
+        FramebufferHandle PostProcessFramebuffer;
+        FramebufferHandle MainPassFramebuffer;
+
+        ImageHandle FinalImage; // Null if RHISettings::RENDER_TO_SWAPCHAIN is true
+
         SamplerHandle DefaultSampler;
 
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))

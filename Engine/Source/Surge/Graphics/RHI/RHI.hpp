@@ -53,7 +53,7 @@ namespace Surge
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }
         void DestroyFramebuffer(FramebufferHandle h) { mBackendRHI.DestroyFramebuffer(h); }
         void ResizeFramebuffer(FramebufferHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeFramebuffer(h, newWidth, newHeight); }
-        FramebufferDesc GetDesc(FramebufferHandle h) { return mBackendRHI.GetDesc(h); }
+        const FramebufferDesc& GetDesc(FramebufferHandle h) const { return mBackendRHI.GetDesc(h); }
 
         // Pipeline
         PipelineHandle CreatePipeline(const PipelineDesc& desc) { return mBackendRHI.CreatePipeline(desc); }
@@ -78,6 +78,8 @@ namespace Surge
         void CmdBindDescriptorSet(const FrameContext& ctx, PipelineHandle pipeline, DescriptorSetHandle setHandle, DescriptorSetSlot slot) { mBackendRHI.CmdBindDescriptorSet(ctx, pipeline, setHandle, slot); }
 
         void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data) { mBackendRHI.CmdPushConstants(ctx, h, shaderStage, offset, size, data); }
+
+        [[deprecated("Blit to swapchain won't not work correctly if used, rather use a FullscreenTriangle instead!")]]
         void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle) { mBackendRHI.CmdBlitToSwapchain(ctx, srcHandle); }
 
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }

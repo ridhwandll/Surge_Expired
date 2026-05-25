@@ -333,7 +333,7 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", h.Index, h.Generation));
         VulkanFramebuffer::Destroy(*this, *entry);
-        mFramebufferPool.Free(h);		
+        mFramebufferPool.Free(h);
     }
 
     void VulkanRHI::ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height)
@@ -344,14 +344,13 @@ namespace Surge
         if (!entry)
             return;
 
-        // Destroy old VkFramebuffer, textures still live
         VulkanFramebuffer::Destroy(*this, *entry);
 
         // Resize the attached Textures
         for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
             ResizeImage(entry->Desc.ColorAttachments[i].Handle, width, height);
         if (entry->Desc.HasDepth)
-            ResizeImage(entry->Desc.DepthAttachment.Handle, width, height);		
+            ResizeImage(entry->Desc.DepthAttachment.Handle, width, height);
 
         // Rebuild with new dimensions
         FramebufferDesc desc = entry->Desc;
@@ -928,11 +927,11 @@ namespace Surge
                         ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
                         ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
                         ImGui::Text("Size: %.5f MB", entry.Size / (1024.0f * 1024.0f));
-                        if(desc.Usage & ImageUsage::SAMPLED && desc.GenerateImGuiID)
+                        if((desc.Usage & ImageUsage::SAMPLED) && desc.GenerateImGuiID)
                         {
                             float aspectRatio = (float)desc.Width / (float)desc.Height;
                             glm::vec2 imgSize = (aspectRatio > 1.0f) ? ImVec2(200.0f, 200.0f / aspectRatio) : ImVec2(200.0f * aspectRatio, 200.0f);
-                            ImGui::Text("Preview: %f, %f", imgSize.x, imgSize.y);
+                            ImGui::Text("Preview: %.2f, %.2f", imgSize.x, imgSize.y);
                             ImGui::Image(entry.ImGuiID, imgSize);
                         }
                         else
@@ -1054,7 +1053,8 @@ namespace Surge
             fbInfo.height = mSwapchain.GetHeight();
             fbInfo.layers = 1;
 
-            VK_CALL(vkCreateFramebuffer(mDevice.GetDevice(), &fbInfo, nullptr, &mSwapchainFramebuffers[i]));		
+            VK_CALL(vkCreateFramebuffer(mDevice.GetDevice(), &fbInfo, nullptr, &mSwapchainFramebuffers[i]));
+            SET_VK_DEBUG_NAME(*this, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)mSwapchainFramebuffers[i], "Swapchain Framebuffer");
         }
     }
 
@@ -1075,11 +1075,11 @@ namespace Surge
         VkAttachmentDescription attachment = {};
         attachment.format = mSwapchain.GetDimensions().Format;               // Backbuffer format
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;                          // Not multisampled
-        attachment.loadOp = RHISettings::BLIT_TO_SWAPCHAIN ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;                   // When ending the frame, we want tiles to be written out
         attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachment.initialLayout = RHISettings::BLIT_TO_SWAPCHAIN ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // After the render pass is complete, we will transition to PRESENT_SRC_KHR layout.
         
         // We have one subpass. This subpass has one color attachment.
@@ -1124,6 +1124,7 @@ namespace Surge
             .pDependencies = &dependency };
 
         VK_CALL(vkCreateRenderPass(device, &rp_info, nullptr, &mRenderPass));
+        SET_VK_DEBUG_NAME(*this, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)mRenderPass, "Swapchain Renderpass");
     }
 
     void VulkanRHI::DestroySwapchainRenderpass()
@@ -1165,14 +1166,14 @@ namespace Surge
         for(auto& descriptorPool : mVkDescriptorPools)
         {
             VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &descriptorPool));
-            SET_VK_DEBUG_NAME((*this), VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)descriptorPool, "DescriptorPool");
+            SET_VK_DEBUG_NAME(*this, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)descriptorPool, "DescriptorPool");
         }
 
         mNonResetableVkDescriptorPools.resize(RHISettings::FRAMES_IN_FLIGHT);
         for(auto& descriptorPool : mNonResetableVkDescriptorPools)
         {
             VK_CALL(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &descriptorPool));
-            SET_VK_DEBUG_NAME((*this), VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)descriptorPool, "NonResetable DescriptorPool");
+            SET_VK_DEBUG_NAME(*this, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)descriptorPool, "NonResetable DescriptorPool");
         }
     }
 

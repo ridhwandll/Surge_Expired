@@ -56,7 +56,7 @@ namespace Surge
         desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Renderer2D.glsl");
         desc.Raster.Cull = CullMode::NONE;
         desc.DebugName = "Renderer2D Pipeline";
-        desc.TargetFramebuffer = blackBoard.OffscreenFramebuffer;
+        desc.TargetFramebuffer = blackBoard.MainPassFramebuffer;
         desc.TargetSwapchain = false;
         desc.Blend.Enable = true;
         m2DPipeline = mRHI->CreatePipeline(desc);
@@ -79,7 +79,7 @@ namespace Surge
 
         mDrawCommands.reserve(MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH); // Amount of max draw calls
 
-        mImageWrites.push_back(blackBoard.FinalImage);
+        mImageWrites.push_back(blackBoard.MainPassColorImage);
     }
 
     void Renderer2DPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackboard)
@@ -169,7 +169,7 @@ namespace Surge
     {
     }
 
-    void Renderer2DPass::Shutdown()
+    void Renderer2DPass::Shutdown(FrameBlackboard& blackBoard)
     {
         SURGE_PROFILE_FUNC("Renderer2DPass::Shutdown");
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);

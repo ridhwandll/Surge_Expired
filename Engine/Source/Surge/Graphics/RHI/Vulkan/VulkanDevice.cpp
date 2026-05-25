@@ -68,7 +68,6 @@ namespace Surge
         if (mGraphicsQueueIndex < 0)
             throw std::runtime_error("Did not find suitable device with a queue that supports graphics and presentation.");
 
-
         Uint deviceExtensionCount;
         VK_CALL(vkEnumerateDeviceExtensionProperties(mGPU, nullptr, &deviceExtensionCount, nullptr));
         Vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
@@ -86,6 +85,16 @@ namespace Surge
             .queueCount = 1,
             .pQueuePriorities = &queuePriority };
 
+        // Features
+        VkPhysicalDeviceFeatures enabledFeatures {};
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceFeatures(mGPU, &deviceFeatures);
+        if(!deviceFeatures.samplerAnisotropy)
+            Log<Severity::Warn>("VkPhysicalDeviceFeatures::samplerAnisotropy is unavailable!");
+        else
+            enabledFeatures.samplerAnisotropy = VK_TRUE;
+
+        deviceInfo.pEnabledFeatures = &enabledFeatures;
         deviceInfo.queueCreateInfoCount = 1;
         deviceInfo.pQueueCreateInfos = &queueInfo;
         deviceInfo.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size());

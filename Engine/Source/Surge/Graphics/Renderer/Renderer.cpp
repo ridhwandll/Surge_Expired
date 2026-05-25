@@ -5,8 +5,8 @@
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/PostProcessPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
-#include <Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp>
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -17,13 +17,13 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
 
         const ClientOptions& clientOptions = Core::GetClient()->GetClientOptions();
-        RHISettings::BLIT_TO_SWAPCHAIN = clientOptions.RenderFinalImageToSwapchian;
+        RHISettings::RENDER_TO_SWAPCHAIN = clientOptions.RenderFinalImageToSwapchian;
 
         mShaderManager.Initialize(ENGINE_SHADER_PATH);
         mShaderManager.Load("Renderer2D.glsl");
         mShaderManager.Load("Renderer3D.glsl");
-        mShaderManager.Load("Outline.glsl");
-        mShaderManager.Load("OutlineStencilWrite.glsl");
+        mShaderManager.Load("Fullscreen.glsl");
+        mShaderManager.Load("Present.glsl");
 
         mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
@@ -32,7 +32,13 @@ namespace Surge
 
         //Sampler
         SamplerDesc samplerDesc = {};
-        samplerDesc.DebugName = "Renderer DefaultSampler";
+        samplerDesc.DebugName = "DefaultSampler";
+        samplerDesc.Min = FilterMode::NEAREST; // We set to NEAREST as Rendergraph Passes uses this internally
+        samplerDesc.Mag = FilterMode::NEAREST;
+        samplerDesc.WrapU = WrapMode::CLAMP;
+        samplerDesc.WrapV = WrapMode::CLAMP;
+        samplerDesc.Anisotropy = true;
+        samplerDesc.MaxAniso = 4;
         blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
 
         uint8_t whitePixel[] = { 255, 255, 255, 255 };
@@ -57,8 +63,8 @@ namespace Surge
             blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
 
         mGraph.AddPass<GeometryPass>();  // Must add GeometryPass before Renderer2DPass because it creates the blackboard.FinalImage
-        mGraph.AddPass<OutlinePass>();
         mGraph.AddPass<Renderer2DPass>();
+        mGraph.AddPass<PostProcessPass>();
         mGraph.AddPass<SwapchainPass>();
         mGraph.Setup(mRHI.get());
         mGraph.Compile();
@@ -73,6 +79,7 @@ namespace Surge
         blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
         blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
         blackBoard.CameraPosition = camera.GetPosition();
+        blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
 
         FrameUBO frameData = {};
         frameData.ViewProjection = blackBoard.ViewProjection;
@@ -91,6 +98,7 @@ namespace Surge
         blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
         blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
         blackBoard.CameraPosition = transform[3];
+        blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
 
         FrameUBO frameData = {};
         frameData.ViewProjection = blackBoard.ViewProjection;
@@ -135,9 +143,6 @@ namespace Surge
             mRHI->DestroyBuffer(blackBoard.FrameUBOs[i]);
 
         mRHI->DestroySampler(blackBoard.DefaultSampler);
-        mRHI->DestroyFramebuffer(blackBoard.OffscreenFramebuffer);
-        mRHI->DestroyImage(blackBoard.FinalImage);
-        mRHI->DestroyImage(blackBoard.DepthImage);
         mRHI->Shutdown();
     }
 

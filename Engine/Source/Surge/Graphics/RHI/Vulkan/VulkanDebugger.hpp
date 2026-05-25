@@ -83,7 +83,7 @@ namespace Surge
     {                                                                                       \
         SG_ASSERT_INTERNAL("[Vulkan] Returned value: {0}", Surge::VKResultToStringyy(res)); \
     }
-#define SET_VK_DEBUG_NAME(rhi, objType, objHandle, name) rhi.SetDebugName(objType, objHandle, name)
+#define SET_VK_DEBUG_NAME(rhi, objType, objHandle, name) (rhi).SetDebugName(objType, objHandle, name)
 #define SET_VMA_DEBUG_NAME(rhi, alloc, name) vmaSetAllocationName(rhi.GetAllocator(), alloc, name)
 #else
 #define VK_CALL(res) res

@@ -14,7 +14,7 @@ namespace Surge
         virtual void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
         virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackboard) override;
         virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
-        virtual void Shutdown() override;
+        virtual void Shutdown(FrameBlackboard& blackBoard) override;
         virtual void OnImGuiRender(FrameBlackboard& blackBoard) override;
     public:
         static constexpr Uint MAX_BATCHES_PER_FRAME = 10;

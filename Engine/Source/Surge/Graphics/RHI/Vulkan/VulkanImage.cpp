@@ -7,10 +7,27 @@ namespace Surge
 {
     VkImageAspectFlags VulkanImage::GetAspectFlags(ImageFormat format)
     {
-        if (format == ImageFormat::D24_UNORM_S8_UINT)
+        if(format == ImageFormat::D24_UNORM_S8_UINT)
             return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
-        if (VulkanUtils::IsDepthFormat(format))
+        if(format == ImageFormat::D32_SFLOAT)
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        if(VulkanUtils::IsDepthFormat(format))
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+
+    // (Rid) For if depth image is sampled in shader then it can have only VK_IMAGE_ASPECT_DEPTH_BIT OR VK_IMAGE_ASPECT_STENCIL_BIT, not both
+    // Thats why I had to create GetAspectFlagsForImageView a separate function which returns only VK_IMAGE_ASPECT_DEPTH_BIT on DepthStencil/DepthOnly format
+    // Thats why this fucntion is created for image view separately
+    static VkImageAspectFlags GetAspectFlagsForImageView(ImageFormat format)
+    {
+        if(format == ImageFormat::D24_UNORM_S8_UINT || format == ImageFormat::D32_SFLOAT)
+            return VK_IMAGE_ASPECT_DEPTH_BIT; // No stencil(hack, we might require stencil buffer reads in future?)
+
+        if(VulkanUtils::IsDepthFormat(format))
             return VK_IMAGE_ASPECT_DEPTH_BIT;
 
         return VK_IMAGE_ASPECT_COLOR_BIT;
@@ -87,7 +104,10 @@ namespace Surge
         viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        viewInfo.subresourceRange.aspectMask = GetAspectFlags(desc.Format);
+
+        // (Rid) For if depth image is sampled in shader then it can have only VK_IMAGE_ASPECT_DEPTH_BIT OR VK_IMAGE_ASPECT_STENCIL_BIT, not both
+        // Thats why I had to create GetAspectFlagsForImageView a separate function which returns only VK_IMAGE_ASPECT_DEPTH_BIT on DepthStencil/DepthOnly format
+        viewInfo.subresourceRange.aspectMask = GetAspectFlagsForImageView(desc.Format);
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = desc.Mips;
         viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -191,10 +211,14 @@ namespace Surge
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = entry.Image;
-        barrier.subresourceRange.aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ||
-            newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
-            ? VK_IMAGE_ASPECT_DEPTH_BIT
-            : VK_IMAGE_ASPECT_COLOR_BIT;
+
+        if(entry.Layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        else if(entry.Layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        else
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
         barrier.subresourceRange.baseMipLevel = 0;
         barrier.subresourceRange.levelCount = entry.Desc.Mips;
         barrier.subresourceRange.baseArrayLayer = 0;

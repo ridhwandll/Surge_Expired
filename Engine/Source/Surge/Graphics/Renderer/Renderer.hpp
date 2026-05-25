@@ -56,10 +56,10 @@ namespace Surge
         const FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
         ImageHandle GetWhiteTexture() const { return mGraph.GetBlackboard().WhiteImage; }
         ImageHandle GetFinalImage() const { return mGraph.GetBlackboard().FinalImage; }
-        FramebufferHandle GetFinalFramebuffer() const { return mGraph.GetBlackboard().OffscreenFramebuffer; }
+        FramebufferHandle GetFinalFramebuffer() const { return mGraph.GetBlackboard().MainPassFramebuffer; }
         uint64_t GetFinalImageImGuiID() const
         {
-            SG_ASSERT(!RHISettings::BLIT_TO_SWAPCHAIN, "Renderer is blitting to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
+            SG_ASSERT(!RHISettings::RENDER_TO_SWAPCHAIN, "Renderer is rendering to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
             return mRHI->GetImGuiImage(mGraph.GetBlackboard().FinalImage);
         }
 

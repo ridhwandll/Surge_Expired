@@ -114,9 +114,6 @@ namespace Surge
         info.clipped = true;
         info.oldSwapchain = oldSwapchain;
 
-        if (RHISettings::BLIT_TO_SWAPCHAIN)
-            info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
         VK_CALL(vkCreateSwapchainKHR(device, &info, nullptr, &mSwapchain));
         Log<Severity::Debug>("VulkanSwapchain created with Width:{} Height:{}", swapchainSize.width, swapchainSize.height);
 

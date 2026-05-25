@@ -9,6 +9,7 @@ namespace Surge
     {
         //SHADOW,
         MAIN_SCENE,
+        POST_PROCESS,
         SWAPCHAIN
     };
 
@@ -22,7 +23,7 @@ namespace Surge
         virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackboard) = 0;
         virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) = 0;
         virtual void OnImGuiRender(FrameBlackboard& blackBoard) = 0;
-        virtual void Shutdown() = 0;
+        virtual void Shutdown(FrameBlackboard& blackBoard) = 0;
 
         PassGroup GetGroup() const { return mGroup; }
         const String& GetName() const { return mName; }

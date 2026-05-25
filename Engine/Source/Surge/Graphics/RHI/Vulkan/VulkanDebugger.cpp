@@ -24,16 +24,37 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(VkDebugUtilsMessageSev
     return VK_FALSE;
 }
 
+#ifdef SURGE_PLATFORM_ANDROID
+#include <dlfcn.h>
+#endif
+
 namespace Surge
 {
     void VulkanDebugger::Create(VkInstanceCreateInfo& vkInstanceCreateInfo)
-    {		
+    {
         mDebugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         mDebugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         mDebugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         mDebugCreateInfo.pfnUserCallback = VulkanDebugCallback;
         mDebugCreateInfo.pUserData = nullptr;
         vkInstanceCreateInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&mDebugCreateInfo;
+    }
+
+    static bool IsRenderDocAttached()
+    {
+#if defined(SURGE_PLATFORM_WINDOWS)
+        return GetModuleHandleA("renderdoc.dll") != nullptr;
+#elif defined(SURGE_PLATFORM_ANDROID)
+        void* handle = dlopen("libVkLayer_renderdoc_shim.so", RTLD_NOLOAD);
+        if(handle)
+        {
+            dlclose(handle);
+            return true;
+        }
+        return false;
+#else
+        return false;
+#endif
     }
 
     void VulkanDebugger::AddValidationLayers(Vector<const char*>& outInstanceLayers)
@@ -51,6 +72,10 @@ namespace Surge
             {
                 validationLayerPresent = true;
                 outInstanceLayers.push_back(validationLayerName);
+
+                if(IsRenderDocAttached())
+                    Log<Severity::Warn>("Renderdoc detected!");
+
                 break;
             }
         }
@@ -80,6 +105,7 @@ namespace Surge
 
     void VulkanDebugger::SetDebugName(const VulkanRHI& rhi, VkObjectType objType, uint64_t objectHandle, const String& name) const
     {
+        SG_ASSERT(objectHandle != 0, "Setting debug name to a null object!");
         VkDebugUtilsObjectNameInfoEXT nameInfo = {};
         nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
         nameInfo.objectType = objType;

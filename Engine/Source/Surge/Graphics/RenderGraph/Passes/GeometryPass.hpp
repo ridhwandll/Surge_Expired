@@ -15,7 +15,7 @@ namespace Surge
         virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
         virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
         virtual void OnImGuiRender(FrameBlackboard& blackBoard) override;
-        virtual void Shutdown() override;
+        virtual void Shutdown(FrameBlackboard& blackBoard) override;
     public:
         static constexpr Uint MAX_LIGHTS = 256;
 

@@ -261,7 +261,7 @@ namespace Surge
             }
         }
 
-        ComputeSmoothNormals();
+        //ComputeSmoothNormals();
         CreateRHIObjects();
         cgltf_free(data);
     }
@@ -305,7 +305,7 @@ namespace Surge
         mMaterials[0]->Set<float>("Roughness", 0.5f);
         mMaterials[0]->Set<float>("Reflectance", 0.5f);
 
-        ComputeSmoothNormals();
+        //ComputeSmoothNormals();
         CreateRHIObjects();
     }
 
@@ -345,46 +345,46 @@ namespace Surge
         return glm::distance2(a, b) < (epsilon * epsilon); // distance2 avoids a slow sqrt
     }
 
-    void Mesh::ComputeSmoothNormals()
-    {
-        // Build index list sorted by position
-        Vector<Uint> sortedIndices(mVertices.size());
-        std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
-        std::sort(sortedIndices.begin(), sortedIndices.end(), [&](Uint a, Uint b)
-            {
-                const glm::vec3& pa = mVertices[a].Position;
-                const glm::vec3& pb = mVertices[b].Position;
-                if(pa.x != pb.x)
-                    return pa.x < pb.x;
-                if(pa.y != pb.y)
-                    return pa.y < pb.y;
-
-                return pa.z < pb.z;
-            });
-
-        // Walk sorted list, accumulate normals for vertices sharing the same position
-        Uint i = 0;
-        while(i < sortedIndices.size())
-        {
-            Uint j = i;
-            const glm::vec3& refPos = mVertices[sortedIndices[i]].Position;
-
-            // Find the end of this position group
-            while(j < sortedIndices.size() && ArePositionsEqual(mVertices[sortedIndices[j]].Position, refPos))
-                j++;
-
-            // Accumulate normals across the group
-            glm::vec3 accumulated = glm::vec3(0.0f);
-            for(Uint k = i; k < j; k++)
-                accumulated += mVertices[sortedIndices[k]].Normal;
-
-            accumulated = glm::normalize(accumulated);
-
-            for(Uint k = i; k < j; k++)
-                mVertices[sortedIndices[k]].SmoothNormal = accumulated;
-
-            i = j;
-        }
-    }
+//     void Mesh::ComputeSmoothNormals()
+//     {
+//         // Build index list sorted by position
+//         Vector<Uint> sortedIndices(mVertices.size());
+//         std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
+//         std::sort(sortedIndices.begin(), sortedIndices.end(), [&](Uint a, Uint b)
+//             {
+//                 const glm::vec3& pa = mVertices[a].Position;
+//                 const glm::vec3& pb = mVertices[b].Position;
+//                 if(pa.x != pb.x)
+//                     return pa.x < pb.x;
+//                 if(pa.y != pb.y)
+//                     return pa.y < pb.y;
+// 
+//                 return pa.z < pb.z;
+//             });
+// 
+//         // Walk sorted list, accumulate normals for vertices sharing the same position
+//         Uint i = 0;
+//         while(i < sortedIndices.size())
+//         {
+//             Uint j = i;
+//             const glm::vec3& refPos = mVertices[sortedIndices[i]].Position;
+// 
+//             // Find the end of this position group
+//             while(j < sortedIndices.size() && ArePositionsEqual(mVertices[sortedIndices[j]].Position, refPos))
+//                 j++;
+// 
+//             // Accumulate normals across the group
+//             glm::vec3 accumulated = glm::vec3(0.0f);
+//             for(Uint k = i; k < j; k++)
+//                 accumulated += mVertices[sortedIndices[k]].Normal;
+// 
+//             accumulated = glm::normalize(accumulated);
+// 
+//             for(Uint k = i; k < j; k++)
+//                 mVertices[sortedIndices[k]].SmoothNormal = accumulated;
+// 
+//             i = j;
+//         }
+//     }
 
 } // namespace Surge

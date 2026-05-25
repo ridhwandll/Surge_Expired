@@ -27,7 +27,7 @@ namespace Surge
         wc.hInstance = hInstance;
         wc.lpszClassName = "Surge Win32Window";
         wc.hbrBackground = (HBRUSH)GetStockObject(DKGRAY_BRUSH);
-        wc.hCursor = NULL;
+        wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wc.hIcon = nullptr;
         wc.hIconSm = wc.hIcon;
         wc.cbClsExtra = 0;
@@ -41,7 +41,7 @@ namespace Surge
         String config = "RELEASE";
 #endif
 
-		String windowTitle = std::format("{} <{}>", mWindowData.Title, config);
+        String windowTitle = std::format("{} <{}>", mWindowData.Title, config);
         glm::ivec2 screenSize = Platform::GetScreenSize();
         mWin32Window = CreateWindow(wc.lpszClassName, windowTitle.c_str(),
                                     WS_OVERLAPPEDWINDOW, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
@@ -49,10 +49,10 @@ namespace Surge
 
         // Set the title bar & border color
         #define DWMWA_CAPTION_COLOR_ 35
-		COLORREF titlebarColor = RGB(20, 20, 20);
-		DwmSetWindowAttribute(mWin32Window, DWMWA_CAPTION_COLOR_, &titlebarColor, sizeof(titlebarColor));
+        COLORREF titlebarColor = RGB(20, 20, 20);
+        DwmSetWindowAttribute(mWin32Window, DWMWA_CAPTION_COLOR_, &titlebarColor, sizeof(titlebarColor));
         #define DWMWA_BORDER_COLOR_ 34
-		DwmSetWindowAttribute(mWin32Window, DWMWA_BORDER_COLOR_, &titlebarColor, sizeof(titlebarColor));
+        DwmSetWindowAttribute(mWin32Window, DWMWA_BORDER_COLOR_, &titlebarColor, sizeof(titlebarColor));
 
         SURGE_GET_WIN32_LAST_ERROR
         ApplyFlags();
@@ -63,7 +63,6 @@ namespace Surge
         ShadowMargins = {1, 1, 1, 1};
         DwmExtendFrameIntoClientArea(mWin32Window, &ShadowMargins);
         SURGE_GET_WIN32_LAST_ERROR
-        PostQuitMessage(0);
     }
 
     WindowsWindow::~WindowsWindow()
@@ -214,25 +213,25 @@ namespace Surge
             case WM_SYSKEYDOWN: // For Alt key
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-				WPARAM virtualKeyCode = wParam;
-				Uint scancode = (lParam & 0x00ff0000) >> 16;
-				bool isExtended = (lParam & 0x01000000) != 0;
+                WPARAM virtualKeyCode = wParam;
+                Uint scancode = (lParam & 0x00ff0000) >> 16;
+                bool isExtended = (lParam & 0x01000000) != 0;
 
-				if (virtualKeyCode == VK_SHIFT)
-				{
-					// MapVirtualKey translates the scancode to the specific L/R version
-					virtualKeyCode = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
-				}
-				else if (virtualKeyCode == VK_CONTROL)
-				{
-					virtualKeyCode = isExtended ? VK_RCONTROL : VK_LCONTROL;
-				}
-				else if (virtualKeyCode == VK_MENU) // Alt key
-				{
-					virtualKeyCode = isExtended ? VK_RMENU : VK_LMENU;
-				}
+                if (virtualKeyCode == VK_SHIFT)
+                {
+                    // MapVirtualKey translates the scancode to the specific L/R version
+                    virtualKeyCode = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+                }
+                else if (virtualKeyCode == VK_CONTROL)
+                {
+                    virtualKeyCode = isExtended ? VK_RCONTROL : VK_LCONTROL;
+                }
+                else if (virtualKeyCode == VK_MENU) // Alt key
+                {
+                    virtualKeyCode = isExtended ? VK_RMENU : VK_LMENU;
+                }
 
-				int repeatCount = (lParam & 0xffff);
+                int repeatCount = (lParam & 0xffff);
                 KeyPressedEvent event(static_cast<KeyCode>(virtualKeyCode), repeatCount);
                 data->mEventCallback(event);
                 break;
@@ -313,6 +312,14 @@ namespace Surge
                 return DefWindowProc(hWnd, msg, wParam, lParam);
                 break;
             }
+            case WM_SETCURSOR:
+            {
+                if(LOWORD(lParam) == HTCLIENT)
+                {
+                    break;
+                }
+                return DefWindowProc(hWnd, msg, wParam, lParam);
+            }
             default:
                 return DefWindowProc(hWnd, msg, wParam, lParam);
         }
@@ -326,6 +333,14 @@ namespace Surge
         {
             switch (msg)
             {
+                case WM_SETCURSOR:
+                {
+                    if(LOWORD(lParam) == HTCLIENT)
+                    {
+                        break;
+                    }
+                    return DefWindowProc(hWnd, msg, wParam, lParam);
+                }
                 case WM_NCHITTEST: // Handle WM_NCHITTEST manually, this signals the default resize
                 {
                     POINT mousePos;

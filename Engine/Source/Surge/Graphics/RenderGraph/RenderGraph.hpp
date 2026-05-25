@@ -11,7 +11,6 @@ namespace Surge
     struct ImageBarrier
     {
         ImageHandle Handle;
-        ImageUsage OldUsage;
         ImageUsage NewUsage;
     };
 
@@ -68,6 +67,7 @@ namespace Surge
         const CompiledGraph& GetCompiledGraph() const { return mCompiledGraph; } // For visualizer
     private:
         void SortByDependencies(Vector<RenderPass*>& passes); // Topological sort within a group based on ImageReads/ImageWrites
+        void DeriveBarrierBetweenExecutionGroups(ExecutionGroup& groupA, ExecutionGroup& groupB);
     private:
         Vector<Scope<RenderPass>> mPasses;
         Vector<std::function<void()>> mImGuiRenderCallbacks;

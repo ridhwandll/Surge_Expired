@@ -100,6 +100,8 @@ namespace Surge
         ImTextureID GetImGuiImage(ImageHandle h);
         void DestroyImGuiImage(ImageHandle h);
 
+        
+
         // Getters for internal use by Vulkan* classes
         const VulkanSwapchain& GetSwapchain() const { return mSwapchain; }
         VulkanSwapchain& GetSwapchain() { return mSwapchain; }
