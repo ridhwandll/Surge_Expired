@@ -6,6 +6,7 @@
 #include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
+#include <Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp>
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -21,6 +22,8 @@ namespace Surge
         mShaderManager.Initialize(ENGINE_SHADER_PATH);
         mShaderManager.Load("Renderer2D.glsl");
         mShaderManager.Load("Renderer3D.glsl");
+        mShaderManager.Load("Outline.glsl");
+        mShaderManager.Load("OutlineStencilWrite.glsl");
 
         mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
@@ -54,6 +57,7 @@ namespace Surge
             blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
 
         mGraph.AddPass<GeometryPass>();  // Must add GeometryPass before Renderer2DPass because it creates the blackboard.FinalImage
+        mGraph.AddPass<OutlinePass>();
         mGraph.AddPass<Renderer2DPass>();
         mGraph.AddPass<SwapchainPass>();
         mGraph.Setup(mRHI.get());
@@ -73,9 +77,9 @@ namespace Surge
         FrameUBO frameData = {};
         frameData.ViewProjection = blackBoard.ViewProjection;
         frameData.CameraPos = blackBoard.CameraPosition;
-        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
 
         mCurrentFrameCtx = mRHI->BeginFrame();
+        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
     }
 
     void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
@@ -91,9 +95,9 @@ namespace Surge
         FrameUBO frameData = {};
         frameData.ViewProjection = blackBoard.ViewProjection;
         frameData.CameraPos = blackBoard.CameraPosition;
-        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
 
         mCurrentFrameCtx = mRHI->BeginFrame();
+        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
     }
 
     void Renderer::EndFrame()

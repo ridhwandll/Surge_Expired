@@ -65,8 +65,8 @@ namespace Surge
             desc.samples = VK_SAMPLE_COUNT_1_BIT;
             desc.loadOp = VulkanUtils::ToVkLoadOp(key.DepthLoad);
             desc.storeOp = VulkanUtils::ToVkStoreOp(key.DepthStore);
-            desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            desc.stencilLoadOp = VulkanUtils::ToVkLoadOp(key.StencilLoad);
+            desc.stencilStoreOp = VulkanUtils::ToVkStoreOp(key.StencilStore);
             desc.initialLayout = key.DepthLoad == LoadOp::LOAD ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
             desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             attachments.push_back(desc);

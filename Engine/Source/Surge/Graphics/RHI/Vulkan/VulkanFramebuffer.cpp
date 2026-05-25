@@ -45,6 +45,8 @@ namespace Surge
             key.DepthFormat = VulkanUtils::TextureFormatToVkFormat(depth->Desc.Format);
             key.DepthLoad = desc.DepthAttachment.Load;
             key.DepthStore = desc.DepthAttachment.Store;
+            key.StencilLoad = desc.DepthAttachment.StencilLoad;
+            key.StencilStore = desc.DepthAttachment.StencilStore;
             views[viewCount++] = depth->View;
 
             entry.ClearValues[entry.ClearCount].depthStencil = { 1.0f, 0 };

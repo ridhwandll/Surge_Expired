@@ -7,6 +7,8 @@
 
 namespace Surge
 {
+    static Entity sSelectedEntity;
+
     Scene::Scene(bool runtime)
     {
         mRuntime = runtime;
@@ -53,6 +55,12 @@ namespace Surge
                 if(mesh.Mesh)
                     renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
             }
+            if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
+            {
+               const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
+               const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+               renderer->SubmitMeshOutline(transform, mesh, glm::vec3(1.0f, 0.6f, 0.1f), 1.3f);
+            }
         }
         renderer->EndFrame();
     }
@@ -86,6 +94,12 @@ namespace Surge
                 {
                     if(mesh.Mesh)
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
+                }
+                if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
+                {
+                    const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
+                    const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                    renderer->SubmitMeshOutline(transform, mesh, glm::vec3(1.0f, 0.6f, 0.1f), 1.3f);
                 }
             }
             renderer->EndFrame();
@@ -158,6 +172,16 @@ namespace Surge
     void Scene::DestroyEntity(Entity entity)
     {
         mRegistry.destroy(entity.Raw());
+    }
+
+    void Scene::SetSlectedEntity(Entity entity)
+    {
+        sSelectedEntity = entity;
+    }
+
+    Surge::Entity Scene::GetSlectedEntity() const
+    {
+        return sSelectedEntity;
     }
 
     void Scene::OnResize(float width, float height)

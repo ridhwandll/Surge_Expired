@@ -27,6 +27,14 @@ namespace Surge
         Ref<Mesh> Mesh_;
     };
 
+    struct OutlineSubmitCmd // Pushed by Renderer::SubmitOutlinedMesh()
+    {
+        glm::mat4 Transform;
+        Ref<Mesh> Mesh_;
+        glm::vec3 Color; // Outline color
+        float Thickness; // Scale factor
+    };
+
     struct LightSubmitCmd // Pushed by Renderer::SubmitLight()
     {
         Light GPULight; // Pre-converted from LightComponent at submit time
@@ -62,12 +70,14 @@ namespace Surge
         Vector<MeshSubmitCmd> MeshList;
         Vector<LightSubmitCmd> LightList;
         Vector<QuadSubmitCmd> QuadList;
+        Vector<OutlineSubmitCmd> OutlineList;
 
         void ClearLists()
         {
             MeshList.clear();
             LightList.clear();
             QuadList.clear();
+            OutlineList.clear();
         }
     };
 }

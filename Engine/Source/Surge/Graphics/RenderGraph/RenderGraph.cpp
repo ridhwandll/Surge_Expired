@@ -172,77 +172,55 @@ namespace Surge
     void RenderGraph::SortByDependencies(Vector<RenderPass*>& passes)
     {
         SCOPED_TIMER("RenderGraph::SortByDependencies");
-        Log<Severity::Debug>("-----RenderGraph::SortByDependencies-----");
 
         if(passes.size() <= 1)
             return;
 
-        HashMap<RenderPass*, int> depCount;
-        for(RenderPass* p : passes)
-            depCount[p] = 0;
+        // Stable bubble-up sort based on direct read/write dependencies
+        bool changed = true;
+        size_t iterations = 0;
+        const size_t maxIterations = passes.size() * passes.size(); // To detect cycles
 
-        // (Rid) Calculate the number of dependencies in each pass
-        // Passes with lowest dependencies executes first
-        for(RenderPass* a : passes)
+        while(changed)
         {
-            for(RenderPass* b : passes)
+            changed = false;
+            iterations++;
+
+            if(iterations > maxIterations)
             {
-                if(a != b)
+                SG_ASSERT_INTERNAL("Cyclic dependency between passes!");
+                return;
+            }
+
+            for(size_t i = 0; i < passes.size() - 1; ++i)
+            {
+                RenderPass* a = passes[i];
+                RenderPass* b = passes[i + 1];
+
+                // (Rid)Does pass A depend on pass B?
+                // (Meaning B writes to something A reads, so B must go BEFORE A)
+                bool aDependsOnB = false;
+                for(ImageHandle write : b->GetImageWrites())
                 {
-                    for(ImageHandle write : a->GetImageWrites())
+                    for(ImageHandle read : a->GetImageReads())
                     {
-                        for(ImageHandle read : b->GetImageReads())
+                        if(write == read)
                         {
-                            if(write == read)
-                            {
-                                const String& writePassName = mRHI->GetDesc(write).DebugName;
-                                const String& readPassName = mRHI->GetDesc(read).DebugName;
-                                Log<Severity::Info>("Renderpass: {0}: {1} image writes to {2} image", b->GetName(), writePassName, readPassName);
-                                depCount[b]++;
-                            }
+                            aDependsOnB = true;
+                            break;
                         }
                     }
+                    if(aDependsOnB)
+                        break;
+                }
+
+                if(aDependsOnB)
+                {
+                    // If A depends on B, swap them so B comes first
+                    std::swap(passes[i], passes[i + 1]);
+                    changed = true;
                 }
             }
         }
-
-        Vector<RenderPass*> sorted;
-        std::queue<RenderPass*> ready;
-        for(auto& [p, count] : depCount)
-        {
-            if(count == 0)
-                ready.push(p);
-        }
-
-        while(!ready.empty())
-        {
-            RenderPass* current = ready.front();
-            ready.pop();
-            sorted.push_back(current);
-
-            for(RenderPass* other : passes)
-            {
-                if(other != current)
-                {
-                    for(ImageHandle write : current->GetImageWrites())
-                    {
-                        for(ImageHandle read : other->GetImageReads())
-                        {
-                            if(write == read)
-                            {
-                                const String& writePassName = mRHI->GetDesc(write).DebugName;
-                                const String& readPassName = mRHI->GetDesc(read).DebugName;
-                                Log<Severity::Info>("RenderGraph::SortByDependencies: {0} image writes to {1} image", writePassName, readPassName);
-                                if(--depCount[other] == 0)
-                                    ready.push(other);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        SG_ASSERT(sorted.size() == passes.size(), "Cyclic dependency between passes!");
-        passes = sorted;
     }
 }

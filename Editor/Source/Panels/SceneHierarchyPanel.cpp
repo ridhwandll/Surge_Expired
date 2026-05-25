@@ -135,9 +135,11 @@ namespace Surge
                 ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
         }
 
-        if (ImGui::IsItemClicked())
+        if(ImGui::IsItemClicked())
+        {
             mSelectedEntity = e;
-
+            mSceneContext->SetSlectedEntity(mSelectedEntity);
+        }
 
         if (isSelectedEntity)
         {
@@ -151,8 +153,11 @@ namespace Surge
         {
             if (ImGui::MenuItem("Delete"))
             {
-                if (mSelectedEntity == e)
+                if(mSelectedEntity == e)
+                {
                     mSelectedEntity = {};
+                    mSceneContext->SetSlectedEntity(mSelectedEntity);
+                }
 
                 // Only execute when the frame ends, else it will give crash on "Entity not found"
                 Surge::Core::AddFrameEndCallback([this, e]() { mSceneContext->DestroyEntity(e); });

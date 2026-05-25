@@ -69,6 +69,20 @@ namespace Surge::VulkanUtils
         return VK_COMPARE_OP_LESS;
     }
 
+    VkStencilOp ToVkStencilOp(StencilOp stencilOp)
+    {
+        switch(stencilOp)
+        {
+            case Surge::StencilOp::KEEP:                return VK_STENCIL_OP_KEEP;
+            case Surge::StencilOp::ZERO:                return VK_STENCIL_OP_ZERO;
+            case Surge::StencilOp::REPLACE:             return VK_STENCIL_OP_REPLACE;
+            case Surge::StencilOp::INCREMENT_AND_CLAMP: return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+            case Surge::StencilOp::DECREMENT_AND_CLAMP: return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+            default:
+                SG_ASSERT_INTERNAL("ToVkStencilOp(StencilOp stencilOp): No Valid conversion for StencilOp exists!");
+        }
+    }
+
     VkBlendFactor ToVkBlendFactor(BlendFactor f)
     {
         switch (f)

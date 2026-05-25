@@ -31,7 +31,7 @@ namespace Surge
         void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
         {
             FrameBlackboard& bb = mGraph.GetBlackboard();
-            bb.MeshList.emplace_back(MeshSubmitCmd { transform, mesh });
+            bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh });
         }
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)
         {
@@ -44,6 +44,10 @@ namespace Surge
             gpuLight.Radius = light.Radius;
             gpuLight.Falloff = light.Falloff;
             bb.LightList.emplace_back(gpuLight);
+        }
+        void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh, const glm::vec3 color = { 1.0f, 0.5f, 0.0f }, float thickness = 1.05f)
+        {
+            mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh, color, thickness });
         }
 
         void OnWindowResize(Uint width, Uint height);

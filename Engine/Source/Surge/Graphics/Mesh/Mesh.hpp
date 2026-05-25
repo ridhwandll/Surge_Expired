@@ -40,6 +40,7 @@ namespace Surge
         const Vector<Ref<Material>>& GetMaterials() const { return mMaterials; }
     private:
         void CreateRHIObjects();
+        void ComputeSmoothNormals();
 
     private:
         String mPath;

@@ -11,16 +11,10 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("GeometryPass::Setup");
         mRHI = rhi;
-
-        DepthDesc depth;
-        depth.TestEnable = true;
-        depth.WriteEnable = true;
-        depth.Op = CompareOp::LESS;
+        glm::uvec2 size = Core::GetWindow()->GetSize();
 
         // Offscreen color image (blackBoard.FinalImage)
         // 2D pass will use this image to write
-        glm::uvec2 size = Core::GetWindow()->GetSize();
-        
         ImageDesc colorDesc = {};
         colorDesc.Width = size.x;
         colorDesc.Height = size.y;
@@ -38,7 +32,7 @@ namespace Surge
         ImageDesc depthDesc = {};
         depthDesc.Width = size.x;
         depthDesc.Height = size.y;
-        depthDesc.Format = ImageFormat::D32_SFLOAT;
+        depthDesc.Format = ImageFormat::D24_UNORM_S8_UINT;
         depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
         depthDesc.DebugName = "Final Depth Texture";
         blackBoard.DepthImage = mRHI->CreateImage(depthDesc);
@@ -53,6 +47,8 @@ namespace Surge
         depthAttachment.Handle = blackBoard.DepthImage;
         depthAttachment.Load = LoadOp::CLEAR;
         depthAttachment.Store = StoreOp::DONT_CARE;
+        depthAttachment.StencilLoad = LoadOp::CLEAR;
+        depthAttachment.StencilStore = StoreOp::DONT_CARE;
 
         FramebufferDesc fbDesc = {};
         fbDesc.ColorAttachments[0] = colorAttachment;
@@ -71,10 +67,14 @@ namespace Surge
         desc.Raster.Polygon = PolygonMode::FILL;
         desc.Raster.Cull = CullMode::BACK;
         desc.Blend.Enable = false;
-        desc.Depth = depth;
+        desc.Depth.TestEnable = true;
+        desc.Depth.WriteEnable = true;
+        desc.Depth.Op = CompareOp::LESS_OR_EQUAL;
+        desc.Stencil.Enable = false;
         desc.DebugName = "Renderer3D Pipeline";
         desc.TargetFramebuffer = blackBoard.OffscreenFramebuffer;
         desc.TargetSwapchain = false;
+
         m3DPipeline = mRHI->CreatePipeline(desc);
 
         // Create Lights Storagebuffer

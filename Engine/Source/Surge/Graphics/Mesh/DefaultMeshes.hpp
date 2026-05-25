@@ -6,6 +6,7 @@
 
 namespace Surge
 {
+    //Matches GPU side vertex shader stage inputs
     struct Vertex
     {
         glm::vec3 Position;
@@ -13,6 +14,7 @@ namespace Surge
         glm::vec3 Tangent;
         glm::vec3 Bitangent;
         glm::vec2 TexCoord;
+        glm::vec3 SmoothNormal;
     };
 
     struct Index

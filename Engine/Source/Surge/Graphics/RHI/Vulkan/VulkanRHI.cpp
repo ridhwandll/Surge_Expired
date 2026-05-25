@@ -654,7 +654,7 @@ namespace Surge
         {
             float clearColorr[4] = { clearColor.r, clearColor.g, clearColor.b, clearColor.a };
             std::copy(std::begin(clearColorr), std::end(clearColorr), entry->ClearValues[0].color.float32);
-        }
+        }        
 
         VkRenderPassBeginInfo rpInfo = {};
         rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

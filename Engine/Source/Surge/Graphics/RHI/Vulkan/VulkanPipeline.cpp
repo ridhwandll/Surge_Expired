@@ -130,7 +130,7 @@ namespace Surge
         raster.lineWidth = desc.Raster.LineWidth;
         raster.depthClampEnable = desc.Raster.DepthClamp ? VK_TRUE : VK_FALSE;
 
-        // Depth stencil
+        // Depth
         VkPipelineDepthStencilStateCreateInfo depthStencil = {};
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
         depthStencil.pNext = nullptr;
@@ -138,16 +138,26 @@ namespace Surge
         depthStencil.depthWriteEnable = desc.Depth.WriteEnable ? VK_TRUE : VK_FALSE;
         depthStencil.depthCompareOp = VulkanUtils::ToVkCompareOp(desc.Depth.Op);
 
-        // Configure Stencil // TODO(Rid): Stencil
-        depthStencil.stencilTestEnable = desc.Depth.EnableStencil ? VK_TRUE : VK_FALSE;
-        //depthStencil.front.failOp = VK_STENCIL_OP_KEEP; //TODO
-        //depthStencil.front.depthFailOp = VK_STENCIL_OP_KEEP;
-        //depthStencil.front.passOp = VK_STENCIL_OP_REPLACE;     // Write reference value on pass
-        //depthStencil.front.compareOp = VK_COMPARE_OP_ALWAYS;   // Always pass and write
-        //depthStencil.front.compareMask = 0xFF;
-        //depthStencil.front.writeMask = 0xFF;                   // Allow writing to the buffer
-        //depthStencil.front.reference = 1;                      // The mask value
-        //depthStencil.back = depthStencil.front;
+        // Stencil
+        depthStencil.stencilTestEnable = desc.Stencil.Enable ? VK_TRUE : VK_FALSE;
+
+        // Front face stencil ops
+        depthStencil.front.failOp = VulkanUtils::ToVkStencilOp(desc.Stencil.Front.Fail);
+        depthStencil.front.depthFailOp = VulkanUtils::ToVkStencilOp(desc.Stencil.Front.DepthFail);
+        depthStencil.front.passOp = VulkanUtils::ToVkStencilOp(desc.Stencil.Front.Pass);
+        depthStencil.front.compareOp = VulkanUtils::ToVkCompareOp(desc.Stencil.Front.CompareOp_);
+        depthStencil.front.compareMask = desc.Stencil.Front.CompareMask;
+        depthStencil.front.writeMask = desc.Stencil.Front.WriteMask;
+        depthStencil.front.reference = desc.Stencil.Front.Reference;
+
+        // Back face stencil ops
+        depthStencil.back.failOp = VulkanUtils::ToVkStencilOp(desc.Stencil.Back.Fail);
+        depthStencil.back.depthFailOp = VulkanUtils::ToVkStencilOp(desc.Stencil.Back.DepthFail);
+        depthStencil.back.passOp = VulkanUtils::ToVkStencilOp(desc.Stencil.Back.Pass);
+        depthStencil.back.compareOp = VulkanUtils::ToVkCompareOp(desc.Stencil.Back.CompareOp_);
+        depthStencil.back.compareMask = desc.Stencil.Back.CompareMask;
+        depthStencil.back.writeMask = desc.Stencil.Back.WriteMask;
+        depthStencil.back.reference = desc.Stencil.Back.Reference;
 
         // Blend
         VkPipelineColorBlendAttachmentState blendAttachment = {};

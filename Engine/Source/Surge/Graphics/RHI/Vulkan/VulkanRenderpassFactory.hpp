@@ -17,11 +17,15 @@ namespace Surge
         std::array<StoreOp, 8> ColorStore = {};
         LoadOp DepthLoad = LoadOp::CLEAR;
         StoreOp DepthStore = StoreOp::STORE;
+        LoadOp StencilLoad = LoadOp::CLEAR;
+        StoreOp StencilStore = StoreOp::DONT_CARE;
 
         bool operator==(const RenderPassKey& o) const
         {
-            if (ColorCount != o.ColorCount)   return false;
-            if (DepthFormat != o.DepthFormat) return false;
+            if (ColorCount != o.ColorCount)
+                return false;
+            if (DepthFormat != o.DepthFormat)
+                return false;
 
             for (Uint i = 0; i < ColorCount; i++)
             {
@@ -29,7 +33,7 @@ namespace Surge
                 if (ColorLoad[i] != o.ColorLoad[i])       return false;
                 if (ColorStore[i] != o.ColorStore[i])     return false;
             }
-            return DepthLoad == o.DepthLoad && DepthStore == o.DepthStore;
+            return (DepthLoad == o.DepthLoad && DepthStore == o.DepthStore) && (StencilLoad == o.StencilLoad && StencilStore == o.StencilStore);
         }
     };
 

@@ -94,6 +94,8 @@ namespace Surge
         ImageHandle Handle;
         LoadOp Load = LoadOp::CLEAR;
         StoreOp Store = StoreOp::STORE;
+        LoadOp StencilLoad = LoadOp::DONT_CARE;
+        StoreOp StencilStore = StoreOp::DONT_CARE;
     };
 
     struct FramebufferDesc
@@ -146,7 +148,6 @@ namespace Surge
     {
         bool TestEnable = false;
         bool WriteEnable = false;
-        bool EnableStencil = false;
         CompareOp Op = CompareOp::LESS;
     };
 
@@ -170,6 +171,25 @@ namespace Surge
         BlendOp AlphaOp = BlendOp::ADD;
     };
 
+    enum class StencilOp { KEEP, ZERO, REPLACE, INCREMENT_AND_CLAMP, DECREMENT_AND_CLAMP };
+    struct StencilOpState
+    {
+        StencilOp Fail = StencilOp::KEEP;
+        StencilOp Pass = StencilOp::KEEP;
+        StencilOp DepthFail = StencilOp::KEEP;
+        CompareOp CompareOp_ = CompareOp::ALWAYS;
+        uint32_t Reference = 0;
+        uint32_t WriteMask = 0xFF;
+        uint32_t CompareMask = 0xFF;
+    };
+
+    struct StencilDesc
+    {
+        bool Enable = false;
+        StencilOpState Front;
+        StencilOpState Back;
+    };
+
     struct PipelineDesc
     {
         // Shaders
@@ -179,6 +199,7 @@ namespace Surge
         RasterDesc Raster = {};
         DepthDesc Depth = {};
         BlendDesc Blend = {};
+        StencilDesc Stencil = {};
 
         FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // Offscreen
         bool TargetSwapchain = false; // Swapchain pass

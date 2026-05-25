@@ -13,6 +13,7 @@ namespace Surge::VulkanUtils
     VkPrimitiveTopology ToVkTopology(Topology t);
     VkPolygonMode ToVkPolygonMode(PolygonMode p);
     VkCompareOp ToVkCompareOp(CompareOp op);
+    VkStencilOp ToVkStencilOp(StencilOp stencilOp);
     VkBlendFactor ToVkBlendFactor(BlendFactor f);
     VkBlendOp ToVkBlendOp(BlendOp op);
     VkAttachmentLoadOp ToVkLoadOp(LoadOp op);
