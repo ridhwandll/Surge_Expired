@@ -9,8 +9,8 @@ namespace Surge
         mRHI = rhi;
 
         PipelineDesc fsDesc = {};
-        fsDesc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Fullscreen.glsl");
-        fsDesc.DebugName = "FullscreenPipeline";
+        fsDesc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("PostProcess.glsl");
+        fsDesc.DebugName = "PostProcess";
         fsDesc.Raster.Topo = Topology::TRIANGLE_LIST;
         fsDesc.Raster.Polygon = PolygonMode::FILL;
         fsDesc.Raster.Cull = CullMode::NONE;
@@ -52,11 +52,10 @@ namespace Surge
         mFullScreenSet = mRHI->CreateDescriptorSet(mFullscreenPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "SceneInputs");
 
         mImageReads.push_back(blackBoard.MainPassColorImage);
-        mImageReads.push_back(blackBoard.MainPassDepthImage);
+        mImageReads.push_back(blackBoard.OutlineMask);
         mImageWrites.push_back(blackBoard.FinalImage);
     }
 
-    // Called inside beginSwapchainREnderpass and endSwapchainRenderpass :(( what to do.
     void PostProcessPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard)
     {
         mRHI->CmdBindPipeline(ctx, mFullscreenPipeline);
@@ -68,34 +67,34 @@ namespace Surge
         writes[0].Sampler = blackBoard.DefaultSampler;
         writes[1].Binding = 1;
         writes[1].Type = DescriptorType::TEXTURE;
-        writes[1].Texture = blackBoard.MainPassDepthImage;
+        writes[1].Texture = blackBoard.OutlineMask;
         writes[1].Sampler = blackBoard.DefaultSampler;
         mRHI->UpdateDescriptorSet(mFullScreenSet, writes.data(), writes.size(), ctx.FrameIndex);
 
         mRHI->CmdBindDescriptorSet(ctx, mFullscreenPipeline, mFullScreenSet, DescriptorSetSlot::ZERO);
 
-        struct FullscreenPushConstants
+        struct PostProcessPushConstants
         {
             glm::vec4 ColorThickness;
             glm::vec2 ScreenResolution;
             glm::vec2 CameraPlanes;
         };
-        FullscreenPushConstants pc = {};
-        pc.ColorThickness = glm::vec4(1.0f, 0.6f, 0.1f, 3.0f);
+        PostProcessPushConstants pc = {};
+        pc.ColorThickness = glm::vec4(blackBoard.OutlineColor,  blackBoard.OutlineThickness);
         pc.ScreenResolution = glm::vec2(static_cast<float>(ctx.Width), static_cast<float>(ctx.Height));
         pc.CameraPlanes = blackBoard.CameraNearFarPlane;
-        mRHI->CmdPushConstants(ctx, mFullscreenPipeline, ShaderType::FRAGMENT | ShaderType::VERTEX, 0, sizeof(FullscreenPushConstants), &pc);
+        mRHI->CmdPushConstants(ctx, mFullscreenPipeline, ShaderType::FRAGMENT | ShaderType::VERTEX, 0, sizeof(PostProcessPushConstants), &pc);
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
 
     void PostProcessPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
     {
-
+        //if(RHISettings::RENDER_TO_SWAPCHAIN && (width > 0 && height > 0))
+            Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.PostProcessFramebuffer, width, height); }); // (Player)
     }
 
     void PostProcessPass::OnImGuiRender(FrameBlackboard& blackBoard)
     {
-
     }
 
     void PostProcessPass::Shutdown(FrameBlackboard& blackBoard)

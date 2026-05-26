@@ -34,6 +34,7 @@ namespace Surge
 
     enum class ImageFormat
     {
+        R8_UNORM,
         RGBA8_SRGB,
         RGBA8_UNORM,
         BGRA8_SRGB,
@@ -192,8 +193,10 @@ namespace Surge
 
     struct PipelineDesc
     {
+        // Attributes and bindings are reflected from shader via SPIRV-Cross
+
         // Shaders
-        Shader Shader_; // Attributes and bindings are reflected from shader via SPIRV-Cross
+        Shader Shader_; 
 
         // State
         RasterDesc Raster = {};
@@ -201,7 +204,7 @@ namespace Surge
         BlendDesc Blend = {};
         StencilDesc Stencil = {};
 
-        FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid(); // Offscreen
+        FramebufferHandle TargetFramebuffer = FramebufferHandle::Invalid();
         bool TargetSwapchain = false; // Swapchain pass
 
         String DebugName = "";

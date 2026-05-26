@@ -23,6 +23,7 @@ namespace Surge
         mCompiledGraph = {};
 
         ExecutionGroup mainGroup = { .Name = "Main Scene", .Type = PassGroup::MAIN_SCENE};
+        ExecutionGroup outlineGroup = { .Name = "Outline Mask", .Type = PassGroup::OUTLINE_MASK };
         ExecutionGroup postProcessGroup = { .Name = "Post Process", .Type = PassGroup::POST_PROCESS };
         ExecutionGroup swapchainGroup = { .Name = "Swapchain", .Type = PassGroup::SWAPCHAIN, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .IsSwapchain = true };
 
@@ -30,24 +31,31 @@ namespace Surge
         {
             switch(pass->GetGroup())
             {
-                case PassGroup::MAIN_SCENE:     mainGroup.Passes.push_back(pass.get());              break;
-                case PassGroup::POST_PROCESS:   postProcessGroup.Passes.push_back(pass.get());       break;
-                case PassGroup::SWAPCHAIN:      swapchainGroup.Passes.push_back(pass.get());         break;
+                case PassGroup::MAIN_SCENE:   mainGroup.Passes.push_back(pass.get());        break;
+                case PassGroup::OUTLINE_MASK: outlineGroup.Passes.push_back(pass.get());     break;
+                case PassGroup::POST_PROCESS: postProcessGroup.Passes.push_back(pass.get()); break;
+                case PassGroup::SWAPCHAIN:    swapchainGroup.Passes.push_back(pass.get());   break;
             }
         }
 
         SortByDependencies(mainGroup.Passes);
+        SortByDependencies(outlineGroup.Passes);
         SortByDependencies(postProcessGroup.Passes);
         SortByDependencies(swapchainGroup.Passes);
 
+        outlineGroup.Framebuffer = mBlackboard.OutlineFramebuffer;
         postProcessGroup.Framebuffer = mBlackboard.PostProcessFramebuffer;
         mainGroup.Framebuffer = mBlackboard.MainPassFramebuffer;
 
         DeriveBarrierBetweenExecutionGroups(mainGroup, postProcessGroup);
+        DeriveBarrierBetweenExecutionGroups(outlineGroup, postProcessGroup);
         DeriveBarrierBetweenExecutionGroups(postProcessGroup, swapchainGroup);
 
         // Build final groups
         mCompiledGraph.Groups.push_back(std::move(mainGroup));
+
+        if(!outlineGroup.Passes.empty())
+            mCompiledGraph.Groups.push_back(std::move(outlineGroup));
 
         if (!postProcessGroup.Passes.empty())
             mCompiledGraph.Groups.push_back(std::move(postProcessGroup));
@@ -135,9 +143,17 @@ namespace Surge
         ImGui::End();
     }
 
-    void RenderGraph::Resize(Uint width, Uint height)
+    void RenderGraph::OnWindowResize(Uint width, Uint height)
     {
-        // Let each node resize its own private resources (framebuffers, pipelines if needed)
+        if(RHISettings::RENDER_TO_SWAPCHAIN && (width > 0 && height > 0))
+        {
+            for(auto& node : mPasses)
+                node->Resize(width, height, mBlackboard);
+        }
+    }
+
+    void RenderGraph::ForceResize(Uint width, Uint height)
+    {
         for(auto& node : mPasses)
             node->Resize(width, height, mBlackboard);
     }

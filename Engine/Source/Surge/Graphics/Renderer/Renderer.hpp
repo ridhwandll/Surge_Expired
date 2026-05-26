@@ -32,6 +32,7 @@ namespace Surge
         {
             FrameBlackboard& bb = mGraph.GetBlackboard();
             bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh });
+            //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
         }
         void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)
         {
@@ -45,12 +46,11 @@ namespace Surge
             gpuLight.Falloff = light.Falloff;
             bb.LightList.emplace_back(gpuLight);
         }
-        void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh, const glm::vec3 color = { 1.0f, 0.5f, 0.0f }, float thickness = 1.05f)
-        {
-            mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh, color, thickness });
-        }
+        void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
 
         void OnWindowResize(Uint width, Uint height);
+        void ForceResize(Uint width, Uint height);
+
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
         const FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
@@ -62,6 +62,9 @@ namespace Surge
             SG_ASSERT(!RHISettings::RENDER_TO_SWAPCHAIN, "Renderer is rendering to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
             return mRHI->GetImGuiImage(mGraph.GetBlackboard().FinalImage);
         }
+
+        void SetOutlineColor(glm::vec3 outlineColor) { mGraph.GetBlackboard().OutlineColor = outlineColor; }
+        void SetOutlineThickness(float outlineThickness) { mGraph.GetBlackboard().OutlineThickness = outlineThickness; }
 
         ShaderManager& GetShaderManager() { return mShaderManager; }
         SamplerHandle GetDefaultSampler() const { return mGraph.GetBlackboard().DefaultSampler; }

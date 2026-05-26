@@ -19,7 +19,7 @@ namespace Surge
         colorDesc.Height = size.y;
         colorDesc.Format = ImageFormat::B10G11R11_UFLOAT_PACK32;
         colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED;
-        colorDesc.DebugName = "Final Texture";
+        colorDesc.DebugName = "GeometryPassColorImage";
         colorDesc.Sampler = blackBoard.DefaultSampler;
         colorDesc.GenerateImGuiID = true;
         blackBoard.MainPassColorImage = mRHI->CreateImage(colorDesc);
@@ -28,10 +28,9 @@ namespace Surge
         ImageDesc depthDesc = {};
         depthDesc.Width = size.x;
         depthDesc.Height = size.y;
-        depthDesc.Format = ImageFormat::D24_UNORM_S8_UINT;
-        depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT | ImageUsage::SAMPLED;
-        depthDesc.DebugName = "Final Depth Texture";
-        depthDesc.GenerateImGuiID = true;
+        depthDesc.Format = ImageFormat::D32_SFLOAT;
+        depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
+        depthDesc.DebugName = "GeometryPassDepthImage";
         blackBoard.MainPassDepthImage = mRHI->CreateImage(depthDesc);
 
         // Offscreen framebuffer
@@ -52,7 +51,7 @@ namespace Surge
         fbDesc.HasDepth = true;
         fbDesc.Width = size.x;
         fbDesc.Height = size.y;
-        fbDesc.DebugName = "Offscreen Framebuffer";
+        fbDesc.DebugName = "GeometryPass Framebuffer";
         blackBoard.MainPassFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
         // Create 3D Pipeline
@@ -151,7 +150,7 @@ namespace Surge
     void GeometryPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
     {
         // blackBoard.OffscreenFramebuffer is owned by GeometryPass and thus resized by GeometryPass
-        if(RHISettings::RENDER_TO_SWAPCHAIN && (width > 0 && height > 0))
+        //if(RHISettings::RENDER_TO_SWAPCHAIN && (width > 0 && height > 0))
             Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.MainPassFramebuffer, width, height); }); // (Player)
 
         // If not blitted to swapchain, user handles resize // (Editor)

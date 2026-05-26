@@ -59,7 +59,7 @@ namespace Surge
             {
                const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
                const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-               renderer->SubmitMeshOutline(transform, mesh, glm::vec3(1.0f, 0.6f, 0.1f), 1.3f);
+               renderer->SubmitMeshOutline(transform, mesh);
             }
         }
         renderer->EndFrame();
@@ -99,7 +99,7 @@ namespace Surge
                 {
                     const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
                     const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                    renderer->SubmitMeshOutline(transform, mesh, glm::vec3(1.0f, 0.6f, 0.1f), 1.3f);
+                    renderer->SubmitMeshOutline(transform, mesh);
                 }
             }
             renderer->EndFrame();

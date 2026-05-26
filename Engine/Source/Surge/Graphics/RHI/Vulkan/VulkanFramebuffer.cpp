@@ -24,7 +24,7 @@ namespace Surge
             ImageEntry* tex = imagePool.Get(desc.ColorAttachments[i].Handle);
             SG_ASSERT(tex, "FramebufferDesc: invalid ColorAttachment handle!");
 
-            key.ColorFormats[i] = VulkanUtils::TextureFormatToVkFormat(tex->Desc.Format);
+            key.ColorFormats[i] = VulkanUtils::ImageFormatToVkFormat(tex->Desc.Format);
             key.ColorLoad[i] = desc.ColorAttachments[i].Load;
             key.ColorStore[i] = desc.ColorAttachments[i].Store;
             views[viewCount++] = tex->View;
@@ -42,7 +42,7 @@ namespace Surge
             const ImageEntry* depth = imagePool.Get(desc.DepthAttachment.Handle);
             SG_ASSERT(depth, "FramebufferDesc: invalid DepthAttachment handle");
 
-            key.DepthFormat = VulkanUtils::TextureFormatToVkFormat(depth->Desc.Format);
+            key.DepthFormat = VulkanUtils::ImageFormatToVkFormat(depth->Desc.Format);
             key.DepthLoad = desc.DepthAttachment.Load;
             key.DepthStore = desc.DepthAttachment.Store;
             key.StencilLoad = desc.DepthAttachment.StencilLoad;

@@ -167,6 +167,8 @@ namespace Surge
 
     void Renderer2DPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
     {
+        // We do nothing here, as Renderer2DPass writes to framebuffer of GeometryPass...
+        // GeometryPass resizes the framebuffer
     }
 
     void Renderer2DPass::Shutdown(FrameBlackboard& blackBoard)

@@ -7,15 +7,20 @@
 
 namespace Surge
 {
-    static DescriptorType ShaderBufferUsageToDescriptorType(ShaderBuffer::Usage type)
+    static bool IsSingleChannelColor(ImageFormat format)
     {
-        switch (type)
+        switch(format)
         {
-        case ShaderBuffer::Usage::STORAGE: return DescriptorType::STORAGE_BUFFER;
-        case ShaderBuffer::Usage::UNIFORM: return DescriptorType::UNIFORM_BUFFER;
-        default:
-            SG_ASSERT_INTERNAL("Invalid ShaderBuffer::Usage type!");
-            return DescriptorType::UNIFORM_BUFFER;
+            case Surge::ImageFormat::R8_UNORM:
+                return true;
+            case Surge::ImageFormat::RGBA8_SRGB:
+            case Surge::ImageFormat::RGBA8_UNORM:
+            case Surge::ImageFormat::BGRA8_SRGB:
+            case Surge::ImageFormat::R16G16B16A16_SFLOAT:
+            case Surge::ImageFormat::B10G11R11_UFLOAT_PACK32:
+                return false;
+            default:
+                SG_ASSERT_INTERNAL("IsSingleChannelColor: Unhandled Image Format!(Are you passing a depth format in IsSingleChannelColor function?)");
         }
     }
 
@@ -162,6 +167,19 @@ namespace Surge
         // Blend
         VkPipelineColorBlendAttachmentState blendAttachment = {};
         blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+        if(!desc.TargetSwapchain)
+        {
+            const FramebufferDesc& fbdesc = rhi.GetDesc(desc.TargetFramebuffer);
+            if((fbdesc.ColorAttachmentCount == 1))
+            {
+                const ImageDesc& imgDesc = rhi.GetDesc(fbdesc.ColorAttachments[0].Handle);
+                if(IsSingleChannelColor(imgDesc.Format))
+                {
+                    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+                }
+            }
+        }
         blendAttachment.blendEnable = desc.Blend.Enable ? VK_TRUE : VK_FALSE;
         blendAttachment.srcColorBlendFactor = VulkanUtils::ToVkBlendFactor(desc.Blend.SrcColor);
         blendAttachment.dstColorBlendFactor = VulkanUtils::ToVkBlendFactor(desc.Blend.DstColor);

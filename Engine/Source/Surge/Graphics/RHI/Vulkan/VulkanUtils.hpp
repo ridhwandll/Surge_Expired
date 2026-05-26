@@ -19,7 +19,7 @@ namespace Surge::VulkanUtils
     VkAttachmentLoadOp ToVkLoadOp(LoadOp op);
     VkAttachmentStoreOp ToVkStoreOp(StoreOp op);
 
-    VkFormat TextureFormatToVkFormat(ImageFormat format);
+    VkFormat ImageFormatToVkFormat(ImageFormat format);
     bool IsDepthFormat(ImageFormat format);
     VkImageUsageFlags ToVkImageUsage(ImageUsage usage, bool transient);
 

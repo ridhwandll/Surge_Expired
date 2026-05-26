@@ -9,6 +9,7 @@ namespace Surge
     {
         //SHADOW,
         MAIN_SCENE,
+        OUTLINE_MASK,
         POST_PROCESS,
         SWAPCHAIN
     };

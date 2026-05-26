@@ -31,8 +31,6 @@ namespace Surge
     {
         glm::mat4 Transform;
         Ref<Mesh> Mesh_;
-        glm::vec3 Color; // Outline color
-        float Thickness; // Scale factor
     };
 
     struct LightSubmitCmd // Pushed by Renderer::SubmitLight()
@@ -63,17 +61,22 @@ namespace Surge
 
         ImageHandle MainPassColorImage;
         ImageHandle MainPassDepthImage;
+        ImageHandle OutlineMask;
+        ImageHandle FinalImage;
 
+        FramebufferHandle OutlineFramebuffer;
         FramebufferHandle PostProcessFramebuffer;
         FramebufferHandle MainPassFramebuffer;
-
-        ImageHandle FinalImage; // Null if RHISettings::RENDER_TO_SWAPCHAIN is true
 
         SamplerHandle DefaultSampler;
 
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))
 
         glm::vec4 ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
+
+        // Outline
+        glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
+        float OutlineThickness = 1.1f;
 
         Vector<MeshSubmitCmd> MeshList;
         Vector<LightSubmitCmd> LightList;

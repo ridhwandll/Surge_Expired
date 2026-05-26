@@ -59,7 +59,7 @@ namespace Surge
         VkImageCreateInfo imageInfo = {};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.format = VulkanUtils::TextureFormatToVkFormat(desc.Format);
+        imageInfo.format = VulkanUtils::ImageFormatToVkFormat(desc.Format);
         imageInfo.extent = { desc.Width, desc.Height, 1 };
         imageInfo.mipLevels = desc.Mips;
         imageInfo.arrayLayers = desc.Layers;
@@ -69,7 +69,7 @@ namespace Surge
 
         // VK_SHARING_MODE_EXCLUSIVE specifies that access to any range or image subresource of the object will be exclusive to a single queue family at a time	
         // VK_SHARING_MODE_CONCURRENT may result in lower performance access to the buffer or image than VK_SHARING_MODE_EXCLUSIVE (Vulkan Docs)
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; 		
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         // VMA allocation
@@ -83,7 +83,7 @@ namespace Surge
             allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
             allocCreateInfo.requiredFlags = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
         }
-        else		
+        else
             allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; // Load on GPU
         // VMA Docs:
         // If you have a preference for putting the resource in GPU (device) memory or CPU (host) memory on systems with discrete graphics card that have
@@ -99,7 +99,7 @@ namespace Surge
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = entry.Image;
         viewInfo.viewType = desc.Layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VulkanUtils::TextureFormatToVkFormat(desc.Format);
+        viewInfo.format = VulkanUtils::ImageFormatToVkFormat(desc.Format);
         viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;

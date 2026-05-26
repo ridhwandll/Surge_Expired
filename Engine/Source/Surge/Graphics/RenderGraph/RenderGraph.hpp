@@ -45,7 +45,8 @@ namespace Surge
         void ClearLists() { mBlackboard.ClearLists(); }
 
         // Recreates size-dependent resources, calls Resize() on all passses
-        void Resize(Uint width, Uint height);
+        void OnWindowResize(Uint width, Uint height);
+        void ForceResize(Uint width, Uint height);
 
         // Destroys all passses and registry resources
         void Shutdown();

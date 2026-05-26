@@ -7,6 +7,7 @@
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/PostProcessPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp"
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -22,7 +23,8 @@ namespace Surge
         mShaderManager.Initialize(ENGINE_SHADER_PATH);
         mShaderManager.Load("Renderer2D.glsl");
         mShaderManager.Load("Renderer3D.glsl");
-        mShaderManager.Load("Fullscreen.glsl");
+        mShaderManager.Load("PostProcess.glsl");
+        mShaderManager.Load("OutlineMask.glsl");
         mShaderManager.Load("Present.glsl");
 
         mRHI = CreateScope<GraphicsRHI>();
@@ -64,6 +66,7 @@ namespace Surge
 
         mGraph.AddPass<GeometryPass>();  // Must add GeometryPass before Renderer2DPass because it creates the blackboard.FinalImage
         mGraph.AddPass<Renderer2DPass>();
+        mGraph.AddPass<OutlinePass>();
         mGraph.AddPass<PostProcessPass>();
         mGraph.AddPass<SwapchainPass>();
         mGraph.Setup(mRHI.get());
@@ -119,7 +122,12 @@ namespace Surge
 
     void Renderer::OnWindowResize(Uint width, Uint height)
     {
-        mGraph.Resize(width, height);
+        mGraph.OnWindowResize(width, height);
+    }
+
+    void Renderer::ForceResize(Uint width, Uint height)
+    {
+        mGraph.ForceResize(width, height);
     }
 
     Ref<Material> Renderer::CreateMaterial(const String& debugName)

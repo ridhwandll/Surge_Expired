@@ -6,6 +6,13 @@ namespace Surge
 {
     void SwapchainPass::Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard)
     {
+        // We need this here(before the early exit below) because it will transition the blackBoard.FinalImage
+        // to SAMPLED thus ImGui::Image can read it.
+        mImageReads.push_back(blackBoard.FinalImage);
+
+        if(!RHISettings::RENDER_TO_SWAPCHAIN)
+            return;
+
         mRHI = rhi;
 
         PipelineDesc fsDesc = {};
@@ -22,7 +29,6 @@ namespace Surge
         mPresentPipeline = mRHI->CreatePipeline(fsDesc);
 
         mPresentSet = mRHI->CreateDescriptorSet(mPresentPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "Present Set");
-        mImageReads.push_back(blackBoard.FinalImage);
     }
 
     void SwapchainPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard)
@@ -45,7 +51,6 @@ namespace Surge
 
     void SwapchainPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
     {
-
     }
 
     void SwapchainPass::OnImGuiRender(FrameBlackboard& blackBoard)
@@ -55,6 +60,9 @@ namespace Surge
 
     void SwapchainPass::Shutdown(FrameBlackboard& blackBoard)
     {
+        if(!RHISettings::RENDER_TO_SWAPCHAIN)
+            return;
+
         mRHI->DestroyPipeline(mPresentPipeline);
         mRHI->DestroyDescriptorSet(mPresentSet);
     }

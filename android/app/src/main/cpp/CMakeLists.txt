@@ -47,7 +47,6 @@ target_link_options(SurgePlayer PRIVATE
 
 
 # Include directories
-# -----------------------------------------------------------------------
 target_include_directories(SurgePlayer PUBLIC
     "${ENGINE_ROOT}"
     "${ENGINE_SRC_ROOT}"

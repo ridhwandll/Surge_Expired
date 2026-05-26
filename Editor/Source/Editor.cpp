@@ -34,8 +34,8 @@ namespace Surge
             texture = mRenderer->GetRHI()->CreateImage(desc);
             stbi_image_free(data);
         }
-        else		
-            Log<Severity::Error>("Failed to load texture at path: {0}", path);		
+        else
+            Log<Severity::Error>("Failed to load texture at path: {0}", path);
 
         return texture;
     }
@@ -43,6 +43,9 @@ namespace Surge
     void Editor::OnInitialize()
     {
         mRenderer = Core::GetRenderer();
+
+        mRenderer->SetOutlineThickness(2);
+
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
         mCamera.SetActive(true);
 
@@ -177,9 +180,11 @@ namespace Surge
 
         if (viewportSize.x > 0.0f && viewportSize.y > 0.0f && (desc.Width != viewportSize.x || desc.Height != viewportSize.y))
         {
-            rhi->WaitIdle(); // Ensure GPU is not using the framebuffer before resizing
+            rhi->WaitIdle();
+
             mCamera.SetViewportSize(viewportSize);
-            rhi->ResizeFramebuffer(fbHandle, (Uint)viewportSize.x, (Uint)viewportSize.y);
+            mRenderer->ForceResize((Uint)viewportSize.x, (Uint)viewportSize.y);
+
             mActiveScene->OnResize(viewportSize.x, viewportSize.y);
         }
     }
