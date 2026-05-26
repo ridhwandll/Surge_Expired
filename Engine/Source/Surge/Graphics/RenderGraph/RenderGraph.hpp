@@ -68,9 +68,10 @@ namespace Surge
         const CompiledGraph& GetCompiledGraph() const { return mCompiledGraph; } // For visualizer
     private:
         void SortByDependencies(Vector<RenderPass*>& passes); // Topological sort within a group based on ImageReads/ImageWrites
-        void DeriveBarrierBetweenExecutionGroups(ExecutionGroup& groupA, ExecutionGroup& groupB);
+        void DeriveBarrierBetweenExecutionGroups(ExecutionGroup& writeGroup, ExecutionGroup& readGroup);
     private:
         Vector<Scope<RenderPass>> mPasses;
+
         Vector<std::function<void()>> mImGuiRenderCallbacks;
         FrameBlackboard mBlackboard;
         CompiledGraph mCompiledGraph;

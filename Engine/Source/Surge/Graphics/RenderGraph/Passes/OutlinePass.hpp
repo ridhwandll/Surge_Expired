@@ -4,6 +4,12 @@
 
 namespace Surge
 {
+    /*
+    * OutlinePass:
+    * Reads : Nothing
+    * Writes: Blackboard.OutlineMask
+    */
+
     class GraphicsRHI;
     class OutlinePass : public RenderPass
     {
@@ -11,11 +17,11 @@ namespace Surge
         OutlinePass() { mName = "OutlinePass"; mGroup = PassGroup::OUTLINE_MASK; }
         virtual ~OutlinePass() = default;
     
-        virtual void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
-        virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
-        virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
-        virtual void OnImGuiRender(FrameBlackboard& blackBoard) override;
-        virtual void Shutdown(FrameBlackboard& blackBoard) override;
+        void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
+        void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
+        void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
+        void OnImGuiRender(FrameBlackboard& blackBoard) override;
+        void Shutdown(FrameBlackboard& blackBoard) override;
 
     private:
         FrameContext mCurrentFrameCtx;

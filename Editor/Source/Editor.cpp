@@ -44,7 +44,7 @@ namespace Surge
     {
         mRenderer = Core::GetRenderer();
 
-        mRenderer->SetOutlineThickness(2);
+        mRenderer->SetOutlineThickness(1);
 
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
         mCamera.SetActive(true);
@@ -60,8 +60,6 @@ namespace Surge
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
         
         Entity runtimeCamera;
-        Entity sprite;
-        Entity cube;
         {
             mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();

@@ -124,16 +124,6 @@ vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
     return (diffuse + specular) * lightIntensity * attenuation;
 }
 
-vec3 ACESFilmic(vec3 x)
-{
-    float a = 2.51;
-    float b = 0.03;
-    float c = 2.43;
-    float d = 0.59;
-    float e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
-}
-
 vec3 CalculateNormal()
 {
    vec3 newNormal;
@@ -175,14 +165,7 @@ void main()
 
     vec3 HDRColor  = ambient + directAccumulation;
 
-    // TODO Move to a separate post process pass
-    //color = color / (color + vec3(1.0)); //Reinhard
-    vec3 color = ACESFilmic(HDRColor); //ACES Filmic
-
-    // Linear to sRGB conversion (Gamma Correction)
-    color = pow(color, vec3(1.0 / 2.2));
-
-    FinalColor = vec4(color, 1.0);
+    FinalColor = vec4(HDRColor, 1.0);
 }
 
 //SURGE:[Shader: Vertex]

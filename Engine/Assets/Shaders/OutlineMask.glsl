@@ -23,6 +23,6 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    float channelValue = 0.5; // Outputs to a R8_UNORM image
+    float channelValue = 1.0; // Outputs to a R8_UNORM image
     outColor = vec4(channelValue, 0.0, 0.0, 1.0);
 }

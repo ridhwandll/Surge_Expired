@@ -19,7 +19,7 @@ namespace Surge
         colorDesc.Height = size.y;
         colorDesc.Format = ImageFormat::B10G11R11_UFLOAT_PACK32;
         colorDesc.Usage = ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED;
-        colorDesc.DebugName = "GeometryPassColorImage";
+        colorDesc.DebugName = "GPassColor";
         colorDesc.Sampler = blackBoard.DefaultSampler;
         colorDesc.GenerateImGuiID = true;
         blackBoard.MainPassColorImage = mRHI->CreateImage(colorDesc);
@@ -29,8 +29,9 @@ namespace Surge
         depthDesc.Width = size.x;
         depthDesc.Height = size.y;
         depthDesc.Format = ImageFormat::D32_SFLOAT;
-        depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT;
-        depthDesc.DebugName = "GeometryPassDepthImage";
+        depthDesc.Usage = ImageUsage::DEPTH_ATTACHMENT | ImageUsage::SAMPLED; // We will sample from it in PostProcess pass
+        depthDesc.GenerateImGuiID = true;
+        depthDesc.DebugName = "GPassDepth";
         blackBoard.MainPassDepthImage = mRHI->CreateImage(depthDesc);
 
         // Offscreen framebuffer
@@ -42,7 +43,7 @@ namespace Surge
         FramebufferAttachment depthAttachment = {};
         depthAttachment.Handle = blackBoard.MainPassDepthImage;
         depthAttachment.Load = LoadOp::CLEAR;
-        depthAttachment.Store = StoreOp::STORE; //We store the depth
+        depthAttachment.Store = StoreOp::STORE; // We store the depth as its used in Post Process pass
 
         FramebufferDesc fbDesc = {};
         fbDesc.ColorAttachments[0] = colorAttachment;
@@ -51,7 +52,7 @@ namespace Surge
         fbDesc.HasDepth = true;
         fbDesc.Width = size.x;
         fbDesc.Height = size.y;
-        fbDesc.DebugName = "GeometryPass Framebuffer";
+        fbDesc.DebugName = "GPass Framebuffer";
         blackBoard.MainPassFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
         // Create 3D Pipeline

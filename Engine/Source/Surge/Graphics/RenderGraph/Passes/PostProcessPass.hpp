@@ -4,6 +4,12 @@
 
 namespace Surge
 {
+   /*
+    * PostProcessPass:
+    * Reads : Blackboard.MainPassColorImage, BlackBoard.OutlineMask
+    * Writes: Blackboard.FinalImage
+    */
+
     class GraphicsRHI;
     class PostProcessPass : public RenderPass
     {
@@ -11,12 +17,11 @@ namespace Surge
         PostProcessPass() { mName = "PostProcessPass"; mGroup = PassGroup::POST_PROCESS; }
         virtual ~PostProcessPass() = default;
     
-        virtual void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
-        virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
-        virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
-        virtual void OnImGuiRender(FrameBlackboard& blackBoard) override;
-        virtual void Shutdown(FrameBlackboard& blackBoard) override;
-
+        void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
+        void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
+        void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
+        void OnImGuiRender(FrameBlackboard& blackBoard) override;
+        void Shutdown(FrameBlackboard& blackBoard) override;
     private:
         FrameContext mCurrentFrameCtx;
         GraphicsRHI* mRHI;

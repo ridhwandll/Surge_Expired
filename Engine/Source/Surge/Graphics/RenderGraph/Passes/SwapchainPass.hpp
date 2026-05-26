@@ -4,6 +4,16 @@
 
 namespace Surge
 {
+    /*
+    * SwapchainPass:
+    * Reads : blackBoard.FinalImage
+    * 
+    * if RHISettings::RENDER_TO_SWAPCHAIN == TRUE
+    *    Writes: Swapchain
+    * else
+    *    Writes: Nothing
+    */
+
     class GraphicsRHI;
     class SwapchainPass : public RenderPass
     {
@@ -11,11 +21,11 @@ namespace Surge
         SwapchainPass() { mName = "SwapchainPass"; mGroup = PassGroup::SWAPCHAIN; }
         virtual ~SwapchainPass() = default;
 
-        virtual void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
-        virtual void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
-        virtual void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
-        virtual void OnImGuiRender(FrameBlackboard& blackBoard) override;
-        virtual void Shutdown(FrameBlackboard& blackBoard) override;
+        void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
+        void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
+        void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override;
+        void OnImGuiRender(FrameBlackboard& blackBoard) override;
+        void Shutdown(FrameBlackboard& blackBoard) override;
     private:
         GraphicsRHI* mRHI;
         PipelineHandle mPresentPipeline;

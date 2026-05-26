@@ -42,5 +42,10 @@ void main()
 {
     vec4 color = unpackUnorm4x8(inColor);
     //outColor = texture(uTextures[inTextureIndex], inUV) * color;
+
+    // Convert incoming sRGB vertex data to Linear Space, then gamma corrected later in PostProcess pass
+    // Else there will be double gamma correction
+    color.rgb = pow(color.rgb, vec3(2.2)); 
+
     outColor = color;
 }

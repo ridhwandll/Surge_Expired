@@ -43,7 +43,7 @@ namespace Surge
         samplerDesc.MaxAniso = 4;
         blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
 
-        uint8_t whitePixel[] = { 255, 255, 255, 255 };
+        Byte whitePixel[] = { 255, 255, 255, 255 };
         ImageDesc texDesc = {};
         texDesc.Width = 1;
         texDesc.Height = 1;
@@ -64,9 +64,9 @@ namespace Surge
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
 
-        mGraph.AddPass<GeometryPass>();  // Must add GeometryPass before Renderer2DPass because it creates the blackboard.FinalImage
-        mGraph.AddPass<Renderer2DPass>();
         mGraph.AddPass<OutlinePass>();
+        mGraph.AddPass<GeometryPass>();
+        mGraph.AddPass<Renderer2DPass>();
         mGraph.AddPass<PostProcessPass>();
         mGraph.AddPass<SwapchainPass>();
         mGraph.Setup(mRHI.get());

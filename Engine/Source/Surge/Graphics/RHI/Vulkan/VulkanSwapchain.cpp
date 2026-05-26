@@ -189,10 +189,11 @@ namespace Surge
 
         for (auto& f : formats)
         {
-            if ((f.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 || f.format == VK_FORMAT_B8G8R8A8_UNORM)
-                &&
-                f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            if((f.format == VK_FORMAT_B8G8R8A8_UNORM) && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            {
+                Log<Severity::Info>("Using swapchain format VK_FORMAT_B8G8R8A8_UNORM and color space: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR");
                 return f;
+            }
         }
         return formats[0]; // Fallback
     }

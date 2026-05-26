@@ -255,7 +255,7 @@ namespace Surge
     }
 
     ImageHandle VulkanRHI::CreateImage(const ImageDesc& desc)
-    {		
+    {
         // TRANSFER_DST is required when InitialData is provided
         SG_ASSERT(!(desc.InitialData && !(desc.Usage & ImageUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. Add TextureUsage::TRANSFER_DST to upload pixel data");
 
@@ -1135,7 +1135,7 @@ namespace Surge
 
     void VulkanRHI::ResizeInternal()
     {
-        //WaitIdle();
+        WaitIdle();
         DestroySwapchainFramebuffers();
         mSwapchain.Resize(*this, 0, 0);
         CreateSwapchainFramebuffers();

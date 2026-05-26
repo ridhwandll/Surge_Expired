@@ -16,6 +16,14 @@ namespace Surge
     };
     static_assert(sizeof(FrameUBO) % 16 == 0, "Size of 'FrameUBO' struct must be 16 bytes aligned!");
 
+    struct VignetteGrainConfig
+    {
+        float Intensity = 0.0f;
+        float Softness = 0.25f;
+        float Grain = 0.0f;
+        float _Padding = 0.0f;
+    };
+
     // -------------------------------------------------------
     // CPU-side submit commands
     // Pushed by Renderer::Submit*(), consumed by nodes in Execute()
@@ -72,11 +80,13 @@ namespace Surge
 
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))
 
-        glm::vec4 ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
+        glm::vec4 ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-        // Outline
+        // Screen Space options
         glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
         float OutlineThickness = 1.1f;
+        bool EnableFXAA;
+        VignetteGrainConfig VignetteGrain;
 
         Vector<MeshSubmitCmd> MeshList;
         Vector<LightSubmitCmd> LightList;

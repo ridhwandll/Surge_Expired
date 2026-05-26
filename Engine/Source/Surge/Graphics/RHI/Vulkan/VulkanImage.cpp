@@ -213,7 +213,7 @@ namespace Surge
         barrier.image = entry.Image;
 
         if(entry.Layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         else if(entry.Layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         else

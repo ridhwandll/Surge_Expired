@@ -5,7 +5,7 @@
 
 namespace Surge
 {
-    class SURGE_API Clock
+    class Clock
     {
     public:
         // Starts the timer. Initializes Life and Delta to current time
