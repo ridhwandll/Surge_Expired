@@ -6,7 +6,6 @@
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
 #include <stb_image.h>
-#include <random>
 
 namespace Surge
 {
@@ -126,6 +125,7 @@ namespace Surge
             t.Rotation = glm::vec3(-30.0f, -40.0f, -30.0f);
             t.MarkDirty();
         }
+
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 

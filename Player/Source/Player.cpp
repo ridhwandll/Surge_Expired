@@ -108,59 +108,50 @@ namespace Surge
         float halfWidth = 0;
         float halfHeight = 0;
 
+        //{
+        //    mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
+        //    CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
+        //    cam.Primary = true;
+        //    cam.FixedAspectRatio = true;
+        //
+        //    cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
+        //    TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
+        //    transform.Position = glm::vec3(-10, 6, 10);
+        //    transform.Rotation = glm::vec3(-30, -45, 0);
+        //
+        //    cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
+        //    float size = cam.Camera.GetOrthographicSize();
+        //    float aspect = cam.Camera.GetAspectRatio();
+        //    halfWidth = size * aspect * 0.5f;
+        //    halfHeight = size * 0.5f;
+        //}
         {
-            mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
+            //Isometric camera
+            mActiveScene->CreateEntity(runtimeCamera, "RuntimeCamera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
             cam.Primary = true;
-            cam.FixedAspectRatio = true;
+            cam.FixedAspectRatio = false;
 
-            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
+            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
             TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-10, 6, 10);
-            transform.Rotation = glm::vec3(-30, -45, 0);
+            transform.Position = glm::vec3(0, 0, 0);
+            transform.Rotation = glm::vec3(-35, 45, 0);
 
-            cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
-            float size = cam.Camera.GetOrthographicSize();
-            float aspect = cam.Camera.GetAspectRatio();
-            halfWidth = size * aspect * 0.5f;
-            halfHeight = size * 0.5f;
-        }
-
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
-        std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
-        mTexturedQuadCount = 50.0f;
-        mChangeQuadAmount = mTexturedQuadCount;
-        FillTextures(mTexturedQuadCount);
-        for (Uint i = 0; i < mTexturedQuadCount; i++)
-        {
-            float x = distX(gen);
-            float y = distY(gen);
-        
-            Entity quad;
-            mActiveScene->CreateEntity(quad, "StressQuad");
-            quad.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), mTextures[i]);
-        
-            auto& t = quad.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(x, y, 0.0f);
-            t.Scale = glm::vec3(0.3f, 0.3f, 1.0f);
-        }		
-        Uint basicQuadCount = 500;
-        for (Uint i = 0; i < basicQuadCount; i++)
-        {
-            float x = distX(gen);
-            float y = distY(gen);
-
-            Entity& quad = mColoredQuads.emplace_back();
-            mActiveScene->CreateEntity(quad, "StressQuad");
-            quad.AddComponent<SpriteRendererComponent>(glm::vec4(1.0f, 0.79f, 0.0f, 1.0f), ImageHandle::Invalid());
-            auto& t = quad.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(x, y, 0.0f);
-            t.Scale = glm::vec3(0.02f, 0.02f, 1.0f);
-            t.MarkDirty();
+            cam.Camera.SetOrthographicSize(15);
+            cam.Camera.SetOrthographicFarClip(1000);
+            cam.Camera.SetOrthographicNearClip(-10);
         }
         {
+            {
+                mActiveScene->CreateEntity(mEntity, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
+                MeshComponent& meshComp = mEntity.AddComponent<MeshComponent>();
+                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
+
+                TransformComponent& t = mEntity.GetComponent<TransformComponent>();
+                t.Position = glm::vec3(0.0f, 0.5f, 0.0f);
+                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+                t.MarkDirty();
+            }
             {
                 Entity floor;
                 mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
@@ -171,39 +162,22 @@ namespace Surge
                 t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
                 t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
                 t.MarkDirty();
-            }
-            {
-                Entity cube;
-                mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
-                MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
 
-                TransformComponent& t = cube.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
+                Ref<Material>& material = meshComp.Mesh->GetMaterialAtIndex(0);
+                material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
+                material->Set<float>("Metallic", 0.3f);
+                material->Set<float>("Roughness", 0.8f);
             }
-            {
-                mActiveScene->CreateEntity(mVkScene, "Vulkan Scene");
-                MeshComponent& meshComp = mVkScene.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-
-                TransformComponent& t = mVkScene.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-        }
-        {
-            Entity pointLight;
-            mActiveScene->CreateEntity(pointLight, "Point Light");
-            LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
-            lightComp.Type = LightType::POINT;
-            lightComp.Intensity = 1.2f;
-            lightComp.Radius = 10.0f;
-            TransformComponent& t = pointLight.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
-            t.MarkDirty();
+            //{
+            //    mActiveScene->CreateEntity(mVkScene, "Vulkan Scene");
+            //    MeshComponent& meshComp = mVkScene.AddComponent<MeshComponent>();
+            //    meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
+            //
+            //    TransformComponent& t = mVkScene.GetComponent<TransformComponent>();
+            //    t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
+            //    t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+            //    t.MarkDirty();
+            //}
         }
         {
             Entity directionalLight;
@@ -219,13 +193,21 @@ namespace Surge
         }
         mActiveScene->OnResize(windowSize.x, windowSize.y);
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
+
+        FrameBlackboard& bb =  mRenderer->GetRenderGraphBlackBoard();
+        bb.VignetteGrain.Intensity = 0.7f;
+        bb.VignetteGrain.Softness = 0.3f;
+        bb.VignetteGrain.Grain = 0.03f;
+
+        bb.Skybox.EnableSunDisk = false;
+        bb.Skybox.Elevation = 10.0f;
     }
 
     void Player::OnUpdate()
     {
         float dt = Core::GetClock().GetSeconds();
 
-        TransformComponent& floorTransform = mVkScene.GetComponent<TransformComponent>();
+        TransformComponent& floorTransform = mEntity.GetComponent<TransformComponent>();
         floorTransform.Rotation.y += 50.0f * dt;
         floorTransform.MarkDirty();
 

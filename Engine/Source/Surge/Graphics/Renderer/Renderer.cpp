@@ -8,6 +8,7 @@
 #include "Surge/Graphics/RenderGraph/Passes/PostProcessPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/SkyPass.hpp"
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -25,6 +26,7 @@ namespace Surge
         mShaderManager.Load("Renderer3D.glsl");
         mShaderManager.Load("PostProcess.glsl");
         mShaderManager.Load("OutlineMask.glsl");
+        mShaderManager.Load("PreethamSky.glsl");
         mShaderManager.Load("Present.glsl");
 
         mRHI = CreateScope<GraphicsRHI>();
@@ -66,6 +68,7 @@ namespace Surge
 
         mGraph.AddPass<OutlinePass>();
         mGraph.AddPass<GeometryPass>();
+        mGraph.AddPass<SkyPass>();
         mGraph.AddPass<Renderer2DPass>();
         mGraph.AddPass<PostProcessPass>();
         mGraph.AddPass<SwapchainPass>();
@@ -81,11 +84,13 @@ namespace Surge
         blackBoard.ViewMatrix = camera.GetViewMatrix();
         blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
         blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
+        blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = camera.GetPosition();
         blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
 
         FrameUBO frameData = {};
         frameData.ViewProjection = blackBoard.ViewProjection;
+        frameData.InverseViewProjection = blackBoard.InverseViewProjection;
         frameData.CameraPos = blackBoard.CameraPosition;
 
         mCurrentFrameCtx = mRHI->BeginFrame();
@@ -100,11 +105,13 @@ namespace Surge
         blackBoard.ViewMatrix = glm::inverse(transform);
         blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
         blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
+        blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = transform[3];
         blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
 
         FrameUBO frameData = {};
         frameData.ViewProjection = blackBoard.ViewProjection;
+        frameData.InverseViewProjection = blackBoard.InverseViewProjection;
         frameData.CameraPos = blackBoard.CameraPosition;
 
         mCurrentFrameCtx = mRHI->BeginFrame();

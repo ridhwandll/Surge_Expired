@@ -53,7 +53,9 @@ namespace Surge
 
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
-        const FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
+        const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }
+        FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
+
         ImageHandle GetWhiteTexture() const { return mGraph.GetBlackboard().WhiteImage; }
         ImageHandle GetFinalImage() const { return mGraph.GetBlackboard().FinalImage; }
         FramebufferHandle GetFinalFramebuffer() const { return mGraph.GetBlackboard().MainPassFramebuffer; }

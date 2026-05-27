@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 
 namespace Surge
@@ -110,13 +111,15 @@ namespace Surge
         mCurrentFrameCtx = ctx;
 
         // FRAME UBO is uploaded by Renderer, so we only need to upload light data here
-        // TODO: We could optimize this by only uploading when lights have changed, but for simplicity we upload every frame for now
         if(!blackBoard.LightList.empty())
         {
             LightUBOData lightData = {};
             for(Uint i = 0; i < blackBoard.LightList.size(); i++)
                 lightData.Lights[i] = blackBoard.LightList[i].GPULight;
 
+            lightData.SkyAmbient = blackBoard.GIParams.SkyAmbient;
+            lightData.HorizonAmbient = blackBoard.GIParams.HorizonAmbient;
+            lightData.GroundAmbient = blackBoard.GIParams.GroundAmbient;
             mRHI->UploadBuffer(mLightUBOs[mCurrentFrameCtx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
         }
 
@@ -159,7 +162,18 @@ namespace Surge
 
     void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard)
     {
+        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+        ImGui::PushFont(boldFont, 25.0f);
+        ImGui::TextUnformatted("Geometry Pass");
+        ImGui::Separator();
+        ImGui::PopFont();
 
+        ImGui::PushFont(boldFont, 20.0f);
+        ImGui::TextUnformatted("Global Illumination");
+        ImGui::PopFont();
+        ImGui::ColorEdit3("SkyAmbient", glm::value_ptr(blackBoard.GIParams.SkyAmbient));
+        ImGui::ColorEdit3("HorizonAmbient", glm::value_ptr(blackBoard.GIParams.HorizonAmbient));
+        ImGui::ColorEdit3("GroundAmbient", glm::value_ptr(blackBoard.GIParams.GroundAmbient));
     }
 
     void GeometryPass::Shutdown(FrameBlackboard& blackBoard)

@@ -33,6 +33,7 @@ layout(push_constant) uniform PushConstants
 layout(std140, set = 0, binding = 0) uniform FrameUBO
 {
     mat4 ViewProjection;
+    mat4 InverseViewProjection;
     vec3 CameraPos;
     float _pad;
 
@@ -40,6 +41,14 @@ layout(std140, set = 0, binding = 0) uniform FrameUBO
 layout(std140, set = 0, binding = 1) readonly buffer Lights
 {
     Light Lights[256];
+
+    // FAST GI PARAMETERS
+    vec3 SkyAmbient;
+    float _pad1;
+    vec3 HorizonAmbient;
+    float _pad2;
+    vec3 GroundAmbient ;
+    float _pad3;
 } uLights;
 
 layout(set = 1, binding = 0) uniform Material
@@ -148,22 +157,53 @@ vec3 CalculateNormal()
    return newNormal;
 }
 
+vec3 CalculateFastGI(vec3 N, vec3 V)
+{
+    // Hemispherical Diffuse Ambient
+    // Maps standard surface normals to the environment gradient
+    float skyGroundWeight = N.y * 0.5 + 0.5;
+    vec3 rawSkyColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(N.y, 0.0));
+    vec3 totalAmbientDiffuse = mix(uLights.GroundAmbient, rawSkyColor, skyGroundWeight);
+
+    vec3 diffuseAmbient = totalAmbientDiffuse * gPBRParams.Albedo * (1.0 - uMaterial.Metallic);
+
+    // Calculate Mathematical Specular Ambient (Fake Environment Reflections)
+    // Uses the reflection vector to find where the eye sees the environment glinting
+    vec3 R = reflect(-V, N);
+
+    float reflectionSkyWeight = R.y * 0.5 + 0.5;
+    vec3 rawReflectionColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(R.y, 0.0));
+    vec3 environmentReflection = mix(uLights.GroundAmbient, rawReflectionColor, reflectionSkyWeight);
+    
+    // Base surface reflectivity profile (F0)
+    vec3 f0 = vec3(0.04) * uMaterial.Reflectance;
+    vec3 specularColor = mix(f0, gPBRParams.Albedo, uMaterial.Metallic);
+    
+    // Roughness attenuation: Rougher surfaces blur and disperse ambient specular energy
+    float roughnessFactor = 1.0 - uMaterial.Roughness;
+    vec3 specularAmbient = environmentReflection * specularColor * (roughnessFactor * roughnessFactor);
+
+    // Combine both components for full indirect lighting approximation
+    return diffuseAmbient + specularAmbient;
+}
+
 void main()
 {
-    //gPBRParams.Albedo = texture(uAlbedoMap, vInput.TexCoord).rgb * uMaterial.Albedo;
+    // gPBRParams.Albedo = texture(uAlbedoMap, vInput.TexCoord).rgb * uMaterial.Albedo;
     gPBRParams.Albedo = uMaterial.Albedo;
     gPBRParams.Normal = CalculateNormal();
     gPBRParams.View = normalize(uFrame.CameraPos - vInput.WorldPos);
 
-    // TODO: GI
-    vec3 ambient = vec3(0.05) * uMaterial.Albedo;
+    // GI
+    vec3 ambient = CalculateFastGI(gPBRParams.Normal, gPBRParams.View);
 
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);
     for (uint i = 0; i < uMesh.LightCount; i++)
         directAccumulation += CalculateMobilePBR(uLights.Lights[i], gPBRParams.Normal, gPBRParams.View, vInput.WorldPos);
 
-    vec3 HDRColor  = ambient + directAccumulation;
+    // Combine direct and indirect results
+    vec3 HDRColor = ambient + directAccumulation;
 
     FinalColor = vec4(HDRColor, 1.0);
 }
@@ -180,6 +220,7 @@ layout(location = 4) in vec2 aTexCoord;
 layout(set = 0, binding = 0) uniform FrameUBO
 {
     mat4 ViewProjection;
+    mat4 InverseViewProjection;
     vec3 CameraPos;
     float _pad;
 

@@ -38,6 +38,7 @@ namespace Surge
 
         const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }
         const Vector<Ref<Material>>& GetMaterials() const { return mMaterials; }
+        Ref<Material>& GetMaterialAtIndex(Uint index) { return mMaterials[index]; }
     private:
         void CreateRHIObjects();
 
