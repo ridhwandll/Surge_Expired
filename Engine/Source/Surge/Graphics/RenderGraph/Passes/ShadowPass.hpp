@@ -2,7 +2,6 @@
 #pragma once
 #include "Surge/Graphics/RenderGraph/RenderPass.hpp"
 
-#define MAX_CASCADE_COUNT 3
 namespace Surge
 {
     /*
@@ -34,14 +33,15 @@ namespace Surge
 
     private:
         GraphicsRHI* mRHI;
-        PipelineHandle mShadowPipeline;
 
-        float mCascadeSplitLambda = 0.91f;
-        std::array<float, MAX_CASCADE_COUNT> mCascadeSplits = {};
-        std::array<glm::mat4, MAX_CASCADE_COUNT> mLightViewProjections = {};
-        std::array<float, MAX_CASCADE_COUNT> mCascadeSplitDepths = {};
+        // ShadowPass manages its own framebuffer
+        FramebufferHandle mShadowPassFramebuffer[MAX_SHADOW_CASCADE_COUNT];
+
+        PipelineHandle mShadowPipelines[MAX_SHADOW_CASCADE_COUNT];
+
+        std::array<glm::mat4, MAX_SHADOW_CASCADE_COUNT> mLightViewProjections = {};
+        std::array<float, MAX_SHADOW_CASCADE_COUNT> mCascadeSplits = {};
+        std::array<float, MAX_SHADOW_CASCADE_COUNT> mCascadeEnds = {};
         float mShadowMapResolution;
-
-
     };
 }

@@ -6,6 +6,7 @@ layout(location = 0) out vec4 outColor;
 
 layout(binding = 0, set = 0) uniform FrameUBO
 {
+    mat4 View;
     mat4 ViewProjection;
     mat4 InverseViewProjection;
     vec3 CameraPos;

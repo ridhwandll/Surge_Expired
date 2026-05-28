@@ -92,6 +92,7 @@ namespace Surge
         blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
 
         FrameUBO frameData = {};
+        frameData.View = blackBoard.ViewMatrix;
         frameData.ViewProjection = blackBoard.ViewProjection;
         frameData.InverseViewProjection = blackBoard.InverseViewProjection;
         frameData.CameraPos = blackBoard.CameraPosition;
@@ -113,6 +114,7 @@ namespace Surge
         blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
 
         FrameUBO frameData = {};
+        frameData.View = blackBoard.ViewMatrix;
         frameData.ViewProjection = blackBoard.ViewProjection;
         frameData.InverseViewProjection = blackBoard.InverseViewProjection;
         frameData.CameraPos = blackBoard.CameraPosition;

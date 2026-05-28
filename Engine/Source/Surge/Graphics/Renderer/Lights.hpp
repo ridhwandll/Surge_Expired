@@ -19,15 +19,15 @@ namespace Surge
 
     struct LightUBOData
     {
-        Light Lights[256] = {};
-        glm::mat4 LightSpaceMatrix;
-        // GI PARAMETERS
+        // GI PARAMETERS // TODO: Remove from here
         glm::vec3 SkyAmbient;
         float _pad1;
         glm::vec3 HorizonAmbient;
         float _pad2;
         glm::vec3 GroundAmbient;
         float _pad3;
+
+        Light Lights[256] = {};
     };
     static_assert(sizeof(LightUBOData) % 16 == 0, "Size of 'Lights' struct must be 16 bytes aligned!");
 

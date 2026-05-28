@@ -19,8 +19,8 @@ namespace Surge
         SCOPED_TIMER("RenderGraph::Compile");
         mCompiledGraph = {};
 
-        ExecutionGroup outlineGroup = { .Name = "OutlineMask", .Type = PassGroup::OUTLINE_MASK };
-        ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW };
+        ExecutionGroup outlineGroup = { .Name = "OutlineMask", .Type = PassGroup::OUTLINE_MASK, };
+        ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW, .ManagesOwnExecution = true };
         ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE};
         ExecutionGroup postProcessGroup = { .Name = "PostProcess", .Type = PassGroup::POST_PROCESS };
         ExecutionGroup swapchainGroup = { .Name = "Swapchain", .Type = PassGroup::SWAPCHAIN, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .IsSwapchain = true };
@@ -37,7 +37,6 @@ namespace Surge
             }
         }
 
-        shadowGroup.Framebuffer = mBlackboard.ShadowPassFramebuffer;
         outlineGroup.Framebuffer = mBlackboard.OutlineFramebuffer;
         postProcessGroup.Framebuffer = mBlackboard.PostProcessFramebuffer;
         mainGroup.Framebuffer = mBlackboard.MainPassFramebuffer;
@@ -78,7 +77,8 @@ namespace Surge
             for(const ImageBarrier& barrier : group.BarriersBeforeGroup)
                 mRHI->CmdTransitionImageLayout(ctx, barrier.Handle, barrier.NewUsage);
 
-            group.IsSwapchain ? mRHI->CmdBeginSwapchainRenderpass(ctx) : mRHI->CmdBeginRenderPass(ctx, group.Framebuffer);
+            if (!group.ManagesOwnExecution)
+                group.IsSwapchain ? mRHI->CmdBeginSwapchainRenderpass(ctx) : mRHI->CmdBeginRenderPass(ctx, group.Framebuffer);
 
             for(RenderPass* pass : group.Passes)
             {
@@ -86,7 +86,8 @@ namespace Surge
                     pass->Execute(ctx, mBlackboard);
             }
 
-            group.IsSwapchain ? (OnImGuiRender(), mRHI->CmdEndSwapchainRenderpass(ctx)) : mRHI->CmdEndRenderPass(ctx, group.Framebuffer);
+            if(!group.ManagesOwnExecution)
+                group.IsSwapchain ? (OnImGuiRender(), mRHI->CmdEndSwapchainRenderpass(ctx)) : mRHI->CmdEndRenderPass(ctx, group.Framebuffer);
         }
     }
 

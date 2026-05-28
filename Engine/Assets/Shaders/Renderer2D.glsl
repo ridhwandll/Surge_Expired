@@ -8,6 +8,7 @@ layout(location = 3) in uint inTextureIndex;
 
 layout(set = 0, binding = 0) uniform FrameUBO
 {
+    mat4 View;
     mat4 ViewProjection;
     vec3 CameraPos;
     float _pad;

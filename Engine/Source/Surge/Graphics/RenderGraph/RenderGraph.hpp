@@ -18,9 +18,14 @@ namespace Surge
     {
         String Name;
         PassGroup Type;
-        Vector<RenderPass*> Passes;               // Sorted
-        Vector<ImageBarrier> BarriersBeforeGroup; // Inserted before vkBeginRenderPass
-        FramebufferHandle Framebuffer;
+        Vector<RenderPass*> Passes;                                   // Sorted
+        Vector<ImageBarrier> BarriersBeforeGroup;                     // Inserted before vkBeginRenderPass
+        FramebufferHandle Framebuffer = FramebufferHandle::Invalid(); // Null if ManagesOwnExecution
+
+        // (Rid) ManagesOwnExecution means this execution group will call vkBeginRenderPass on its Execute method
+        // We primarily use it for CSM, is this a good design choice?
+        bool ManagesOwnExecution = false;
+
         bool IsSwapchain = false;
     };
 

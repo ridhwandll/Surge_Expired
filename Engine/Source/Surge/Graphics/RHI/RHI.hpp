@@ -43,7 +43,7 @@ namespace Surge
         void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset = 0) { mBackendRHI.UploadBuffer(h, data, size, offset); }
         void DestroyBuffer(BufferHandle buffer) { mBackendRHI.DestroyBuffer(buffer); }
 
-        // Texture
+        // Image
         ImageHandle CreateImage(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
         void DestroyImage(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
         void ResizeImage(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }

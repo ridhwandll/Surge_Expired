@@ -9,7 +9,7 @@ layout(location = 4) in vec2 aTexCoord;
 layout(push_constant) uniform ShadowPushConstant
 {
     mat4 Transform;
-    mat4 LightSpaceTransform;
+    mat4 LightSpaceTransform; // View Projection matrix from lights perspective
 } pc;
 
 void main()

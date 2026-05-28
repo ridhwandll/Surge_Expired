@@ -10,7 +10,7 @@ namespace Surge
     // Thats why this fucntion is created for image view separately
     static VkImageAspectFlags GetAspectFlagsForImageView(ImageFormat format)
     {
-        if(format == ImageFormat::D24_UNORM_S8_UINT || format == ImageFormat::D32_SFLOAT)
+        if(format == ImageFormat::D24_UNORM_S8_UINT || format == ImageFormat::D32_SFLOAT || format == ImageFormat::D16_UNORM)
             return VK_IMAGE_ASPECT_DEPTH_BIT; // No stencil(hack, we might require stencil buffer reads in future?)
 
         if(VulkanUtils::IsDepthFormat(format))
@@ -186,7 +186,7 @@ namespace Surge
     {
         if(entry.Layout == newLayout)
         {
-            Log<Severity::Warn>("Trying to call VulkanImage::TransitionLayout while entry.Layout = newLayout!");
+            //Log<Severity::Warn>("Trying to call VulkanImage::TransitionLayout while entry.Layout = newLayout!");
             return;
         }
 

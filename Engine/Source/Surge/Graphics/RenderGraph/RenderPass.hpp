@@ -29,8 +29,9 @@ namespace Surge
         virtual void OnImGuiRender(FrameBlackboard& blackBoard) = 0;
         virtual void Shutdown(FrameBlackboard& blackBoard) = 0;
 
-        PassGroup GetGroup() const { return mGroup; }
         const String& GetName() const { return mName; }
+        PassGroup GetGroup() const { return mGroup; }
+
         void SetEnabled(bool isEnabled) { mEnabled = isEnabled; }
         bool IsEnabled() { return mEnabled; }
         const Vector<ImageHandle>& GetImageReads() const { return mImageReads; }
@@ -38,10 +39,12 @@ namespace Surge
     protected:
         
     protected:
-        PassGroup mGroup = PassGroup::MAIN_SCENE; // each pass sets this in constructor
+        // Each pass sets this in constructor
         String mName;
+        PassGroup mGroup;
 
         bool mEnabled = true;
+
         Vector<ImageHandle> mImageReads;
         Vector<ImageHandle> mImageWrites;
     };

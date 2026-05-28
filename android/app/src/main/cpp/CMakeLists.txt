@@ -82,9 +82,7 @@ target_compile_definitions(SurgePlayer PRIVATE
     SURGE_EXPORT
 )
 
-# ---------------------------------------------------------------------
 # NDK system libraries
-# ----------------------------------------------------------------------
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(vulkan-lib vulkan)

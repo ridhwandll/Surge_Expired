@@ -2,20 +2,40 @@
 #pragma once
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
+#include "Surge/Graphics/Renderer/Lights.hpp"
+#include "Surge/Graphics/Mesh/Mesh.hpp"
 #include <glm/glm.hpp>
-#include <Surge/Graphics/Renderer/Lights.hpp>
-#include <Surge/Graphics/Mesh/Mesh.hpp>
+
+#define MAX_SHADOW_CASCADE_COUNT 3
 
 namespace Surge
 {
     struct FrameUBO
     {
+        glm::mat4 View;
         glm::mat4 ViewProjection;        // 64 bytes
         glm::mat4 InverseViewProjection; // 64 bytes
         glm::vec3 CameraPos;             // 12 bytes
         float _pad0;                     // 4 bytes pads to 16-byte boundary
     };
     static_assert(sizeof(FrameUBO) % 16 == 0, "Size of 'FrameUBO' struct must be 16 bytes aligned!");
+
+    struct ShadowUBO
+    {
+        glm::vec4 CascadeEnds;
+        glm::mat4 LightSpaceMatrix[MAX_SHADOW_CASCADE_COUNT];
+        Uint CascadeCount;
+        int ShowCascades;
+        float _pad0, pad1;
+    };
+    static_assert(sizeof(ShadowUBO) % 16 == 0, "Size of 'FrameUBO' struct must be 16 bytes aligned!");
+
+    struct ShadowSettings
+    {
+        int CascadeCount = MAX_SHADOW_CASCADE_COUNT;
+        float CascadeSplitLambda = 0.9f;
+        bool ShowCascades = false;
+    };
 
     // TODO: Move to a SkyComponent
     struct Sky
@@ -80,31 +100,33 @@ namespace Surge
         glm::mat4 ViewProjection;
         glm::mat4 InverseViewProjection;
         glm::vec2 CameraNearFarPlane;
-        mutable glm::mat4 LightSpaceMatrix; //Set by ShadowPass
 
         bool HasDirectionalLight = false;
         glm::vec3 DirectionalLightDir; //Set by Renderer.cpp
 
         Uint FrameIndex;
         BufferHandle FrameUBOs[RHISettings::FRAMES_IN_FLIGHT];
-
+        BufferHandle ShadowUBOs[RHISettings::FRAMES_IN_FLIGHT];
         ImageHandle WhiteImage;
 
         ImageHandle MainPassColorImage;
         ImageHandle MainPassDepthImage;
         ImageHandle OutlineMask;
         ImageHandle FinalImage;
-        ImageHandle ShadowPassImage;
+        ImageHandle ShadowMap[MAX_SHADOW_CASCADE_COUNT];
 
         FramebufferHandle OutlineFramebuffer;
         FramebufferHandle PostProcessFramebuffer;
         FramebufferHandle MainPassFramebuffer;
-        FramebufferHandle ShadowPassFramebuffer;
 
         SamplerHandle DefaultSampler;
 
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))
 
+        //Shadow Settings
+        ShadowSettings ShadowSettings_;
+
+        // GI & skybox
         GIParameters GIParams;
         Sky Skybox;
 
@@ -114,6 +136,7 @@ namespace Surge
         bool EnableFXAA;
         VignetteGrainConfig VignetteGrain;
 
+        // CMD lists
         Vector<MeshSubmitCmd> MeshList;
         Vector<LightSubmitCmd> LightList;
         Vector<QuadSubmitCmd> QuadList;

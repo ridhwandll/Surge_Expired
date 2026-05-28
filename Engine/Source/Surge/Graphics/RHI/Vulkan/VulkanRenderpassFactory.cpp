@@ -11,7 +11,7 @@ namespace Surge
         auto it = mCache.find(key);
         if(it != mCache.end())
         {
-            Log<Severity::Warn>("Returning VkRenderPass from Cache");
+            //Log<Severity::Warn>("Returning VkRenderPass from Cache");
             return it->second;
         }
 

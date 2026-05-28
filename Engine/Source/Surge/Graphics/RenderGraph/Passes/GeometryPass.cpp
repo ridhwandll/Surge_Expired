@@ -90,15 +90,34 @@ namespace Surge
             writes[0].Binding = 0;
             writes[0].Type = DescriptorType::UNIFORM_BUFFER;
             writes[0].Buffer = blackBoard.FrameUBOs[i];
-            writes[1].BufferRange = sizeof(FrameUBO);
+            writes[0].BufferRange = sizeof(FrameUBO);
             writes[1].Binding = 1;
             writes[1].Type = DescriptorType::STORAGE_BUFFER;
             writes[1].Buffer = mLightUBOs[i];
             writes[1].BufferRange = sizeof(LightUBOData);
             mRHI->UpdateDescriptorSet(mFrameDescriptorSet, writes.data(), writes.size(), i);
         }
+
+        // Create Shadow UBOs
+        BufferDesc shadowUBODesc = {};
+        shadowUBODesc.Usage = BufferUsage::UNIFORM;
+        shadowUBODesc.HostVisible = true;
+        shadowUBODesc.DebugName = "Renderer3D_Shadows";
+        shadowUBODesc.Size = sizeof(ShadowUBO);
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            blackBoard.ShadowUBOs[i] = mRHI->CreateBuffer(shadowUBODesc);
+
         // Create DescriptorSetSlot::TWO
         mShadowMapDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, DescriptorSetSlot::TWO, DescriptorUpdateFrequency::DYNAMIC, "ShadowMap DescriptorSet [Set2]");
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            std::array<DescriptorWrite, 1> writes = {};
+            writes[0].Binding = 3;
+            writes[0].Type = DescriptorType::UNIFORM_BUFFER;
+            writes[0].Buffer = blackBoard.ShadowUBOs[i];
+            writes[0].BufferRange = sizeof(ShadowUBO);
+            mRHI->UpdateDescriptorSet(mShadowMapDescriptorSet, writes.data(), writes.size(), i);
+        }
 
         SamplerDesc shadowSamplerDesc = {};
         shadowSamplerDesc.WrapU = WrapMode::CLAMP;
@@ -107,7 +126,9 @@ namespace Surge
         shadowSamplerDesc.CompareOp_ = CompareOp::LESS_OR_EQUAL;
         mShadowSampler = mRHI->CreateSampler(shadowSamplerDesc);
 
-        mImageReads.push_back(blackBoard.ShadowPassImage);
+        for(Uint i = 0; i < MAX_SHADOW_CASCADE_COUNT; i++)
+            mImageReads.push_back(blackBoard.ShadowMap[i]);
+
         mImageWrites.push_back(blackBoard.MainPassColorImage);
         mImageWrites.push_back(blackBoard.MainPassDepthImage);
 
@@ -124,19 +145,32 @@ namespace Surge
             LightUBOData lightData = {};
             for(Uint i = 0; i < blackBoard.LightList.size(); i++)
                 lightData.Lights[i] = blackBoard.LightList[i].GPULight;
-            
-            lightData.LightSpaceMatrix = blackBoard.LightSpaceMatrix;
+
             lightData.SkyAmbient = blackBoard.GIParams.SkyAmbient;
             lightData.HorizonAmbient = blackBoard.GIParams.HorizonAmbient;
             lightData.GroundAmbient = blackBoard.GIParams.GroundAmbient;
             mRHI->UploadBuffer(mLightUBOs[ctx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
         }
-        std::array<DescriptorWrite, 1> writes = {};// TODO: Move this out of the execute loop
-        writes[0].Binding = 0;
-        writes[0].Type = DescriptorType::TEXTURE;
-        writes[0].Texture = blackBoard.ShadowPassImage;
-        writes[0].Sampler = mShadowSampler;
-        mRHI->UpdateDescriptorSet(mShadowMapDescriptorSet, writes.data(), writes.size(), ctx.FrameIndex);
+
+        {   // TODO: Move this out of the execute loop
+            std::array<DescriptorWrite, MAX_SHADOW_CASCADE_COUNT> writes = {};
+            for(Uint i = 0; i < MAX_SHADOW_CASCADE_COUNT; i++)
+            {
+                writes[i].Binding = i;
+                writes[i].Type = DescriptorType::TEXTURE;
+                writes[i].Sampler = mShadowSampler;
+
+                if(i < blackBoard.ShadowSettings_.CascadeCount)
+                    writes[i].Texture = blackBoard.ShadowMap[i]; // Valid cascade
+                else
+                {
+                    //writes[i].Texture = mDummyShadowMap; 
+                    writes[i].Texture = blackBoard.ShadowMap[i]; // TODO REMOVE!: Inactive cascade: Bind a 1x1 dummy depth texture
+                    Log<Severity::Warn>("TOOD: bind 1x1 dummy depth texture");
+                }
+            }
+            mRHI->UpdateDescriptorSet(mShadowMapDescriptorSet, writes.data(), writes.size(), ctx.FrameIndex);
+        }
 
         mRHI->CmdBindPipeline(ctx, m3DPipeline);
         mRHI->CmdBindDescriptorSet(ctx, m3DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
@@ -195,11 +229,13 @@ namespace Surge
         mRHI->DestroyFramebuffer(blackBoard.MainPassFramebuffer);
         mRHI->DestroyImage(blackBoard.MainPassColorImage);
         mRHI->DestroyImage(blackBoard.MainPassDepthImage);
-
         mRHI->DestroyPipeline(m3DPipeline);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
             mRHI->DestroyBuffer(mLightUBOs[i]);
+            mRHI->DestroyBuffer(blackBoard.ShadowUBOs[i]);
+        }
 
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
         mRHI->DestroyDescriptorSet(mShadowMapDescriptorSet);
