@@ -50,6 +50,7 @@ namespace Surge
     {
         glm::mat4 Transform;
         Ref<Mesh> Mesh_;
+        bool DropShadow;
     };
 
     struct OutlineSubmitCmd // Pushed by Renderer::SubmitOutlinedMesh()
@@ -79,6 +80,10 @@ namespace Surge
         glm::mat4 ViewProjection;
         glm::mat4 InverseViewProjection;
         glm::vec2 CameraNearFarPlane;
+        mutable glm::mat4 LightSpaceMatrix; //Set by ShadowPass
+
+        bool HasDirectionalLight = false;
+        glm::vec3 DirectionalLightDir; //Set by Renderer.cpp
 
         Uint FrameIndex;
         BufferHandle FrameUBOs[RHISettings::FRAMES_IN_FLIGHT];
@@ -89,16 +94,17 @@ namespace Surge
         ImageHandle MainPassDepthImage;
         ImageHandle OutlineMask;
         ImageHandle FinalImage;
+        ImageHandle ShadowPassImage;
 
         FramebufferHandle OutlineFramebuffer;
         FramebufferHandle PostProcessFramebuffer;
         FramebufferHandle MainPassFramebuffer;
+        FramebufferHandle ShadowPassFramebuffer;
 
         SamplerHandle DefaultSampler;
 
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))
 
-        glm::vec4 ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
         GIParameters GIParams;
         Sky Skybox;
 

@@ -24,6 +24,7 @@ namespace Surge::VulkanUtils
     VkImageUsageFlags ToVkImageUsage(ImageUsage usage, bool transient);
 
     String TextureFormatToString(ImageFormat format);
+    VkImageAspectFlags GetVkImageAspectFlags(ImageFormat format);
     const char* TextureUsageToString(ImageUsage usage);
     const char* BufferUsageToString(BufferUsage usage);
     const char* LoadOpToString(LoadOp op);

@@ -7,11 +7,11 @@ namespace Surge
 {
     struct Light
     {
-        glm::vec4 PositionType;               // 16 bytes -> xyz = pos or dir, w = type (0 = dir, 1 = point)
-        glm::vec3 Color;                      // 12 bytes -> rgb=color
-        float Intensity;                      // 4 bytes -> light intensity
-        float Radius;                         // 4 bytes  -> point light falloff
-        float Falloff;                        // 4 bytes  -> point light falloff curve
+        glm::vec4 PositionType; // 16 bytes -> xyz = pos or dir, w = type (0 = dir, 1 = point)
+        glm::vec3 Color;        // 12 bytes -> rgb=color
+        float Intensity;        // 4 bytes -> light intensity
+        float Radius;           // 4 bytes  -> point light falloff
+        float Falloff;          // 4 bytes  -> point light falloff curve
 
         glm::vec2 _pad0;
     };
@@ -20,8 +20,8 @@ namespace Surge
     struct LightUBOData
     {
         Light Lights[256] = {};
-
-        // FAST GI PARAMETERS
+        glm::mat4 LightSpaceMatrix;
+        // GI PARAMETERS
         glm::vec3 SkyAmbient;
         float _pad1;
         glm::vec3 HorizonAmbient;
@@ -33,8 +33,8 @@ namespace Surge
 
     enum class LightType : Uint
     {
-        POINT = 0,
-        DIRECTIONAL = 1
+        DIRECTIONAL = 0,
+        POINT = 1
     };
     
 } // namespace Surge

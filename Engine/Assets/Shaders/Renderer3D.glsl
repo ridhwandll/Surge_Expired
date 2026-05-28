@@ -41,6 +41,7 @@ layout(std140, set = 0, binding = 0) uniform FrameUBO
 layout(std140, set = 0, binding = 1) readonly buffer Lights
 {
     Light Lights[256];
+    mat4 LightSpaceMatrix;
 
     // FAST GI PARAMETERS
     vec3 SkyAmbient;
@@ -62,6 +63,7 @@ layout(set = 1, binding = 0) uniform Material
 
 } uMaterial;
 //layout(set = 1, binding = 1) uniform sampler2D uAlbedoMap;
+layout(set = 2, binding = 0) uniform sampler2DShadow uShadowMap;
 
 struct PBRParameters
 {
@@ -72,6 +74,38 @@ struct PBRParameters
     vec3 View;
 };
 PBRParameters gPBRParams;
+
+const vec2 poissonDisk[4] = vec2[](
+    vec2(-0.94201624, -0.39906216),
+    vec2( 0.94558609, -0.76890725),
+    vec2(-0.09418410,  0.92938870),
+    vec2( 0.34495938,  0.29387760)
+);
+
+float SampleShadow(vec3 worldPos)
+{
+    vec4 shadowCoord = uLights.LightSpaceMatrix * vec4(worldPos, 1.0);
+    vec3 projCoords  = shadowCoord.xyz / shadowCoord.w;
+    vec2 uv = projCoords.xy * 0.5 + 0.5;
+    float depth = projCoords.z;
+
+    vec2 texelSize = vec2(1.0 / 2048.0);
+    float shadow   = 0.0;
+    for (int i = 0; i < 4; i++)
+        shadow += texture(uShadowMap, vec3(uv + poissonDisk[i] * texelSize, depth));
+
+    return shadow / 4.0;
+}
+float SampleHardShadow(vec3 worldPos)
+{
+    vec4 shadowCoord = uLights.LightSpaceMatrix * vec4(worldPos, 1.0);
+    vec3 projCoords  = shadowCoord.xyz / shadowCoord.w;
+    vec2 uv = projCoords.xy * 0.5 + 0.5;
+    float depth = projCoords.z;
+
+    return texture(uShadowMap, vec3(uv, depth));
+}
+
 
 // Energy conserving Blinn-Phong?
 vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
@@ -124,12 +158,13 @@ vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
     // as the highlight gets tighter.
     float specNormalization = (shininess + 8.0) / (8.0 * 3.14159);
     float specularTerm = pow(dotNH, shininess) * specNormalization;
-    
+
     // Final Composition
     vec3 diffuse = (diffuseColor / 3.14159) * dotNL;
     vec3 specular = specColor * specularTerm * dotNL;
 
     vec3 lightIntensity = light.Color.rgb * light.Intensity;
+
     return (diffuse + specular) * lightIntensity * attenuation;
 }
 
@@ -200,9 +235,18 @@ void main()
     // Direct Lighting Accumulation
     vec3 directAccumulation = vec3(0.0);
     for (uint i = 0; i < uMesh.LightCount; i++)
-        directAccumulation += CalculateMobilePBR(uLights.Lights[i], gPBRParams.Normal, gPBRParams.View, vInput.WorldPos);
+    {
+        vec3 contribution = CalculateMobilePBR(uLights.Lights[i], gPBRParams.Normal, gPBRParams.View, vInput.WorldPos);
 
-    // Combine direct and indirect results
+        if (uLights.Lights[i].PositionType.w == 0.0) // directional light
+        {
+            float shadowFactor = SampleShadow(vInput.WorldPos);
+            contribution *= shadowFactor;
+        }
+
+        directAccumulation += contribution;
+    }
+
     vec3 HDRColor = ambient + directAccumulation;
 
     FinalColor = vec4(HDRColor, 1.0);

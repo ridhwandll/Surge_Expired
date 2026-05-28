@@ -24,11 +24,11 @@ namespace Surge
 
         glm::vec3 rgb;
 
-        if (h < 1.0f / 6.0f) rgb = { c, x, 0 };
-        else if (h < 2.0f / 6.0f) rgb = { x, c, 0 };
-        else if (h < 3.0f / 6.0f) rgb = { 0, c, x };
-        else if (h < 4.0f / 6.0f) rgb = { 0, x, c };
-        else if (h < 5.0f / 6.0f) rgb = { x, 0, c };
+        if(h < 1.0f / 6.0f) rgb = { c, x, 0 };
+        else if(h < 2.0f / 6.0f) rgb = { x, c, 0 };
+        else if(h < 3.0f / 6.0f) rgb = { 0, c, x };
+        else if(h < 4.0f / 6.0f) rgb = { 0, x, c };
+        else if(h < 5.0f / 6.0f) rgb = { x, 0, c };
         else rgb = { c, 0, x };
 
         return rgb + glm::vec3(m);
@@ -184,11 +184,11 @@ namespace Surge
             mActiveScene->CreateEntity(directionalLight, "Directional Light");
             LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
             lightComp.Type = LightType::DIRECTIONAL;
-            lightComp.Intensity = 0.5f;
+            lightComp.Intensity = 5.5f;
             lightComp.Radius = 1.0f;
             TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
             t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-            t.Rotation = glm::vec3(-30.0f, -40.0f, -30.0f);
+            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
             t.MarkDirty();
         }
         mActiveScene->OnResize(windowSize.x, windowSize.y);
@@ -197,7 +197,7 @@ namespace Surge
         FrameBlackboard& bb =  mRenderer->GetRenderGraphBlackBoard();
         bb.VignetteGrain.Intensity = 0.7f;
         bb.VignetteGrain.Softness = 0.3f;
-        bb.VignetteGrain.Grain = 0.03f;
+        bb.VignetteGrain.Grain = 0.01f;
 
         bb.Skybox.EnableSunDisk = false;
         bb.Skybox.Elevation = 10.0f;

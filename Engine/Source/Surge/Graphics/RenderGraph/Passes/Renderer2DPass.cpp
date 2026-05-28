@@ -214,6 +214,5 @@ namespace Surge
         ImGui::ProgressBar(usageRatio, ImVec2(-1.0f, 0.0f));
         ImGui::Text("%u / %u Vertices", mTotalVertexCount, MAX_VERTICES);
         ImGui::PopStyleColor();
-        ImGui::ColorEdit4("Clear Color", (float*)&blackBoard.ClearColor);
     }
 }

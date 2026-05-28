@@ -16,8 +16,6 @@ namespace Surge
 
         // Record a pipeline barrier that transitions the image layout, Updates entry.Layout to newLayout after recording
         static void TransitionLayout(VkCommandBuffer cmd, ImageEntry& entry, VkImageLayout newLayout);
-
-        static VkImageAspectFlags GetAspectFlags(ImageFormat format); 
     };
 
 }

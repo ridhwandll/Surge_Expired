@@ -9,6 +9,7 @@
 #include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SkyPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/ShadowPass.hpp"
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -27,6 +28,7 @@ namespace Surge
         mShaderManager.Load("PostProcess.glsl");
         mShaderManager.Load("OutlineMask.glsl");
         mShaderManager.Load("PreethamSky.glsl");
+        mShaderManager.Load("Shadow.glsl");
         mShaderManager.Load("Present.glsl");
 
         mRHI = CreateScope<GraphicsRHI>();
@@ -66,6 +68,7 @@ namespace Surge
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
 
+        mGraph.AddPass<ShadowPass>();
         mGraph.AddPass<OutlinePass>();
         mGraph.AddPass<GeometryPass>();
         mGraph.AddPass<SkyPass>();
@@ -125,6 +128,28 @@ namespace Surge
 
         mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
         mGraph.ClearLists();
+    }
+
+    void Renderer::SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position)
+    {
+        FrameBlackboard& bb = mGraph.GetBlackboard();
+
+        Light gpuLight {};
+        gpuLight.Color = light.Color;
+        gpuLight.Intensity = light.Intensity;
+        gpuLight.Radius = light.Radius;
+        gpuLight.Falloff = light.Falloff;
+
+        if(light.Type == LightType::DIRECTIONAL)
+        {
+            bb.HasDirectionalLight = true;
+            bb.DirectionalLightDir = transform[2];
+            gpuLight.PositionType = glm::vec4(bb.DirectionalLightDir, 0.0f); // w = 0.0f for dir light
+        }
+        else if(light.Type == LightType::POINT)
+            gpuLight.PositionType = glm::vec4(position, 1.0f); // w = 1.0f for point lights
+
+        bb.LightList.emplace_back(gpuLight);
     }
 
     void Renderer::OnWindowResize(Uint width, Uint height)

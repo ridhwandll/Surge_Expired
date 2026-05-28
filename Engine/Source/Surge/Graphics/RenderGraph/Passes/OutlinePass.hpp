@@ -24,9 +24,7 @@ namespace Surge
         void Shutdown(FrameBlackboard& blackBoard) override;
 
     private:
-        FrameContext mCurrentFrameCtx;
         GraphicsRHI* mRHI;
-
         PipelineHandle mOutlineMaskPipeline;
     };
 }

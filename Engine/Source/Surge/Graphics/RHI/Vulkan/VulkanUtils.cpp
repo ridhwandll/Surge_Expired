@@ -120,6 +120,7 @@ namespace Surge::VulkanUtils
         case ImageFormat::BGRA8_SRGB:  return VK_FORMAT_B8G8R8A8_SRGB;
         case ImageFormat::D24_UNORM_S8_UINT:  return VK_FORMAT_D24_UNORM_S8_UINT;
         case ImageFormat::D32_SFLOAT:  return VK_FORMAT_D32_SFLOAT;
+        case ImageFormat::D16_UNORM:  return VK_FORMAT_D16_UNORM;
         case ImageFormat::R16G16B16A16_SFLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
         case ImageFormat::B10G11R11_UFLOAT_PACK32: return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
         default:
@@ -134,6 +135,7 @@ namespace Surge::VulkanUtils
         switch (format)
         {
         case ImageFormat::D32_SFLOAT:
+        case ImageFormat::D16_UNORM:
         case ImageFormat::D24_UNORM_S8_UINT:
             return true;
         default:
@@ -246,6 +248,7 @@ namespace Surge::VulkanUtils
         case ImageFormat::RGBA8_UNORM: return "RGBA8_UNORM";
         case ImageFormat::BGRA8_SRGB: return "BGRA8_SRGB";
         case ImageFormat::D32_SFLOAT: return "DEPTH32_SFLOAT";
+        case ImageFormat::D16_UNORM: return "DEPTH16_UNORM";
         case ImageFormat::D24_UNORM_S8_UINT: return "D24_UNORM_S8_UINT";
         case ImageFormat::R16G16B16A16_SFLOAT: return "R16G16B16A16_SFLOAT";
         case ImageFormat::B10G11R11_UFLOAT_PACK32: return "B10G11R11_UFLOAT_PACK32";
@@ -253,6 +256,21 @@ namespace Surge::VulkanUtils
         SG_ASSERT_INTERNAL("Unknown TextureFormat enum value!");
         return "Unknown";
     }
+
+    VkImageAspectFlags GetVkImageAspectFlags(ImageFormat format)
+    {
+        if(format == ImageFormat::D24_UNORM_S8_UINT)
+            return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+        if(format == ImageFormat::D32_SFLOAT || format == ImageFormat::D16_UNORM)
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        if(VulkanUtils::IsDepthFormat(format))
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+
 
     const char* TextureUsageToString(ImageUsage usage)
     {

@@ -5,20 +5,6 @@
 
 namespace Surge
 {
-    VkImageAspectFlags VulkanImage::GetAspectFlags(ImageFormat format)
-    {
-        if(format == ImageFormat::D24_UNORM_S8_UINT)
-            return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-
-        if(format == ImageFormat::D32_SFLOAT)
-            return VK_IMAGE_ASPECT_DEPTH_BIT;
-
-        if(VulkanUtils::IsDepthFormat(format))
-            return VK_IMAGE_ASPECT_DEPTH_BIT;
-
-        return VK_IMAGE_ASPECT_COLOR_BIT;
-    }
-
     // (Rid) For if depth image is sampled in shader then it can have only VK_IMAGE_ASPECT_DEPTH_BIT OR VK_IMAGE_ASPECT_STENCIL_BIT, not both
     // Thats why I had to create GetAspectFlagsForImageView a separate function which returns only VK_IMAGE_ASPECT_DEPTH_BIT on DepthStencil/DepthOnly format
     // Thats why this fucntion is created for image view separately
@@ -51,7 +37,7 @@ namespace Surge
             SG_ASSERT(!(desc.Usage & ImageUsage::TRANSFER_SRC), "TextureDesc: Transient textures cannot have TRANSFER_SRC usage");
         }
 
-        ImageEntry entry = {};		
+        ImageEntry entry = {};
         entry.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         entry.Desc = desc;
 
@@ -179,7 +165,7 @@ namespace Surge
         region.bufferOffset = 0;
         region.bufferRowLength = 0;// tightly packed
         region.bufferImageHeight = 0;
-        region.imageSubresource.aspectMask = VulkanImage::GetAspectFlags(entry->Desc.Format);
+        region.imageSubresource.aspectMask = VulkanUtils::GetVkImageAspectFlags(entry->Desc.Format);
         region.imageSubresource.mipLevel = 0;
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;

@@ -39,6 +39,7 @@ namespace Surge
         RGBA8_UNORM,
         BGRA8_SRGB,
         D32_SFLOAT,
+        D16_UNORM,
         D24_UNORM_S8_UINT,
         R16G16B16A16_SFLOAT,
         B10G11R11_UFLOAT_PACK32
@@ -137,6 +138,11 @@ namespace Surge
         PolygonMode Polygon = PolygonMode::FILL;
         float LineWidth = 1.0f;
         bool DepthClamp = false;
+
+        bool DepthBiasEnable = false;
+        float DepthBiasConstantFactor = 1.25f;
+        float DepthBiasSlopeFactor = 1.75f;
+        float DepthBiasClamp = 0.0f;
     };
 
     enum class CompareOp
@@ -224,6 +230,10 @@ namespace Surge
         float MipBias = 0.0f;
         float MaxAniso = 1.0f;
         bool Anisotropy = false;
+
+        bool CompareEnable = false;
+        CompareOp CompareOp_ = CompareOp::LESS_OR_EQUAL;
+
         String DebugName;
     };
 

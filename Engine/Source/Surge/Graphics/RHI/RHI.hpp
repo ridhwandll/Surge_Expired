@@ -85,7 +85,7 @@ namespace Surge
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdBeginSwapchainRenderpass(ctx); }
         void CmdEndSwapchainRenderpass(const FrameContext& ctx) { mBackendRHI.CmdEndSwapchainRenderpass(ctx); }
 
-        void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor = { 1.0f, 0.0f, 1.0f, 1.0f }) { mBackendRHI.CmdBeginRenderPass(ctx, h, clearColor); }
+        void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdBeginRenderPass(ctx, h); }
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdEndRenderPass(ctx, h); }
         void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
 

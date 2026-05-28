@@ -46,7 +46,6 @@ target_link_options(SurgePlayer PRIVATE
 )
 
 
-# Include directories
 target_include_directories(SurgePlayer PUBLIC
     "${ENGINE_ROOT}"
     "${ENGINE_SRC_ROOT}"
@@ -59,7 +58,7 @@ target_include_directories(SurgePlayer PUBLIC
     "${VENDOR_ROOT}/volk"
     "${VENDOR_ROOT}/SPIRV-Cross/Include"
     "${VENDOR_ROOT}/stb"
-    "${VENDOR_ROOT}/cgltf"
+    "${VENDOR_ROOT}/cgltf" n
     "${VENDOR_ROOT}/ImGui"
     "${VENDOR_ROOT}/Optick/Include"
     "${VENDOR_ROOT}/entt/Include"
@@ -69,9 +68,8 @@ target_include_directories(SurgePlayer PUBLIC
     "${game-activity_NATIVE_SRCS}"
 )
 
-# -----------------------------------------------------------------------
+
 # Platform defines
-# -----------------------------------------------------------------------
 target_compile_definitions(SurgePlayer PRIVATE
     SURGE_PLATFORM_ANDROID
     VK_USE_PLATFORM_ANDROID_KHR

@@ -87,42 +87,41 @@ namespace Surge
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
 
                 TransformComponent& t = cube.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 1.0f, 0.0f);
+                t.Position = glm::vec3(0.0f, 2.0f, 0.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
                 t.MarkDirty();
             }
-            {
-                Entity e;
-                mActiveScene->CreateEntity(e, "Vulkan Scene");
-                MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-                TransformComponent& t = e.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
+            //{
+            //    Entity e;
+            //    mActiveScene->CreateEntity(e, "Vulkan Scene");
+            //    MeshComponent& meshComp = e.AddComponent<MeshComponent>();
+            //    meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
+            //    TransformComponent& t = e.GetComponent<TransformComponent>();
+            //    t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
+            //    t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+            //    t.MarkDirty();
+            //}
         }
-        {
-            Entity pointLight;
-            mActiveScene->CreateEntity(pointLight, "Point Light");
-            LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
-            lightComp.Type = LightType::POINT;
-            lightComp.Intensity = 1.2f;
-            lightComp.Radius = 10.0f;
-            TransformComponent& t = pointLight.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
-            t.MarkDirty();
-        }
+        //{
+        //    Entity pointLight;
+        //    mActiveScene->CreateEntity(pointLight, "Point Light");
+        //    LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
+        //    lightComp.Type = LightType::POINT;
+        //    lightComp.Intensity = 1.2f;
+        //    lightComp.Radius = 10.0f;
+        //    TransformComponent& t = pointLight.GetComponent<TransformComponent>();
+        //    t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
+        //    t.MarkDirty();
+        //}
         {
             Entity directionalLight;
             mActiveScene->CreateEntity(directionalLight, "Directional Light");
             LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
             lightComp.Type = LightType::DIRECTIONAL;
-            lightComp.Intensity = 0.5f;
-            lightComp.Radius = 1.0f;
+            lightComp.Intensity = 4.5f;
             TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
             t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-            t.Rotation = glm::vec3(-30.0f, -40.0f, -30.0f);
+            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
             t.MarkDirty();
         }
 

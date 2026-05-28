@@ -422,6 +422,12 @@ namespace Surge
         info.maxLod = VK_LOD_CLAMP_NONE;
         info.anisotropyEnable = desc.Anisotropy ? VK_TRUE : VK_FALSE;
         info.maxAnisotropy = desc.MaxAniso;
+        if (desc.CompareEnable)
+        {
+            info.compareEnable = VK_TRUE;
+            info.compareOp = VulkanUtils::ToVkCompareOp(desc.CompareOp_);
+            info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        }
 
         SamplerEntry entry = {};
         entry.Desc = desc;
@@ -642,18 +648,12 @@ namespace Surge
         vkCmdEndRenderPass(cmd);
     }
 
-    void VulkanRHI::CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor)
+    void VulkanRHI::CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h)
     {
         FramebufferEntry* entry = mFramebufferPool.Get(h);
         SG_ASSERT(entry, "CmdBeginRenderPass: invalid FramebufferHandle");
 
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-
-        if (entry->ClearCount > 0)
-        {
-            float clearColorr[4] = { clearColor.r, clearColor.g, clearColor.b, clearColor.a };
-            std::copy(std::begin(clearColorr), std::end(clearColorr), entry->ClearValues[0].color.float32);
-        }
 
         VkRenderPassBeginInfo rpInfo = {};
         rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

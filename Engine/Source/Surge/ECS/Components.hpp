@@ -101,6 +101,7 @@ namespace Surge
     struct MeshComponent
     {
         Ref<Mesh> Mesh;
+        bool DropShadow = true;
         SURGE_REFLECTION_ENABLE;
     };
 

@@ -86,19 +86,28 @@ namespace Surge
         mFrameDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "3D_FrameData [Set0]");
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
         {
-            DescriptorWrite frameDescriptorWrite[2] = {};
-            frameDescriptorWrite[0].Binding = 0;
-            frameDescriptorWrite[0].Type = DescriptorType::UNIFORM_BUFFER;
-            frameDescriptorWrite[0].Buffer = blackBoard.FrameUBOs[i];
-            frameDescriptorWrite[1].BufferRange = sizeof(FrameUBO);
-
-            frameDescriptorWrite[1].Binding = 1;
-            frameDescriptorWrite[1].Type = DescriptorType::STORAGE_BUFFER;
-            frameDescriptorWrite[1].Buffer = mLightUBOs[i];
-            frameDescriptorWrite[1].BufferRange = sizeof(LightUBOData);
-            mRHI->UpdateDescriptorSet(mFrameDescriptorSet, frameDescriptorWrite, 2, i);
+            std::array<DescriptorWrite, 2> writes = {};
+            writes[0].Binding = 0;
+            writes[0].Type = DescriptorType::UNIFORM_BUFFER;
+            writes[0].Buffer = blackBoard.FrameUBOs[i];
+            writes[1].BufferRange = sizeof(FrameUBO);
+            writes[1].Binding = 1;
+            writes[1].Type = DescriptorType::STORAGE_BUFFER;
+            writes[1].Buffer = mLightUBOs[i];
+            writes[1].BufferRange = sizeof(LightUBOData);
+            mRHI->UpdateDescriptorSet(mFrameDescriptorSet, writes.data(), writes.size(), i);
         }
+        // Create DescriptorSetSlot::TWO
+        mShadowMapDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, DescriptorSetSlot::TWO, DescriptorUpdateFrequency::DYNAMIC, "ShadowMap DescriptorSet [Set2]");
 
+        SamplerDesc shadowSamplerDesc = {};
+        shadowSamplerDesc.WrapU = WrapMode::CLAMP;
+        shadowSamplerDesc.WrapV = WrapMode::CLAMP;
+        shadowSamplerDesc.CompareEnable = true;
+        shadowSamplerDesc.CompareOp_ = CompareOp::LESS_OR_EQUAL;
+        mShadowSampler = mRHI->CreateSampler(shadowSamplerDesc);
+
+        mImageReads.push_back(blackBoard.ShadowPassImage);
         mImageWrites.push_back(blackBoard.MainPassColorImage);
         mImageWrites.push_back(blackBoard.MainPassDepthImage);
 
@@ -108,7 +117,6 @@ namespace Surge
     void GeometryPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard)
     {
         SURGE_PROFILE_FUNC("GeometryPass::Execute");
-        mCurrentFrameCtx = ctx;
 
         // FRAME UBO is uploaded by Renderer, so we only need to upload light data here
         if(!blackBoard.LightList.empty())
@@ -116,21 +124,29 @@ namespace Surge
             LightUBOData lightData = {};
             for(Uint i = 0; i < blackBoard.LightList.size(); i++)
                 lightData.Lights[i] = blackBoard.LightList[i].GPULight;
-
+            
+            lightData.LightSpaceMatrix = blackBoard.LightSpaceMatrix;
             lightData.SkyAmbient = blackBoard.GIParams.SkyAmbient;
             lightData.HorizonAmbient = blackBoard.GIParams.HorizonAmbient;
             lightData.GroundAmbient = blackBoard.GIParams.GroundAmbient;
-            mRHI->UploadBuffer(mLightUBOs[mCurrentFrameCtx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
+            mRHI->UploadBuffer(mLightUBOs[ctx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
         }
+        std::array<DescriptorWrite, 1> writes = {};// TODO: Move this out of the execute loop
+        writes[0].Binding = 0;
+        writes[0].Type = DescriptorType::TEXTURE;
+        writes[0].Texture = blackBoard.ShadowPassImage;
+        writes[0].Sampler = mShadowSampler;
+        mRHI->UpdateDescriptorSet(mShadowMapDescriptorSet, writes.data(), writes.size(), ctx.FrameIndex);
 
-        mRHI->CmdBindPipeline(mCurrentFrameCtx, m3DPipeline);
-        mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m3DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
+        mRHI->CmdBindPipeline(ctx, m3DPipeline);
+        mRHI->CmdBindDescriptorSet(ctx, m3DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
+        mRHI->CmdBindDescriptorSet(ctx, m3DPipeline, mShadowMapDescriptorSet, DescriptorSetSlot::TWO);
 
         for(const MeshSubmitCmd& cmd : blackBoard.MeshList)
         {
             const Mesh& mesh = *cmd.Mesh_;
-            mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mesh.GetVertexBuffer());
-            mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mesh.GetIndexBuffer());
+            mRHI->CmdBindVertexBuffer(ctx, mesh.GetVertexBuffer());
+            mRHI->CmdBindIndexBuffer(ctx, mesh.GetIndexBuffer());
             const Vector<Ref<Material>>& materials = mesh.GetMaterials();
 
             const Submesh* submeshes = mesh.GetSubmeshes().data();
@@ -142,22 +158,18 @@ namespace Surge
                 pushConstants.Transform = cmd.Transform * submesh.Transform;
                 pushConstants.LightCount = (Uint)blackBoard.LightList.size();
 
-                materials[submesh.MaterialIndex]->UpdateForRendering(mCurrentFrameCtx);
-                materials[submesh.MaterialIndex]->Bind(mCurrentFrameCtx, m3DPipeline);
+                materials[submesh.MaterialIndex]->UpdateForRendering(ctx);
+                materials[submesh.MaterialIndex]->Bind(ctx, m3DPipeline);
 
-                mRHI->CmdPushConstants(mCurrentFrameCtx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
-                mRHI->CmdDrawIndexed(mCurrentFrameCtx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
+                mRHI->CmdPushConstants(ctx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
+                mRHI->CmdDrawIndexed(ctx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
             }
         }
     }
 
     void GeometryPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
     {
-        // blackBoard.OffscreenFramebuffer is owned by GeometryPass and thus resized by GeometryPass
-        //if(RHISettings::RENDER_TO_SWAPCHAIN && (width > 0 && height > 0))
-            Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.MainPassFramebuffer, width, height); }); // (Player)
-
-        // If not blitted to swapchain, user handles resize // (Editor)
+        Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.MainPassFramebuffer, width, height); });
     }
 
     void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard)
@@ -179,7 +191,7 @@ namespace Surge
     void GeometryPass::Shutdown(FrameBlackboard& blackBoard)
     {
         SURGE_PROFILE_FUNC("GeometryPass::Shutdown");
-
+        mRHI->DestroySampler(mShadowSampler);
         mRHI->DestroyFramebuffer(blackBoard.MainPassFramebuffer);
         mRHI->DestroyImage(blackBoard.MainPassColorImage);
         mRHI->DestroyImage(blackBoard.MainPassDepthImage);
@@ -190,5 +202,6 @@ namespace Surge
             mRHI->DestroyBuffer(mLightUBOs[i]);
 
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
+        mRHI->DestroyDescriptorSet(mShadowMapDescriptorSet);
     }
 }

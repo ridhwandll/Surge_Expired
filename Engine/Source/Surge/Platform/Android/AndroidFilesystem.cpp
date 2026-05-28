@@ -27,7 +27,7 @@ namespace Surge
 
     bool Filesystem::CreateOrEnsureDirectory(const Path& path)
     {
-        return std::filesystem::create_directories(path.Str()) || std::filesystem::exists(path.Str());
+        return false;
     }
 
     String Filesystem::RemoveExtension(const Path& path)

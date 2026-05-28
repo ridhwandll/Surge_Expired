@@ -8,6 +8,8 @@ cmake-build-release
 *.surgeProj
 *.surge
 
+Engine/Assets/Shaders/SPIRV/
+
 android/local.properties  # machine-specific SDK path
 android/.gradle
 android/.idea

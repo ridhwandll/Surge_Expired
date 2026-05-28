@@ -6,7 +6,7 @@ namespace Surge
 {
    /*
     * PostProcessPass:
-    * Reads : Blackboard.MainPassColorImage, BlackBoard.OutlineMask
+    * Reads : Blackboard.MainPassColorImage, BlackBoard.MainPassDepthImage, BlackBoard.OutlineMask
     * Writes: Blackboard.FinalImage
     */
 
@@ -23,9 +23,8 @@ namespace Surge
         void OnImGuiRender(FrameBlackboard& blackBoard) override;
         void Shutdown(FrameBlackboard& blackBoard) override;
     private:
-        FrameContext mCurrentFrameCtx;
         GraphicsRHI* mRHI;
-        DescriptorSetHandle mFullScreenSet;
+        DescriptorSetHandle mPostProcessDescriptorSet;
         PipelineHandle mFullscreenPipeline;
     };
 }

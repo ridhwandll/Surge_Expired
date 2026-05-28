@@ -46,14 +46,14 @@ namespace Surge
         {
             auto view = mRegistry.view<LightComponent, TransformComponent>();
             for(const auto& [entity, light, transform] : view.each())
-                renderer->SubmitLight(light, transform.Position, transform.Rotation);
+                renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
         }
         {
             // 3D Meshes
             for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
             {
                 if(mesh.Mesh)
-                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
+                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
             }
             if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
             {
@@ -86,14 +86,14 @@ namespace Surge
             {
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
                 for (const auto& [entity, light, transform] : view.each())
-                    renderer->SubmitLight(light, transform.Position, transform.Rotation);
+                    renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
             }
             {
                 // 3D Meshes
                 for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
                 {
                     if(mesh.Mesh)
-                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh);
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
                 }
                 if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
                 {

@@ -85,7 +85,7 @@ namespace Surge
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
         void CmdEndSwapchainRenderpass(const FrameContext& ctx);
 
-        void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h, glm::vec4 clearColor);
+        void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h);
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h);
 
         // slot maps to layout(set = N) in GLSL

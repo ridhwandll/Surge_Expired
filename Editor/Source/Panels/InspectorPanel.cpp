@@ -189,20 +189,19 @@ namespace Surge
             DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
                 String kek = "TODO: Implement Asset Manager";
                 ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
+                ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
                 const Vector<Ref<Material>>& materials = component.Mesh->GetMaterials();
                 for(size_t i = 0; i < materials.size(); i++)
                 {
                     ImGui::PushID(i);
                     const Ref<Material>& material = materials[i];
                     const String& matName = material->GetName();
-
-                    // 1. Force the Tree Node to span across BOTH columns of the main table
+                    // Force the Tree Node to span across BOTH columns of the main table
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
 
                     // ImGuiTreeNodeFlags_SpanAllColumns makes the background highlight stretch beautifully
                     bool nodeOpen = ImGui::TreeNodeEx(matName.c_str(), ImGuiTreeNodeFlags_SpanAllColumns);
-
                     if(nodeOpen)
                     {
                         // Name

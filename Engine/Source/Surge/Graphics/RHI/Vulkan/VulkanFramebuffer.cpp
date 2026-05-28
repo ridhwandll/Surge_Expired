@@ -29,10 +29,9 @@ namespace Surge
             key.ColorStore[i] = desc.ColorAttachments[i].Store;
             views[viewCount++] = tex->View;
 
-            // Does this do auto transition?
-            //tex->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; 
-            // Default clear color per attachment (Foof pink)
-            entry.ClearValues[i].color = { {1.0f, 0.0f, 1.0f, 1.0f} };
+            // Does this do auto transition? YES
+            // tex->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            entry.ClearValues[i].color = { {0.0f, 0.0f, 0.0f, 1.0f} }; // TODO: Support for clear color
             entry.ClearCount++;
         }
         key.ColorCount = desc.ColorAttachmentCount;

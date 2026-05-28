@@ -135,6 +135,11 @@ namespace Surge
         raster.lineWidth = desc.Raster.LineWidth;
         raster.depthClampEnable = desc.Raster.DepthClamp ? VK_TRUE : VK_FALSE;
 
+        raster.depthBiasEnable = desc.Raster.DepthBiasEnable ? VK_TRUE : VK_FALSE;
+        raster.depthBiasConstantFactor = desc.Raster.DepthBiasConstantFactor;
+        raster.depthBiasSlopeFactor = desc.Raster.DepthBiasSlopeFactor;
+        raster.depthBiasClamp = desc.Raster.DepthBiasClamp;
+
         // Depth
         VkPipelineDepthStencilStateCreateInfo depthStencil = {};
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -168,11 +173,13 @@ namespace Surge
         VkPipelineColorBlendAttachmentState blendAttachment = {};
         blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+        // TODO: FIX THIS MESS LATER PROPERLY
         if(!desc.TargetSwapchain)
         {
             const FramebufferDesc& fbdesc = rhi.GetDesc(desc.TargetFramebuffer);
-            if((fbdesc.ColorAttachmentCount == 1))
+            if((fbdesc.ColorAttachmentCount == 1)) // TODO: Fix this hack
             {
+                // Checking if we only output only one color
                 const ImageDesc& imgDesc = rhi.GetDesc(fbdesc.ColorAttachments[0].Handle);
                 if(IsSingleChannelColor(imgDesc.Format))
                 {
@@ -192,6 +199,21 @@ namespace Surge
         blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         blend.attachmentCount = 1;
         blend.pAttachments = &blendAttachment;
+
+        // TODO: FIX THIS MESS LATER PROPERLY
+        //////////////////////////////////////////////////////////
+        if(!desc.TargetSwapchain)
+        {
+            // Check if the pipeline's framebuffer is depth only!
+            const FramebufferDesc& fbdesc = rhi.GetDesc(desc.TargetFramebuffer);
+            if(fbdesc.ColorAttachmentCount == 0 && fbdesc.HasDepth)
+            {
+                blend.logicOpEnable = VK_FALSE;
+                blend.attachmentCount = 0;
+                blend.pAttachments = nullptr;
+            }
+        }
+        //////////////////////////////////////////////////////////
 
         // Viewport
         VkPipelineViewportStateCreateInfo viewport = {};

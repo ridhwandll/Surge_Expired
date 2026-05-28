@@ -28,24 +28,14 @@ namespace Surge
             FrameBlackboard& bb = mGraph.GetBlackboard();
             bb.QuadList.push_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture });
         }
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh)
+        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow)
         {
             FrameBlackboard& bb = mGraph.GetBlackboard();
-            bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh });
+            bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow });
             //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
         }
-        void SubmitLight(const LightComponent& light, const glm::vec3& position, const glm::vec3& rotation)
-        {
-            FrameBlackboard& bb = mGraph.GetBlackboard();
+        void SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position);
 
-            Light gpuLight {};
-            gpuLight.PositionType = (light.Type == LightType::DIRECTIONAL) ? glm::vec4(rotation, 0.0f) : glm::vec4(position, 1.0f); // Directional light has w = 0, Point light has w = 1
-            gpuLight.Color = light.Color;
-            gpuLight.Intensity = light.Intensity;
-            gpuLight.Radius = light.Radius;
-            gpuLight.Falloff = light.Falloff;
-            bb.LightList.emplace_back(gpuLight);
-        }
         void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
 
         void OnWindowResize(Uint width, Uint height);

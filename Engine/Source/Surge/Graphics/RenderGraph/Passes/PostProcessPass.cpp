@@ -7,6 +7,7 @@ namespace Surge
     void PostProcessPass::Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard)
     {
         mRHI = rhi;
+        glm::uvec2 size = Core::GetWindow()->GetSize();
 
         PipelineDesc fsDesc = {};
         fsDesc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("PostProcess.glsl");
@@ -14,13 +15,10 @@ namespace Surge
         fsDesc.Raster.Topo = Topology::TRIANGLE_LIST;
         fsDesc.Raster.Polygon = PolygonMode::FILL;
         fsDesc.Raster.Cull = CullMode::NONE;
-        
         fsDesc.Blend.Enable = false;
         fsDesc.Depth.TestEnable = false;
         fsDesc.Depth.WriteEnable = false;
         fsDesc.Stencil.Enable = false;
-
-        glm::uvec2 size = Core::GetWindow()->GetSize();
 
         ImageDesc colorDesc = {};
         colorDesc.Width = size.x;
@@ -49,7 +47,7 @@ namespace Surge
         fsDesc.TargetFramebuffer = blackBoard.PostProcessFramebuffer;
 
         mFullscreenPipeline = rhi->CreatePipeline(fsDesc);
-        mFullScreenSet = mRHI->CreateDescriptorSet(mFullscreenPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "SceneInputs");
+        mPostProcessDescriptorSet = mRHI->CreateDescriptorSet(mFullscreenPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "SceneInputs");
 
         mImageReads.push_back(blackBoard.MainPassColorImage);
         mImageReads.push_back(blackBoard.MainPassDepthImage);
@@ -75,8 +73,8 @@ namespace Surge
         writes[2].Type = DescriptorType::TEXTURE;
         writes[2].Texture = blackBoard.MainPassDepthImage;
         writes[2].Sampler = blackBoard.DefaultSampler;
-        mRHI->UpdateDescriptorSet(mFullScreenSet, writes.data(), writes.size(), ctx.FrameIndex);
-        mRHI->CmdBindDescriptorSet(ctx, mFullscreenPipeline, mFullScreenSet, DescriptorSetSlot::ZERO);
+        mRHI->UpdateDescriptorSet(mPostProcessDescriptorSet, writes.data(), writes.size(), ctx.FrameIndex);
+        mRHI->CmdBindDescriptorSet(ctx, mFullscreenPipeline, mPostProcessDescriptorSet, DescriptorSetSlot::ZERO);
 
         struct PostProcessPushConstants
         {
@@ -125,7 +123,7 @@ namespace Surge
             mRHI->DestroyFramebuffer(blackBoard.PostProcessFramebuffer);
         }
 
-        mRHI->DestroyDescriptorSet(mFullScreenSet);
+        mRHI->DestroyDescriptorSet(mPostProcessDescriptorSet);
         mRHI->DestroyPipeline(mFullscreenPipeline);
     }
 }

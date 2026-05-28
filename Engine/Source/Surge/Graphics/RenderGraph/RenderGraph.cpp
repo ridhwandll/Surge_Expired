@@ -19,8 +19,9 @@ namespace Surge
         SCOPED_TIMER("RenderGraph::Compile");
         mCompiledGraph = {};
 
-        ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE};
         ExecutionGroup outlineGroup = { .Name = "OutlineMask", .Type = PassGroup::OUTLINE_MASK };
+        ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW };
+        ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE};
         ExecutionGroup postProcessGroup = { .Name = "PostProcess", .Type = PassGroup::POST_PROCESS };
         ExecutionGroup swapchainGroup = { .Name = "Swapchain", .Type = PassGroup::SWAPCHAIN, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .IsSwapchain = true };
 
@@ -28,6 +29,7 @@ namespace Surge
         {
             switch(pass->GetGroup())
             {
+                case PassGroup::SHADOW:       shadowGroup.Passes.push_back(pass.get());      break;
                 case PassGroup::MAIN_SCENE:   mainGroup.Passes.push_back(pass.get());        break;
                 case PassGroup::OUTLINE_MASK: outlineGroup.Passes.push_back(pass.get());     break;
                 case PassGroup::POST_PROCESS: postProcessGroup.Passes.push_back(pass.get()); break;
@@ -35,14 +37,17 @@ namespace Surge
             }
         }
 
+        shadowGroup.Framebuffer = mBlackboard.ShadowPassFramebuffer;
         outlineGroup.Framebuffer = mBlackboard.OutlineFramebuffer;
         postProcessGroup.Framebuffer = mBlackboard.PostProcessFramebuffer;
         mainGroup.Framebuffer = mBlackboard.MainPassFramebuffer;
 
+        DeriveBarrierBetweenExecutionGroups(shadowGroup, mainGroup);
         DeriveBarrierBetweenExecutionGroups(mainGroup, postProcessGroup);
         DeriveBarrierBetweenExecutionGroups(outlineGroup, postProcessGroup);
         DeriveBarrierBetweenExecutionGroups(postProcessGroup, swapchainGroup);
 
+        SortByDependencies(shadowGroup.Passes);
         SortByDependencies(mainGroup.Passes);
         SortByDependencies(outlineGroup.Passes);
         SortByDependencies(postProcessGroup.Passes);
@@ -51,6 +56,9 @@ namespace Surge
         // Build final groups
         if(!outlineGroup.Passes.empty())
             mCompiledGraph.Groups.push_back(std::move(outlineGroup));
+
+        if(!shadowGroup.Passes.empty())
+            mCompiledGraph.Groups.push_back(std::move(shadowGroup));
 
         mCompiledGraph.Groups.push_back(std::move(mainGroup));
 
@@ -70,7 +78,7 @@ namespace Surge
             for(const ImageBarrier& barrier : group.BarriersBeforeGroup)
                 mRHI->CmdTransitionImageLayout(ctx, barrier.Handle, barrier.NewUsage);
 
-            group.IsSwapchain ? mRHI->CmdBeginSwapchainRenderpass(ctx) : mRHI->CmdBeginRenderPass(ctx, group.Framebuffer, mBlackboard.ClearColor);
+            group.IsSwapchain ? mRHI->CmdBeginSwapchainRenderpass(ctx) : mRHI->CmdBeginRenderPass(ctx, group.Framebuffer);
 
             for(RenderPass* pass : group.Passes)
             {

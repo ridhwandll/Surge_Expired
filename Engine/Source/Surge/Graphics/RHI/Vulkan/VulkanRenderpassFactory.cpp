@@ -9,8 +9,11 @@ namespace Surge
     VkRenderPass VulkanRenderpassFactory::GetOrCreate(const VulkanRHI& rhi, const RenderPassKey& key)
     {
         auto it = mCache.find(key);
-        if (it != mCache.end())
+        if(it != mCache.end())
+        {
+            Log<Severity::Warn>("Returning VkRenderPass from Cache");
             return it->second;
+        }
 
         VkRenderPass rp = Create(rhi, key);
         mCache[key] = rp;
@@ -94,10 +97,13 @@ namespace Surge
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
 
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.srcAccessMask = 0;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        if(key.ColorCount > 0)
+        {
+            dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dependency.srcAccessMask = 0;
+            dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        }
 
         if (hasDepth)
         {

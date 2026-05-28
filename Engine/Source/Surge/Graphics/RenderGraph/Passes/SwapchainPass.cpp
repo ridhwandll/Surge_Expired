@@ -49,15 +49,6 @@ namespace Surge
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
 
-    void SwapchainPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
-    {
-    }
-
-    void SwapchainPass::OnImGuiRender(FrameBlackboard& blackBoard)
-    {
-
-    }
-
     void SwapchainPass::Shutdown(FrameBlackboard& blackBoard)
     {
         if(!RHISettings::RENDER_TO_SWAPCHAIN)

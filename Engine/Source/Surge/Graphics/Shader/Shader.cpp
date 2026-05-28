@@ -137,7 +137,12 @@ namespace Surge
 
     String Shader::GetShaderCachePath(ShaderType type)
     {
-        String path = std::format("{0}_{1}.spv", mPath, VulkanUtils::ShaderTypeToString(type));
+        String parentPath = Filesystem::GetParentPath(mPath);
+        String shaderName = Filesystem::GetNameWithExtension(mPath);
+        String spirVDirectory = std::format("{0}/SPIRV", parentPath);
+        Filesystem::CreateOrEnsureDirectory(spirVDirectory); //Filesystem::CreateOrEnsureDirectory is a Windows only function, reurns false on Android
+
+        String path = std::format("{0}/{1}_{2}.spv", spirVDirectory, shaderName, VulkanUtils::ShaderTypeToString(type));
         return path;
     }
 
