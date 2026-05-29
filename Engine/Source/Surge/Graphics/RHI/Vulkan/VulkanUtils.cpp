@@ -228,35 +228,6 @@ namespace Surge::VulkanUtils
         return buffer;
     }
 
-    const char* LoadOpToString(LoadOp op)
-    {
-        switch (op)
-        {
-        case LoadOp::LOAD:  return "LOAD";
-        case LoadOp::CLEAR: return "CLEAR";
-        case LoadOp::DONT_CARE: return "DONT_CARE";
-        }
-        return "Unknown";
-    }
-
-    Surge::String TextureFormatToString(ImageFormat format)
-    {
-        switch (format)
-        {
-        case ImageFormat::R8_UNORM: return "R8_UNORM";
-        case ImageFormat::RGBA8_SRGB: return "RGBA8_SRGB";
-        case ImageFormat::RGBA8_UNORM: return "RGBA8_UNORM";
-        case ImageFormat::BGRA8_SRGB: return "BGRA8_SRGB";
-        case ImageFormat::D32_SFLOAT: return "DEPTH32_SFLOAT";
-        case ImageFormat::D16_UNORM: return "DEPTH16_UNORM";
-        case ImageFormat::D24_UNORM_S8_UINT: return "D24_UNORM_S8_UINT";
-        case ImageFormat::R16G16B16A16_SFLOAT: return "R16G16B16A16_SFLOAT";
-        case ImageFormat::B10G11R11_UFLOAT_PACK32: return "B10G11R11_UFLOAT_PACK32";
-        }
-        SG_ASSERT_INTERNAL("Unknown TextureFormat enum value!");
-        return "Unknown";
-    }
-
     VkImageAspectFlags GetVkImageAspectFlags(ImageFormat format)
     {
         if(format == ImageFormat::D24_UNORM_S8_UINT)
@@ -270,7 +241,6 @@ namespace Surge::VulkanUtils
 
         return VK_IMAGE_ASPECT_COLOR_BIT;
     }
-
 
     const char* TextureUsageToString(ImageUsage usage)
     {
@@ -305,39 +275,6 @@ namespace Surge::VulkanUtils
 
         *ptr = '\0'; // Null terminate
         return buffer;
-    }
-
-    const char* StoreOpToString(StoreOp op)
-    {
-        switch (op)
-        {
-        case StoreOp::STORE:  return "STORE";
-        case StoreOp::DONT_CARE: return "DONT_CARE";
-        }
-        return "Unknown";
-    }
-
-    String ShaderDataTypeToString(const ShaderDataType& type)
-    {
-        switch (type)
-        {
-        case ShaderDataType::INT: return "Int";
-        case ShaderDataType::UINT: return "UInt";
-        case ShaderDataType::FLOAT: return "Float";
-        case ShaderDataType::FLOAT2: return "Float2";
-        case ShaderDataType::FLOAT3: return "Float3";
-        case ShaderDataType::FLOAT4: return "Float4";
-        case ShaderDataType::MAT2: return "Mat2";
-        case ShaderDataType::MAT4: return "Mat4";
-        case ShaderDataType::MAT3: return "Mat3";
-        case ShaderDataType::BOOL: return "Bool";
-        case ShaderDataType::STRUCT: return "Struct";
-        case ShaderDataType::NONE: SG_ASSERT_INTERNAL("ShaderDataType::NONE is invalid in this case!");
-        default:
-            SG_ASSERT_INTERNAL("Tf?");
-        }
-        SG_ASSERT_INTERNAL("Unknown ShaderDataType!");
-        return "NONE";
     }
 
     Uint ShaderDataTypeSize(ShaderDataType type)
@@ -398,7 +335,7 @@ namespace Surge::VulkanUtils
         if (type == "None") return ShaderType::NONE;
         else if (type == "Vertex") return ShaderType::VERTEX;
         else if (type == "Pixel") return ShaderType::FRAGMENT; // Backwards compatibility
-        else if (type == "Fragment") return ShaderType::FRAGMENT;		
+        else if (type == "Fragment") return ShaderType::FRAGMENT;
         else if (type == "Compute") return ShaderType::COMPUTE;
         else
         {
@@ -409,7 +346,7 @@ namespace Surge::VulkanUtils
 
     VkFormat ShaderDataTypeToVulkanFormat(ShaderDataType type)
     {
-        switch (type)		
+        switch (type)
         {
         case ShaderDataType::UINT: return VK_FORMAT_R32_UINT;
         case ShaderDataType::FLOAT: return VK_FORMAT_R32_SFLOAT;

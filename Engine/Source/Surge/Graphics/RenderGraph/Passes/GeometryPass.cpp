@@ -124,6 +124,7 @@ namespace Surge
         shadowSamplerDesc.WrapV = WrapMode::CLAMP;
         shadowSamplerDesc.CompareEnable = true;
         shadowSamplerDesc.CompareOp_ = CompareOp::LESS_OR_EQUAL;
+        shadowSamplerDesc.DebugName = "ShadowComparisonSampler";
         mShadowSampler = mRHI->CreateSampler(shadowSamplerDesc);
 
         for(Uint i = 0; i < MAX_SHADOW_CASCADE_COUNT; i++)

@@ -8,16 +8,16 @@ namespace SurgeReflect
     class Registry
     {
     public:
-        SURGE_API static void Initialize();
-        SURGE_API static Registry* Get();
-        SURGE_API static void Shutdown();
+        static void Initialize();
+        static Registry* Get();
+        static void Shutdown();
 
-        SURGE_API ~Registry();
-        SURGE_API Class* GetClass(const std::string& name);
-        SURGE_API void RegisterReflectionClass(Class&& clazz);
-        SURGE_API void RemoveClass(std::string name);
-        SURGE_API Class* GetIfExists(const std::string& name);
-        SURGE_API const auto& GetAllClasses() const { return mClasses; }
+        ~Registry();
+        Class* GetClass(const std::string& name);
+        void RegisterReflectionClass(Class&& clazz);
+        void RemoveClass(std::string name);
+        Class* GetIfExists(const std::string& name);
+        const auto& GetAllClasses() const { return mClasses; }
 
     private:
         std::unordered_map<std::string, Class*> mClasses;

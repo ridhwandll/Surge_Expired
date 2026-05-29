@@ -1,9 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ShaderReflector.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
+#include <SurgeReflect/Enum.hpp>
 #include <SPIRV-Cross/spirv_glsl.hpp>
 #include "SPIRV-Cross/spirv_hlsl.hpp"
 #include "SPIRV-Cross/spirv_msl.hpp"
+
 
 
 namespace Surge
@@ -73,7 +75,7 @@ namespace Surge
         {
             for (const auto& [location, input] : inputs)
             {
-                Log<Severity::Info>("Stage Input: {0}, Location: {1}, Type: {2}, Stage: {3}", input.Name, location, VulkanUtils::ShaderDataTypeToString(input.DataType), VulkanUtils::ShaderTypeToString(stage));
+                Log<Severity::Info>("Stage Input: {0}, Location: {1}, Type: {2}, Stage: {3}", input.Name, location, SurgeReflect::EnumToString(input.DataType), VulkanUtils::ShaderTypeToString(stage));
             }
         }
         for(const ShaderBuffer& buffer : mShaderBuffers)
@@ -82,7 +84,7 @@ namespace Surge
                 buffer.ShaderUsage == ShaderBuffer::Usage::STORAGE ? "Storage" : "Uniform", VulkanUtils::ShaderTypeToString(buffer.ShaderStages));
             for (const ShaderBufferMember& member : buffer.Members)
             {
-                Log<Severity::Info>("\tMember: {0}, Offset: {1}, Size: {2}, Type: {3}", member.Name, member.MemoryOffset, member.Size, VulkanUtils::ShaderDataTypeToString(member.DataType));
+                Log<Severity::Info>("\tMember: {0}, Offset: {1}, Size: {2}, Type: {3}", member.Name, member.MemoryOffset, member.Size, SurgeReflect::EnumToString(member.DataType));
             }
         }
         for (const ShaderResource& res : mShaderResources)

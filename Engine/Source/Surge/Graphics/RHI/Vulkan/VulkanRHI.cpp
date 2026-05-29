@@ -14,6 +14,7 @@
 #include <android/native_window.h>
 #endif
 #include "Backends/imgui_impl_vulkan.h"
+#include <SurgeReflect/Enum.hpp>
 
 #define LOG_OBJ_CREATION_DELETION 0
 #if LOG_OBJ_CREATION_DELETION
@@ -857,7 +858,7 @@ namespace Surge
                                     {
                                         ImGui::Text("Debug Name: %s", tDesc.DebugName.c_str());
                                         ImGui::Text("Dimensions: %dx%d", tDesc.Width, tDesc.Height);
-                                        ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(tDesc.Format).c_str());
+                                        ImGui::Text("Format: %s", SurgeReflect::EnumToString(tDesc.Format).data());
                                         ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(tDesc.Usage));
                                         ImGui::Text("Size: %.3f MB", texEntry->Size / (1024.0f * 1024.0f));
                                         ImGui::TreePop();
@@ -872,7 +873,7 @@ namespace Surge
                         {
                             ImGui::Text("Depth Attachment:");
                             ImGui::Text("TextureHandle (%d, %d)\nLoadOp: %s\nStoreOp: %s", desc.DepthAttachment.Handle.Index, desc.DepthAttachment.Handle.Generation,
-                                VulkanUtils::LoadOpToString(desc.DepthAttachment.Load), VulkanUtils::StoreOpToString(desc.DepthAttachment.Store));
+                                        SurgeReflect::EnumToString(desc.DepthAttachment.Load).data(), SurgeReflect::EnumToString(desc.DepthAttachment.Store).data());
                         }
                         ImGui::TreePop();
                     }
@@ -897,12 +898,12 @@ namespace Surge
                         ImGui::Text("Enabled: %s", desc.Anisotropy ? "Yes" : "No");
                         ImGui::Text("Max Anisotropy: %.1f", desc.MaxAniso);
                         ImGui::Text("Filter Mode:");
-                        ImGui::Text("Min Filter: %s", desc.Min == FilterMode::LINEAR ? "LINEAR" : "NEAREST");
-                        ImGui::Text("Mag Filter: %s", desc.Mag == FilterMode::LINEAR ? "LINEAR" : "NEAREST");
-                        ImGui::Text("Mipmap Mode: %s", desc.Mip == MipmapMode::LINEAR ? "LINEAR" : "NEAREST");
+                        ImGui::Text("Min Filter: %s", SurgeReflect::EnumToString(desc.Min).data());
+                        ImGui::Text("Mag Filter: %s", SurgeReflect::EnumToString(desc.Mag).data());
+                        ImGui::Text("Mipmap Mode: %s", SurgeReflect::EnumToString(desc.Mip).data());
                         ImGui::Text("Wrap Mode:");
-                        ImGui::Text("U: %s", desc.WrapU == WrapMode::REPEAT ? "REPEAT" : "CLAMP/MIRRORED_REPEAT");
-                        ImGui::Text("V: %s", desc.WrapV == WrapMode::REPEAT ? "REPEAT" : "CLAMP/MIRRORED_REPEAT");
+                        ImGui::Text("U: %s", SurgeReflect::EnumToString(desc.WrapU).data());
+                        ImGui::Text("V: %s", SurgeReflect::EnumToString(desc.WrapV).data());
                         ImGui::Text("Mip Bias: %.2f", desc.MipBias);
                         ImGui::TreePop();
                     }
@@ -924,7 +925,7 @@ namespace Surge
 
                         ImGui::Text("Debug Name: %s", desc.DebugName.c_str());
                         ImGui::Text("Dimensions: %dx%d", desc.Width, desc.Height);
-                        ImGui::Text("Format: %s", VulkanUtils::TextureFormatToString(desc.Format).c_str());
+                        ImGui::Text("Format: %s", SurgeReflect::EnumToString(desc.Format).data());
                         ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(desc.Usage));
                         ImGui::Text("Size: %.5f MB", entry.Size / (1024.0f * 1024.0f));
                         if((desc.Usage & ImageUsage::SAMPLED) && desc.GenerateImGuiID)

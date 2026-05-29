@@ -6,43 +6,13 @@
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
 #include <stb_image.h>
+#include "SurgeReflect/Enum.hpp"
 
 namespace Surge
 {
-    ImageHandle Editor::LoadTexture()
-    {
-        ImageHandle texture = ImageHandle::Invalid();
-        stbi_set_flip_vertically_on_load(1);
-        SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
-        String path = "Engine/Assets/Textures/RidWhite.png";
-        int width, height, channels;
-        stbi_uc* data = nullptr;
-        data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-        if (data)
-        {
-            ImageDesc desc = {};
-            desc.Width = width;
-            desc.Height = height;
-            desc.Format = ImageFormat::RGBA8_SRGB;
-            desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
-            desc.DebugName = "Tex.png";
-            desc.GenerateImGuiID = true;
-            desc.InitialData = data;
-            desc.DataSize = width * height * 4;
-            desc.Sampler = defautSampler;
-            texture = mRenderer->GetRHI()->CreateImage(desc);
-            stbi_image_free(data);
-        }
-        else
-            Log<Severity::Error>("Failed to load texture at path: {0}", path);
-
-        return texture;
-    }
-
     void Editor::OnInitialize()
     {
         mRenderer = Core::GetRenderer();
-
         mRenderer->SetOutlineThickness(1);
 
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
@@ -55,7 +25,6 @@ namespace Surge
         mPanelManager.PushPanel<ViewportPanel>(&mCamera);
 
         mActiveScene = Ref<Scene>::Create(false);
-        //mRenderer->SetSceneContext(mActiveScene);
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
         
         Entity runtimeCamera;
@@ -190,6 +159,36 @@ namespace Surge
     {
         auto& rhi = mRenderer->GetRHI();
         rhi->DestroyImage(mRidTex);
+    }
+
+    ImageHandle Editor::LoadTexture()
+    {
+        ImageHandle texture = ImageHandle::Invalid();
+        stbi_set_flip_vertically_on_load(1);
+        SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
+        String path = "Engine/Assets/Textures/RidWhite.png";
+        int width, height, channels;
+        stbi_uc* data = nullptr;
+        data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+        if(data)
+        {
+            ImageDesc desc = {};
+            desc.Width = width;
+            desc.Height = height;
+            desc.Format = ImageFormat::RGBA8_SRGB;
+            desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
+            desc.DebugName = "Tex.png";
+            desc.GenerateImGuiID = true;
+            desc.InitialData = data;
+            desc.DataSize = width * height * 4;
+            desc.Sampler = defautSampler;
+            texture = mRenderer->GetRHI()->CreateImage(desc);
+            stbi_image_free(data);
+        }
+        else
+            Log<Severity::Error>("Failed to load texture at path: {0}", path);
+
+        return texture;
     }
 
 } // namespace Surge

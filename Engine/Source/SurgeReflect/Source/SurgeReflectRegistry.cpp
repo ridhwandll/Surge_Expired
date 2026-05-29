@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "SurgeReflect/SurgeReflectRegistry.hpp"
-#include <assert.h>
+#include <cassert>
 
 namespace SurgeReflect
 {
