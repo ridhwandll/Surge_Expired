@@ -27,7 +27,7 @@ namespace Surge
         EditorCamera& GetCamera() { return mCamera; }
 
     private:
-        void Resize();
+        void CheckResize();
         void OnImGuiRender();
         ImageHandle Editor::LoadTexture();
     private:

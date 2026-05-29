@@ -204,6 +204,9 @@ namespace Surge
     ///////////
     void RenderGraph::OnImGuiRender()
     {
+        if(!mShowImGui)
+            return;
+
         for(auto& callback : mImGuiRenderCallbacks)
             callback();
 

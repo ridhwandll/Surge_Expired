@@ -765,6 +765,8 @@ namespace Surge
         ImGui::Separator();
         ImGui::PopFont();
 
+        ImGui::Text("Frame Time: %f ms", Core::GetClock().GetMilliseconds());
+
         constexpr float boldFontSize = 18.0f;
         ImGui::PushFont(boldFont, boldFontSize);
         ImGui::TextUnformatted("GPU Info");

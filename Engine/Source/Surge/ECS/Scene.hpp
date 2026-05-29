@@ -68,7 +68,7 @@ namespace Surge
         template <typename T>
         T& GetComponent()
         {
-            T& component = mScene->GetRegistry().get<T>(mEnttHandle);
+             T& component = mScene->GetRegistry().get<T>(mEnttHandle);
             return component;
         }
 

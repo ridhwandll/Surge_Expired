@@ -91,6 +91,13 @@ namespace Surge
         ImageHandle Texture;
     };
 
+    struct LineSubmitCmd // Pushed by Renderer::SubmitLine()
+    {
+        glm::vec3 P0;
+        glm::vec3 P1;
+        glm::vec4 Color;
+    };
+
     struct FrameBlackboard
     {
         // Written by Renderer::BeginFrame()
@@ -140,6 +147,7 @@ namespace Surge
         Vector<MeshSubmitCmd> MeshList;
         Vector<LightSubmitCmd> LightList;
         Vector<QuadSubmitCmd> QuadList;
+        Vector<LineSubmitCmd> LineList;
         Vector<OutlineSubmitCmd> OutlineList;
 
         void ClearLists()
@@ -147,7 +155,11 @@ namespace Surge
             MeshList.clear();
             LightList.clear();
             QuadList.clear();
+            LineList.clear();
             OutlineList.clear();
+
+            //QuadList.reserve(Renderer2DPass::MAX_QUADS_TOTAL);
+            //LineList.reserve(Renderer2DPass::MAX_LINES_TOTAL);
         }
     };
 }

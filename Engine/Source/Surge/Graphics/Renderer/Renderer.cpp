@@ -24,6 +24,7 @@ namespace Surge
 
         mShaderManager.Initialize(ENGINE_SHADER_PATH);
         mShaderManager.Load("Renderer2D.glsl");
+        mShaderManager.Load("Renderer2DLine.glsl");
         mShaderManager.Load("Renderer3D.glsl");
         mShaderManager.Load("PostProcess.glsl");
         mShaderManager.Load("OutlineMask.glsl");

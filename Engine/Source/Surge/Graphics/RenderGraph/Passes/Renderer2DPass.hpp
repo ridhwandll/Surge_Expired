@@ -23,20 +23,23 @@ namespace Surge
         void Shutdown(FrameBlackboard& blackBoard) override;
         void OnImGuiRender(FrameBlackboard& blackBoard) override;
     public:
-        static constexpr Uint MAX_BATCHES_PER_FRAME = 10;
         static constexpr Uint MAX_QUADS_TOTAL = 100000;    // 100k quads total, across all(10) batches
         static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
 
+        // 1 draw call for ALL lines
+        static constexpr Uint MAX_LINES_TOTAL = 300000;
+        static constexpr Uint MAX_LINES_PER_BATCH = 300000;
     private:
-        void RegisterDrawcall();
+        void RegisterQuadDrawcall();
+        void RegisterLineDrawcall();
 
     private:
+        //Quads
         struct QuadDrawCmd
         {
             Uint VertexOffset = 0;
             Uint QuadCount = 0;
         };
-
         struct QuadVertex
         {
             glm::vec3 Position;
@@ -44,8 +47,7 @@ namespace Surge
             glm::vec2 UV;
             Uint TextureIndex;
         };
-
-        struct BatchData
+        struct QuadBatchData
         {
             Vector<QuadVertex> VertexData;
             Uint VertexCount = 0;
@@ -56,25 +58,65 @@ namespace Surge
                 QuadCount = 0;
             }
         };
+
+        // Lines
+        struct LineDrawCmd
+        {
+            Uint VertexOffset;
+            Uint VertexCount;
+        };
+        struct LineVertex
+        {
+            glm::vec3 Position;
+            glm::vec4 Color;
+        };
+        struct LineBatchData
+        {
+            Vector<LineVertex> VertexData;
+            Uint VertexCount = 0;
+            Uint LineCount = 0;
+            void Reset()
+            {
+                VertexCount = 0;
+                LineCount = 0;
+            }
+        };
     private:
+        static constexpr Uint MAX_QUAD_BATCHES = MAX_QUADS_TOTAL / MAX_QUADS_PER_BATCH; // = 10
+        static constexpr Uint MAX_LINE_BATCHES = MAX_LINES_TOTAL / MAX_LINES_PER_BATCH; // = 1
+
         GraphicsRHI* mRHI = nullptr;
         FrameContext mCurrentFrameCtx;
-        BatchData mCurrentBatch;
-        Vector<QuadDrawCmd> mDrawCommands; // We store the draw commands for each batch, and execute them all at the end of the frame in one go
 
         // TODO: Textures in Renderer2D
         //DescriptorSetHandle mTexDescriptorSets[MAX_BATCHES_PER_FRAME];
 
-        Uint mCurrentBatchIndex = 0;
-        Uint mTotalVertexCount = 0;
+        // Quads
+        Uint mTotalQuadlVertexCount = 0;
         Uint mTotalQuadCount = 0;
         Uint mCurrentFrameVertexOffset = 0;
         bool mMaxQuadCountReached = false;
 
+        std::array<QuadDrawCmd, MAX_QUAD_BATCHES> mQuadDrawCommands;
+        Uint mQuadDrawCommandCount = 0;
+
+        QuadBatchData mCurrentQuadBatch;
         PipelineHandle m2DPipeline;
-        BufferHandle mVertexBuffers[RHISettings::FRAMES_IN_FLIGHT];
-        BufferHandle mIndexBuffer;
+        BufferHandle mQuadVB[RHISettings::FRAMES_IN_FLIGHT];
+        BufferHandle mQuadIB;
         DescriptorSetHandle mFrameDescriptorSet;
 
+        //Lines
+        Uint mTotalLineVertexCount = 0;
+        Uint mTotalLineCount = 0;
+        Uint mCurrentLineVertexOffset = 0;
+        bool mMaxLinesCountReached = false;
+
+        std::array<LineDrawCmd, MAX_LINE_BATCHES> mLineDrawCommands;
+        Uint mLineDrawCommandCount = 0;
+
+        LineBatchData mCurrentLineBatch;
+        PipelineHandle m2DLinePipeline;
+        BufferHandle mLineVB[RHISettings::FRAMES_IN_FLIGHT];
     };
 }

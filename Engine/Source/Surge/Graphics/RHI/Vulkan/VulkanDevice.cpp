@@ -94,6 +94,11 @@ namespace Surge
         else
             enabledFeatures.samplerAnisotropy = VK_TRUE;
 
+        if(!deviceFeatures.wideLines)
+            Log<Severity::Warn>("VkPhysicalDeviceFeatures::wideLines is unavailable!");
+        else
+            enabledFeatures.wideLines = VK_TRUE;
+
         deviceInfo.pEnabledFeatures = &enabledFeatures;
         deviceInfo.queueCreateInfoCount = 1;
         deviceInfo.pQueueCreateInfos = &queueInfo;

@@ -53,6 +53,8 @@ namespace Surge
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
 
+        void ShowImGui(bool show) { mShowImGui = show; }
+
         // Destroys all passses and registry resources
         void Shutdown();
 
@@ -75,6 +77,7 @@ namespace Surge
         void SortByDependencies(Vector<RenderPass*>& passes); // Topological sort within a group based on ImageReads/ImageWrites
         void DeriveBarrierBetweenExecutionGroups(ExecutionGroup& writeGroup, ExecutionGroup& readGroup);
     private:
+        bool mShowImGui = true;
         Vector<Scope<RenderPass>> mPasses;
 
         Vector<std::function<void()>> mImGuiRenderCallbacks;

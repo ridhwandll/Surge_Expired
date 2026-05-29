@@ -25,8 +25,11 @@ namespace Surge
 
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())
         {
-            FrameBlackboard& bb = mGraph.GetBlackboard();
-            bb.QuadList.push_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture });
+            mGraph.GetBlackboard().QuadList.emplace_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture });
+        }
+        void SubmitLine(const glm::vec3& point0, const glm::vec3& point1, const glm::vec4& color)
+        {
+            mGraph.GetBlackboard().LineList.emplace_back(LineSubmitCmd { .P0 = point0, .P1 = point1, .Color = color, });
         }
         void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow)
         {
@@ -40,7 +43,7 @@ namespace Surge
 
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
-
+        void ShowImGui(bool show) { mGraph.ShowImGui(show); }
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
         const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }

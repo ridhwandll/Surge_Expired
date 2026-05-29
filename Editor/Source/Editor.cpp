@@ -54,22 +54,22 @@ namespace Surge
                 mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
                 MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
-
+            
                 TransformComponent& t = cube.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 2.0f, 0.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
                 t.MarkDirty();
             }
-            //{
-            //    Entity e;
-            //    mActiveScene->CreateEntity(e, "Vulkan Scene");
-            //    MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-            //    meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-            //    TransformComponent& t = e.GetComponent<TransformComponent>();
-            //    t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-            //    t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-            //    t.MarkDirty();
-            //}
+            {
+                Entity e;
+                mActiveScene->CreateEntity(e, "Vulkan Scene");
+                MeshComponent& meshComp = e.AddComponent<MeshComponent>();
+                meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
+                TransformComponent& t = e.GetComponent<TransformComponent>();
+                t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
+                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+                t.MarkDirty();
+            }
         }
         //{
         //    Entity pointLight;
@@ -99,7 +99,13 @@ namespace Surge
 
     void Editor::OnUpdate()
     {
-        Resize();
+        // Axes
+        constexpr float axesLength = 10000.0f;
+        mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
+        mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
+        mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+
+        CheckResize();
         if (mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
             mActiveScene->Update();
         else
@@ -121,9 +127,10 @@ namespace Surge
         mPanelManager.OnEvent(e);
 
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
-            if(keyEvent.GetKeyCode() == Key::F5)
-                mShowRuntimeView = !mShowRuntimeView;
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent)
+                                             {
+                                                 if(keyEvent.GetKeyCode() == Key::F5)
+                                                     mShowRuntimeView = !mShowRuntimeView;
                                              });
     }
 
@@ -135,7 +142,7 @@ namespace Surge
     {
     }
 
-    void Editor::Resize()
+    void Editor::CheckResize()
     {
         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
         Scope<GraphicsRHI>& rhi = mRenderer->GetRHI();

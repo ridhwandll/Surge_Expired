@@ -108,45 +108,45 @@ namespace Surge
         float halfWidth = 0;
         float halfHeight = 0;
 
-        //{
-        //    mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
-        //    CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-        //    cam.Primary = true;
-        //    cam.FixedAspectRatio = true;
-        //
-        //    cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
-        //    TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-        //    transform.Position = glm::vec3(-10, 6, 10);
-        //    transform.Rotation = glm::vec3(-30, -45, 0);
-        //
-        //    cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
-        //    float size = cam.Camera.GetOrthographicSize();
-        //    float aspect = cam.Camera.GetAspectRatio();
-        //    halfWidth = size * aspect * 0.5f;
-        //    halfHeight = size * 0.5f;
-        //}
         {
-            //Isometric camera
-            mActiveScene->CreateEntity(runtimeCamera, "RuntimeCamera");
+            mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
             cam.Primary = true;
-            cam.FixedAspectRatio = false;
-
-            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
+            cam.FixedAspectRatio = true;
+        
+            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
             TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, 0, 0);
-            transform.Rotation = glm::vec3(-35, 45, 0);
-
-            cam.Camera.SetOrthographicSize(15);
-            cam.Camera.SetOrthographicFarClip(1000);
-            cam.Camera.SetOrthographicNearClip(-10);
+            transform.Position = glm::vec3(-10, 6, 10);
+            transform.Rotation = glm::vec3(-30, -45, 0);
+        
+            cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
+            float size = cam.Camera.GetOrthographicSize();
+            float aspect = cam.Camera.GetAspectRatio();
+            halfWidth = size * aspect * 0.5f;
+            halfHeight = size * 0.5f;
         }
+        //{
+        //    //Isometric camera
+        //    mActiveScene->CreateEntity(runtimeCamera, "RuntimeCamera");
+        //    CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
+        //    cam.Primary = true;
+        //    cam.FixedAspectRatio = false;
+        //
+        //    cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
+        //    TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
+        //    transform.Position = glm::vec3(0, 0, 0);
+        //    transform.Rotation = glm::vec3(-35, 45, 0);
+        //
+        //    cam.Camera.SetOrthographicSize(15);
+        //    cam.Camera.SetOrthographicFarClip(1000);
+        //    cam.Camera.SetOrthographicNearClip(-100);
+        //}
         {
             {
                 mActiveScene->CreateEntity(mEntity, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
                 MeshComponent& meshComp = mEntity.AddComponent<MeshComponent>();
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-
+            
                 TransformComponent& t = mEntity.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.5f, 0.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -157,12 +157,12 @@ namespace Surge
                 mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
                 MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
                 meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-
+            
                 TransformComponent& t = floor.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
                 t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
                 t.MarkDirty();
-
+            
                 Ref<Material>& material = meshComp.Mesh->GetMaterialAtIndex(0);
                 material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
                 material->Set<float>("Metallic", 0.3f);
@@ -319,12 +319,23 @@ namespace Surge
         ImGui::End();
     }
 
+    static bool showImGui = true;
     void Player::OnEvent(Event& e)
     {
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<WindowResizeEvent>([&](WindowResizeEvent& resizeEvent) {
-                Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
-            });
+        dispatcher.Dispatch<WindowResizeEvent>([&](WindowResizeEvent& resizeEvent)
+                                               {
+                                                   Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
+                                               });
+
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent)
+                                             {
+                                                 if(keyEvent.GetKeyCode() == Key::F7)
+                                                 {
+                                                     showImGui = !showImGui;
+                                                     mRenderer->ShowImGui(showImGui);
+                                                 }
+                                             });
     }
 
     void Player::Resize(Uint width, Uint height)

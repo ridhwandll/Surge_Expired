@@ -37,8 +37,11 @@ vec3 YxyToXYZ(vec3 Yxy)
     float Y = Yxy.r;
     float x = Yxy.g;
     float y = Yxy.b;
-    float X = x * (Y / y);
-    float Z = (1.0 - x - y) * (Y / y);
+
+    float safeY = max(y, 0.0001); 
+
+    float X = x * (Y / safeY);
+    float Z = (1.0 - x - y) * (Y / safeY);
     return vec3(X, Y, Z);
 }
 
@@ -89,7 +92,8 @@ vec3 CalculateZenithLuminanceYxy(in float t, in float thetaS)
 
 vec3 CalculatePerezLuminanceYxy(in float theta, in float gamma, in vec3 A, in vec3 B, in vec3 C, in vec3 D, in vec3 E)
 {
-    return (1.0 + A * exp(B / cos(theta))) * (1.0 + C * exp(D * gamma) + E * cos(gamma) * cos(gamma));
+    float cosThetaSafe = max(cos(theta), 0.0001);
+    return (1.0 + A * exp(B / cosThetaSafe)) * (1.0 + C * exp(D * gamma) + E * cos(gamma) * cos(gamma));
 }
 
 vec3 CalculateSkyLuminanceRGB(in vec3 s, in vec3 e, in float t)
@@ -114,7 +118,9 @@ void main()
 {
     vec4 clipPos = vec4(inUV * 2.0 - 1.0, 0.0, 1.0);
     vec4 worldPos = frame.InverseViewProjection * clipPos;
-    vec3 rayDir = normalize(worldPos.xyz / worldPos.w - frame.CameraPos);
+
+    float safeW = (abs(worldPos.w) < 0.00001) ? 0.00001 : worldPos.w;
+    vec3 rayDir = normalize((worldPos.xyz / safeW) - frame.CameraPos);
 
     vec3 skyColor = CalculateSkyLuminanceRGB(pc.SunDirection, rayDir, pc.Turbidity) * pc.Exposure;
 
