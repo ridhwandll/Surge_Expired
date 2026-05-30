@@ -95,7 +95,7 @@ namespace Surge
             }
         }
 
-        return String();
+        return "";
     }
 
     void* Platform::LoadSharedLibrary(const String& path)

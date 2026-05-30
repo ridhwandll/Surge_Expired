@@ -14,15 +14,21 @@ namespace Surge
 
         virtual void OnInitialize() override;
         virtual void OnUpdate() override;
-        virtual void OnImGuiRender() override;
         virtual void OnEvent(Event& e) override;
         virtual void OnShutdown() override;
     private:
         void Resize(Uint width, Uint height);
-
+        void OnImGuiRender();
+        void FillTextures(Uint texCount);
     private:
-        Entity mRotatingCube;
-        Entity mFloor;
+
+        Uint mTexturedQuadCount = 500;
+        Vector<ImageHandle> mTextures;
+        int mChangeQuadAmount;
+        bool mMoveEnabled = true;
+        Vector<Entity> mColoredQuads;
+        Entity mEntity;
+
         Renderer* mRenderer;
     };
 } // namespace Surge

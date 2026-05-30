@@ -43,6 +43,7 @@ namespace Surge
         float GetPitch() const { return mPitch; }
         float GetYaw() const { return mYaw; }
         float GetCameraSpeed() const { return mSpeed; }
+        glm::vec2 GetNearAndFarPlane() const { return { mNearClip, mFarClip }; };
 
     private:
         void UpdateCameraView();

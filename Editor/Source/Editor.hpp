@@ -3,8 +3,8 @@
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Panels/Titlebar.hpp"
 #include "Panels/PaneManager.hpp"
+#include "Surge/Graphics/RHI/RHIHandle.hpp"
 
 namespace Surge
 {
@@ -16,7 +16,6 @@ namespace Surge
 
         virtual void OnInitialize() override;
         virtual void OnUpdate() override;
-        virtual void OnImGuiRender() override;
         virtual void OnEvent(Event& e) override;
         virtual void OnShutdown() override;
 
@@ -25,17 +24,17 @@ namespace Surge
         void OnRuntimeEnd();
 
         PanelManager& GetPanelManager() { return mPanelManager; }
-        Titlebar& GetTitlebar() { return mTitleBar; }
         EditorCamera& GetCamera() { return mCamera; }
 
     private:
-        void Resize();
-
+        void CheckResize();
+        void OnImGuiRender();
+        ImageHandle Editor::LoadTexture();
     private:
+        bool mShowRuntimeView = false;
+        ImageHandle mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
-
         PanelManager mPanelManager;
-        Titlebar mTitleBar {};
     };
 } // namespace Surge

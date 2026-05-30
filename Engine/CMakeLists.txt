@@ -12,7 +12,6 @@ set(INCLUDE_DIRS
     Source
     Source/SurgeReflect/Include
     Vendor
-    Vendor/fmt/Include
     Vendor/glm
     Vendor/Vulkan-Headers/Include
     Vendor/VulkanMemoryAllocator/Include
@@ -29,11 +28,10 @@ set(INCLUDE_DIRS
 )
 
 set(LIB_LINKS
-    fmt
     volk
     SPIRV-Cross
     ImGui
-    #Optick
+    Optick
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 
@@ -46,6 +44,7 @@ target_precompile_headers(Surge PRIVATE "Source/Surge/Pch.hpp")
 
 GroupSourcesByFolder(Surge)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(TARGET Surge PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_target_properties(Surge PROPERTIES FOLDER Engine)
 
@@ -67,27 +66,17 @@ target_compile_definitions(Surge
     ${PLATFORM_COMPILE_DEFS}
 
     $<$<CONFIG:Debug>:SURGE_DEBUG>
+    $<$<CONFIG:MinSizeRel>:SURGE_DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:SURGE_DEBUG>
     $<$<CONFIG:Release>:SURGE_RELEASE>
 
     PRIVATE
     SURGE_EXPORT
 )
 
-add_custom_command(TARGET Surge PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Editor/$<CONFIGURATION>/Libraries)
-CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/$<CONFIGURATION>/Surge.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/ImGui/$<CONFIGURATION>/ImGui.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/fmt/$<CONFIGURATION>/fmt.lib Editor)
-#CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/Optick/$<CONFIGURATION>/Optick.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/SPIRV-Cross/$<CONFIGURATION>/SPIRV-Cross.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_BINARY_DIR}/Engine/Vendor/volk/$<CONFIGURATION>/volk.lib Editor)
-CopyBinaryToExeDir(Surge ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib Editor)
-
-add_custom_command(
-    TARGET Surge
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:Surge>"
-        "$<TARGET_FILE_DIR:Editor>"
-    COMMENT "Build dll: Copying Surge dll to Editor output directory"
-    VERBATIM
+add_custom_command(TARGET Surge POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+        "${CMAKE_SOURCE_DIR}/Engine/Assets/"
+        "${CMAKE_SOURCE_DIR}/android/app/src/main/assets/Engine/Assets/"
+    COMMENT "Copying Engine/Assets directory to android Assets folder"
 )

@@ -8,9 +8,8 @@ namespace Surge
 {
     struct ClientOptions
     {
-        void* AndroidApp = nullptr; // Android specific, used to pass the android; Ignore on Windows
         WindowDesc WindowDescription;
-        bool EnableImGui = true;
+        bool RenderFinalImageToSwapchian = true;
     };
 
     class SURGE_API Client
@@ -21,13 +20,12 @@ namespace Surge
 
         virtual void OnInitialize() {};
         virtual void OnUpdate() {};
-        virtual void OnEvent(Event& e) {};
-        virtual void OnImGuiRender() {};
+        virtual void OnEvent(Event& e) { (void)e; };
         virtual void OnShutdown() {};
         Ref<Scene> GetActiveProject() const { return mActiveScene; }
 
         void SetOptions(const ClientOptions& appCreateInfo) { mClientOptions = appCreateInfo; }
-        const ClientOptions& GeClientOptions() const { return mClientOptions; }
+        const ClientOptions& GetClientOptions() const { return mClientOptions; }
 
     protected:
         Ref<Scene> mActiveScene;

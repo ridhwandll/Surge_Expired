@@ -32,6 +32,9 @@ namespace Surge
         void CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name = "New Entity");
         void DestroyEntity(Entity entity);
 
+        void SetSlectedEntity(Entity entity);
+        Entity GetSlectedEntity() const;
+
         void OnResize(float width, float height);
 
         entt::registry& GetRegistry() { return mRegistry; }
@@ -48,7 +51,7 @@ namespace Surge
     // Entity
     //
 
-    class SURGE_API Entity
+    class Entity
     {
     public:
         Entity() = default;
@@ -56,9 +59,16 @@ namespace Surge
             : mEnttHandle(handle), mScene(scene) {}
 
         template <typename T>
-        T& GetComponent()
+        const T& GetComponent() const
         {
             T& component = mScene->GetRegistry().get<T>(mEnttHandle);
+            return component;
+        }
+
+        template <typename T>
+        T& GetComponent()
+        {
+             T& component = mScene->GetRegistry().get<T>(mEnttHandle);
             return component;
         }
 

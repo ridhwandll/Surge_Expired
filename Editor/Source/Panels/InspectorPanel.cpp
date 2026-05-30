@@ -5,8 +5,8 @@
 #include "Surge/Utility/FileDialogs.hpp"
 #include "Surge/Core/Core.hpp"
 #include <imgui.h>
-#include <imgui_internal.h>
 #include <imgui_stdlib.h>
+#include <imgui_internal.h>
 #include <IconsFontAwesome.hpp>
 #include <filesystem>
 
@@ -23,18 +23,16 @@ namespace Surge
         bool remvove = false;
         if (open)
         {
-            const ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
-            const float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y;
-
-            if (isRemoveable)
-            {
-                ImGui::SameLine();
-                ImGui::SetCursorPosX(contentRegionAvailable.x + 13.0f);
-                if (ImGui::Button(reinterpret_cast<const char*>(ICON_SURGE_TRASH_O)))
-                    remvove = true;
-            }
             if (ImGui::BeginTable("##ComponentTable", 2, ImGuiTableFlags_Resizable))
             {
+                if (isRemoveable)
+                {
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted("Settings");
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button(reinterpret_cast<const char*>("REMOVE")))
+                        remvove = true;
+                }
                 function();
                 ImGui::EndTable();
             }
@@ -43,32 +41,6 @@ namespace Surge
         if (remvove)
             Surge::Core::AddFrameEndCallback([entity]() mutable { entity.RemoveComponent<XComponent>(); });
 
-        ImGui::PopID();
-    }
-
-    static void DrawMatTexControl(const char* mapName, Ref<Material>& material)
-    {
-        ImGui::PushID(mapName);
-        Ref<Texture2D>& texture = material->Get<Ref<Texture2D>>(mapName);
-        if (ImGuiAux::TButton(mapName, "Open"))
-        {
-            String path = FileDialog::OpenFile("");
-            if (!path.empty())
-            {
-                TextureSpecification spec;
-                spec.UseMips = true;
-                Ref<Texture2D> tex = Texture2D::Create(path, spec);
-                material->Set<Ref<Texture2D>>(mapName, tex);
-            }
-        }
-
-        ImGui::SameLine();
-        if (ImGuiAux::Button("Remove"))
-            material->RemoveTexture(mapName);
-
-        ImGui::SameLine();
-        float fontSize = ImGui::GetIO().FontDefault->FontSize + 6;
-        ImGuiAux::Image(texture->GetImage2D(), {fontSize, fontSize});
         ImGui::PopID();
     }
 
@@ -97,66 +69,19 @@ namespace Surge
                 {
                     if (ImGui::MenuItem("Camera"))
                         entity.AddComponent<CameraComponent>();
-                    if (ImGui::MenuItem("Mesh"))
+                    if (ImGui::MenuItem("Sprite Renderer"))
+                        entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+                    if(ImGui::MenuItem("Mesh Component"))
+                    {
                         entity.AddComponent<MeshComponent>();
-                    if (ImGui::MenuItem("Point Light"))
-                        entity.AddComponent<PointLightComponent>();
-                    if (ImGui::MenuItem("Directional Light"))
-                        entity.AddComponent<DirectionalLightComponent>();
+                        MeshComponent& meshComponent = entity.AddComponent<MeshComponent>();
+                    }
+                    if (ImGui::MenuItem("Light"))
+                        entity.AddComponent<LightComponent>();
                     ImGui::EndPopup();
                 }
             }
         }
-        ImGui::End();
-
-        // Material Panel; TODO: Merge with inspector later
-        ImGui::Begin("Material Editor");
-        Entity selectedEntity = mHierarchy->GetSelectedEntity();
-        if (selectedEntity && selectedEntity.HasComponent<MeshComponent>())
-        {
-            static Uint selectedMatIndex = 0;
-            Ref<Mesh>& mesh = selectedEntity.GetComponent<MeshComponent>().Mesh;
-            if (mesh)
-            {
-                Vector<Ref<Material>>& materials = mesh->GetMaterials();
-                if (ImGui::BeginTable("MatTable", 1))
-                {
-                    for (Uint i = 0; i < materials.size(); i++)
-                    {
-                        ImGuiTreeNodeFlags flags = ((i == selectedMatIndex) ? ImGuiTreeNodeFlags_Selected : 0);
-                        flags |= ImGuiTreeNodeFlags_SpanFullWidth;
-
-                        // TODO: remove std::to_string hack
-                        bool open = ImGuiAux::TSelectable(fmt::format("{0} ({1})", materials[i]->GetName(), std::to_string(glm::abs(*(int*)&materials[i]))).c_str());
-
-                        if (selectedMatIndex == i)
-                            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32({0.1f, 0.1f, 0.1f, 1.0f}));
-
-                        if (open)
-                            selectedMatIndex = i;
-                    }
-                    ImGui::EndTable();
-                }
-                if (materials.size() <= selectedMatIndex)
-                    selectedMatIndex = 0;
-
-                Ref<Material>& material = materials[selectedMatIndex];
-                if (ImGui::BeginTable("MatEditTable", 2, ImGuiTableFlags_Resizable) && material)
-                {
-                    ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Albedo", &material->Get<glm::vec3>("Material.Albedo"));
-                    ImGuiAux::TProperty<float>("Metalness", &material->Get<float>("Material.Metalness"), 0.0f, 1.0f);
-                    ImGuiAux::TProperty<float>("Roughness", &material->Get<float>("Material.Roughness"), 0.0f, 1.0f);
-                    ImGuiAux::TProperty<bool>("UseNormalMap", &material->Get<bool>("Material.UseNormalMap"));
-                    ImGui::Separator();
-                    DrawMatTexControl("AlbedoMap", material);
-                    DrawMatTexControl("NormalMap", material);
-                    DrawMatTexControl("MetalnessMap", material);
-                    DrawMatTexControl("RoughnessMap", material);
-                    ImGui::EndTable();
-                }
-            }
-        }
-
         ImGui::End();
     }
 
@@ -166,7 +91,7 @@ namespace Surge
         {
             NameComponent& component = entity.GetComponent<NameComponent>();
             ImGui::PushItemWidth(-1);
-            ImGui::InputText("##n@Me", &component.Name);
+            ImGui::InputText("##nA@Me", &component.Name);
             ImGui::PopItemWidth();
         }
 
@@ -175,25 +100,14 @@ namespace Surge
             TransformComponent& component = entity.GetComponent<TransformComponent>();
             DrawComponent<TransformComponent>(
                 entity, "Transform", [&component]() {
-                    ImGuiAux::TProperty<glm::vec3>("Position", &component.Position);
-                    ImGuiAux::TProperty<glm::vec3>("Rotation", &component.Rotation);
-                    ImGuiAux::TProperty<glm::vec3>("Scale", &component.Scale);
+                    if (ImGuiAux::TProperty<glm::vec3>("Position", &component.Position));
+                        component.MarkDirty();
+                    if (ImGuiAux::TProperty<glm::vec3>("Rotation", &component.Rotation))
+                        component.MarkDirty();
+                    if (ImGuiAux::TProperty<glm::vec3>("Scale", &component.Scale))
+                        component.MarkDirty();
                 },
                 false);
-        }
-
-        if (entity.HasComponent<MeshComponent>())
-        {
-            MeshComponent& component = entity.GetComponent<MeshComponent>();
-            DrawComponent<MeshComponent>(entity, "Mesh", [&component]() {
-                const String meshPath = component.Mesh ? component.Mesh->GetPath().Str() : "";
-                if (ImGuiAux::TButton("Path", meshPath.empty() ? "Open..." : meshPath.c_str()))
-                {
-                    String path = FileDialog::OpenFile("");
-                    if (!path.empty())
-                        component.Mesh = Ref<Mesh>::Create(path);
-                }
-            });
         }
 
         if (entity.HasComponent<CameraComponent>())
@@ -261,24 +175,132 @@ namespace Surge
             });
         }
 
-        if (entity.HasComponent<PointLightComponent>())
+        if (entity.HasComponent<SpriteRendererComponent>())
         {
-            PointLightComponent& component = entity.GetComponent<PointLightComponent>();
-            DrawComponent<PointLightComponent>(entity, "Point Light", [&component]() {
-                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
-                ImGuiAux::TProperty<float>("Intensity", &component.Intensity);
-                ImGuiAux::TProperty<float>("Radius", &component.Radius);
-                ImGuiAux::TProperty<float>("Falloff", &component.Falloff, 0.0f, 1.0f);
-            });
+            SpriteRendererComponent& component = entity.GetComponent<SpriteRendererComponent>();
+            DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
+                ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
+                });
         }
 
-        if (entity.HasComponent<DirectionalLightComponent>())
+        if (entity.HasComponent<MeshComponent>())
         {
-            DirectionalLightComponent& component = entity.GetComponent<DirectionalLightComponent>();
-            DrawComponent<DirectionalLightComponent>(entity, "Directional Light", [&component]() {
+            MeshComponent& component = entity.GetComponent<MeshComponent>();
+            DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
+                String kek = "TODO: Implement Asset Manager";
+                ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
+                ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
+                const Vector<Ref<Material>>& materials = component.Mesh->GetMaterials();
+                for(size_t i = 0; i < materials.size(); i++)
+                {
+                    ImGui::PushID(i);
+                    const Ref<Material>& material = materials[i];
+                    const String& matName = material->GetName();
+                    // Force the Tree Node to span across BOTH columns of the main table
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+
+                    // ImGuiTreeNodeFlags_SpanAllColumns makes the background highlight stretch beautifully
+                    bool nodeOpen = ImGui::TreeNodeEx(matName.c_str(), ImGuiTreeNodeFlags_SpanAllColumns);
+                    if(nodeOpen)
+                    {
+                        // Name
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Name");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        ImGui::TextUnformatted(matName.c_str());
+                        ImGui::PopItemWidth();
+
+                        // Albedo
+                        glm::vec3 albedo = material->Get<glm::vec3>("Albedo");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Albedo");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if (ImGui::ColorEdit3("##v", &albedo.x))
+                            material->Set<glm::vec3>("Albedo", albedo);
+                        ImGui::PopItemWidth();
+
+                        // Metallic
+                        float metallic = material->Get<float>("Metallic");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Metallic");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if(ImGui::SliderFloat("##Metallic", &metallic, 0.0f, 1.0f))
+                            material->Set<float>("Metallic", metallic);
+                        ImGui::PopItemWidth();
+
+                        // Roughness
+                        float roughness = material->Get<float>("Roughness");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Roughness");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if(ImGui::SliderFloat("##Roughness", &roughness, 0.0f, 1.0f))
+                            material->Set<float>("Roughness", roughness);
+                        ImGui::PopItemWidth();
+
+                        // Reflectance 
+                        float reflectance = material->Get<float>("Reflectance");
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted("Reflectance");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::PushItemWidth(-FLT_MIN);
+                        if(ImGui::SliderFloat("##Reflectance", &reflectance, 0.1f, 1.0f))
+                            material->Set<float>("Reflectance", reflectance);
+                        ImGui::PopItemWidth();
+
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+
+                });
+        }
+
+        if (entity.HasComponent<LightComponent>())
+        {
+            LightComponent& component = entity.GetComponent<LightComponent>();
+            DrawComponent<LightComponent>(entity, "Light", [&component]()
+            {
+                const char* lightTypeStrings[] = { "POINT", "DIRECTIONAL" };
+                const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("TYPE");
+                ImGui::TableNextColumn();
+                ImGui::PushItemWidth(-1);
+                if (ImGui::BeginCombo("##TYPE", currentLightTypeString))
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        const bool isSelected = currentLightTypeString == lightTypeStrings[i];
+                        if (ImGui::Selectable(lightTypeStrings[i], isSelected))
+                        {
+                            currentLightTypeString = lightTypeStrings[i];
+                            component.Type = static_cast<LightType>(i);
+                        }
+                        if (isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopItemWidth();
+
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
                 ImGuiAux::TProperty<float>("Intensity", &component.Intensity);
-                ImGuiAux::TProperty<float>("Size", &component.Size);
+
+                if (component.Type == LightType::POINT)
+                {
+                    ImGuiAux::TProperty<float>("Radius", &component.Radius);
+                    ImGuiAux::TSlider<float>("Falloff", component.Falloff, 0.1f, 2.0f);
+                }
             });
         }
     }

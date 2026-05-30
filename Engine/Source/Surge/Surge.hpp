@@ -7,17 +7,10 @@
 #include "Surge/Core/Input/Input.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Memory.hpp"
-#include "Surge/Core/Thread/ThreadPool.hpp"
+
 #include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Core/Events/Event.hpp"
-
-#include "Surge/Graphics/Interface/GraphicsPipeline.hpp"
-#include "Surge/Graphics/Interface/IndexBuffer.hpp"
-#include "Surge/Graphics/Interface/Texture.hpp"
-#include "Surge/Graphics/Interface/VertexBuffer.hpp"
-#include "Surge/Graphics/RenderContext.hpp"
-#include "Surge/Graphics/Shader/Shader.hpp"
 
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"

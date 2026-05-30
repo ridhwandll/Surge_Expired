@@ -3,9 +3,9 @@
 #include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Graphics/Abstraction/Vulkan/VulkanRenderContext.hpp"
 #include "Surge/Utility/Platform.hpp"
 #include "Surge/AssetManager/AssetManager.hpp"
+#include "Profiler.hpp"
 #include <filesystem>
 
 
@@ -24,14 +24,9 @@ namespace Surge::Core
     void OnEvent(Event& e)
     {
         GCoreData.SurgeClient->OnEvent(e);
-        Surge::EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e)
-            {
-                //if (GetWindow()->GetWindowState() != WindowState::Minimized)
-                //    GCoreData.SurgeRenderContext->OnResize(); 
-            });
-        dispatcher.Dispatch<Surge::AppClosedEvent>([](Surge::AppClosedEvent& e) { GCoreData.Running = false; });
+        EventDispatcher dispatcher(e);
         dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
+        dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e) { GCoreData.SurgeRenderer->OnWindowResize(e.GetWidth(), e.GetHeight()); });
     }
 
     void Initialize(Client* application)
@@ -46,7 +41,7 @@ namespace Surge::Core
             Platform::SetEnvVariable(ENV_VAR_KEY, std::filesystem::current_path().string());
 
         GCoreData.SurgeClient = application;
-        const ClientOptions& clientOptions = GCoreData.SurgeClient->GeClientOptions();
+        const ClientOptions& clientOptions = GCoreData.SurgeClient->GetClientOptions();
 
         // Window
 #ifdef SURGE_PLATFORM_ANDROID
@@ -55,10 +50,6 @@ namespace Surge::Core
         GCoreData.SurgeWindow = new WindowsWindow(clientOptions.WindowDescription);
 #endif
         GCoreData.SurgeWindow->RegisterEventCallback(OnEvent);
-
-        // Render Context
-        //GCoreData.SurgeRenderContext = new VulkanRenderContext();
-        //GCoreData.SurgeRenderContext->Initialize(GCoreData.SurgeWindow, clientOptions.EnableImGui);
 
         // Renderer
         GCoreData.SurgeRenderer = new Renderer();
@@ -83,23 +74,17 @@ namespace Surge::Core
             GCoreData.SurgeClock.Update();
             GCoreData.SurgeWindow->Update();
 
-            if (GCoreData.SurgeWindow->GetWindowState() != WindowState::Minimized)
+            if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
+                continue;
+
+            GCoreData.SurgeClient->OnUpdate();
+
+            if (!GCoreData.FrameEndCallbacks.empty())
             {
-                //GCoreData.SurgeRenderContext->BeginFrame();
+                for (std::function<void()>& function : GCoreData.FrameEndCallbacks)
+                    function();
 
-                GCoreData.SurgeClient->OnUpdate();
-                if (GCoreData.SurgeClient->GeClientOptions().EnableImGui)
-                    GCoreData.SurgeClient->OnImGuiRender();
-
-                //GCoreData.SurgeRenderContext->EndFrame();
-
-                if (!GCoreData.FrameEndCallbacks.empty())
-                {
-                    for (std::function<void()>& function : GCoreData.FrameEndCallbacks)
-                        function();
-
-                    GCoreData.FrameEndCallbacks.clear();
-                }
+                GCoreData.FrameEndCallbacks.clear();
             }
         }
     }
@@ -107,6 +92,9 @@ namespace Surge::Core
     void Core::Shutdown()
     {
         SCOPED_TIMER("Core::Shutdown");
+
+        // TODO: Remove this
+        GCoreData.SurgeRenderer->GetRHI()->WaitIdle();
 
         // NOTE(Rid): Order Matters here
         GCoreData.SurgeClient->OnShutdown();
@@ -117,8 +105,6 @@ namespace Surge::Core
         delete GCoreData.SurgeRenderer;
 
         delete GCoreData.SurgeWindow;
-        //GCoreData.SurgeRenderContext->Shutdown();
-        //delete GCoreData.SurgeRenderContext;
         SurgeReflect::Registry::Shutdown();
     }
 
@@ -128,7 +114,6 @@ namespace Surge::Core
     }
 
     Window* GetWindow() { return GCoreData.SurgeWindow; }
-    RenderContext* GetRenderContext() { return GCoreData.SurgeRenderContext; }
     Renderer* GetRenderer() { return GCoreData.SurgeRenderer; }
     CoreData* GetData() { return &GCoreData; }
     Client* GetClient() { return GCoreData.SurgeClient; }

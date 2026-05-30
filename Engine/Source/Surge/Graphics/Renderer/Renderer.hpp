@@ -1,41 +1,16 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Memory.hpp"
+#include "Surge/Graphics/RenderGraph/RenderGraph.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "Lights.hpp"
-#include "Surge/Graphics/Shader/ShaderSet.hpp"
-#include "Surge/Graphics/Interface/DescriptorSet.hpp"
-
-#define FRAMES_IN_FLIGHT 2
-#define BASE_SHADER_PATH "Engine/Assets/Shaders" //Sadkek, we don't have an asset manager yet
+#include "Surge/Graphics/Shader/ShaderManager.hpp"
+#include "Surge/Graphics/RHI/RHI.hpp"
 
 namespace Surge
 {
-    struct DrawCommand
-    {
-        DrawCommand(MeshComponent* meshComp, const glm::mat4& transform)
-            : MeshComp(meshComp), Transform(transform) {}
-
-        MeshComponent* MeshComp;
-        glm::mat4 Transform;
-    };
-
-    class SURGE_API Scene;
-    struct RendererData
-    {
-        Vector<DrawCommand> DrawList;
-
-        Scene* SceneContext;
-
-        // Camera
-        glm::vec3 CameraPosition;
-        glm::mat4 ViewMatrix;
-        glm::mat4 ProjectionMatrix;
-        glm::mat4 ViewProjection;
-    };
-
+    class Scene;
     class EditorCamera;
-    class SURGE_API Renderer
+    class Renderer
     {
     public:
         Renderer() = default;
@@ -44,19 +19,62 @@ namespace Surge
         void Initialize();
         void Shutdown();
 
-        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
-        void BeginFrame(const EditorCamera& camera);
+        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D = 0);
+        void BeginFrame(const EditorCamera& camera, Uint submitCount3D = 0);
         void EndFrame();
-        void SetRenderArea(Uint width, Uint height);
 
-        FORCEINLINE void SubmitMesh(MeshComponent& meshComp, const glm::mat4& transform) { mData->DrawList.push_back(DrawCommand(&meshComp, transform)); }
-        void SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
-        void SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction);
+        void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())
+        {
+            mGraph.GetBlackboard().QuadList.emplace_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture });
+        }
+        void SubmitLine(const glm::vec3& point0, const glm::vec3& point1, const glm::vec4& color)
+        {
+            mGraph.GetBlackboard().LineList.emplace_back(LineSubmitCmd { .P0 = point0, .P1 = point1, .Color = color, });
+        }
+        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow)
+        {
+            FrameBlackboard& bb = mGraph.GetBlackboard();
+            bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow });
+            //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
+        }
+        void SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position);
 
-        RendererData* GetData() { return mData.get(); }
-        void SetSceneContext(Ref<Scene>& scene) { mData->SceneContext = scene.Raw(); }
+        void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
+
+        void OnWindowResize(Uint width, Uint height);
+        void ForceResize(Uint width, Uint height);
+        void ShowImGui(bool show) { mGraph.ShowImGui(show); }
+        Ref<Material> CreateMaterial(const String& debugName = "Material");
+
+        const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }
+        FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
+
+        ImageHandle GetWhiteTexture() const { return mGraph.GetBlackboard().WhiteImage; }
+        ImageHandle GetFinalImage() const { return mGraph.GetBlackboard().FinalImage; }
+        FramebufferHandle GetFinalFramebuffer() const { return mGraph.GetBlackboard().MainPassFramebuffer; }
+        uint64_t GetFinalImageImGuiID() const
+        {
+            SG_ASSERT(!RHISettings::RENDER_TO_SWAPCHAIN, "Renderer is rendering to swapchain, cannot get Renderer's final image for ImGui rendering! Set ClientOptions::RenderFinalImageToSwapchain to false");
+            return mRHI->GetImGuiImage(mGraph.GetBlackboard().FinalImage);
+        }
+
+        void SetOutlineColor(glm::vec3 outlineColor) { mGraph.GetBlackboard().OutlineColor = outlineColor; }
+        void SetOutlineThickness(float outlineThickness) { mGraph.GetBlackboard().OutlineThickness = outlineThickness; }
+
+        ShaderManager& GetShaderManager() { return mShaderManager; }
+        SamplerHandle GetDefaultSampler() const { return mGraph.GetBlackboard().DefaultSampler; }
+
+        const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
+        Scope<GraphicsRHI>& GetRHI() { return mRHI; }
+
+        void AddImGuiRenderCallback(std::function<void()> callback) { mGraph.AddImGuiRenderCallback(std::move(callback)); }
 
     private:
-        Scope<RendererData> mData;
+        FrameContext mCurrentFrameCtx;
+
+        RenderGraph mGraph;
+
+        ShaderManager mShaderManager;
+        Scope<GraphicsRHI> mRHI;
     };
 } // namespace Surge

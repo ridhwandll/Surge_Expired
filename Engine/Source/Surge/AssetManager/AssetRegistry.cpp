@@ -22,7 +22,7 @@ namespace Surge
             return mRegistry.at(path);
         }
         Log<Severity::Error>("AssetRegistry: Asset with path '{}' not found in registry!", path.string());
-        return {};
+        return sNullMetadata;
     }
 
     AssetMetadata& AssetRegistry::Get(const std::filesystem::path& path)

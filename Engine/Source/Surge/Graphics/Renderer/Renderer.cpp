@@ -1,63 +1,192 @@
 ﻿// Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Graphics/Interface/DescriptorSet.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
+#include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/RHI/RHI.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/PostProcessPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/SkyPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/ShadowPass.hpp"
+
+#define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
 namespace Surge
 {
-    struct UBufCameraData // At binding 0 set 0
-    {
-        glm::mat4 ViewMatrix;
-        glm::mat4 ProjectionMatrix;
-        glm::mat4 ViewProjectionMatrix;
-    };
-
     void Renderer::Initialize()
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
-        mData = CreateScope<RendererData>();
+
+        const ClientOptions& clientOptions = Core::GetClient()->GetClientOptions();
+        RHISettings::RENDER_TO_SWAPCHAIN = clientOptions.RenderFinalImageToSwapchian;
+
+        mShaderManager.Initialize(ENGINE_SHADER_PATH);
+        mShaderManager.Load("Renderer2D.glsl");
+        mShaderManager.Load("Renderer2DLine.glsl");
+        mShaderManager.Load("Renderer3D.glsl");
+        mShaderManager.Load("PostProcess.glsl");
+        mShaderManager.Load("OutlineMask.glsl");
+        mShaderManager.Load("PreethamSky.glsl");
+        mShaderManager.Load("Shadow.glsl");
+        mShaderManager.Load("Present.glsl");
+
+        mRHI = CreateScope<GraphicsRHI>();
+        mRHI->Initialize(Core::GetWindow());
+
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+
+        //Sampler
+        SamplerDesc samplerDesc = {};
+        samplerDesc.DebugName = "DefaultSampler";
+        samplerDesc.Min = FilterMode::NEAREST; // We set to NEAREST as Rendergraph Passes uses this internally
+        samplerDesc.Mag = FilterMode::NEAREST;
+        samplerDesc.WrapU = WrapMode::CLAMP;
+        samplerDesc.WrapV = WrapMode::CLAMP;
+        samplerDesc.Anisotropy = true;
+        samplerDesc.MaxAniso = 4;
+        blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
+
+        Byte whitePixel[] = { 255, 255, 255, 255 };
+        ImageDesc texDesc = {};
+        texDesc.Width = 1;
+        texDesc.Height = 1;
+        texDesc.Format = ImageFormat::RGBA8_UNORM;
+        texDesc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
+        texDesc.DebugName = "WhiteTexture";
+        texDesc.InitialData = whitePixel;
+        texDesc.GenerateImGuiID = true;
+        texDesc.DataSize = sizeof(whitePixel);
+        texDesc.Sampler = blackBoard.DefaultSampler;
+        blackBoard.WhiteImage = mRHI->CreateImage(texDesc);
+
+        BufferDesc frameUBODesc = {};
+        frameUBODesc.Usage = BufferUsage::UNIFORM;
+        frameUBODesc.HostVisible = true;
+        frameUBODesc.DebugName = "FrameUBO";
+        frameUBODesc.Size = sizeof(FrameUBO);
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
+
+        mGraph.AddPass<ShadowPass>();
+        mGraph.AddPass<OutlinePass>();
+        mGraph.AddPass<GeometryPass>();
+        mGraph.AddPass<SkyPass>();
+        mGraph.AddPass<Renderer2DPass>();
+        mGraph.AddPass<PostProcessPass>();
+        mGraph.AddPass<SwapchainPass>();
+        mGraph.Setup(mRHI.get());
+        mGraph.Compile();
     }
 
-    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
-    {
-        SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
-        mData->ViewMatrix = glm::inverse(transform);
-        mData->ProjectionMatrix = camera.GetProjectionMatrix();
-        mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
-        mData->CameraPosition = transform[3];
-    }
-
-    void Renderer::BeginFrame(const EditorCamera& camera)
+    void Renderer::BeginFrame(const EditorCamera& camera, Uint submitCount3D)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
-        mData->ViewMatrix = camera.GetViewMatrix();
-        mData->ProjectionMatrix = camera.GetProjectionMatrix();
-        mData->ViewProjection = mData->ProjectionMatrix * mData->ViewMatrix;
-        mData->CameraPosition = camera.GetPosition();
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+
+        blackBoard.ViewMatrix = camera.GetViewMatrix();
+        blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
+        blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
+        blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
+        blackBoard.CameraPosition = camera.GetPosition();
+        blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
+
+        FrameUBO frameData = {};
+        frameData.View = blackBoard.ViewMatrix;
+        frameData.ViewProjection = blackBoard.ViewProjection;
+        frameData.InverseViewProjection = blackBoard.InverseViewProjection;
+        frameData.CameraPos = blackBoard.CameraPosition;
+
+        mCurrentFrameCtx = mRHI->BeginFrame();
+        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
+    }
+
+    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
+    {
+        SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+
+        blackBoard.ViewMatrix = glm::inverse(transform);
+        blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
+        blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
+        blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
+        blackBoard.CameraPosition = transform[3];
+        blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
+
+        FrameUBO frameData = {};
+        frameData.View = blackBoard.ViewMatrix;
+        frameData.ViewProjection = blackBoard.ViewProjection;
+        frameData.InverseViewProjection = blackBoard.InverseViewProjection;
+        frameData.CameraPos = blackBoard.CameraPosition;
+
+        mCurrentFrameCtx = mRHI->BeginFrame();
+        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
     }
 
     void Renderer::EndFrame()
     {
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
-        mData->DrawList.clear();
+        mGraph.Execute(mCurrentFrameCtx);
+
+        mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
+        mGraph.ClearLists();
     }
 
-    void Renderer::SetRenderArea(Uint width, Uint height)
+    void Renderer::SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position)
     {
+        FrameBlackboard& bb = mGraph.GetBlackboard();
+
+        Light gpuLight {};
+        gpuLight.Color = light.Color;
+        gpuLight.Intensity = light.Intensity;
+        gpuLight.Radius = light.Radius;
+        gpuLight.Falloff = light.Falloff;
+
+        if(light.Type == LightType::DIRECTIONAL)
+        {
+            bb.HasDirectionalLight = true;
+            bb.DirectionalLightDir = transform[2];
+            gpuLight.PositionType = glm::vec4(bb.DirectionalLightDir, 0.0f); // w = 0.0f for dir light
+        }
+        else if(light.Type == LightType::POINT)
+            gpuLight.PositionType = glm::vec4(position, 1.0f); // w = 1.0f for point lights
+
+        bb.LightList.emplace_back(gpuLight);
+    }
+
+    void Renderer::OnWindowResize(Uint width, Uint height)
+    {
+        mGraph.OnWindowResize(width, height);
+    }
+
+    void Renderer::ForceResize(Uint width, Uint height)
+    {
+        mGraph.ForceResize(width, height);
+    }
+
+    Ref<Material> Renderer::CreateMaterial(const String& debugName)
+    {
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+        Ref<Material> material = Ref<Material>::Create(blackBoard.MaterialPipeline, mShaderManager.Get("Renderer3D.glsl"), "Material");
+        return material;
     }
 
     void Renderer::Shutdown()
     {
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
-        //mData->ShaderSet.Shutdown();
-    }
+        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
 
-    void Renderer::SubmitPointLight(const PointLightComponent& pointLight, const glm::vec3& position)
-    {
-    }
+        mRHI->WaitIdle();
+        mGraph.Shutdown();
 
-    void Renderer::SubmitDirectionalLight(const DirectionalLightComponent& dirLight, const glm::vec3& direction)
-    {
+        mRHI->DestroyImage(blackBoard.WhiteImage);
+
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            mRHI->DestroyBuffer(blackBoard.FrameUBOs[i]);
+
+        mRHI->DestroySampler(blackBoard.DefaultSampler);
+        mRHI->Shutdown();
     }
 
 } // namespace Surge

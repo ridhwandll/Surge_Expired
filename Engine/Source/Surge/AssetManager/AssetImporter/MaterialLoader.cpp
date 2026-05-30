@@ -42,7 +42,7 @@ namespace Surge
         //}
         //
         //asset->SetFlag(AssetFlag::INVALID);
-        //return false;
+        return false;
     }
 
     bool MaterialLoader::SaveData(AssetMetadata metaData, const Ref<Asset>& asset)
@@ -82,7 +82,7 @@ namespace Surge
         //    FileSystem::WriteFile(AssetManager::GetAbsolutePath(metaData), out.c_str());
         //    return true;
         //}
-        //return false;
+        return false;
     }
 
     void MaterialLoader::SerializeTexture(const Ref<Material>& mat, const char* mapName /*, YAML::Emitter& out*/) const

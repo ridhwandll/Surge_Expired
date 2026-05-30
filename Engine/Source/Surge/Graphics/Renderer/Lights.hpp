@@ -1,42 +1,40 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include <glm/glm.hpp>
 #include "Surge/Core/Defines.hpp"
+#include <glm/glm.hpp>
 
 namespace Surge
 {
-    struct PointLight
+    struct Light
     {
-        PointLight() = default;
+        glm::vec4 PositionType; // 16 bytes -> xyz = pos or dir, w = type (0 = dir, 1 = point)
+        glm::vec3 Color;        // 12 bytes -> rgb=color
+        float Intensity;        // 4 bytes -> light intensity
+        float Radius;           // 4 bytes  -> point light falloff
+        float Falloff;          // 4 bytes  -> point light falloff curve
 
-        glm::vec3 Position = glm::vec3(0.0f, 0.0f, 0.0f);
-        float Intensity = 1.0f;
-        glm::vec3 Color = glm::vec3(1.0f, 1.0f, 1.0f);
-        float Radius = 3.0f;
-        float Falloff = 0.0f;
-
-        glm::vec3 _Padding_ = {};
+        glm::vec2 _pad0;
     };
-    static_assert(sizeof(PointLight) % 16 == 0, "Size of 'PointLight' struct must be 16 bytes aligned!");
+    static_assert(sizeof(Light) % 16 == 0, "Size of 'Light' struct must be 16 bytes aligned!");
 
-    struct DirectionalLight
+    struct LightUBOData
     {
-        glm::vec3 Direction;
-        float Intensity;
+        // GI PARAMETERS // TODO: Remove from here
+        glm::vec3 SkyAmbient;
+        float _pad1;
+        glm::vec3 HorizonAmbient;
+        float _pad2;
+        glm::vec3 GroundAmbient;
+        float _pad3;
 
-        glm::vec3 Color;
-        float Size;
+        Light Lights[256] = {};
     };
-    static_assert(sizeof(DirectionalLight) % 16 == 0, "Size of 'DirectionalLight' struct must be 16 bytes aligned!");
+    static_assert(sizeof(LightUBOData) % 16 == 0, "Size of 'Lights' struct must be 16 bytes aligned!");
 
-    struct LightUniformBufferData
+    enum class LightType : Uint
     {
-        glm::vec3 CameraPosition = {};
-        Uint PointLightCount = 0;
-
-        PointLight PointLights[1024] = {};
-        DirectionalLight DirLight = {};
+        DIRECTIONAL = 0,
+        POINT = 1
     };
-    static_assert(sizeof(LightUniformBufferData) % 16 == 0, "Size of 'Lights' struct must be 16 bytes aligned!");
-
+    
 } // namespace Surge

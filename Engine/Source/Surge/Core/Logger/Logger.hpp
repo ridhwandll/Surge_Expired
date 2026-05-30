@@ -1,27 +1,31 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include <fmt/color.h>
-#include <fmt/core.h>
+#include "Surge/Core/String.hpp"
+#include <stdio.h>
 #include <mutex>
+#include <format>
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/log.h>
 #define SURGE_TAG "SurgeEngine"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, SURGE_TAG, __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, SURGE_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, SURGE_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, SURGE_TAG, __VA_ARGS__)
-#define LOGF(...) __android_log_print(ANDROID_LOG_FATAL, SURGE_TAG, __VA_ARGS__)
-#else
-#define LOGI(...)
-#define LOGW(...)
-#define LOGE(...)
-#define LOGD(...)
-#define LOGF(...)
+#elif defined(SURGE_PLATFORM_WINDOWS)
+//#define WIN32_LEAN_AND_MEAN
+//#include <windows.h>
 #endif
 
 namespace Surge
 {
+	namespace LogColor {
+		constexpr const char* Reset = "\x1b[0m";
+		constexpr const char* Red = "\x1b[31m";
+		constexpr const char* Green = "\x1b[32m";
+		constexpr const char* Yellow = "\x1b[33m";
+		constexpr const char* Blue = "\x1b[34m";
+		constexpr const char* Cyan = "\x1b[36m";
+		constexpr const char* Bold = "\x1b[1m";
+        constexpr const char* Fatal = "\x1b[41;97m";
+	}
+
     enum class Severity
     {
         Trace = 0,
@@ -34,64 +38,52 @@ namespace Surge
 
     static std::mutex sLogMutex;
 
-    // TODO (Rid): Support for logging in Files, getting the last 'x' number of messages, store messages in a buffer
-    // etc.
-    template <Severity severity = Severity::Trace, typename... Args>
-    void Log(const char* format, const Args&... args)
+	template <Severity severity = Severity::Trace, typename... Args>
+	void Log(const std::string& fmtMsg, Args&&... args)
     {
-        sLogMutex.lock();
-        time_t now = time(0);
-        tm* ltm = localtime(&now);
-        if constexpr (severity == Severity::Trace)
-        {
-            fmt::print("[{0}:{1}:{2}] ", ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
-            fmt::print(format, args...);
-#ifdef SURGE_PLATFORM_ANDROID
-            LOGI(format);
-#endif
-        }
-        if constexpr (severity == Severity::Info)
-        {
-            fmt::print(fg(fmt::color::lawn_green), "[{0}:{1}:{2}] ", ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
-            fmt::print(fg(fmt::color::lawn_green) | fmt::emphasis::bold, format, args...);
-#ifdef SURGE_PLATFORM_ANDROID
-            LOGI(format);
-#endif
-        }
-        if constexpr (severity == Severity::Debug)
-        {
-            fmt::print(fg(fmt::color::aqua), "[{0}:{1}:{2}] ", ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
-            fmt::print(fg(fmt::color::aqua) | fmt::emphasis::bold, format, args...);
-#ifdef SURGE_PLATFORM_ANDROID
-            LOGD(format);
-#endif
-        }
-        if constexpr (severity == Severity::Warn)
-        {
-            fmt::print(fg(fmt::color::yellow), "[{0}:{1}:{2}] ", ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
-            fmt::print(fg(fmt::color::yellow) | fmt::emphasis::bold | fmt::emphasis::italic, format, args...);
-#ifdef SURGE_PLATFORM_ANDROID
-            LOGW(format);
-#endif
-        }
-        if constexpr (severity == Severity::Error)
-        {
-            fmt::print(fg(fmt::color::red), "[{0}:{1}:{2}] ", ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
-            fmt::print(fg(fmt::color::red) | fmt::emphasis::bold | fmt::emphasis::italic, format, args...);
-#ifdef SURGE_PLATFORM_ANDROID
-            LOGE(format);
-#endif
-        }
-        if constexpr (severity == Severity::Fatal)
-        {
-            fmt::print(bg(fmt::color::red), "[{0}:{1}:{2}] ", ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
-            fmt::print(fg(fmt::color::antique_white) | bg(fmt::color::red) | fmt::emphasis::underline | fmt::emphasis::italic, format, args...);
-#ifdef SURGE_PLATFORM_ANDROID
-            LOGF(format);
-#endif
-        }
-        std::putc('\n', stdout);
-        sLogMutex.unlock();
-    }
+        std::lock_guard<std::mutex> lock(sLogMutex);
 
+        std::time_t now = std::time(nullptr);
+        std::tm ltm{};
+#ifdef _WIN32
+        localtime_s(&ltm, &now);
+#else
+        localtime_r(&now, &ltm);
+#endif
+
+        // Format message
+        std::string message = std::vformat(fmtMsg, std::make_format_args(args...));
+        String finalMsg = std::format("[{:02}:{:02}:{:02}] {}", ltm.tm_hour, ltm.tm_min, ltm.tm_sec, message);
+
+        // Output
+#ifdef SURGE_PLATFORM_ANDROID
+        switch (severity)
+        {
+        case Severity::Trace:
+        case Severity::Info:  __android_log_print(ANDROID_LOG_INFO, SURGE_TAG, "%s", finalMsg.c_str()); break;
+        case Severity::Debug: __android_log_print(ANDROID_LOG_DEBUG, SURGE_TAG, "%s", finalMsg.c_str()); break;
+        case Severity::Warn:  __android_log_print(ANDROID_LOG_WARN, SURGE_TAG, "%s", finalMsg.c_str()); break;
+        case Severity::Error: __android_log_print(ANDROID_LOG_ERROR, SURGE_TAG, "%s", finalMsg.c_str()); break;
+        case Severity::Fatal: __android_log_print(ANDROID_LOG_FATAL, SURGE_TAG, "%s", finalMsg.c_str()); break;
+        }
+#elif defined(SURGE_PLATFORM_WINDOWS)
+
+        const char* color = nullptr;
+		switch (severity)
+		{
+        case Severity::Trace: color = LogColor::Reset; break;
+		case Severity::Info:  color = LogColor::Green; break;
+		case Severity::Warn:  color = LogColor::Yellow; break;
+		case Severity::Error: color = LogColor::Red; break;
+		case Severity::Debug: color = LogColor::Cyan; break;
+		case Severity::Fatal: color = LogColor::Fatal; break;
+		default: color = LogColor::Reset; break;
+		}
+
+		std::fwrite(color, 1, strlen(color), stdout);
+		std::fwrite(finalMsg.data(), 1, finalMsg.size(), stdout);
+		std::fwrite(LogColor::Reset, 1, strlen(LogColor::Reset), stdout);
+		std::fputc('\n', stdout);
+#endif
+    }
 } // namespace Surge

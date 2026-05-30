@@ -4,14 +4,13 @@ plugins {
 
 android {
     namespace = 'com.surgetechnologies.surgeplayer'
+    compileSdk 33
 
-    compileSdk = 33
-
-    ndkVersion = "27.3.13750724" 
+    ndkVersion = "27.3.13750724"
 
     defaultConfig {
         applicationId = "com.surgetechnologies.surgeplayer"
-        minSdk = 24
+        minSdk 29 //Android 10 is must as we need Vulkan 1.1
         targetSdk = 33
         versionCode = 1
         versionName = "1.0"
@@ -22,8 +21,9 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += "-std=c++23 -fexceptions -Wno-everything"
-                arguments += "-DANDROID_STL=c++_shared"
+                cppFlags += "-std=c++20"
+                cppFlags += "-fstack-protector-strong -D_FORTIFY_SOURCE=2"
+                cppFlags += "-Wall -Wextra"
                 arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
                 arguments += "-DANDROID_STL=c++_static"
             }
@@ -41,9 +41,11 @@ android {
         debug {
             debuggable = true
             jniDebuggable = true
+            minifyEnabled = false
 
             externalNativeBuild {
                 cmake {
+                    cppFlags += "-O0 -g"
                     arguments += "-DCMAKE_BUILD_TYPE=Debug"
                 }
             }
@@ -51,13 +53,15 @@ android {
         release {
             debuggable = false
             jniDebuggable = false
-            minifyEnabled = false
+            minifyEnabled = true
 
             externalNativeBuild {
                 cmake {
+                    cppFlags += "-O3 -ffast-math -flto"
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
+            signingConfig signingConfigs.debug
         }
     }
 
@@ -67,6 +71,10 @@ android {
         }
     }
 
+    buildFeatures {
+        prefab true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -74,4 +82,12 @@ android {
 }
 
 dependencies {
+    // Provides com.google.androidgamesdk.GameActivity (Java side)
+    implementation "androidx.games:games-activity:3.0.0"
+
+    // GameActivity extends AppCompatActivity transitive but declare explicitly
+    implementation "androidx.appcompat:appcompat:1.6.1"
+
+    // Provides androidx.startup.InitializationProvider
+    implementation "androidx.startup:startup-runtime:1.1.1"
 }

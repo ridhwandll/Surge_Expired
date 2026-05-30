@@ -2,7 +2,7 @@
 // Android entry point – replaces the desktop main() when building for Android.
 #ifdef SURGE_PLATFORM_ANDROID
 
-#include <android_native_app_glue.h>
+#include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
 #include "Surge/Platform/Android/AndroidApp.hpp"
@@ -10,11 +10,11 @@
 namespace Surge::Android
 {
     android_app* GAndroidApp = nullptr;
+
 } // namespace Surge::Android
 
 void android_main(android_app* app)
 {
-    // Make GAndroidApp available to platform and window code before Core::Initialize()
     Surge::Android::GAndroidApp = app;
 
     // Block until the native window is ready
@@ -30,23 +30,21 @@ void android_main(android_app* app)
     }
 
     Surge::ClientOptions clientOptions;
-    clientOptions.AndroidApp = (void*)app;
-    clientOptions.EnableImGui = false;
-    clientOptions.WindowDescription = {
-        static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window)),
-        static_cast<Surge::Uint>(ANativeWindow_getHeight(app->window)),
-        "Player",
-        Surge::WindowFlags::CreateDefault};
+    clientOptions.RenderFinalImageToSwapchian = true;
+    Surge::WindowDesc desc;
+    desc.Width = static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window));
+    desc.Height = static_cast<Surge::Uint>(ANativeWindow_getHeight(app->window));
+    desc.Title = "SurgePlayer";
+    desc.Flags = Surge::WindowFlags::CreateDefault;
+    clientOptions.WindowDescription = desc;
 
-    Surge::Player* playerApp = Surge::MakeClient<Surge::Player>();
+    auto* playerApp = Surge::MakeClient<Surge::Player>();
     playerApp->SetOptions(clientOptions);
-    LOGI("Created client!");
 
     Surge::Core::Initialize(playerApp);
-    LOGI("Initialized core!");
     Surge::Core::Run();
     Surge::Core::Shutdown();
-    LOGI("Shutting down!");
+    Surge::Log<Surge::Severity::Info>("Shutting down");
 }
 
 #endif // SURGE_PLATFORM_ANDROID

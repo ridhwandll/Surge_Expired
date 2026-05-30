@@ -42,77 +42,18 @@ namespace SurgeReflect
         template <class T>
         inline constexpr std::string_view GetTypeName();
 
-        template <>
-        inline constexpr std::string_view GetTypeName<void>()
-        {
-            return "void";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<int>()
-        {
-            return "int";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<short>()
-        {
-            return "short";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<double>()
-        {
-            return "double";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<long double>()
-        {
-            return "long double";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<float>()
-        {
-            return "float";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<unsigned int>()
-        {
-            return "unsigned int";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<long>()
-        {
-            return "long";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<long long>()
-        {
-            return "long long";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<unsigned long long>()
-        {
-            return "unsigned long long";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<char>()
-        {
-            return "char";
-        }
-
-        template <>
-        inline constexpr std::string_view GetTypeName<wchar_t>()
-        {
-            return "wchar_t";
-        }
+        template <> inline constexpr std::string_view GetTypeName<void>() { return "void"; }
+        template <> inline constexpr std::string_view GetTypeName<int>() { return "int"; }
+        template <> inline constexpr std::string_view GetTypeName<short>() { return "short"; }
+        template <> inline constexpr std::string_view GetTypeName<double>() { return "double"; }
+        template <> inline constexpr std::string_view GetTypeName<long double>() { return "long double"; }
+        template <> inline constexpr std::string_view GetTypeName<float>() { return "float"; }
+        template <> inline constexpr std::string_view GetTypeName<unsigned int>() { return "unsigned int"; } 
+        template <> inline constexpr std::string_view GetTypeName<long>() { return "long"; }
+        template <> inline constexpr std::string_view GetTypeName<long long>() { return "long long"; }
+        template <> inline constexpr std::string_view GetTypeName<unsigned long long>() { return "unsigned long long"; }
+        template <> inline constexpr std::string_view GetTypeName<char>() { return "char"; }
+        template <> inline constexpr std::string_view GetTypeName<wchar_t>() { return "wchar_t"; }
 
         template <class T>
         static constexpr auto IsTypeClass = std::is_class_v<T>;

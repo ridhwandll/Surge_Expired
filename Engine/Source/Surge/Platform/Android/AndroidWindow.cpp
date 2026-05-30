@@ -3,220 +3,291 @@
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #include "Surge/Core/Core.hpp"
 #include <android/log.h>
-#include <android/input.h>
-
-#define SURGE_ANDROID_LOG_TAG "SurgeEngine"
+#include <imgui.h>
 
 namespace Surge
 {
-    // Single instance pointer – set on construction, used by input helpers
-    static AndroidWindow* sAndroidWindowInstance = nullptr;
+	static AndroidWindow* sAndroidWindowInstance = nullptr;
 
-    AndroidWindow::AndroidWindow(const WindowDesc& windowData)
-    {
-        mWindowData = windowData;
-        sAndroidWindowInstance = this;
+	AndroidWindow::AndroidWindow(const WindowDesc& windowData)
+	{
+		mWindowData = windowData;
+		sAndroidWindowInstance = this;
 
-        android_app* app = Android::GAndroidApp;
-        app->userData = this;
-        app->onAppCmd = HandleAppCmd;
-        app->onInputEvent = HandleInputEvent;
+		android_app* app = Android::GAndroidApp;
+		app->userData = this;
+		app->onAppCmd = HandleAppCmd;
 
-        // The native window may already be available (window created before Init)
-        mNativeWindow = app->window;
+		// Pass nullptr to disable filtering and receive every axis
+		android_app_set_motion_event_filter(app, nullptr);
 
-        if (mNativeWindow)
-        {
-            mWindowData.Width = static_cast<Uint>(ANativeWindow_getWidth(mNativeWindow));
-            mWindowData.Height = static_cast<Uint>(ANativeWindow_getHeight(mNativeWindow));
-        }
+		// Surface may already be available if the window was created before Init
+		mNativeWindow = app->window;
+		if (mNativeWindow)
+		{
+			mWindowData.Width = static_cast<Uint>(ANativeWindow_getWidth(mNativeWindow));
+			mWindowData.Height = static_cast<Uint>(ANativeWindow_getHeight(mNativeWindow));
+		}
 
-        __android_log_print(ANDROID_LOG_INFO, SURGE_ANDROID_LOG_TAG,
-                            "AndroidWindow created (%ux%u)", mWindowData.Width, mWindowData.Height);
-    }
+		Log<Severity::Info>("AndroidWindow created ({}x{})", mWindowData.Width, mWindowData.Height);
+	}
 
-    void AndroidWindow::Update()
-    {
-        android_app* app = Android::GAndroidApp;
+	void AndroidWindow::Update()
+	{
+		android_app* app = Android::GAndroidApp;
 
-        int events = 0;
-        android_poll_source* source = nullptr;
+		// Drain lifecycle / system events (non-blocking)
+		int events = 0;
+		android_poll_source* source = nullptr;
+		while (ALooper_pollOnce(0, nullptr, &events, reinterpret_cast<void**>(&source)) >= 0)
+		{
+			if (source)
+				source->process(app, source);
+		}
 
-        // Non-blocking poll – drain all pending events
-        while (ALooper_pollOnce(0, nullptr, &events, reinterpret_cast<void**>(&source)) >= 0)
-        {
-            if (source != nullptr)
-                source->process(app, source);
+		// Check destroy request (set by glue after APP_CMD_DESTROY)
+		if (app->destroyRequested && !mDestroyFired)
+		{
+			mDestroyFired = true;
+			WindowClosedEvent e;
+			if (mEventCallback)
+				mEventCallback(e);
+			return;
+		}
 
-            if (app->destroyRequested)
-            {
-                AppClosedEvent e;
-                if (mEventCallback)
-                    mEventCallback(e);
-                return;
-            }
-        }
-    }
+		// Swap GameActivity input buffers, atomic hand-off from the input thread
+		android_input_buffer* inputBuffer = android_app_swap_input_buffers(app);
+		if (!inputBuffer)
+			return;
 
-    glm::vec2 AndroidWindow::GetSize() const
-    {
-        if (mNativeWindow)
-        {
-            return {static_cast<float>(ANativeWindow_getWidth(mNativeWindow)),
-                    static_cast<float>(ANativeWindow_getHeight(mNativeWindow))};
-        }
-        return {static_cast<float>(mWindowData.Width), static_cast<float>(mWindowData.Height)};
-    }
+		// Motion events (touch, stylus, joystick)
+		for (uint64_t i = 0; i < inputBuffer->motionEventsCount; ++i)
+			HandleMotionEvent(this, &inputBuffer->motionEvents[i]);
 
-    void AndroidWindow::SetSize(const glm::vec2& size) const
-    {
-        // ANativeWindow size is determined by the display; cannot be set programmatically
-        (void)size;
-    }
+		// Key events (back button, volume keys, gamepad, etc.)
+		for (uint64_t i = 0; i < inputBuffer->keyEventsCount; ++i)
+			HandleKeyEvent(this, &inputBuffer->keyEvents[i]);
 
-    // Static callback invoked by android_native_app_glue for lifecycle commands
-    void AndroidWindow::HandleAppCmd(android_app* app, int32_t cmd)
-    {
-        AndroidWindow* self = static_cast<AndroidWindow*>(app->userData);
-        if (!self)
-            return;
+		// Clear both buffers must be called after processing
+		android_app_clear_motion_events(inputBuffer);
+		android_app_clear_key_events(inputBuffer);
+	}
 
-        switch (cmd)
-        {
-            case APP_CMD_INIT_WINDOW:
-            {
-                self->mNativeWindow = app->window;
-                self->mWindowState = WindowState::Normal;
-                if (self->mNativeWindow)
-                {
-                    Uint w = static_cast<Uint>(ANativeWindow_getWidth(self->mNativeWindow));
-                    Uint h = static_cast<Uint>(ANativeWindow_getHeight(self->mNativeWindow));
-                    self->mWindowData.Width = w;
-                    self->mWindowData.Height = h;
+	glm::vec2 AndroidWindow::GetSize() const
+	{
+		if (mNativeWindow)
+			return { static_cast<float>(ANativeWindow_getWidth(mNativeWindow)), static_cast<float>(ANativeWindow_getHeight(mNativeWindow)) };
 
-                    WindowResizeEvent e(w, h);
-                    if (self->mEventCallback)
-                        self->mEventCallback(e);
-                }
-                break;
-            }
-            case APP_CMD_TERM_WINDOW:
-            {
-                self->mWindowState = WindowState::Minimized;
-                self->mNativeWindow = nullptr;
-                break;
-            }
-            case APP_CMD_GAINED_FOCUS:
-            {
-                self->mWindowState = WindowState::Normal;
-                break;
-            }
-            case APP_CMD_LOST_FOCUS:
-            {
-                self->mWindowState = WindowState::Minimized;
-                break;
-            }
-            case APP_CMD_WINDOW_RESIZED:
-            case APP_CMD_CONFIG_CHANGED:
-            {
-                if (app->window)
-                {
-                    Uint w = static_cast<Uint>(ANativeWindow_getWidth(app->window));
-                    Uint h = static_cast<Uint>(ANativeWindow_getHeight(app->window));
-                    self->mWindowData.Width = w;
-                    self->mWindowData.Height = h;
+		return { static_cast<float>(mWindowData.Width), static_cast<float>(mWindowData.Height) };
+	}
 
-                    WindowResizeEvent e(w, h);
-                    if (self->mEventCallback)
-                        self->mEventCallback(e);
-                }
-                break;
-            }
-            case APP_CMD_DESTROY:
-            {
-                AppClosedEvent e;
-                if (self->mEventCallback)
-                    self->mEventCallback(e);
-                break;
-            }
-            default:
-                break;
-        }
-    }
+	void AndroidWindow::SetSize(const glm::vec2& size) const
+	{
+		(void)size; // ANativeWindow dimensions are display-controlled
+	}
 
-    // Static callback for touch/key input events
-    int32_t AndroidWindow::HandleInputEvent(android_app* app, AInputEvent* event)
-    {
-        AndroidWindow* self = static_cast<AndroidWindow*>(app->userData);
-        if (!self)
-            return 0;
+	// Lifecycle command callback (called on the main thread by the glue)
+	void AndroidWindow::HandleAppCmd(android_app* app, int32_t cmd)
+	{
+		auto* self = static_cast<AndroidWindow*>(app->userData);
+		if (!self)
+			return;
 
-        int32_t eventType = AInputEvent_getType(event);
+		switch (cmd)
+		{
+		case APP_CMD_SAVE_STATE:
+			Log<Severity::Info>("APP_CMD_SAVE_STATE");
+			break;
 
-        if (eventType == AINPUT_EVENT_TYPE_MOTION)
-        {
-            int32_t action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
-            float x = AMotionEvent_getX(event, 0);
-            float y = AMotionEvent_getY(event, 0);
+		case APP_CMD_INIT_WINDOW:
+		{
+			self->mNativeWindow = app->window;
+			self->mWindowState = WindowState::Normal;
+			if (self->mNativeWindow)
+			{
+				Uint w = static_cast<Uint>(ANativeWindow_getWidth(self->mNativeWindow));
+				Uint h = static_cast<Uint>(ANativeWindow_getHeight(self->mNativeWindow));
+				self->mWindowData.Width = w;
+				self->mWindowData.Height = h;
 
-            self->mTouchX = x;
-            self->mTouchY = y;
+				WindowResizeEvent e(w, h);
+				if (self->mEventCallback)
+					self->mEventCallback(e);
+			}
+			Log<Severity::Info>("APP_CMD_INIT_WINDOW ({}x{})", self->mWindowData.Width, self->mWindowData.Height);
+			break;
+		}
 
-            switch (action)
-            {
-                case AMOTION_EVENT_ACTION_DOWN:
-                case AMOTION_EVENT_ACTION_POINTER_DOWN:
-                {
-                    self->mTouchDown = true;
-                    MouseMovedEvent moveEvent(x, y);
-                    if (self->mEventCallback)
-                        self->mEventCallback(moveEvent);
-                    MouseButtonPressedEvent pressEvent(static_cast<MouseCode>(Mouse::ButtonLeft));
-                    if (self->mEventCallback)
-                        self->mEventCallback(pressEvent);
-                    return 1;
-                }
-                case AMOTION_EVENT_ACTION_UP:
-                case AMOTION_EVENT_ACTION_POINTER_UP:
-                case AMOTION_EVENT_ACTION_CANCEL:
-                {
-                    self->mTouchDown = false;
-                    MouseButtonReleasedEvent releaseEvent(static_cast<MouseCode>(Mouse::ButtonLeft));
-                    if (self->mEventCallback)
-                        self->mEventCallback(releaseEvent);
-                    return 1;
-                }
-                case AMOTION_EVENT_ACTION_MOVE:
-                {
-                    MouseMovedEvent moveEvent(x, y);
-                    if (self->mEventCallback)
-                        self->mEventCallback(moveEvent);
-                    return 1;
-                }
-                default:
-                    break;
-            }
-        }
+		case APP_CMD_TERM_WINDOW:
+			Log<Severity::Info>("APP_CMD_TERM_WINDOW");
+			self->mWindowState = WindowState::Minimized;
+			self->mNativeWindow = nullptr;
+			break;
 
-        return 0;
-    }
+		case APP_CMD_GAINED_FOCUS:
+			Log<Severity::Info>("APP_CMD_GAINED_FOCUS");
+			self->mWindowState = WindowState::Normal;
+			break;
 
-    // Input helper
-    float AndroidGetTouchX()
-    {
-        return sAndroidWindowInstance ? sAndroidWindowInstance->mTouchX : 0.0f;
-    }
+		case APP_CMD_LOST_FOCUS:
+			Log<Severity::Info>("APP_CMD_LOST_FOCUS");
+			self->mWindowState = WindowState::Minimized;
+			break;
 
-    float AndroidGetTouchY()
-    {
-        return sAndroidWindowInstance ? sAndroidWindowInstance->mTouchY : 0.0f;
-    }
+		case APP_CMD_WINDOW_RESIZED:
+		case APP_CMD_CONFIG_CHANGED:
+		{
+			Log<Severity::Info>("APP_CMD_CONFIG_CHANGED");
+			if (app->window)
+			{
+				Uint w = static_cast<Uint>(ANativeWindow_getWidth(app->window));
+				Uint h = static_cast<Uint>(ANativeWindow_getHeight(app->window));
+				self->mWindowData.Width = w;
+				self->mWindowData.Height = h;
 
-    bool AndroidIsTouchDown()
-    {
-        return sAndroidWindowInstance ? sAndroidWindowInstance->mTouchDown : false;
-    }
+				WindowResizeEvent e(w, h);
+				if (self->mEventCallback)
+					self->mEventCallback(e);
+			}
+			break;
+		}
+
+		case APP_CMD_DESTROY:
+			Log<Severity::Info>("APP_CMD_DESTROY");
+			// Actual event is fired via destroyRequested in Update()
+			// to avoid double-firing. Nothing to do here.
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	// Motion event handler (touch / multi-touch)
+	void AndroidWindow::HandleMotionEvent(AndroidWindow* window, const GameActivityMotionEvent* event)
+	{
+		if (!window || !event || event->pointerCount == 0)
+			return;
+
+		const int32_t action = event->action;
+		const int32_t actionMasked = action & AMOTION_EVENT_ACTION_MASK;
+
+		// For POINTER_DOWN / POINTER_UP the acting pointer index is encoded in the action
+		uint32_t pointerIndex = 0;
+		if (actionMasked == AMOTION_EVENT_ACTION_POINTER_DOWN || actionMasked == AMOTION_EVENT_ACTION_POINTER_UP)
+		{
+			pointerIndex = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+			if (pointerIndex >= event->pointerCount)
+				pointerIndex = 0;
+		}
+
+		const GameActivityPointerAxes* pointer = &event->pointers[pointerIndex];
+		const float x = GameActivityPointerAxes_getX(pointer);
+		const float y = GameActivityPointerAxes_getY(pointer);
+
+		window->mTouchX = x;
+		window->mTouchY = y;
+
+		// Feed ImGui directly, GameActivity has no AInputEvent*, so we drive
+		// ImGui IO manually instead of calling ImGui_ImplAndroid_HandleInputEvent
+		ImGuiIO& io = ImGui::GetIO();
+
+		switch (actionMasked)
+		{
+		case AMOTION_EVENT_ACTION_DOWN:
+		case AMOTION_EVENT_ACTION_POINTER_DOWN:
+		{
+			window->mTouchDown = true;
+			io.AddMousePosEvent(x, y);
+			io.AddMouseButtonEvent(0, true);
+
+			MouseMovedEvent moveEvent(x, y);
+			MouseButtonPressedEvent pressEvent(static_cast<MouseCode>(Mouse::ButtonLeft));
+			if (window->mEventCallback)
+			{
+				window->mEventCallback(moveEvent);
+				window->mEventCallback(pressEvent);
+			}
+			break;
+		}
+
+		case AMOTION_EVENT_ACTION_UP:
+		case AMOTION_EVENT_ACTION_POINTER_UP:
+		case AMOTION_EVENT_ACTION_CANCEL:
+		{
+			window->mTouchDown = false;
+			io.AddMouseButtonEvent(0, false);
+
+			MouseButtonReleasedEvent releaseEvent(static_cast<MouseCode>(Mouse::ButtonLeft));
+			if (window->mEventCallback)
+				window->mEventCallback(releaseEvent);
+			break;
+		}
+
+		case AMOTION_EVENT_ACTION_MOVE:
+		{
+			// MOVE carries ALL active pointers, iterate every one
+			for (Uint p = 0; p < event->pointerCount; ++p)
+			{
+				const float px = GameActivityPointerAxes_getX(&event->pointers[p]);
+				const float py = GameActivityPointerAxes_getY(&event->pointers[p]);
+
+				// Primary pointer drives ImGui and the window's tracked position
+				if (p == 0)
+				{
+					window->mTouchX = px;
+					window->mTouchY = py;
+					io.AddMousePosEvent(px, py);
+				}
+
+				MouseMovedEvent moveEvent(px, py);
+				if (window->mEventCallback)
+					window->mEventCallback(moveEvent);
+			}
+			break;
+		}
+		case AMOTION_EVENT_ACTION_SCROLL:
+		{
+			// ALL active pointers, iterate every one
+			for (Uint p = 0; p < event->pointerCount; ++p)
+			{
+				float xScroll = GameActivityPointerAxes_getAxisValue(&event->pointers[p], AMOTION_EVENT_AXIS_HSCROLL);
+				float yScroll = GameActivityPointerAxes_getAxisValue(&event->pointers[p], AMOTION_EVENT_AXIS_VSCROLL);
+				io.AddMouseWheelEvent(xScroll, yScroll);
+			}
+		}
+		default:
+			break;
+		}
+	}
+
+	// Key event handler (back button, volume, gamepad buttons, etc.)
+	void AndroidWindow::HandleKeyEvent(AndroidWindow* window, const GameActivityKeyEvent* event)
+	{
+		if (!window || !event)
+			return;
+
+		// Back button, treat as app close request on android
+		if (event->keyCode == AKEYCODE_BACK && event->action == AKEY_EVENT_ACTION_UP)
+		{
+            //window->mWindowState = WindowState::Minimized;
+            // TODO: Have a proper way to store and manage states in Android
+            // Currently we destroy the window and be done with it
+			WindowClosedEvent e;
+			if (window->mEventCallback)
+                window->mEventCallback(e);
+
+			return;
+		}
+
+		// Extend here for gamepad / keyboard key binding
+	}
+
+	// Input polling helpers used by AndroidInput.cpp
+	float Android::GetTouchX() { return sAndroidWindowInstance ? sAndroidWindowInstance->mTouchX : 0.0f; }
+	float Android::GetTouchY() { return sAndroidWindowInstance ? sAndroidWindowInstance->mTouchY : 0.0f; }
+	bool Android::IsTouchDown() { return sAndroidWindowInstance != nullptr && sAndroidWindowInstance->mTouchDown; }
 
 } // namespace Surge
 
-#endif // SURGE_ANDROID
+#endif // SURGE_PLATFORM_ANDROID

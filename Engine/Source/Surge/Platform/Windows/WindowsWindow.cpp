@@ -8,6 +8,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace Surge
 {
+
     WindowsWindow::WindowsWindow(const WindowDesc& windowData)
     {
         mWindowData = windowData;
@@ -16,8 +17,8 @@ namespace Surge
         WNDCLASSEX wc = {};
         wc.cbSize = sizeof(WNDCLASSEX);
 
-        const ClientOptions& options = Surge::Core::GetClient()->GeClientOptions();
-        if (options.WindowDescription.Flags & WindowFlags::EditorAcceleration)
+        const ClientOptions& options = Surge::Core::GetClient()->GetClientOptions();
+        if (options.WindowDescription.Flags & WindowFlags::NoTitlebar)
             wc.lpfnWndProc = WindowProcWithImgui;
         else
             wc.lpfnWndProc = WindowProcWithoutImGui;
@@ -26,18 +27,33 @@ namespace Surge
         wc.hInstance = hInstance;
         wc.lpszClassName = "Surge Win32Window";
         wc.hbrBackground = (HBRUSH)GetStockObject(DKGRAY_BRUSH);
-        wc.hCursor = NULL;
+        wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wc.hIcon = nullptr;
         wc.hIconSm = wc.hIcon;
         wc.cbClsExtra = 0;
 
         RegisterClassEx(&wc);
-        SURGE_GET_WIN32_LAST_ERROR
+        SURGE_GET_WIN32_LAST_ERROR;
 
+#ifdef SURGE_DEBUG
+        String config = "DEBUG";
+#elif defined(SURGE_RELEASE)
+        String config = "RELEASE";
+#endif
+
+        String windowTitle = std::format("{} <{}>", mWindowData.Title, config);
         glm::ivec2 screenSize = Platform::GetScreenSize();
-        mWin32Window = CreateWindow(wc.lpszClassName, mWindowData.Title.c_str(),
+        mWin32Window = CreateWindow(wc.lpszClassName, windowTitle.c_str(),
                                     WS_OVERLAPPEDWINDOW, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
                                     mWindowData.Height, nullptr, NULL, wc.hInstance, this);
+
+        // Set the title bar & border color
+        #define DWMWA_CAPTION_COLOR_ 35
+        COLORREF titlebarColor = RGB(20, 20, 20);
+        DwmSetWindowAttribute(mWin32Window, DWMWA_CAPTION_COLOR_, &titlebarColor, sizeof(titlebarColor));
+        #define DWMWA_BORDER_COLOR_ 34
+        DwmSetWindowAttribute(mWin32Window, DWMWA_BORDER_COLOR_, &titlebarColor, sizeof(titlebarColor));
+
         SURGE_GET_WIN32_LAST_ERROR
         ApplyFlags();
         SG_ASSERT(mWin32Window, "WindowsWindow creation failure!");
@@ -47,7 +63,6 @@ namespace Surge
         ShadowMargins = {1, 1, 1, 1};
         DwmExtendFrameIntoClientArea(mWin32Window, &ShadowMargins);
         SURGE_GET_WIN32_LAST_ERROR
-        PostQuitMessage(0);
     }
 
     WindowsWindow::~WindowsWindow()
@@ -108,7 +123,7 @@ namespace Surge
     {
         RECT rect;
         glm::vec2 result;
-        if (GetWindowRect(mWin32Window, &rect))
+        if (GetClientRect(mWin32Window, &rect))
         {
             result.x = static_cast<float>(rect.right - rect.left);
             result.y = static_cast<float>(rect.bottom - rect.top);
@@ -169,13 +184,6 @@ namespace Surge
                 data->mEventCallback(event);
                 break;
             }
-            case WM_QUIT:
-            {
-                WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                AppClosedEvent event;
-                data->mEventCallback(event);
-                break;
-            }
             case WM_SIZE:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
@@ -202,10 +210,29 @@ namespace Surge
                 break;
             }
             case WM_KEYDOWN:
+            case WM_SYSKEYDOWN: // For Alt key
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+                WPARAM virtualKeyCode = wParam;
+                Uint scancode = (lParam & 0x00ff0000) >> 16;
+                bool isExtended = (lParam & 0x01000000) != 0;
+
+                if (virtualKeyCode == VK_SHIFT)
+                {
+                    // MapVirtualKey translates the scancode to the specific L/R version
+                    virtualKeyCode = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+                }
+                else if (virtualKeyCode == VK_CONTROL)
+                {
+                    virtualKeyCode = isExtended ? VK_RCONTROL : VK_LCONTROL;
+                }
+                else if (virtualKeyCode == VK_MENU) // Alt key
+                {
+                    virtualKeyCode = isExtended ? VK_RMENU : VK_LMENU;
+                }
+
                 int repeatCount = (lParam & 0xffff);
-                KeyPressedEvent event(static_cast<KeyCode>(wParam), repeatCount);
+                KeyPressedEvent event(static_cast<KeyCode>(virtualKeyCode), repeatCount);
                 data->mEventCallback(event);
                 break;
             }
@@ -285,6 +312,14 @@ namespace Surge
                 return DefWindowProc(hWnd, msg, wParam, lParam);
                 break;
             }
+            case WM_SETCURSOR:
+            {
+                if(LOWORD(lParam) == HTCLIENT)
+                {
+                    break;
+                }
+                return DefWindowProc(hWnd, msg, wParam, lParam);
+            }
             default:
                 return DefWindowProc(hWnd, msg, wParam, lParam);
         }
@@ -298,6 +333,14 @@ namespace Surge
         {
             switch (msg)
             {
+                case WM_SETCURSOR:
+                {
+                    if(LOWORD(lParam) == HTCLIENT)
+                    {
+                        break;
+                    }
+                    return DefWindowProc(hWnd, msg, wParam, lParam);
+                }
                 case WM_NCHITTEST: // Handle WM_NCHITTEST manually, this signals the default resize
                 {
                     POINT mousePos;

@@ -5,32 +5,35 @@
 
 namespace Surge
 {
-    // Android has no keyboard; key queries always return false.
+    // Android has no keyboard; key queries always return false
     bool Input::IsKeyPressed(KeyCode)
     {
+        SG_ASSERT_INTERNAL("Android has no keyboard so bool Input::IsKeyPressed(KeyCode) is always return false!");
         return false;
     }
 
-    // Primary touch maps to left mouse button.
-    bool Input::IsMouseButtonPressed(const MouseCode button)
+    // Primary touch maps to left mouse button
+    bool Input::IsMouseButtonPressed(MouseCode button)
     {
         if (button == Mouse::ButtonLeft)
-            return AndroidIsTouchDown();
+            return Android::IsTouchDown();
+
         return false;
     }
 
     Pair<float, float> Input::GetMousePosition()
     {
-        return {AndroidGetTouchX(), AndroidGetTouchY()};
+        return {Android::GetTouchX(), Android::GetTouchY()};
     }
 
-    float Input::GetMouseX() { return AndroidGetTouchX(); }
+    float Input::GetMouseX() { return Android::GetTouchX(); }
 
-    float Input::GetMouseY() { return AndroidGetTouchY(); }
+    float Input::GetMouseY() { return Android::GetTouchY(); }
 
     void Input::SetCursorMode(CursorMode)
     {
         // No cursor on Android
+        SG_ASSERT_INTERNAL("Android has no keyboard so bool Input::IsKeyPressed(KeyCode) is always return false!");
     }
 
 } // namespace Surge

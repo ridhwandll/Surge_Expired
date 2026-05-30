@@ -7,13 +7,11 @@
 
 namespace Surge
 {
+    static Entity sSelectedEntity;
+
     Scene::Scene(bool runtime)
     {
         mRuntime = runtime;
-        // mParentProject = parentProject;
-        // mMetadata.Name = name;
-        // mMetadata.SceneUUID = UUID();
-        // mMetadata.ScenePath = path;
     }
 
     Scene::~Scene()
@@ -35,32 +33,33 @@ namespace Surge
     {
         camera.OnUpdate();
         Renderer* renderer = Core::GetRenderer();
-        renderer->BeginFrame(camera);
+
+        auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+        Uint submitCount3D = meshGroup.size();
+
+        renderer->BeginFrame(camera, submitCount3D);
         {
-            auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-            for (auto& entity : group)
-            {
-                auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                if (mesh.Mesh)
-                {
-                    renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                }
-            }
+            auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
+            for(const auto& [entity, sprite, transform] : view.each())
+                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
         }
         {
-            auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
-            for (auto& entity : group)
-            {
-                auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-                renderer->SubmitPointLight(pointLight, transformComponent.Position);
-            }
+            auto view = mRegistry.view<LightComponent, TransformComponent>();
+            for(const auto& [entity, light, transform] : view.each())
+                renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
         }
         {
-            const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
-            for (auto& entity : view)
+            // 3D Meshes
+            for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
             {
-                const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-                renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+                if(mesh.Mesh)
+                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
+            }
+            if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
+            {
+               const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
+               const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+               renderer->SubmitMeshOutline(transform, mesh);
             }
         }
         renderer->EndFrame();
@@ -68,37 +67,39 @@ namespace Surge
 
     void Scene::Update()
     {
+        SURGE_PROFILE_FUNC("Scene::Update()");
+        //Timer timer("Scene::Update()", true);
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
+
+        auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
+        Uint submitCount3D = (Uint)meshGroup.size();
 
         if (camera.Data1)
         {
             Renderer* renderer = Core::GetRenderer();
-            renderer->BeginFrame(*camera.Data1, camera.Data2);
+            renderer->BeginFrame(*camera.Data1, camera.Data2, submitCount3D);
             {
-                auto group = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-                for (auto& entity : group)
-                {
-                    auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-                    if (mesh.Mesh)
-                    {
-                        renderer->SubmitMesh(mesh, transformComponent.GetTransform());
-                    }
-                }
+                auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
+                for (const auto& [entity, sprite, transform] : view.each())
+                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
             }
             {
-                auto group = mRegistry.group<PointLightComponent>(entt::get<TransformComponent>);
-                for (auto& entity : group)
-                {
-                    auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-                    renderer->SubmitPointLight(pointLight, transformComponent.Position);
-                }
+                auto view = mRegistry.view<LightComponent, TransformComponent>();
+                for (const auto& [entity, light, transform] : view.each())
+                    renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
             }
             {
-                const auto& view = mRegistry.view<TransformComponent, DirectionalLightComponent>();
-                for (auto& entity : view)
+                // 3D Meshes
+                for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
                 {
-                    const auto& [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-                    renderer->SubmitDirectionalLight(light, glm::normalize(transform.GetTransform()[2]));
+                    if(mesh.Mesh)
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
+                }
+                if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
+                {
+                    const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
+                    const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                    renderer->SubmitMeshOutline(transform, mesh);
                 }
             }
             renderer->EndFrame();
@@ -134,8 +135,7 @@ namespace Surge
         CopyComponent<TransformComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
-        CopyComponent<PointLightComponent>(other->mRegistry, mRegistry, enttMap);
-        CopyComponent<DirectionalLightComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<LightComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -172,6 +172,16 @@ namespace Surge
     void Scene::DestroyEntity(Entity entity)
     {
         mRegistry.destroy(entity.Raw());
+    }
+
+    void Scene::SetSlectedEntity(Entity entity)
+    {
+        sSelectedEntity = entity;
+    }
+
+    Surge::Entity Scene::GetSlectedEntity() const
+    {
+        return sSelectedEntity;
     }
 
     void Scene::OnResize(float width, float height)

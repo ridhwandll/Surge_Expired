@@ -24,7 +24,7 @@ namespace Surge
         void SetType(const AssetType& type) { mBaseType = type; }
 
         // Get the flags in this Asset
-        const AssetFlag& GetFlags() const { return static_cast<AssetFlag>(mFlags); }
+        uint16_t GetFlags() { return mFlags; }
 
         // Set the flag(s) of this Asset
         void SetFlag(AssetFlag flags) { mFlags = static_cast<uint16_t>(flags); }

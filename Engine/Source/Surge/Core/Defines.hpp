@@ -2,7 +2,6 @@
 #pragma once
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Time/Timer.hpp"
-#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -68,13 +67,13 @@
         ::Surge::Log<Surge::Severity::Fatal>(__VA_ARGS__); \
         ASSERT();                                          \
     }
-#define SCOPED_TIMER(...) Timer tImEr(fmt::format(__VA_ARGS__), true)
+#define SCOPED_TIMER(...) Timer tImEr(std::format(__VA_ARGS__), true)
 #else
 #define ASSERT()
 #define SG_ASSERT(...)
 #define SG_ASSERT_NOMSG(...)
 #define SG_ASSERT_INTERNAL(...)
-#define SCOPED_TIMER(...) Timer tImEr(fmt::format(__VA_ARGS__), true)
+#define SCOPED_TIMER(...) Timer tImEr(std::format(__VA_ARGS__), true)
 #endif
 
 // Defines and stuff
@@ -128,9 +127,6 @@ namespace Surge
     using Vector = std::vector<T>; // TODO(Rid): Have a dedicated vector class SURGE_API
 
     template <typename T>
-    using Deque = std::deque<T>;
-
-    template <typename T>
     using Scope = std::unique_ptr<T>;
     template <typename T, typename... Args>
     constexpr Scope<T> CreateScope(Args&&... args)
@@ -142,7 +138,7 @@ namespace Surge
     using HashMap = std::unordered_map<T1, T2>;
 
     template <typename T1, typename T2>
-    struct SURGE_API Pair
+    struct Pair
     {
         T1 Data1;
         T2 Data2;

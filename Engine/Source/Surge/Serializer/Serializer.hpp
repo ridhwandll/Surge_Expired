@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Path.hpp"
 #include "Surge/Core/Defines.hpp"
 #include "Surge/ECS/Scene.hpp"
 

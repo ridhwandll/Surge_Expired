@@ -8,10 +8,9 @@
 
 namespace Surge
 {
-    enum class SURGE_API EventType
+    enum class EventType
     {
         None = 0,
-        AppClose,
         WindowClose,
         WindowResize,
         WindowFocus,
@@ -26,7 +25,7 @@ namespace Surge
         MouseScrolled
     };
 
-    class SURGE_API Event
+    class Event
     {
     public:
         Event() = default;
@@ -42,7 +41,7 @@ namespace Surge
     virtual const char* GetName() const override { return #type; }
 
     // Key Events
-    class SURGE_API KeyEvent : public Event
+    class KeyEvent : public Event
     {
     public:
         KeyCode GetKeyCode() const { return mKeyCode; }
@@ -209,19 +208,11 @@ namespace Surge
         EVENT_CLASS_TYPE(WindowClose);
     };
 
-    class SURGE_API AppClosedEvent : public Event
-    {
-    public:
-        AppClosedEvent() {}
-
-        virtual String ToString() const override { return "AppCloseEvent"; }
-        EVENT_CLASS_TYPE(AppClose);
-    };
-
     class SURGE_API EventDispatcher
     {
     public:
-        EventDispatcher(Event& event) : mEvent(event) {}
+        EventDispatcher(Event& event)
+            : mEvent(event) {}
 
         template <typename T, typename F>
         void Dispatch(const F& func)
@@ -233,4 +224,5 @@ namespace Surge
     private:
         Event& mEvent;
     };
+
 } // namespace Surge
