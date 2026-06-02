@@ -163,7 +163,9 @@ namespace Surge
             mCurrentQuadBatch.QuadCount++;
             mTotalQuadCount++;
         }
-        RegisterQuadDrawcall();
+
+        if(mCurrentQuadBatch.QuadCount > 0)
+            RegisterQuadDrawcall();
 
         if(!mQuadDrawCommands.empty())
         {
@@ -172,8 +174,11 @@ namespace Surge
             mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mQuadVB[mCurrentFrameCtx.FrameIndex], 0);
             mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mQuadIB, 0);
 
-            for(const QuadDrawCmd& cmd : mQuadDrawCommands)
+            for(Uint i = 0; i < mQuadDrawCommandCount; i++)
+            {
+                const QuadDrawCmd& cmd = mQuadDrawCommands[i];
                 mRHI->CmdDrawIndexed(mCurrentFrameCtx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
+            }
         }
 
         //
@@ -213,8 +218,11 @@ namespace Surge
             mRHI->CmdBindDescriptorSet(ctx, m2DLinePipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
             mRHI->CmdBindVertexBuffer(ctx, mLineVB[ctx.FrameIndex], 0);
 
-            for(const auto& cmd : mLineDrawCommands)
+            for(Uint i = 0; i < mLineDrawCommandCount; i++)
+            {
+                const LineDrawCmd& cmd = mLineDrawCommands[i];
                 mRHI->CmdDraw(ctx, cmd.VertexCount, 1, cmd.VertexOffset, 0);
+            }
         }
     }
 
