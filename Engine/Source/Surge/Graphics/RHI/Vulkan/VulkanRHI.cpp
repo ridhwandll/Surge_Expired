@@ -119,6 +119,7 @@ namespace Surge
 
     void VulkanRHI::BeginFrame(FrameContext& outCtx)
     {
+        SURGE_PROFILE_FUNC("VulkanRHI::BeginFrame");
         mStats.Reset();
         mImGuiContext.BeginFrame();
         VkDevice device = mDevice.GetDevice();
@@ -130,7 +131,7 @@ namespace Surge
         // Wait for this SLOT's fence
         // This slot was used N frames ago, wait until the GPU is done with it
         {
-            //Timer fenceTimer("vkWaitForFences", true);
+            Timer fenceTimer("vkWaitForFences", true);
             vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
         }
 
@@ -172,6 +173,7 @@ namespace Surge
 
     void VulkanRHI::EndFrame(const FrameContext& ctx)
     {
+        SURGE_PROFILE_FUNC("VulkanRHI::EndFrame");
         // End recording
         const PerFrame& frame = mFrame.GetCurrentVkFrame();
         vkEndCommandBuffer(frame.CmdBuffer);
@@ -238,6 +240,7 @@ namespace Surge
 
     void VulkanRHI::UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset)
     {
+        SURGE_PROFILE_FUNC("VulkanRHI::UploadBuffer");
         BufferEntry* entry = mBufferPool.Get(h);
         SG_ASSERT(entry != nullptr, "UploadBuffer: invalid handle!");
 

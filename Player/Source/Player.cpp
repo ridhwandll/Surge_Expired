@@ -205,6 +205,11 @@ namespace Surge
 
     void Player::OnUpdate()
     {
+        constexpr float axesLength = 10000.0f;
+        mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
+        mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
+        mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+
         float dt = Core::GetClock().GetSeconds();
 
         TransformComponent& floorTransform = mEntity.GetComponent<TransformComponent>();

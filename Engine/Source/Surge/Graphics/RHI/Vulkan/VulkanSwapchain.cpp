@@ -61,10 +61,9 @@ namespace Surge
             swapchainSize.height = height;
             Log<Severity::Debug>("VulkanSwapchain: Using custom swapchain size Width:{} Height:{}", swapchainSize.width, swapchainSize.height);
         }
-        else		
+        else
             swapchainSize = surfaceProperties.currentExtent;
-        
-        
+
         VkPresentModeKHR swapchainPresentMode = SelectPresentMode(gpu, surface);
 
         // Determine the number of VkImage's to use in the swapchain.
@@ -82,7 +81,7 @@ namespace Surge
         if (surfaceProperties.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)		
             preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
         
-        else		
+        else
             preTransform = surfaceProperties.currentTransform;		
 
         VkSwapchainKHR oldSwapchain = mSwapchain;

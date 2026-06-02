@@ -97,7 +97,7 @@ namespace Surge
         Uint mCurrentFrameVertexOffset = 0;
         bool mMaxQuadCountReached = false;
 
-        std::array<QuadDrawCmd, MAX_QUAD_BATCHES> mQuadDrawCommands;
+        std::array<QuadDrawCmd, MAX_QUAD_BATCHES> mQuadDrawCommands {};
         Uint mQuadDrawCommandCount = 0;
 
         QuadBatchData mCurrentQuadBatch;
@@ -112,7 +112,7 @@ namespace Surge
         Uint mCurrentLineVertexOffset = 0;
         bool mMaxLinesCountReached = false;
 
-        std::array<LineDrawCmd, MAX_LINE_BATCHES> mLineDrawCommands;
+        std::array<LineDrawCmd, MAX_LINE_BATCHES> mLineDrawCommands {};
         Uint mLineDrawCommandCount = 0;
 
         LineBatchData mCurrentLineBatch;

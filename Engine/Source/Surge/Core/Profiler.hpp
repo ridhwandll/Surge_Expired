@@ -12,14 +12,13 @@
     #ifdef SURGE_DEBUG
     #define PROFILE_SURGE 1
     #define USE_OPTICK 1
+    #include <optick.h>
     #endif
 
     #ifdef SURGE_RELEASE
     #define PROFILE_SURGE 0
     #define USE_OPTICK 0 // Enable if required in release mode
     #endif
-
-    #include <optick.h>
 
 #endif
 
