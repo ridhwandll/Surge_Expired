@@ -4,7 +4,6 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
-#include "Surge/AssetManager/AssetManager.hpp"
 #include "Profiler.hpp"
 #include <filesystem>
 
@@ -57,9 +56,6 @@ namespace Surge::Core
 
         // Reflection Engine
         SurgeReflect::Registry::Initialize();
-
-        // Asset Manager
-        AssetManager::Init("Assets");
 
         GCoreData.Running = true;
 
