@@ -1,18 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "SurgeMath/Math.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Asset/Mesh.hpp"
 
 namespace Surge
 {
     static Entity sSelectedEntity;
-
-    Scene::Scene(bool runtime)
-    {
-        mRuntime = runtime;
-    }
 
     Scene::~Scene()
     {
@@ -50,14 +46,18 @@ namespace Surge
         }
         {
             // 3D Meshes
-            for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
+            for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
             {
-                if(mesh.Mesh)
-                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
+                if(meshComponent.MeshID)
+                {
+                    Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComponent.MeshID);
+                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+                }
             }
             if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
             {
-               const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
+               const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
+               Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
                const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
                renderer->SubmitMeshOutline(transform, mesh);
             }
@@ -90,14 +90,18 @@ namespace Surge
             }
             {
                 // 3D Meshes
-                for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
+                for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
                 {
-                    if(mesh.Mesh)
-                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
+                    if(meshComponent.MeshID)
+                    {
+                        Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComponent.MeshID);
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+                    }
                 }
                 if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
                 {
-                    const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
+                    const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
+                    Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
                     const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
                     renderer->SubmitMeshOutline(transform, mesh);
                 }
@@ -107,7 +111,7 @@ namespace Surge
     }
 
     template <typename T>
-    static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const HashMap<UUID, entt::entity>& enttMap)
+    static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const std::unordered_map<UUID, entt::entity>& enttMap)
     {
         auto components = srcRegistry.view<T>();
         for (entt::entity srcEntity : components)
@@ -121,7 +125,7 @@ namespace Surge
 
     void Scene::CopyTo(Scene* other)
     {
-        HashMap<UUID, entt::entity> enttMap;
+        std::unordered_map<UUID, entt::entity> enttMap;
         auto idComponents = mRegistry.view<IDComponent>();
         for (entt::entity entity : idComponents)
         {

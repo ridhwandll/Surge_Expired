@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <cstdarg>
 
 #define HIERARCHY_ENTITY_DND "HiEnT!"
 
@@ -137,6 +138,22 @@ namespace Surge::ImGuiAux
         ImGui::PopID();
     }
 
+    inline void TString(const char* title, const char* fmt, ...)
+    {
+        ImGui::PushID(title);
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(title);
+        ImGui::TableNextColumn();
+        ImGui::PushItemWidth(-1);
+
+        va_list args;
+        va_start(args, fmt);
+        ImGui::TextV(fmt, args);
+        va_end(args);
+
+        ImGui::PopID();
+    }
+
     template <typename T, CustomProprtyFlag F = CustomProprtyFlag::None>
     bool TProperty(const char* title, T* value, float dragMin = 0.0f, float dragMax = 0.0f)
     {
@@ -162,8 +179,6 @@ namespace Surge::ImGuiAux
                     result = ImGui::DragFloat4("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
                 else if constexpr(std::is_same_v<T, bool>)
                     result = ImGui::Checkbox("##v", value);
-                else if constexpr(std::is_same_v<T, String>)
-                    ImGui::TextUnformatted(value->c_str());
                 else
                     static_assert(false);
             }

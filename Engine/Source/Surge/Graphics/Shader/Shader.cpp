@@ -137,7 +137,7 @@ namespace Surge
 
     String Shader::GetShaderCachePath(ShaderType type)
     {
-        String parentPath = Filesystem::GetParentPath(mPath);
+        String parentPath = Filesystem::GetParentPath(mPath).string();
         String shaderName = Filesystem::GetNameWithExtension(mPath);
         String spirVDirectory = std::format("{0}/SPIRV", parentPath);
         Filesystem::CreateOrEnsureDirectory(spirVDirectory); //Filesystem::CreateOrEnsureDirectory is a Windows only function, reurns false on Android

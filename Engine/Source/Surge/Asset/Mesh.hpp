@@ -2,10 +2,10 @@
 #pragma once
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Memory.hpp"
-#include "SurgeMath/AABB.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/Material/Material.hpp"
-#include "DefaultMeshes.hpp"
+#include "SurgeMath/AABB.hpp"
+#include "Asset.hpp"
 
 namespace Surge
 {
@@ -24,14 +24,16 @@ namespace Surge
         String NodeName, MeshName;
     };
 
-    class Mesh : public RefCounted
+    class Mesh : public Asset
     {
     public:
-        Mesh(DefaultMesh type);
-        Mesh(const String& filepath); // Relative path to Engine/Assets directory
-        ~Mesh();
+        // Mesh Construction
+        // @param filepath Pass actual filepath to generate the mesh from disk
+        //                 Pass DefaultMesh::X to generate a default mesh from memory
+        Mesh(const String& filepath);
 
-        const String& GetPath() const { return mPath; }
+        ~Mesh();
+        AssetType GetAssetType() const override { return AssetType::MESH; }
 
         BufferHandle GetVertexBuffer() const { return mVertexBuffer; }
         BufferHandle GetIndexBuffer() const { return mIndexBuffer; }
@@ -39,18 +41,14 @@ namespace Surge
         const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }
         const Vector<Ref<Material>>& GetMaterials() const { return mMaterials; }
         Ref<Material>& GetMaterialAtIndex(Uint index) { return mMaterials[index]; }
-    private:
-        void CreateRHIObjects();
 
+        static Ref<Mesh> Create(const String& filepath);
     private:
-        String mPath;
+        bool CheckAndGenerateDefaultMesh(const String& filepath);
+    private:
         Vector<Submesh> mSubmeshes;
-
         BufferHandle mVertexBuffer;
         BufferHandle mIndexBuffer;
-
-        Vector<Vertex> mVertices;
-        Vector<Index> mIndices;
 
         // TODO
         // Materials associated with this mesh

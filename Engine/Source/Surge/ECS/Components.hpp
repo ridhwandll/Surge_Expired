@@ -4,10 +4,11 @@
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/Mesh/Mesh.hpp"
 #include "Surge/Graphics/Material/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
+#include "Surge/Asset/Asset.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -100,7 +101,7 @@ namespace Surge
 
     struct MeshComponent
     {
-        Ref<Mesh> Mesh;
+        AssetID MeshID = AssetID::INVALID;
         bool DropShadow = true;
         SURGE_REFLECTION_ENABLE;
     };

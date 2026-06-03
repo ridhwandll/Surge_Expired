@@ -5,6 +5,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Panels/PaneManager.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Surge/Asset/Texture2D.hpp"
 
 namespace Surge
 {
@@ -29,10 +30,9 @@ namespace Surge
     private:
         void CheckResize();
         void OnImGuiRender();
-        ImageHandle Editor::LoadTexture();
     private:
         bool mShowRuntimeView = false;
-        ImageHandle mRidTex;
+        Ref<Texture2D> mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
         PanelManager mPanelManager;

@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Asset/Asset.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
@@ -21,34 +22,19 @@ namespace Surge
         Uint V1, V2, V3;
     };
 
-    enum class DefaultMesh
+    struct DefaultMesh
     {
-        CUBE = 0,
-        SPHERE,
-        PLANE,
-        CONE,
-        CYLINDER,
-        BEAN, // Totally not Capsule
-        TORUS
+        constexpr static const char* CUBE     = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_CUBE";
+        constexpr static const char* SPHERE   = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_SPHERE";
+        constexpr static const char* PLANE    = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_PLANE";
+        constexpr static const char* CONE     = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_CONE";
+        constexpr static const char* CYLINDER = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_CYLINDER";
+        constexpr static const char* BEAN     = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_BEAN";
+        constexpr static const char* TORUS    = SURGE_MEMORY_ASSET_PREFIX"MESH_DEFAULT_TORUS";
     };
 
     namespace MeshGenerator
     {
-        inline String DefaultMeshToString(DefaultMesh type)
-        {
-            switch (type)
-            {
-            case DefaultMesh::CUBE: return "Cube";
-            case DefaultMesh::SPHERE: return "Sphere";
-            case DefaultMesh::PLANE: return "Plane";
-            case DefaultMesh::CONE: return "Cone";
-            case DefaultMesh::CYLINDER: return "Cylinder";
-            case DefaultMesh::BEAN: return "Bean";
-            case DefaultMesh::TORUS: return "Torus";
-            default: return "Unknown";
-            }
-        }
-
         struct MeshData
         {
             Vector<Vertex> Vertices;
@@ -515,21 +501,18 @@ namespace Surge
             return mesh;
         }
 
-        inline MeshData GenerateDefaultMesh(DefaultMesh type)
+        // Returns empty mesh data if str doesnt match the DefaultMesh::X
+        inline MeshData GenerateDefaultMesh(const String& str)
         {
-            switch (type)
-            {
-            case DefaultMesh::CUBE:     return GenerateCube();
-            case DefaultMesh::SPHERE:   return GenerateSphere();
-            case DefaultMesh::PLANE:    return GeneratePlane();
-            case DefaultMesh::CONE:     return GenerateCone();
-            case DefaultMesh::CYLINDER: return GenerateCylinder();
-            case DefaultMesh::BEAN:     return GenerateBean();
-            case DefaultMesh::TORUS:    return GenerateTorus();
-            default:
-                SG_ASSERT_INTERNAL("Tf yo doin?");
-                return GenerateCube();
-            }
+            if(strcmp(str.c_str(), DefaultMesh::CUBE) == 0)          return GenerateCube();
+            else if(strcmp(str.c_str(), DefaultMesh::SPHERE) == 0)   return GenerateSphere();
+            else if(strcmp(str.c_str(), DefaultMesh::PLANE) == 0)    return GeneratePlane();
+            else if(strcmp(str.c_str(), DefaultMesh::CONE) == 0)     return GenerateCone();
+            else if(strcmp(str.c_str(), DefaultMesh::CYLINDER) == 0) return GenerateCylinder();
+            else if(strcmp(str.c_str(), DefaultMesh::BEAN) == 0)     return GenerateBean();
+            else if(strcmp(str.c_str(), DefaultMesh::TORUS) == 0)    return GenerateTorus();
+            else
+                return {};
         }
     }
 

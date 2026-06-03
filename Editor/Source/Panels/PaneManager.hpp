@@ -3,6 +3,7 @@
 #include "Panels/IPanel.hpp"
 #include "Surge/Core/Time/Timer.hpp"
 #include "Surge/Core/Defines.hpp"
+#include <unordered_map>
 
 namespace Surge
 {
@@ -56,13 +57,13 @@ namespace Surge
                 element.Panel->OnEvent(e);
         }
 
-        HashMap<PanelCode, PanelData>& GetAllPanels()
+        std::unordered_map<PanelCode, PanelData>& GetAllPanels()
         {
             return mPanels;
         }
 
     private:
-        HashMap<PanelCode, PanelData> mPanels;
+        std::unordered_map<PanelCode, PanelData> mPanels;
     };
 
 } // namespace Surge

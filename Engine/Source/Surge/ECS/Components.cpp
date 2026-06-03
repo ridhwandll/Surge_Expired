@@ -31,7 +31,7 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CameraComponent)
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::CameraComponent)
 
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::MeshComponent)
-    .AddVariable<&Surge::MeshComponent::Mesh>("Mesh")
+    .AddVariable<&Surge::MeshComponent::MeshID>("MeshID")
     .AddVariable<&Surge::MeshComponent::DropShadow>("DropShadow")
 SURGE_REFLECT_CLASS_REGISTER_END(Surge::MeshComponent)
 

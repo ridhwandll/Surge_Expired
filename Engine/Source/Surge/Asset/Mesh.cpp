@@ -1,7 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Mesh.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Utility/Filesystem.hpp"
+#include "DefaultMeshes.hpp"
+
 #include <glm/gtc/type_ptr.hpp>
 #include <cgltf.h>
 
@@ -10,7 +11,6 @@
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <android/asset_manager.h>
 #endif
-#include <numeric>
 
 namespace Surge
 {
@@ -29,9 +29,14 @@ namespace Surge
 
     Mesh::Mesh(const String& filepath)
     {
-        mPath = filepath;
+        if(CheckAndGenerateDefaultMesh(filepath))
+            return;
+
         cgltf_options options = {};
         cgltf_data* data = nullptr;
+
+        Vector<Vertex> vertices;
+        Vector<Index> indices;
 
 #ifdef SURGE_PLATFORM_ANDROID
         android_app* app = Android::GAndroidApp;
@@ -178,7 +183,7 @@ namespace Surge
                     submesh.BoundingBox.Max.y = glm::max(vertex.Position.y, submesh.BoundingBox.Max.y);
                     submesh.BoundingBox.Max.z = glm::max(vertex.Position.z, submesh.BoundingBox.Max.z);
 
-                    mVertices.push_back(vertex);
+                    vertices.push_back(vertex);
                 }
 
                 // Indices; read as triangles (3 at a time)
@@ -188,7 +193,7 @@ namespace Surge
                         (Uint)cgltf_accessor_read_index(prim.indices, i),
                         (Uint)cgltf_accessor_read_index(prim.indices, i + 1),
                         (Uint)cgltf_accessor_read_index(prim.indices, i + 2) };
-                    mIndices.push_back(index);
+                    indices.push_back(index);
                 }
 
                 vertexCount += submesh.VertexCount;
@@ -222,7 +227,6 @@ namespace Surge
                 submesh.LocalTransform = localTransform;
             }
         }
-
         // Materials
         // glTF PBR metallic-roughness:
         //   base_color_texture = AlbedoMap
@@ -261,52 +265,25 @@ namespace Surge
             }
         }
 
-        //ComputeSmoothNormals();
-        CreateRHIObjects();
+        Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        BufferDesc vbDesc = {};
+        vbDesc.Size = static_cast<Uint>(vertices.size()) * sizeof(Vertex);
+        vbDesc.Usage = BufferUsage::VERTEX;
+        vbDesc.HostVisible = false;
+        vbDesc.InitialData = vertices.data();
+        vbDesc.DebugName = "MeshVB";
+        mVertexBuffer = rhi->CreateBuffer(vbDesc);
+        BufferDesc ibDesc = {};
+        ibDesc.Size = static_cast<Uint>(indices.size()) * sizeof(Index);
+        ibDesc.Usage = BufferUsage::INDEX;
+        ibDesc.HostVisible = false;
+        ibDesc.InitialData = indices.data();
+        ibDesc.DebugName = "MeshIB";
+        mIndexBuffer = rhi->CreateBuffer(ibDesc);
+
+        vertices.clear();
+        indices.clear();
         cgltf_free(data);
-    }
-
-    Mesh::Mesh(DefaultMesh type)
-    {
-        MeshGenerator::MeshData meshData = MeshGenerator::GenerateDefaultMesh(type);
-        mVertices = std::move(meshData.Vertices);
-        mIndices = std::move(meshData.Indices);
-
-        // Only one submesh for default meshes
-        mSubmeshes.emplace_back();
-        Submesh& submesh = mSubmeshes.back();
-        submesh.BaseVertex = 0;
-        submesh.BaseIndex = 0;
-        submesh.MaterialIndex = 0;
-
-        submesh.VertexCount = (Uint)mVertices.size();
-        submesh.IndexCount = (Uint)mIndices.size() * 3;
-
-        submesh.Transform = glm::mat4(1.0f);
-        submesh.LocalTransform = glm::mat4(1.0f);
-        submesh.MeshName = "DefaultMesh";
-        submesh.NodeName= "DefaultMesh_Node";
-
-        submesh.BoundingBox.Reset();
-        //Compute AABB
-        glm::vec3 minBound(std::numeric_limits<float>::max());
-        glm::vec3 maxBound(-std::numeric_limits<float>::max());
-        for (const auto& v : mVertices)
-        {
-            minBound = glm::min(minBound, v.Position);
-            maxBound = glm::max(maxBound, v.Position);
-        }
-        submesh.BoundingBox.Min = minBound;
-        submesh.BoundingBox.Max = maxBound;
-
-        mMaterials.emplace_back(Core::GetRenderer()->CreateMaterial("DefaultMaterial"));
-        mMaterials[0]->Set<glm::vec3>("Albedo", glm::vec3(0.8f));
-        mMaterials[0]->Set<float>("Metallic", 0.5f);
-        mMaterials[0]->Set<float>("Roughness", 0.5f);
-        mMaterials[0]->Set<float>("Reflectance", 0.5f);
-
-        //ComputeSmoothNormals();
-        CreateRHIObjects();
     }
 
     Mesh::~Mesh()
@@ -318,73 +295,72 @@ namespace Surge
         rhi->DestroyBuffer(mIndexBuffer);
     }
 
-    void Mesh::CreateRHIObjects()
+    Ref<Mesh> Mesh::Create(const String& filepath)
     {
-        Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        return Ref<Mesh>::Create(filepath);
+    }
 
+    bool Mesh::CheckAndGenerateDefaultMesh(const String& filepath)
+    {
+        MeshGenerator::MeshData meshData = MeshGenerator::GenerateDefaultMesh(filepath);
+        if(meshData.Vertices.empty())
+            return false;
+
+        const Vector<Vertex>& vertices = meshData.Vertices;
+        const Vector<Index>& indices = meshData.Indices;
+ 
+        // Only one submesh for default meshes
+        mSubmeshes.emplace_back();
+        Submesh& submesh = mSubmeshes.back();
+        submesh.BaseVertex = 0;
+        submesh.BaseIndex = 0;
+        submesh.MaterialIndex = 0;
+ 
+        submesh.VertexCount = (Uint)vertices.size();
+        submesh.IndexCount = (Uint)indices.size() * 3;
+ 
+        submesh.Transform = glm::mat4(1.0f);
+        submesh.LocalTransform = glm::mat4(1.0f);
+        submesh.MeshName = "DefaultMesh";
+        submesh.NodeName= "DefaultMesh_Node";
+ 
+        submesh.BoundingBox.Reset();
+        //Compute AABB
+        glm::vec3 minBound(std::numeric_limits<float>::max());
+        glm::vec3 maxBound(-std::numeric_limits<float>::max());
+        for (const auto& v : vertices)
+        {
+            minBound = glm::min(minBound, v.Position);
+            maxBound = glm::max(maxBound, v.Position);
+        }
+        submesh.BoundingBox.Min = minBound;
+        submesh.BoundingBox.Max = maxBound;
+ 
+        mMaterials.emplace_back(Core::GetRenderer()->CreateMaterial("DefaultMaterial"));
+        mMaterials[0]->Set<glm::vec3>("Albedo", glm::vec3(0.8f));
+        mMaterials[0]->Set<float>("Metallic", 0.5f);
+        mMaterials[0]->Set<float>("Roughness", 0.5f);
+        mMaterials[0]->Set<float>("Reflectance", 0.5f);
+ 
+        Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
         BufferDesc vbDesc = {};
-        vbDesc.Size = static_cast<Uint>(mVertices.size()) * sizeof(Vertex);
+        vbDesc.Size = static_cast<Uint>(vertices.size()) * sizeof(Vertex);
         vbDesc.Usage = BufferUsage::VERTEX;
         vbDesc.HostVisible = false;
-        vbDesc.InitialData = mVertices.data();
+        vbDesc.InitialData = vertices.data();
         vbDesc.DebugName = "MeshVB";
         mVertexBuffer = rhi->CreateBuffer(vbDesc);
-
         BufferDesc ibDesc = {};
-        ibDesc.Size = static_cast<Uint>(mIndices.size()) * sizeof(Index);
+        ibDesc.Size = static_cast<Uint>(indices.size()) * sizeof(Index);
         ibDesc.Usage = BufferUsage::INDEX;
         ibDesc.HostVisible = false;
-        ibDesc.InitialData = mIndices.data();
+        ibDesc.InitialData = indices.data();
         ibDesc.DebugName = "MeshIB";
         mIndexBuffer = rhi->CreateBuffer(ibDesc);
-    }
 
-    static bool ArePositionsEqual(const glm::vec3& a, const glm::vec3& b)
-    {
-        const float epsilon = 0.0001f;
-        return glm::distance2(a, b) < (epsilon * epsilon); // distance2 avoids a slow sqrt
+        meshData.Vertices.clear();
+        meshData.Indices.clear();
+        return true;
     }
-
-//     void Mesh::ComputeSmoothNormals()
-//     {
-//         // Build index list sorted by position
-//         Vector<Uint> sortedIndices(mVertices.size());
-//         std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
-//         std::sort(sortedIndices.begin(), sortedIndices.end(), [&](Uint a, Uint b)
-//             {
-//                 const glm::vec3& pa = mVertices[a].Position;
-//                 const glm::vec3& pb = mVertices[b].Position;
-//                 if(pa.x != pb.x)
-//                     return pa.x < pb.x;
-//                 if(pa.y != pb.y)
-//                     return pa.y < pb.y;
-// 
-//                 return pa.z < pb.z;
-//             });
-// 
-//         // Walk sorted list, accumulate normals for vertices sharing the same position
-//         Uint i = 0;
-//         while(i < sortedIndices.size())
-//         {
-//             Uint j = i;
-//             const glm::vec3& refPos = mVertices[sortedIndices[i]].Position;
-// 
-//             // Find the end of this position group
-//             while(j < sortedIndices.size() && ArePositionsEqual(mVertices[sortedIndices[j]].Position, refPos))
-//                 j++;
-// 
-//             // Accumulate normals across the group
-//             glm::vec3 accumulated = glm::vec3(0.0f);
-//             for(Uint k = i; k < j; k++)
-//                 accumulated += mVertices[sortedIndices[k]].Normal;
-// 
-//             accumulated = glm::normalize(accumulated);
-// 
-//             for(Uint k = i; k < j; k++)
-//                 mVertices[sortedIndices[k]].SmoothNormal = accumulated;
-// 
-//             i = j;
-//         }
-//     }
 
 } // namespace Surge

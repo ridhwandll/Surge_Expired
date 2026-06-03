@@ -1,12 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include <Surge/Surge.hpp>
 #include "Editor.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+
 #include "Utility/ImGuiAux.hpp"
 #include "Panels/ViewportPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
-#include <stb_image.h>
 #include "SurgeReflect/Enum.hpp"
+#include "Surge/Asset/DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -19,12 +21,11 @@ namespace Surge
         mCamera.SetActive(true);
 
         // Configure panels
-        SceneHierarchyPanel* sceneHierarchy;
-        sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
+        SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
         mPanelManager.PushPanel<ViewportPanel>(&mCamera);
 
-        mActiveScene = Ref<Scene>::Create(false);
+        mActiveScene = Ref<Scene>::Create();
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
         
         Entity runtimeCamera;
@@ -36,26 +37,29 @@ namespace Surge
             transform.Position = glm::vec3(-10, 6, 10);
             transform.Rotation = glm::vec3(-30, -45, 0);
         }
-            
-        mRidTex = LoadTexture();
+
+        AssetID assetID = AssetManager::Import("Textures/RidWhite.png", AssetType::TEXTURE2D);
+        mRidTex = AssetManager::Load<Texture2D>(assetID) ;
+
         {
             {
                 Entity floor;
-                mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
+                mActiveScene->CreateEntity(floor, "Cube");
                 MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
+                meshComp.MeshID = AssetManager::Import(DefaultMesh::CUBE, AssetType::MESH);
+
                 TransformComponent& t = floor.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
                 t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
                 t.MarkDirty();
             }
             {
-                Entity cube;
-                mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
-                MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
+                Entity sphere;
+                mActiveScene->CreateEntity(sphere, "Sphere");
+                MeshComponent& meshComp = sphere.AddComponent<MeshComponent>();
+                meshComp.MeshID = AssetManager::Import(DefaultMesh::SPHERE, AssetType::MESH);
             
-                TransformComponent& t = cube.GetComponent<TransformComponent>();
+                TransformComponent& t = sphere.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 2.0f, 0.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
                 t.MarkDirty();
@@ -64,24 +68,25 @@ namespace Surge
                 Entity e;
                 mActiveScene->CreateEntity(e, "Vulkan Scene");
                 MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
+                meshComp.MeshID = AssetManager::Import("Mesh/VulkanScene.glb", AssetType::MESH);
+
                 TransformComponent& t = e.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
                 t.MarkDirty();
             }
         }
-        //{
-        //    Entity pointLight;
-        //    mActiveScene->CreateEntity(pointLight, "Point Light");
-        //    LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
-        //    lightComp.Type = LightType::POINT;
-        //    lightComp.Intensity = 1.2f;
-        //    lightComp.Radius = 10.0f;
-        //    TransformComponent& t = pointLight.GetComponent<TransformComponent>();
-        //    t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
-        //    t.MarkDirty();
-        //}
+        {
+            Entity pointLight;
+            mActiveScene->CreateEntity(pointLight, "Point Light");
+            LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
+            lightComp.Type = LightType::POINT;
+            lightComp.Intensity = 1.2f;
+            lightComp.Radius = 10.0f;
+            TransformComponent& t = pointLight.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
+            t.MarkDirty();
+        }
         {
             Entity directionalLight;
             mActiveScene->CreateEntity(directionalLight, "Directional Light");
@@ -162,41 +167,7 @@ namespace Surge
         }
     }
 
-    void Editor::OnShutdown()
-    {
-        auto& rhi = mRenderer->GetRHI();
-        rhi->DestroyImage(mRidTex);
-    }
-
-    ImageHandle Editor::LoadTexture()
-    {
-        ImageHandle texture = ImageHandle::Invalid();
-        stbi_set_flip_vertically_on_load(1);
-        SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
-        String path = "Engine/Assets/Textures/RidWhite.png";
-        int width, height, channels;
-        stbi_uc* data = nullptr;
-        data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-        if(data)
-        {
-            ImageDesc desc = {};
-            desc.Width = width;
-            desc.Height = height;
-            desc.Format = ImageFormat::RGBA8_SRGB;
-            desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
-            desc.DebugName = "Tex.png";
-            desc.GenerateImGuiID = true;
-            desc.InitialData = data;
-            desc.DataSize = width * height * 4;
-            desc.Sampler = defautSampler;
-            texture = mRenderer->GetRHI()->CreateImage(desc);
-            stbi_image_free(data);
-        }
-        else
-            Log<Severity::Error>("Failed to load texture at path: {0}", path);
-
-        return texture;
-    }
+    void Editor::OnShutdown() {}
 
 } // namespace Surge
 

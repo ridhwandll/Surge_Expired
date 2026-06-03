@@ -1,17 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
-#include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Asset/Mesh.hpp"
+#include "Surge/Asset/DefaultMeshes.hpp"
+#include "Surge/Asset/Texture2D.hpp"
+
 #include <random>
 #include <imgui_internal.h>
-#include "stb_image.h"
-
-#ifdef SURGE_PLATFORM_ANDROID
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#endif
-#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 
 
 namespace Surge
@@ -52,68 +49,31 @@ namespace Surge
         return glm::vec2(distX(gen), distY(gen));
     }
 
-    void Player::FillTextures(Uint texCount)
-    {
-        stbi_set_flip_vertically_on_load(1);
-        SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
-        for (int i = 0; i < texCount; i++)
-        {
-            String path = "Engine/Assets/Textures/RidWhite.png";
-            int width, height, channels;
-            stbi_uc* data = nullptr;
-#ifdef SURGE_PLATFORM_WINDOWS
-            data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-#elif defined(SURGE_PLATFORM_ANDROID)
-            android_app* app = Android::GAndroidApp;
-            AAssetManager* assetManager = app->activity->assetManager;
-            AAsset* asset = AAssetManager_open(assetManager, path.c_str(), AASSET_MODE_BUFFER);
-
-            Vector<unsigned char> buffer;
-            int bufferSize = AAsset_getLength(asset);
-            buffer.resize(bufferSize);
-
-            AAsset_read(asset, buffer.data(), bufferSize);
-            AAsset_close(asset);
-
-            data = stbi_load_from_memory(buffer.data(), bufferSize, &width, &height, &channels, 4);
-#endif
-            if (data)
-            {
-                ImageDesc desc = {};
-                desc.Width = width;
-                desc.Height = height;
-                desc.Format = ImageFormat::RGBA8_SRGB;
-                desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
-                desc.GenerateImGuiID = true;
-                desc.DebugName = String(std::to_string(i + 1) + ".png");
-                desc.InitialData = data;
-                desc.DataSize = width * height * 4;
-                desc.Sampler = defautSampler;
-                ImageHandle texture = mRenderer->GetRHI()->CreateImage(desc);
-                mTextures.push_back(texture);
-                stbi_image_free(data);
-            }
-            else
-                Log<Severity::Error>("Failed to load texture at path: {0}", path);
-        }
-    }
-
     void Player::OnInitialize()
     {
         mRenderer = Core::GetRenderer();
-        mActiveScene = Ref<Scene>::Create(false);
+        mActiveScene = Ref<Scene>::Create();
         Entity runtimeCamera;
 
+        {
+            AssetID assetID = AssetManager::Import("Textures/RidWhite.png", AssetType::TEXTURE2D);
+            Ref<Texture2D> ridTex = AssetManager::Load<Texture2D>(assetID);
+            Log<Severity::Info>("Ref<Texture2D> ridTex: RefCount: {}", ridTex->GetRefCount());
+            AssetManager::Unload(assetID);
+            Log<Severity::Info>("Ref<Texture2D> ridTex: RefCount: {}", ridTex->GetRefCount());
+        }
+
+        Ref<Mesh> mesh = Mesh::Create(DefaultMesh::CYLINDER);
+
         glm::vec2 windowSize = Core::GetWindow()->GetSize();
-        float halfWidth = 0;
-        float halfHeight = 0;
 
         {
             mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
             CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
             cam.Primary = true;
             cam.FixedAspectRatio = true;
-        
+
+#if 1       // Perspective camera
             cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
             TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
             transform.Position = glm::vec3(-10, 6, 10);
@@ -122,62 +82,56 @@ namespace Surge
             cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
             float size = cam.Camera.GetOrthographicSize();
             float aspect = cam.Camera.GetAspectRatio();
-            halfWidth = size * aspect * 0.5f;
-            halfHeight = size * 0.5f;
+#else
+            //Orthographic Camera
+            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
+            TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
+            transform.Position = glm::vec3(0, 0, 0);
+            transform.Rotation = glm::vec3(-35, 45, 0);
+
+            cam.Camera.SetOrthographicSize(15);
+            cam.Camera.SetOrthographicFarClip(1000);
+            cam.Camera.SetOrthographicNearClip(-100);
+#endif
         }
-        //{
-        //    //Isometric camera
-        //    mActiveScene->CreateEntity(runtimeCamera, "RuntimeCamera");
-        //    CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-        //    cam.Primary = true;
-        //    cam.FixedAspectRatio = false;
-        //
-        //    cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
-        //    TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-        //    transform.Position = glm::vec3(0, 0, 0);
-        //    transform.Rotation = glm::vec3(-35, 45, 0);
-        //
-        //    cam.Camera.SetOrthographicSize(15);
-        //    cam.Camera.SetOrthographicFarClip(1000);
-        //    cam.Camera.SetOrthographicNearClip(-100);
-        //}
+
         {
             {
-                mActiveScene->CreateEntity(mEntity, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
-                MeshComponent& meshComp = mEntity.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-            
-                TransformComponent& t = mEntity.GetComponent<TransformComponent>();
+                Entity e;
+                mActiveScene->CreateEntity(e, "Cube");
+                MeshComponent& meshComp = e.AddComponent<MeshComponent>();
+                meshComp.MeshID = AssetManager::Import(DefaultMesh::CUBE, AssetType::MESH);
+
+                TransformComponent& t = e.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.5f, 0.0f);
                 t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
                 t.MarkDirty();
             }
             {
                 Entity floor;
-                mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
+                mActiveScene->CreateEntity(floor, "Floor");
                 MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
+                meshComp.MeshID = AssetManager::Import(DefaultMesh::CYLINDER, AssetType::MESH);
             
                 TransformComponent& t = floor.GetComponent<TransformComponent>();
                 t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-                t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
+                t.Scale = glm::vec3(12.0f, 1.0f, 12.0f);
                 t.MarkDirty();
-            
-                Ref<Material>& material = meshComp.Mesh->GetMaterialAtIndex(0);
+
+                Ref<Material>& material = AssetManager::Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
                 material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
                 material->Set<float>("Metallic", 0.3f);
                 material->Set<float>("Roughness", 0.8f);
             }
-            //{
-            //    mActiveScene->CreateEntity(mVkScene, "Vulkan Scene");
-            //    MeshComponent& meshComp = mVkScene.AddComponent<MeshComponent>();
-            //    meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-            //
-            //    TransformComponent& t = mVkScene.GetComponent<TransformComponent>();
-            //    t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-            //    t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-            //    t.MarkDirty();
-            //}
+            {
+                mActiveScene->CreateEntity(mRotatingEntity, "Vulkan Scene");
+                MeshComponent& meshComp = mRotatingEntity.AddComponent<MeshComponent>();
+                meshComp.MeshID = AssetManager::Import("Mesh/VulkanScene.glb", AssetType::MESH);
+
+                TransformComponent& t = mRotatingEntity.GetComponent<TransformComponent>();
+                t.Position = glm::vec3(2.0f, 1.6f, 0.0f);
+                t.MarkDirty();
+            }
         }
         {
             Entity directionalLight;
@@ -212,7 +166,7 @@ namespace Surge
 
         float dt = Core::GetClock().GetSeconds();
 
-        TransformComponent& floorTransform = mEntity.GetComponent<TransformComponent>();
+        TransformComponent& floorTransform = mRotatingEntity.GetComponent<TransformComponent>();
         floorTransform.Rotation.y += 50.0f * dt;
         floorTransform.MarkDirty();
 

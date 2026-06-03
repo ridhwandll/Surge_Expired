@@ -5,6 +5,8 @@
 #include "Surge/Core/Input/Input.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Asset/DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -48,34 +50,34 @@ namespace Surge
                 ImGui::Separator();
                 if (ImGui::BeginMenu("Mesh"))
                 {
-                    int defMesh = -1;
+                    const char* defMesh = "";
                     if (ImGui::MenuItem("Empty Mesh"))
-                        defMesh = -2;
+                        defMesh = "Empty";
                     if (ImGui::MenuItem("Cube"))
-                        defMesh = static_cast<int>(DefaultMesh::CUBE);
+                        defMesh = DefaultMesh::CUBE;
                     if (ImGui::MenuItem("Sphere"))
-                       defMesh = static_cast<int>(DefaultMesh::SPHERE);
+                       defMesh = DefaultMesh::SPHERE;
                     if (ImGui::MenuItem("Bean"))
-                        defMesh = static_cast<int>(DefaultMesh::BEAN);
+                        defMesh = DefaultMesh::BEAN;
                     if (ImGui::MenuItem("Cone"))
-                        defMesh = static_cast<int>(DefaultMesh::CONE);
+                        defMesh = DefaultMesh::CONE;
                     if (ImGui::MenuItem("Cylinder"))
-                        defMesh = static_cast<int>(DefaultMesh::CYLINDER);
+                        defMesh = DefaultMesh::CYLINDER;
                     if (ImGui::MenuItem("Torus"))
-                        defMesh = static_cast<int>(DefaultMesh::TORUS);
+                        defMesh = DefaultMesh::TORUS;
                     if (ImGui::MenuItem("Plane"))
-                        defMesh = static_cast<int>(DefaultMesh::PLANE);
+                        defMesh = DefaultMesh::PLANE;
 
-                    if(defMesh == -2)
+                    if(strcmp(defMesh, "Empty") == 0)
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
-                        MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
+                        mSelectedEntity.AddComponent<MeshComponent>();
                     }
-                    else if (defMesh != -1)
+                    else if (strcmp(defMesh, "") != 0)
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
                         MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
-                        meshComponent.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(defMesh));
+                        meshComponent.MeshID = AssetManager::Import(defMesh, AssetType::MESH);
                     }
                     ImGui::EndPopup();
                 }

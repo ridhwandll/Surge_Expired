@@ -185,10 +185,9 @@ namespace Surge
                         if(write == read && !barrierAdded.count(write))
                         {
                             const ImageDesc& writeDesc = mRHI->GetDesc(write);
-
-                            Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
-                            Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
-                            Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
+                            //Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
+                            //Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
+                            //Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
                             //Log<Severity::Warn>("From: {} -> To: SAMPLED", VulkanUtils::TextureUsageToString(writeDesc.Usage)); //TODO: Remove
                             readGroup.BarriersBeforeGroup.push_back({ write, ImageUsage::SAMPLED });
                             barrierAdded.insert(write);

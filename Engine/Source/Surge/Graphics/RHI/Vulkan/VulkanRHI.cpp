@@ -131,7 +131,7 @@ namespace Surge
         // Wait for this SLOT's fence
         // This slot was used N frames ago, wait until the GPU is done with it
         {
-            Timer fenceTimer("vkWaitForFences", true);
+            //Timer fenceTimer("vkWaitForFences", true);
             vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
         }
 

@@ -195,7 +195,7 @@ namespace Surge
 
         String result = outJson.dump(4);
         FILE* f;
-        errno_t e = fopen_s(&f, path, "w");
+        errno_t e = fopen_s(&f, path.string().c_str(), "w");
         if (f)
         {
             fwrite(result.c_str(), sizeof(char), result.size(), f);

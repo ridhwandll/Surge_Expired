@@ -3,7 +3,6 @@
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Time/Timer.hpp"
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 
@@ -133,9 +132,6 @@ namespace Surge
     {
         return std::make_unique<T>(std::forward<Args>(args)...);
     }
-
-    template <typename T1, typename T2>
-    using HashMap = std::unordered_map<T1, T2>;
 
     template <typename T1, typename T2>
     struct Pair

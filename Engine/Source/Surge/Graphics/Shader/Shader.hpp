@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Core/Defines.hpp"
 #include "ShaderReflector.hpp"
+#include <unordered_map>
 #include <functional>
 
 namespace Surge
@@ -25,7 +26,7 @@ namespace Surge
         String GetShaderCachePath(ShaderType type);
     private:
         String mPath;
-        HashMap<ShaderType, String> mShaderSources;
+        std::unordered_map<ShaderType, String> mShaderSources;
         Vector<SPIRVHandle> mShaderSPIRVs;
         ShaderType mTypesBit;
         ShaderReflectionData mReflectionData;

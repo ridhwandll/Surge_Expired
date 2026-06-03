@@ -13,11 +13,10 @@ namespace Surge
     class Scene;
     class Entity;
 
-    class SURGE_API Scene : public RefCounted
+    class Scene : public RefCounted
     {
     public:
-        Scene() = delete;
-        Scene(bool runtime);
+        Scene() = default;
         ~Scene();
 
         void OnRuntimeStart();
@@ -44,7 +43,6 @@ namespace Surge
 
     private:
         entt::registry mRegistry;
-        bool mRuntime;
     };
 
     //

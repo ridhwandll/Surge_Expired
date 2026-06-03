@@ -13,6 +13,7 @@
 #elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #endif
+#include "../Asset/AssetManager.hpp"
 
 
 #define ENV_VAR_KEY "SURGE_DIR"
@@ -49,6 +50,8 @@ namespace Surge::Core
         GCoreData.SurgeWindow = new WindowsWindow(clientOptions.WindowDescription);
 #endif
         GCoreData.SurgeWindow->RegisterEventCallback(OnEvent);
+
+        AssetManager::Initialize("Engine/Assets");
 
         // Renderer
         GCoreData.SurgeRenderer = new Renderer();
@@ -88,6 +91,8 @@ namespace Surge::Core
     void Core::Shutdown()
     {
         SCOPED_TIMER("Core::Shutdown");
+
+        AssetManager::Shutdown();
 
         // TODO: Remove this
         GCoreData.SurgeRenderer->GetRHI()->WaitIdle();
