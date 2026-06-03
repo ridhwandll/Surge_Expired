@@ -14,7 +14,6 @@ namespace Surge
     String                                       AssetManager::sAssetsDirectory;
     std::unordered_map<AssetID, AssetMetadata>   AssetManager::sAssetRegistry;
     std::unordered_map<AssetID, Ref<Asset>>      AssetManager::sLoadedAssets;
-    std::unordered_map<uint64_t, AssetID>        AssetManager::sPathIndex;
 
     void AssetManager::Initialize(const String& assetDirectory)
     {
@@ -29,7 +28,6 @@ namespace Surge
 
         sLoadedAssets.clear();
         sAssetRegistry.clear();
-        sPathIndex.clear();
         Log<Severity::Info>("[AssetManager] Shutdown");
     }
 
@@ -42,13 +40,13 @@ namespace Surge
         if(relativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
             return ImportFromMemory(relativePath, type);
 
-        // Return the existing ID if already registered
-        const uint64_t pathHash = HashPath(relativePath);
-        auto indexIt = sPathIndex.find(pathHash);
-        if(indexIt != sPathIndex.end())
         {
-            Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", relativePath.c_str(), indexIt->second.Get());
-            return indexIt->second;
+            const AssetID existing = GetIDFromPath(relativePath);
+            if(existing.IsValid())
+            {
+                Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", relativePath.c_str(), existing.Get());
+                return existing;
+            }
         }
 
         const String absPath = GetAbsolutePath(relativePath);
@@ -60,9 +58,7 @@ namespace Surge
             return UUID::INVALID;
         }
 
-        // Retrieve or generate a stable UUID via the .surgeasset sidecar
-        // The sidecar guarantees the same ID survives renames/re-imports
-        const AssetID id = ReadOrCreateSidecar(absPath, type);
+        const AssetID id = AssetID();
         if(!id.IsValid())
         {
             Log<Severity::Error>("[AssetManager] Import failed: could not read/create sidecar for: '{}'.", absPath.c_str());
@@ -74,9 +70,7 @@ namespace Surge
         meta.Type = type;
         meta.Flags = AssetFlags::VALID;
         meta.RelativePath = relativePath;
-
         sAssetRegistry[id] = std::move(meta);
-        sPathIndex[pathHash] = id;
 
         Log<Severity::Info>("[AssetManager] Imported '{}' | ID: {} | Type: {}", relativePath.c_str(), id.Get(), SurgeReflect::EnumToString(type).data());
 
@@ -89,13 +83,13 @@ namespace Surge
         SG_ASSERT(type != AssetType::NONE, "[AssetManager] Cannot import with AssetType::NONE");
         SG_ASSERT(!memoryStr.empty(), "[AssetManager] Cannot import with an empty memoryStr!");
 
-        // Idempotent: return the existing ID if already registered
-        const uint64_t pathHash = HashPath(memoryStr);
-        auto indexIt = sPathIndex.find(pathHash);
-        if(indexIt != sPathIndex.end())
         {
-            Log<Severity::Warn>("[AssetManager] Import: '{}' is already registered (ID: {})!", memoryStr.c_str(), indexIt->second.Get());
-            return indexIt->second;
+            const AssetID existing = GetIDFromPath(memoryStr);
+            if(existing.IsValid())
+            {
+                Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", memoryStr.c_str(), existing.Get());
+                return existing;
+            }
         }
 
         AssetMetadata meta;
@@ -103,8 +97,6 @@ namespace Surge
         meta.Type = type;
         meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY;
         meta.RelativePath = memoryStr;
-
-        sPathIndex[pathHash] = meta.ID;
         sAssetRegistry[meta.ID] = std::move(meta);
 
         Log<Severity::Info>("[AssetManager] Imported '{}' | ID: {} | Type: {}", memoryStr.c_str(), meta.ID.Get(), SurgeReflect::EnumToString(type).data());
@@ -135,7 +127,6 @@ namespace Surge
         if(meta.IsMissing())
         {
             Log<Severity::Error>("[AssetManager] Load: Source file missing for '{}'!", meta.RelativePath);
-
             return nullptr;
         }
 
@@ -191,8 +182,12 @@ namespace Surge
 
     AssetID AssetManager::GetIDFromPath(const String& relativePath)
     {
-        auto it = sPathIndex.find(HashPath(relativePath));
-        return it != sPathIndex.end() ? it->second : UUID(uint64_t(UUID::INVALID));
+        for(const auto& [id, meta] : sAssetRegistry)
+        {
+            if(meta.RelativePath == relativePath)
+                return id;
+        }
+        return UUID::INVALID;
     }
 
     // Registry
@@ -237,7 +232,6 @@ namespace Surge
             return false;
 
         sAssetRegistry.clear();
-        sPathIndex.clear();
 
         String line;
         Uint count = 0;
@@ -285,7 +279,6 @@ namespace Surge
             {
                 const String absPath = GetAbsolutePath(relPath);
                 const bool exists = std::ifstream(absPath).good();
-
                 meta.Flags = exists ? AssetFlags::VALID : AssetFlags::MISSING;
 
                 if(!exists)
@@ -293,8 +286,7 @@ namespace Surge
             }
 
             sAssetRegistry[id] = std::move(meta);
-            sPathIndex[HashPath(relPath)] = id;
-            ++count;
+            count++;
         }
 
         Log<Severity::Info>("[AssetManager] Registry deserialized ({} entries).", count);
@@ -331,104 +323,6 @@ namespace Surge
                 return nullptr;
             }
         }
-    }
-
-    // Sidecar helpers
-    //
-    // Format (Hero.png.surgeasset):
-    //   UUID=<decimal_u64>
-    //   Type=Texture2D
-    AssetID AssetManager::ReadOrCreateSidecar(const String& absAssetPath, AssetType type)
-    {
-        const String sidecarPath = GetSidecarPath(absAssetPath);
-
-        AssetID existingID = AssetID::INVALID;
-        AssetType existingType = AssetType::NONE;
-
-        if(ReadSidecar(sidecarPath, existingID, existingType))
-        {
-            if(existingType != type)
-            {
-                Log<Severity::Warn>("[AssetManager] Sidecar type mismatch for '{}': stored={} requested={}. " "Re-import with the correct type if this is wrong.",
-                    absAssetPath.c_str(),
-                    SurgeReflect::EnumToString(existingType).data(),
-                    SurgeReflect::EnumToString(type).data());
-            }
-            return existingID; // Stable ID from disk wins
-        }
-
-        // No sidecar yet: generate a fresh UUID and persist it
-        const AssetID freshID;
-        if(!WriteSidecar(sidecarPath, freshID, type))
-            return UUID::INVALID;
-
-        return freshID;
-    }
-
-    bool AssetManager::WriteSidecar(const String& sidecarPath, const AssetID& id, AssetType type)
-    {
-        std::ofstream file(sidecarPath, std::ios::out | std::ios::trunc);
-        if(!file.is_open())
-        {
-            Log<Severity::Error>("[AssetManager] WriteSidecar: Failed to open '{}'.", sidecarPath.c_str());
-            return false;
-        }
-
-        file << "UUID=" << id.Get() << '\n';
-        file << "Type=" << SurgeReflect::EnumToString(type).data() << '\n';
-        return true;
-    }
-
-    bool AssetManager::ReadSidecar(const String& sidecarPath, AssetID& outID, AssetType& outType)
-    {
-        std::ifstream file(sidecarPath);
-        if(!file.is_open())
-            return false;
-
-        uint64_t rawID = 0;
-        AssetType type = AssetType::NONE;
-        String line;
-
-        while(std::getline(file, line))
-        {
-            // "UUID=<value>"
-            if(line.compare(0, 5, "UUID=") == 0)
-            {
-                char* end = nullptr;
-                errno = 0;
-                rawID = strtoull(line.c_str() + 5, &end, 10);
-                if(end == line.c_str() + 5 || errno == ERANGE) rawID = 0;
-            }
-            // "Type=<TypeString>"
-            else if(line.compare(0, 5, "Type=") == 0)
-            {
-                type = AssetTypeFromString(line.c_str() + 5);
-            }
-        }
-
-        if(rawID == 0 || type == AssetType::NONE)
-            return false;
-
-        outID = UUID(rawID);
-        outType = type;
-        return true;
-    }
-
-    uint64_t AssetManager::HashPath(const String& relativePath)
-    {
-        // FNV-1a 64-bit: fast, low-collision, deterministic.
-        // Path separators are normalised (\\ → /) for cross-platform consistency.
-        constexpr uint64_t kOffsetBasis = 14695981039346656037ULL;
-        constexpr uint64_t kPrime = 1099511628211ULL;
-
-        uint64_t hash = kOffsetBasis;
-        for(const char c : relativePath)
-        {
-            const char n = (c == '\\') ? '/' : c;
-            hash ^= static_cast<uint64_t>(n);
-            hash *= kPrime;
-        }
-        return hash;
     }
 
 } // namespace Surge

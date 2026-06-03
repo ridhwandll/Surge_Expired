@@ -79,25 +79,14 @@ namespace Surge
         static Ref<Asset> LoadAsset(AssetID id);
         static Ref<Asset> LoadInternal(const AssetMetadata& metadata);
 
-        // .surgeasset sidecar helpers
-        static AssetID ReadOrCreateSidecar(const String& absAssetPath, AssetType type);
-        static bool WriteSidecar(const String& sidecarPath, const AssetID& id, AssetType type);
-        static bool ReadSidecar(const String& sidecarPath, AssetID& outID, AssetType& outType);
-
         // Utilities
         static String GetAbsolutePath(const String& relativePath) { return sAssetsDirectory + '/' + relativePath; }
-        static String GetSidecarPath(const String& absAssetPath) { return absAssetPath + kSidecarExtension; }
-        static uint64_t HashPath(const String& relativePath);
     private:
         static String sAssetsDirectory;
         static std::unordered_map<AssetID, AssetMetadata> sAssetRegistry;
         static std::unordered_map<AssetID, Ref<Asset>> sLoadedAssets;
 
-        // O(1) path -> ID lookup Avoids iterating the full registry for GetIDFromPath()
-        static std::unordered_map<uint64_t /*FNV-1a hash of the relative path*/, AssetID> sPathIndex;
-
         static constexpr const char* kRegistryFilename = "AssetRegistry.surge";
-        static constexpr const char* kSidecarExtension = ".surgeasset";
         static constexpr char kRegistryDelimiter = '|';
     };
 
