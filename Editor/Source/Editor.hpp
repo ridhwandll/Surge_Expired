@@ -6,6 +6,7 @@
 #include "Panels/PaneManager.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Asset/Texture2D.hpp"
+#include "ProjectBrowser.hpp"
 
 namespace Surge
 {
@@ -24,6 +25,9 @@ namespace Surge
         void OnRuntimeStart();
         void OnRuntimeEnd();
 
+        void SetCurrentProject(const Project& project) { mCurrentProject = project; }
+        void SetActiveScene(Ref<Scene> scene) { mActiveScene = scene; }
+
         PanelManager& GetPanelManager() { return mPanelManager; }
         EditorCamera& GetCamera() { return mCamera; }
 
@@ -35,6 +39,7 @@ namespace Surge
         Ref<Texture2D> mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
+        ProjectBrowser mProjectBrowser;
         PanelManager mPanelManager;
     };
 } // namespace Surge

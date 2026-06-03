@@ -2,9 +2,12 @@
 #include "Surge/Serializer/Serializer.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Asset/Asset.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <filesystem>
 #include <json/json.hpp>
+#include <fstream>
+
 
 // https://github.com/nlohmann/json#arbitrary-types-conversions
 namespace glm
@@ -53,7 +56,8 @@ namespace Surge
     //----------
 
     // Enum Mapping(s)
-    NLOHMANN_JSON_SERIALIZE_ENUM(RuntimeCamera::ProjectionType, {{RuntimeCamera::ProjectionType::Perspective, "Perspective"}, {RuntimeCamera::ProjectionType::Orthographic, "Orthographic"}})
+    NLOHMANN_JSON_SERIALIZE_ENUM(RuntimeCamera::ProjectionType, { {RuntimeCamera::ProjectionType::Perspective, "Perspective"}, {RuntimeCamera::ProjectionType::Orthographic, "Orthographic"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(LightType, { {LightType::POINT, "POINT"}, {LightType::DIRECTIONAL, "DIRECTIONAL"} });
 
     template <typename XComponent>
     FORCEINLINE static void SerializeComponent(nlohmann::json& j, Entity& e)
@@ -78,7 +82,6 @@ namespace Surge
                     std::memcpy(&destination, reinterpret_cast<const bool*>(source), size);
                     out[name] = destination;
                     offset += size;
-                    continue;
                 }
                 else if (type.EqualTo<float>())
                 {
@@ -86,24 +89,12 @@ namespace Surge
                     std::memcpy(&destination, reinterpret_cast<const float*>(source), size);
                     out[name] = destination;
                     offset += size;
-                    continue;
                 }
-                else if (type.EqualTo<UUID>())
+                else if (type.EqualTo<UUID>() || type.EqualTo<AssetID>())
                 {
                     uint64_t destination = *reinterpret_cast<const uint64_t*>(source);
                     out[name] = destination;
                     offset += size;
-                    continue;
-                }
-                else if (type.EqualTo<Vector<UUID>>())
-                {
-                    Vector<uint64_t> destination;
-                    const Vector<UUID>* src = reinterpret_cast<const Vector<UUID>*>(source);
-                    destination.resize(src->size());
-                    size = src->size() * sizeof(uint64_t);
-                    std::memcpy(destination.data(), src->data(), size);
-                    out[name] = destination;
-                    continue;
                 }
                 else if (type.EqualTo<String>())
                 {
@@ -116,11 +107,6 @@ namespace Surge
                     std::memcpy(reinterpret_cast<void*>(destination.data()), reinterpret_cast<const String*>(source)->c_str(), size);
                     out[name] = destination;
                     offset += size;
-                    continue;
-                }
-                else if (type.EqualTo<Path>())
-                {
-                    continue;
                 }
                 else if (type.EqualTo<glm::vec3>())
                 {
@@ -128,7 +114,6 @@ namespace Surge
                     std::memcpy(glm::value_ptr(destination), glm::value_ptr(*reinterpret_cast<const glm::vec3*>(source)), size);
                     out[name] = destination;
                     offset += size;
-                    continue;
                 }
                 else if (type.EqualTo<RuntimeCamera>())
                 {
@@ -142,20 +127,17 @@ namespace Surge
                     out["Orthographic Size"] = cam->GetOrthographicSize();
                     out["Projection"] = cam->GetProjectionType();
                     offset += size;
-                    continue;
                 }
-                //else if (type.EqualTo<Ref<Mesh>>())
-                //{
-                //    const Ref<Mesh>* mesh = reinterpret_cast<const Ref<Mesh>*>(source);
-                //    String path;
-                //    if (*mesh)
-                //        path = std::filesystem::relative((*mesh)->GetPath().Str()).string();
-                //
-                //    out[name] = path;
-                //    offset += size;
-                //    continue;
-                //}
-                Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
+                else if(type.EqualTo<LightType>())
+                {
+                    LightType lightType = (LightType)*(const Uint*)(source);
+                    Log<Severity::Info>("Light Type '{0}'", (Uint)lightType);
+
+                    out[name] = *(const LightType*)(source);
+                    offset += size;
+                }
+                else
+                    Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
             }
         }
     }
@@ -175,8 +157,7 @@ namespace Surge
         SerializeComponents<SERIALIZABLE_COMPONENTS>(out, e);
     }
 
-    template <>
-    void Surge::Serializer::Serialize(const Path& path, Scene* in)
+    void Serializer::SerializeScene(const Path& path, Scene* in)
     {
 #ifndef SURGE_PLATFORM_ANDROID
         SG_ASSERT_NOMSG(in);
@@ -194,13 +175,16 @@ namespace Surge
         outJson["Scene"]["Size"] = size;
 
         String result = outJson.dump(4);
-        FILE* f;
-        errno_t e = fopen_s(&f, path.string().c_str(), "w");
-        if (f)
+        std::ofstream file(path.string(), std::ios::out | std::ios::trunc);
+        if(!file.is_open())
         {
-            fwrite(result.c_str(), sizeof(char), result.size(), f);
-            fclose(f);
+            Log<Severity::Error>("SerializeScene: Failed to open '{}'.", path.string().c_str());
+            return;
         }
+
+        file << result;
+        file.close();
+        
 #endif // !SURGE_PLATFORM_ANDROID
     }
 
@@ -246,7 +230,7 @@ namespace Surge
                     std::memcpy(dst, &source, size);
                 }
             }
-            else if (type.EqualTo<UUID>())
+            else if (type.EqualTo<UUID>() || type.EqualTo<AssetID>())
             {
                 const uint64_t source = inJson[name];
                 uint64_t* dst = reinterpret_cast<uint64_t*>(destination);
@@ -269,16 +253,6 @@ namespace Surge
                 src->resize(size);
                 std::memcpy(src->data(), source.c_str(), size);
             }
-            else if (type.EqualTo<Path>())
-            {
-//                 const String source = inJson[name];
-//                 size = source.size();
-// 
-//                 Path* src = reinterpret_cast<Path*>(destination);
-//                 *src = Path(fmt::format("{0}/{1}", e.GetScene()->GetParentProject()->GetMetadata().ProjPath.Str(), source));
-// 
-//                 size = src->Size();
-            }
             else if (type.EqualTo<glm::vec3>())
             {
                 glm::vec3 source = inJson[name];
@@ -297,12 +271,12 @@ namespace Surge
                 cam.SetProjectionType(inJson["Projection"]);
                 std::memcpy(destination, &cam, size);
             }
-            //else if (type.EqualTo<Ref<Mesh>>())
-            //{
-            //    String path = inJson[name];
-            //    Ref<Mesh>& src = *reinterpret_cast<Ref<Mesh>*>(destination);
-            //    path.empty() ? src = nullptr : src = Ref<Mesh>::Create(path);
-            //}
+            else if(type.EqualTo<LightType>())
+            {
+                const LightType source = inJson[name];
+                LightType* dst = reinterpret_cast<LightType*>(destination);
+                std::memcpy(dst, &source, size);
+            }
             else
                 Log<Severity::Warn>("Unhandled Variable of type: '{0}' while deserializing!", type.GetFullName());
 
@@ -324,8 +298,7 @@ namespace Surge
         DeserializeComponents<SERIALIZABLE_COMPONENTS>(inJson, e);
     }
 
-    template <>
-    void Serializer::Deserialize(const Path& path, Scene* out)
+    void Serializer::DeserializeScene(const Path& path, Scene* out)
     {
         SG_ASSERT_NOMSG(out);
         auto& registry = out->GetRegistry();
@@ -345,73 +318,56 @@ namespace Surge
         }
     }
 
-    ///////////
-    //Project//
-    ///////////
+    void Serializer::SerializeProject(const Path& path, Project* in)
+    {
+        SG_ASSERT_NOMSG(in);
 
-//     template <>
-//     void Serializer::Serialize(const Path& path, ProjectMetadata* in)
-//     {
-//         nlohmann::json outJson = nlohmann::json();
-// 
-//         outJson["Name"] = in->Name;
-//         outJson["UUID"] = in->ProjectID.Get();
-//         outJson["ProjPath"] = in->ProjPath;
-//         outJson["InternalDirectory"] = in->InternalDirectory;
-//         outJson["ProjectMetadataPath"] = in->ProjectMetadataPath;
-//         outJson["ActiveSceneIndex"] = in->ActiveSceneIndex;
-// 
-//         nlohmann::json& sceneNode = outJson["Scenes"];
-//         Uint index = 0;
-//         for (auto& sceneMetadata : in->SceneMetadatas)
-//         {
-//             String idx = fmt::format("{0}", index);
-//             sceneNode[idx]["UUID"] = sceneMetadata.SceneUUID.Get();
-//             sceneNode[idx]["Name"] = sceneMetadata.Name;
-//             String relativeScenePath;
-// 
-//             std::filesystem::path path(sceneMetadata.ScenePath.Str());
-//             path.is_absolute() ? relativeScenePath = std::filesystem::relative(sceneMetadata.ScenePath.Str(), in->ProjPath.Str()).string() : relativeScenePath = sceneMetadata.ScenePath.Str();
-//             sceneNode[idx]["Path"] = relativeScenePath;
-//             index++;
-//         }
-//         sceneNode["Size"] = in->SceneMetadatas.size();
-// 
-//         String result = outJson.dump(4);
-//         FILE* f;
-//         errno_t e = fopen_s(&f, path, "w");
-//         if (f)
-//         {
-//             fwrite(result.c_str(), sizeof(char), result.size(), f);
-//             fclose(f);
-//         }
-//     }
-// 
-//     template <>
-//     void Serializer::Deserialize(const Path& path, ProjectMetadata* out)
-//     {
-//         String jsonContents = Filesystem::ReadFile<String>(path);
-//         nlohmann::json inJson = jsonContents.empty() ? nlohmann::json() : nlohmann::json::parse(jsonContents);
-// 
-//         out->Name = inJson["Name"];
-//         if (inJson.contains("UUID"))
-//             out->ProjectID = inJson["UUID"].get<uint64_t>();
-//         out->ProjPath = inJson["ProjPath"].get<String>();
-//         out->InternalDirectory = inJson["InternalDirectory"].get<String>();
-//         out->ProjectMetadataPath = inJson["ProjectMetadataPath"].get<String>();
-//         out->ActiveSceneIndex = inJson["ActiveSceneIndex"];
-// 
-//         nlohmann::json& sceneNode = inJson["Scenes"];
-//         Uint size = sceneNode["Size"];
-//         for (Uint i = 0; i < size; i++)
-//         {
-//             String idx = fmt::format("{0}", i);
-//             SceneMetadata& metadata = out->SceneMetadatas.emplace_back();
-// 
-//             metadata.Name = sceneNode[idx]["Name"];
-//             metadata.ScenePath = fmt::format("{0}/{1}", out->ProjPath, sceneNode[idx]["Path"].get<String>());
-//             metadata.SceneUUID = sceneNode[idx]["UUID"].get<uint64_t>();
-//         }
-//     }
+        nlohmann::json outJson;
+        outJson["Project"]["Name"] = in->Name;
+        outJson["Project"]["Version"] = in->Version;
+        outJson["Project"]["StartScene"] = static_cast<uint64_t>(in->StartScene);
+
+        String result = outJson.dump(4);
+
+        std::ofstream file(path.string(), std::ios::out | std::ios::trunc);
+        if(!file.is_open())
+        {
+            Log<Severity::Error>("SerializeProject: Failed to open '{}'.", path.string().c_str());
+            return;
+        }
+
+        file << result;
+        file.close();
+    }
+
+    void Serializer::DeserializeProject(const Path& path, Project* out)
+    {
+        SG_ASSERT_NOMSG(out);
+
+        String jsonContents = Filesystem::ReadFile<String>(path);
+
+        if(jsonContents.empty())
+        {
+            Log<Severity::Error>("DeserializeProject: File is empty or could not be read '{}'!", path.string());
+            return;
+        }
+
+        try
+        {
+            nlohmann::json parsedJson = nlohmann::json::parse(jsonContents);
+
+            if(parsedJson.contains("Project"))
+            {
+                const auto& projNode = parsedJson["Project"];
+                out->Name = projNode.value("Name", "");
+                out->Version = projNode.value("Version", "1.0");
+                out->StartScene = static_cast<AssetID>(projNode.value("StartScene", 0ULL));
+            }
+        }
+        catch(const nlohmann::json::exception& e)
+        {
+            Log<Severity::Error>("DeserializeProject: JSON parsing failed for '{}'. Error: {}", path.string(), e.what());
+        }
+    }
 
 } // namespace Surge

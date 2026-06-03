@@ -3,6 +3,7 @@
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Core/Events/Event.hpp"
 #include "Surge/Core/Window/Window.hpp"
+#include "Surge/Core/Project.hpp"
 
 namespace Surge
 {
@@ -12,7 +13,7 @@ namespace Surge
         bool RenderFinalImageToSwapchian = true;
     };
 
-    class SURGE_API Client
+    class Client
     {
     public:
         Client() = default;
@@ -22,12 +23,12 @@ namespace Surge
         virtual void OnUpdate() {};
         virtual void OnEvent(Event& e) { (void)e; };
         virtual void OnShutdown() {};
-        Ref<Scene> GetActiveProject() const { return mActiveScene; }
 
         void SetOptions(const ClientOptions& appCreateInfo) { mClientOptions = appCreateInfo; }
         const ClientOptions& GetClientOptions() const { return mClientOptions; }
 
     protected:
+        Project mCurrentProject;
         Ref<Scene> mActiveScene;
 
     private:

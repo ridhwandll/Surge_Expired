@@ -150,7 +150,7 @@ namespace Surge
         ImGui_ImplVulkan_Init(&vkInfo);
 
         // Load Fonts
-        style.FontSizeBase = 17.0f;
+        style.FontSizeBase = 16.0f;
         
         // ----------------------- ImGui Font Management ----------------------- 
         // Normal font -> index = 0
@@ -159,14 +159,18 @@ namespace Surge
         // Use ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[index]) to use!
         // ----------------------- ImGui Font Management ----------------------- 
 
+        constexpr const char* regularfontPath = "Engine/Assets/Fonts/Roboto_SemiCondensed-Regular.ttf";
+        constexpr const char* boldfontPath    = "Engine/Assets/Fonts/Roboto_SemiCondensed-Bold.ttf";
+        constexpr const char* italicfontPath  = "Engine/Assets/Fonts/Roboto_SemiCondensed-Italic.ttf";
+
 #ifdef SURGE_PLATFORM_WINDOWS
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);		
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
+        io.Fonts->AddFontFromFileTTF(regularfontPath, style.FontSizeBase);
+        io.Fonts->AddFontFromFileTTF(boldfontPath, style.FontSizeBase);
+        io.Fonts->AddFontFromFileTTF(italicfontPath, style.FontSizeBase);
 #elif defined(SURGE_PLATFORM_ANDROID)
-        LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);
-        LoadImGuiFont("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
-        LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
+        LoadImGuiFont(regularfontPath, style.FontSizeBase);
+        LoadImGuiFont(boldfontPath, style.FontSizeBase);
+        LoadImGuiFont(italicfontPath, style.FontSizeBase);
 #else
         io.Fonts->AddFontDefault();
 #endif

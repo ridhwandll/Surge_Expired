@@ -3,6 +3,8 @@
 #include "Texture2D.hpp"
 #include "Mesh.hpp"
 #include "SurgeReflect/Enum.hpp"
+#include "Surge/Serializer/Serializer.hpp"
+#include "Surge/ECS/Scene.hpp"
 
 #include <fstream>
 #include <cerrno>
@@ -14,21 +16,26 @@ namespace Surge
     String                                       AssetManager::sAssetsDirectory;
     std::unordered_map<AssetID, AssetMetadata>   AssetManager::sAssetRegistry;
     std::unordered_map<AssetID, Ref<Asset>>      AssetManager::sLoadedAssets;
+    bool                                         AssetManager::sInitialized = false;
 
-    void AssetManager::Initialize(const String& assetDirectory)
+    void AssetManager::Initialize(const Path& assetDirectory)
     {
-        sAssetsDirectory = assetDirectory;
+        sAssetsDirectory = assetDirectory.generic_string();
         DeserializeRegistry();
         Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", sAssetsDirectory, sAssetRegistry.size());
+        sInitialized = true;
     }
 
     void AssetManager::Shutdown()
     {
-        SerializeRegistry();
+        if (!sInitialized)
+            return;
 
+        SerializeRegistry();
         sLoadedAssets.clear();
         sAssetRegistry.clear();
         Log<Severity::Info>("[AssetManager] Shutdown");
+        sInitialized = false;
     }
 
     // Import
@@ -36,9 +43,6 @@ namespace Surge
     {
         SG_ASSERT(type != AssetType::NONE, "[AssetManager] Cannot import with AssetType::NONE");
         SG_ASSERT(!relativePath.empty(), "[AssetManager] Cannot import with an empty path!");
-
-        if(relativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
-            return ImportFromMemory(relativePath, type);
 
         {
             const AssetID existing = GetIDFromPath(relativePath);
@@ -49,59 +53,48 @@ namespace Surge
             }
         }
 
-        const String absPath = GetAbsolutePath(relativePath);
+        // If the engine is not created form memory, validate the source file exists on disk
 
-        // Validate the source file exists on disk
-        if(!std::ifstream(absPath).good())
+        bool fromMemory = true;
+        if(!relativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
         {
-            Log<Severity::Warn>("[AssetManager] Import failed: file not found: '{}'!", absPath.c_str());
-            return UUID::INVALID;
+            const String absPath = GetAbsolutePath(relativePath);
+            if(!std::ifstream(absPath).good())
+            {
+                Log<Severity::Warn>("[AssetManager] Import failed: file not found: '{}'!", absPath.c_str());
+                return UUID::INVALID;
+            }
+            fromMemory = false;
         }
 
-        const AssetID id = AssetID();
-        if(!id.IsValid())
-        {
-            Log<Severity::Error>("[AssetManager] Import failed: could not read/create sidecar for: '{}'.", absPath.c_str());
-            return UUID::INVALID;
-        }
+        AssetID id = AssetID();
 
         AssetMetadata meta;
         meta.ID = id;
         meta.Type = type;
-        meta.Flags = AssetFlags::VALID;
+
+        fromMemory ? meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY : meta.Flags = AssetFlags::VALID;
+
         meta.RelativePath = relativePath;
         sAssetRegistry[id] = std::move(meta);
 
         Log<Severity::Info>("[AssetManager] Imported '{}' | ID: {} | Type: {}", relativePath.c_str(), id.Get(), SurgeReflect::EnumToString(type).data());
-
         return id;
     }
 
-    // No Sidecars, no file system validations, memoryStr is directly passed to LoadInternal(no paths)
-    AssetID AssetManager::ImportFromMemory(const String& memoryStr, AssetType type)
+    // We assume the caller has already serialized this asset to disk at the given relativePath, so we just need to register it and add it to the loaded cache
+    AssetID AssetManager::ImportLive(const String& relativePath, AssetType type, Ref<Asset> asset)
     {
-        SG_ASSERT(type != AssetType::NONE, "[AssetManager] Cannot import with AssetType::NONE");
-        SG_ASSERT(!memoryStr.empty(), "[AssetManager] Cannot import with an empty memoryStr!");
+        SG_ASSERT(asset, "[AssetManager] ImportLive: asset is null!");
+        SG_ASSERT(std::ifstream(GetAbsolutePath(relativePath)).good(), "[AssetManager] ImportLive: serialized file not found! You must serialize the asset to disk yourself before calling this method!");
 
-        {
-            const AssetID existing = GetIDFromPath(memoryStr);
-            if(existing.IsValid())
-            {
-                Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", memoryStr.c_str(), existing.Get());
-                return existing;
-            }
-        }
+        AssetID id = Import(relativePath, type);
+        if(!id.IsValid())
+            return UUID::INVALID;
 
-        AssetMetadata meta;
-        meta.ID = AssetID();
-        meta.Type = type;
-        meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY;
-        meta.RelativePath = memoryStr;
-        sAssetRegistry[meta.ID] = std::move(meta);
-
-        Log<Severity::Info>("[AssetManager] Imported '{}' | ID: {} | Type: {}", memoryStr.c_str(), meta.ID.Get(), SurgeReflect::EnumToString(type).data());
-
-        return meta.ID;
+        asset->mID = id;
+        sLoadedAssets[id] = std::move(asset);
+        return id;
     }
 
     // Load (template in header points here)
@@ -167,6 +160,17 @@ namespace Surge
         return sLoadedAssets.find(id) != sLoadedAssets.end();
     }
 
+    void AssetManager::Save(AssetID id)
+    {
+        auto cacheIt = sLoadedAssets.find(id);
+        if(cacheIt == sLoadedAssets.end())
+        {
+            Log<Severity::Warn>("[AssetManager] Save: AssetID {} is not loaded.", id.Get());
+            return;
+        }
+        SaveInternal(sAssetRegistry.at(id), cacheIt->second);
+    }
+
     bool AssetManager::IsRegistered(AssetID id)
     {
         return sAssetRegistry.find(id) != sAssetRegistry.end();
@@ -193,8 +197,8 @@ namespace Surge
     // Registry
     //
     // Format (AssetRegistry.surge):
-    //    // comment lines start with //
-    //    <uuid>|<TypeString>|<relative/path/to/asset.ext>
+    //    comment lines start with //
+    //    <UUID>|<TypeString>|<Relative/path/to/asset.ext OR MemoryString>
     void AssetManager::SerializeRegistry()
     {
         const String registryPath = sAssetsDirectory + '/' + kRegistryFilename;
@@ -308,9 +312,9 @@ namespace Surge
             case AssetType::TEXTURE2D: return Texture2D::Create(fullPath);
             case AssetType::SCENE:
             {
-                // TODO: return Serializer::Deserialize(fullPath);
-                SG_ASSERT_INTERNAL("[AssetManager] Scene loader not yet connected!");
-                return nullptr;
+                Ref<Scene> scene = Ref<Scene>::Create();
+                Serializer::DeserializeScene(fullPath, scene.Raw());
+                return scene;
             }
             case AssetType::SPRITE:
             {
@@ -323,6 +327,18 @@ namespace Surge
                 return nullptr;
             }
         }
+    }
+
+    void AssetManager::SaveInternal(const AssetMetadata& meta, const Ref<Asset>& asset)
+    {
+        const String fullPath = GetAbsolutePath(meta.RelativePath);
+        if(meta.Type == AssetType::SCENE)
+        {
+            Ref<Scene> scene = asset.template As<Scene>();
+            Serializer::SerializeScene(fullPath, scene.Raw());
+        }
+        else
+            SG_ASSERT_INTERNAL("[AssetManager] SaveInternal: No save implementation for this AssetType!");
     }
 
 } // namespace Surge

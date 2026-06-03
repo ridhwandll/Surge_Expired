@@ -21,7 +21,7 @@ namespace Surge
     }
 
     template <>
-    SURGE_API String Filesystem::ReadFile(const Path& path)
+    String Filesystem::ReadFile(const Path& path)
     {
         HANDLE hFile = ::CreateFile(path.string().c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         SURGE_GET_WIN32_LAST_ERROR
@@ -43,7 +43,7 @@ namespace Surge
     }
 
     template <>
-    SURGE_API Vector<Uint> Filesystem::ReadFile(const Path& path)
+    Vector<Uint> Filesystem::ReadFile(const Path& path)
     {
         Vector<Uint> result;
         FILE* f;

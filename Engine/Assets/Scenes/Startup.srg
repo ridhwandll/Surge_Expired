@@ -1,0 +1,198 @@
+{
+    "Scene": {
+        "Entity0": {
+            "Surge::IDComponent": {
+                "ID": 14426349537085700400
+            },
+            "Surge::LightComponent": {
+                "Color": {
+                    "X": 0.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                },
+                "Intensity": 1.0,
+                "Radius": 4.5,
+                "Type": "POINT"
+            },
+            "Surge::NameComponent": {
+                "Name": "Directional Light"
+            },
+            "Surge::TransformComponent": {
+                "Position": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "X": 30.0,
+                    "Y": -30.0,
+                    "Z": 30.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            }
+        },
+        "Entity1": {
+            "Surge::IDComponent": {
+                "ID": 4797612131836911213
+            },
+            "Surge::LightComponent": {
+                "Color": {
+                    "X": 1.401298464324817e-45,
+                    "Y": 1.0,
+                    "Z": 1.0
+                },
+                "Intensity": 1.0,
+                "Radius": 1.2000000476837158,
+                "Type": "POINT"
+            },
+            "Surge::NameComponent": {
+                "Name": "Point Light"
+            },
+            "Surge::TransformComponent": {
+                "Position": {
+                    "X": 1.0,
+                    "Y": 2.0,
+                    "Z": 1.0
+                },
+                "Rotation": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            }
+        },
+        "Entity2": {
+            "Surge::IDComponent": {
+                "ID": 2470598415354773723
+            },
+            "Surge::MeshComponent": {
+                "DropShadow": true,
+                "MeshID": 1856476528077056562
+            },
+            "Surge::NameComponent": {
+                "Name": "Vulkan Scene"
+            },
+            "Surge::TransformComponent": {
+                "Position": {
+                    "X": 2.0,
+                    "Y": 1.7000000476837158,
+                    "Z": 1.0
+                },
+                "Rotation": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            }
+        },
+        "Entity3": {
+            "Surge::IDComponent": {
+                "ID": 10960596270929491445
+            },
+            "Surge::MeshComponent": {
+                "DropShadow": true,
+                "MeshID": 2731364263165909680
+            },
+            "Surge::NameComponent": {
+                "Name": "Sphere"
+            },
+            "Surge::TransformComponent": {
+                "Position": {
+                    "X": 0.0,
+                    "Y": 2.0,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            }
+        },
+        "Entity4": {
+            "Surge::IDComponent": {
+                "ID": 16310834156233457894
+            },
+            "Surge::MeshComponent": {
+                "DropShadow": true,
+                "MeshID": 8137916857482469638
+            },
+            "Surge::NameComponent": {
+                "Name": "Cube"
+            },
+            "Surge::TransformComponent": {
+                "Position": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 10.0,
+                    "Y": 1.0,
+                    "Z": 10.0
+                }
+            }
+        },
+        "Entity5": {
+            "Surge::CameraComponent": {
+                "FixedAspectRatio": false,
+                "Orthographic FarClip": 1.0,
+                "Orthographic NearClip": -1.0,
+                "Orthographic Size": 10.0,
+                "Perspective FarClip": 1024.0,
+                "Perspective NearClip": 0.10000000149011612,
+                "Primary": true,
+                "Projection": "Perspective",
+                "Vertical FOV": 45.0
+            },
+            "Surge::IDComponent": {
+                "ID": 7185076285841075679
+            },
+            "Surge::NameComponent": {
+                "Name": "Runtime Camera"
+            },
+            "Surge::TransformComponent": {
+                "Position": {
+                    "X": -10.0,
+                    "Y": 6.0,
+                    "Z": 10.0
+                },
+                "Rotation": {
+                    "X": -30.0,
+                    "Y": -45.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            }
+        },
+        "Size": 6
+    }
+}

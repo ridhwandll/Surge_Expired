@@ -7,8 +7,6 @@
 #include "Panels/ViewportPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
-#include "SurgeReflect/Enum.hpp"
-#include "Surge/Asset/DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -27,100 +25,45 @@ namespace Surge
 
         mActiveScene = Ref<Scene>::Create();
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
-        
-        Entity runtimeCamera;
-        {
-            mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
-            CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-            cam.Primary = true;
-            TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-10, 6, 10);
-            transform.Rotation = glm::vec3(-30, -45, 0);
-        }
-
-        AssetID assetID = AssetManager::Import("Textures/RidWhite.png", AssetType::TEXTURE2D);
-        mRidTex = AssetManager::Load<Texture2D>(assetID) ;
-
-        {
-            {
-                Entity floor;
-                mActiveScene->CreateEntity(floor, "Cube");
-                MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-                meshComp.MeshID = AssetManager::Import(DefaultMesh::CUBE, AssetType::MESH);
-
-                TransformComponent& t = floor.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-                t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
-                t.MarkDirty();
-            }
-            {
-                Entity sphere;
-                mActiveScene->CreateEntity(sphere, "Sphere");
-                MeshComponent& meshComp = sphere.AddComponent<MeshComponent>();
-                meshComp.MeshID = AssetManager::Import(DefaultMesh::SPHERE, AssetType::MESH);
-            
-                TransformComponent& t = sphere.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 2.0f, 0.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-            {
-                Entity e;
-                mActiveScene->CreateEntity(e, "Vulkan Scene");
-                MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-                meshComp.MeshID = AssetManager::Import("Mesh/VulkanScene.glb", AssetType::MESH);
-
-                TransformComponent& t = e.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-        }
-        {
-            Entity pointLight;
-            mActiveScene->CreateEntity(pointLight, "Point Light");
-            LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
-            lightComp.Type = LightType::POINT;
-            lightComp.Intensity = 1.2f;
-            lightComp.Radius = 10.0f;
-            TransformComponent& t = pointLight.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
-            t.MarkDirty();
-        }
-        {
-            Entity directionalLight;
-            mActiveScene->CreateEntity(directionalLight, "Directional Light");
-            LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
-            lightComp.Type = LightType::DIRECTIONAL;
-            lightComp.Intensity = 4.5f;
-            TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
-            t.MarkDirty();
-        }
-
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 
     void Editor::OnUpdate()
     {
-        // Axes
-        constexpr float axesLength = 10000.0f;
-        mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
-        mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
-        mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+        if(mCurrentProject.IsValid())
+        {
+            // Axes
+            constexpr float axesLength = 10000.0f;
+            mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
+            mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
+            mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
 
-        CheckResize();
-        if (mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
-            mActiveScene->Update();
+            CheckResize();
+            if(mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
+                mActiveScene->Update();
+            else
+                mActiveScene->Update(mCamera);
+        }
         else
+        {
+            // (Rid) We have to do this to render the ImGUI! Is this a design flaw? Maybe. But it works for now and we can refactor later if needed
             mActiveScene->Update(mCamera);
+        }
     }
 
     void Editor::OnImGuiRender()
     {
-        ImGuiAux::DockSpace();
-        mPanelManager.RenderAll();
+        if(mCurrentProject.IsValid())
+        {
+            mRenderer->ShowInternalImGui(true);
+            ImGuiAux::DockSpace();
+            mPanelManager.RenderAll();
+        }
+        else
+        {
+            mRenderer->ShowInternalImGui(false);
+            mProjectBrowser.Render();
+        }
     }
 
     void Editor::OnEvent(Event& e)
@@ -136,6 +79,11 @@ namespace Surge
                                              {
                                                  if(keyEvent.GetKeyCode() == Key::F5)
                                                      mShowRuntimeView = !mShowRuntimeView;
+                                                 if(keyEvent.GetKeyCode() == Key::F2)
+                                                 {
+                                                     AssetManager::Save(mActiveScene->GetID());
+                                                 }
+
                                              });
     }
 

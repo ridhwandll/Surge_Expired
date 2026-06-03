@@ -5,19 +5,22 @@
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include <entt.hpp>
 #include "Components.hpp"
+#include "Surge/Asset/Asset.hpp"
+
+#include <entt.hpp>
 
 namespace Surge
 {
     class Scene;
     class Entity;
 
-    class Scene : public RefCounted
+    class Scene : public Asset
     {
     public:
-        Scene() = default;
+        Scene();
         ~Scene();
+        AssetType GetAssetType() const override { return AssetType::SCENE; }
 
         void OnRuntimeStart();
         void Update(); // Runtime Update
@@ -40,7 +43,8 @@ namespace Surge
         const entt::registry& GetRegistry() const { return mRegistry; }
 
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
-
+    private:
+        void AddStartupEntities();
     private:
         entt::registry mRegistry;
     };

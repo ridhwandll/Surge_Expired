@@ -3,7 +3,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/Material/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
@@ -74,14 +73,11 @@ namespace Surge
     {
         SpriteRendererComponent() = default;
         SpriteRendererComponent(const glm::vec4& color)
-            : Color(color), Image(ImageHandle::Invalid()) {}
+            : Color(color) {}
         SpriteRendererComponent(const glm::vec3& color, float alpha)
-            : Color(glm::vec4(color, alpha)), Image(ImageHandle::Invalid()) {}
-        SpriteRendererComponent(const glm::vec4& colorTint, ImageHandle texture)
-            : Color(colorTint), Image(texture) {}
+            : Color(glm::vec4(color, alpha)){}
 
         glm::vec4 Color;
-        ImageHandle Image = ImageHandle::Invalid();
 
         SURGE_REFLECTION_ENABLE;
     };

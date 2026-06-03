@@ -203,11 +203,11 @@ namespace Surge
     ///////////
     void RenderGraph::OnImGuiRender()
     {
-        if(!mShowImGui)
-            return;
-
         for(auto& callback : mImGuiRenderCallbacks)
             callback();
+
+        if(!mShowImGui)
+            return;
 
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
         if(ImGui::Begin("RenderGraph"))

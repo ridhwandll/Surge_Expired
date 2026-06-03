@@ -9,7 +9,7 @@ namespace Surge
     {
     public:
         static SURGE_API String OpenFile(const char* filter);
-        static SURGE_API String SaveFile(const char* filter);
+        static SURGE_API String SaveFile(const char* filter, const char* defaultName = "");
         static SURGE_API String ChooseFolder();
     };
 

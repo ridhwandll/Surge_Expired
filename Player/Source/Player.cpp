@@ -53,76 +53,9 @@ namespace Surge
     {
         mRenderer = Core::GetRenderer();
         mActiveScene = Ref<Scene>::Create();
-        Entity runtimeCamera;
-
-        {
-            AssetID assetID = AssetManager::Import("Textures/RidWhite.png", AssetType::TEXTURE2D);
-            Ref<Texture2D> ridTex = AssetManager::Load<Texture2D>(assetID);
-            Log<Severity::Info>("Ref<Texture2D> ridTex: RefCount: {}", ridTex->GetRefCount());
-            AssetManager::Unload(assetID);
-            Log<Severity::Info>("Ref<Texture2D> ridTex: RefCount: {}", ridTex->GetRefCount());
-        }
-
         Ref<Mesh> mesh = Mesh::Create(DefaultMesh::CYLINDER);
 
-        glm::vec2 windowSize = Core::GetWindow()->GetSize();
-
         {
-            mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
-            CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-            cam.Primary = true;
-            cam.FixedAspectRatio = true;
-
-#if 1       // Perspective camera
-            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
-            TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-10, 6, 10);
-            transform.Rotation = glm::vec3(-30, -45, 0);
-        
-            cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
-            float size = cam.Camera.GetOrthographicSize();
-            float aspect = cam.Camera.GetAspectRatio();
-#else
-            //Orthographic Camera
-            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
-            TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(0, 0, 0);
-            transform.Rotation = glm::vec3(-35, 45, 0);
-
-            cam.Camera.SetOrthographicSize(15);
-            cam.Camera.SetOrthographicFarClip(1000);
-            cam.Camera.SetOrthographicNearClip(-100);
-#endif
-        }
-
-        {
-            {
-                Entity e;
-                mActiveScene->CreateEntity(e, "Cube");
-                MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-                meshComp.MeshID = AssetManager::Import(DefaultMesh::CUBE, AssetType::MESH);
-
-                TransformComponent& t = e.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 0.5f, 0.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-            {
-                Entity floor;
-                mActiveScene->CreateEntity(floor, "Floor");
-                MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-                meshComp.MeshID = AssetManager::Import(DefaultMesh::CYLINDER, AssetType::MESH);
-            
-                TransformComponent& t = floor.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-                t.Scale = glm::vec3(12.0f, 1.0f, 12.0f);
-                t.MarkDirty();
-
-                Ref<Material>& material = AssetManager::Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
-                material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
-                material->Set<float>("Metallic", 0.3f);
-                material->Set<float>("Roughness", 0.8f);
-            }
             {
                 mActiveScene->CreateEntity(mRotatingEntity, "Vulkan Scene");
                 MeshComponent& meshComp = mRotatingEntity.AddComponent<MeshComponent>();
@@ -145,7 +78,6 @@ namespace Surge
             t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
             t.MarkDirty();
         }
-        mActiveScene->OnResize(windowSize.x, windowSize.y);
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
 
         FrameBlackboard& bb =  mRenderer->GetRenderGraphBlackBoard();

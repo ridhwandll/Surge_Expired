@@ -43,7 +43,7 @@ namespace Surge
 
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
-        void ShowImGui(bool show) { mGraph.ShowImGui(show); }
+        void ShowInternalImGui(bool show) { mGraph.ShowInternalImGui(show); }
         Ref<Material> CreateMaterial(const String& debugName = "Material");
 
         const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }

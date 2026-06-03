@@ -271,7 +271,7 @@ namespace Surge
             LightComponent& component = entity.GetComponent<LightComponent>();
             DrawComponent<LightComponent>(entity, "Light", [&component]()
             {
-                const char* lightTypeStrings[] = { "POINT", "DIRECTIONAL" };
+                const char* lightTypeStrings[] = { "DIRECTIONAL", "POINT" };
                 const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted("TYPE");

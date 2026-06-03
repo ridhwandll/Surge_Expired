@@ -5,10 +5,16 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Asset/Mesh.hpp"
+#include "Surge/Asset/DefaultMeshes.hpp"
 
 namespace Surge
 {
     static Entity sSelectedEntity;
+
+    Scene::Scene()
+    {
+        AddStartupEntities();
+    }
 
     Scene::~Scene()
     {
@@ -37,7 +43,7 @@ namespace Surge
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
-                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
+                renderer->SubmitQuad(transform.GetTransform(), sprite.Color);
         }
         {
             auto view = mRegistry.view<LightComponent, TransformComponent>();
@@ -81,7 +87,7 @@ namespace Surge
             {
                 auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
                 for (const auto& [entity, sprite, transform] : view.each())
-                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
+                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color);
             }
             {
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
@@ -209,6 +215,64 @@ namespace Surge
             }
         }
         return result;
+    }
+
+    void Scene::AddStartupEntities()
+    {
+        // Add default perspective camera
+        Entity runtimeCamera;
+        CreateEntity(runtimeCamera, "Runtime Camera");
+        CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
+        cam.Primary = true;
+        cam.FixedAspectRatio = true;
+        cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
+        TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
+        transform.Position = glm::vec3(-10, 6, 10);
+        transform.Rotation = glm::vec3(-30, -45, 0);
+
+        glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        OnResize(windowSize.x, windowSize.y);
+
+        {
+            Entity e;
+            CreateEntity(e, "Cube");
+            MeshComponent& meshComp = e.AddComponent<MeshComponent>();
+            meshComp.MeshID = AssetManager::Import(DefaultMesh::CUBE, AssetType::MESH);
+
+            TransformComponent& t = e.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(0.0f, 2.5f, 0.0f);
+            t.Rotation = glm::vec3(45.0f, 60.0f, 20.0f);
+            t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+            t.MarkDirty();
+        }
+        {
+            Entity floor;
+            CreateEntity(floor, "Floor");
+            MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
+            meshComp.MeshID = AssetManager::Import(DefaultMesh::CYLINDER, AssetType::MESH);
+
+            TransformComponent& t = floor.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+            t.Scale = glm::vec3(15.0f, 1.0f, 15.0f);
+            t.MarkDirty();
+
+            Ref<Material>& material = AssetManager::Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
+            material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
+            material->Set<float>("Metallic", 0.1f);
+            material->Set<float>("Roughness", 0.9f);
+        }
+        {
+            Entity directionalLight;
+            CreateEntity(directionalLight, "Directional Light");
+            LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
+            lightComp.Type = LightType::DIRECTIONAL;
+            lightComp.Intensity = 5.5f;
+            lightComp.Radius = 1.0f;
+            TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
+            t.MarkDirty();
+        }
     }
 
 } // namespace Surge
