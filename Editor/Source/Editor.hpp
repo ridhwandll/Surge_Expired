@@ -3,7 +3,7 @@
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Panels/PaneManager.hpp"
+#include "Panels/PanelManager.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Asset/Texture2D.hpp"
 #include "ProjectBrowser.hpp"
@@ -25,8 +25,8 @@ namespace Surge
         void OnRuntimeStart();
         void OnRuntimeEnd();
 
+        void LoadScene(Ref<Scene> scene);
         void SetCurrentProject(const Project& project) { mCurrentProject = project; }
-        void SetActiveScene(Ref<Scene> scene) { mActiveScene = scene; }
 
         PanelManager& GetPanelManager() { return mPanelManager; }
         EditorCamera& GetCamera() { return mCamera; }
@@ -34,8 +34,12 @@ namespace Surge
     private:
         void CheckResize();
         void OnImGuiRender();
+        void RenderEditorSettings();
     private:
+        // Editor Settins
         bool mShowRuntimeView = false;
+        bool mShowAxes = true;
+
         Ref<Texture2D> mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;

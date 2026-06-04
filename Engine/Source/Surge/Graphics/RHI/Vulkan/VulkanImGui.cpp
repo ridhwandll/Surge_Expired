@@ -257,7 +257,7 @@ namespace Surge
     {
         auto colorFromBytes = [](const uint8_t r, const uint8_t g, const uint8_t b) { return ImVec4(static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f, static_cast<float>(b) / 255.0f, 1.0f); };
         auto colorFromBytesS = [&colorFromBytes](const uint8_t s) { return colorFromBytes(s, s, s); };
-        ImVec4 themeColor = colorFromBytes(32, 32, 32);
+        ImVec4 themeColor = colorFromBytesS(30);
 
         auto& style = ImGui::GetStyle();
 
@@ -282,9 +282,9 @@ namespace Surge
         colors[ImGuiCol_HeaderActive] = colorFromBytesS(22);
         colors[ImGuiCol_CheckMark] = colorFromBytes(10, 200, 10); // Green
 
-        colors[ImGuiCol_Button] = themeColor;
-        colors[ImGuiCol_ButtonHovered] = colorFromBytesS(66);
-        colors[ImGuiCol_ButtonActive] = colorFromBytesS(120);
+        colors[ImGuiCol_Button] = colorFromBytesS(20);
+        colors[ImGuiCol_ButtonHovered] = colorFromBytesS(15);
+        colors[ImGuiCol_ButtonActive] = colorFromBytesS(50);
         colors[ImGuiCol_SeparatorHovered] = { 0.8f, 0.4f, 0.1f, 1.0f };
         colors[ImGuiCol_SeparatorActive] = { 1.0f, 0.5f, 0.1f, 1.0f };
 

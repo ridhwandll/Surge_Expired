@@ -7,6 +7,7 @@
 #include "Panels/ViewportPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
+#include "Panels/ContentBrowserPanel.hpp"
 
 namespace Surge
 {
@@ -22,6 +23,7 @@ namespace Surge
         SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
         mPanelManager.PushPanel<ViewportPanel>(&mCamera);
+        mPanelManager.PushPanel<ContentBrowserPanel>();
 
         mActiveScene = Ref<Scene>::Create();
         sceneHierarchy->SetSceneContext(mActiveScene.Raw());
@@ -34,9 +36,12 @@ namespace Surge
         {
             // Axes
             constexpr float axesLength = 10000.0f;
-            mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
-            mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
-            mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+            if (mShowAxes)
+            {
+                mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
+                mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
+                mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+            }
 
             CheckResize();
             if(mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
@@ -57,13 +62,23 @@ namespace Surge
         {
             mRenderer->ShowInternalImGui(true);
             ImGuiAux::DockSpace();
-            mPanelManager.RenderAll();
+            mPanelManager.RenderPanels();
+            RenderEditorSettings();
         }
         else
         {
             mRenderer->ShowInternalImGui(false);
             mProjectBrowser.Render();
         }
+    }
+
+    void Editor::RenderEditorSettings()
+    {
+        ImGui::Begin("Editor Settings");
+        if (ImGuiAux::Button("Save Scene (F2)")) { AssetManager::Save(mActiveScene->GetID()); }
+        ImGui::Checkbox("Show Runtime View", &mShowRuntimeView);
+        ImGui::Checkbox("Show Axes", &mShowAxes);
+        ImGui::End();
     }
 
     void Editor::OnEvent(Event& e)
@@ -77,13 +92,10 @@ namespace Surge
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent)
                                              {
-                                                 if(keyEvent.GetKeyCode() == Key::F5)
-                                                     mShowRuntimeView = !mShowRuntimeView;
                                                  if(keyEvent.GetKeyCode() == Key::F2)
                                                  {
                                                      AssetManager::Save(mActiveScene->GetID());
                                                  }
-
                                              });
     }
 
@@ -95,6 +107,12 @@ namespace Surge
     {
     }
 
+    void Editor::LoadScene(Ref<Scene> scene)
+    {
+        mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
+        mActiveScene = scene;
+    }
+
     void Editor::CheckResize()
     {
         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
@@ -104,7 +122,7 @@ namespace Surge
         FramebufferHandle fbHandle = mRenderer->GetFinalFramebuffer();
         FramebufferDesc desc = rhi->GetDesc(fbHandle);
 
-        if (viewportSize.x > 0.0f && viewportSize.y > 0.0f && (desc.Width != viewportSize.x || desc.Height != viewportSize.y))
+        if (viewportSize.x > 0.0f && viewportSize.y > 0.0f && (desc.Width != (Uint)viewportSize.x || desc.Height != (Uint)viewportSize.y))
         {
             rhi->WaitIdle();
 

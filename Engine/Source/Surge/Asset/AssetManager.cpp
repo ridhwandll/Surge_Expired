@@ -93,6 +93,15 @@ namespace Surge
             return UUID::INVALID;
 
         asset->mID = id;
+
+        // Stamp the loaded flag in metadata (Import never does this)
+        // Also this Live asset is not Loaded via Load<T>() so it won't have gone through LoadInternal which normally stamps this flag
+        {
+            auto it = sAssetRegistry.find(id);
+            SG_ASSERT(it != sAssetRegistry.end(), "[AssetManager] ImportLive: Asset not found in registry! This should not happen.");
+            it->second.Flags |= AssetFlags::LOADED;
+        }
+
         sLoadedAssets[id] = std::move(asset);
         return id;
     }

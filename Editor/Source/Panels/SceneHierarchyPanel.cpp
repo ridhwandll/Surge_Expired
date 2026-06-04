@@ -27,7 +27,7 @@ namespace Surge
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
         if (ImGui::Begin(PanelCodeToString(mCode), show))
         {
-            if (ImGui::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
+            if (ImGuiAux::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
                 ImGui::OpenPopup("Add Entity");
 
             if (ImGui::BeginPopup("Add Entity") || (ImGui::BeginPopupContextWindow(nullptr, 1)))
@@ -45,7 +45,7 @@ namespace Surge
                 if (ImGui::MenuItem("Sprite Renderer"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Sprite");
-                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor2);
                 }
                 ImGui::Separator();
                 if (ImGui::BeginMenu("Mesh"))
@@ -147,7 +147,7 @@ namespace Surge
         {
             if (mSelectedEntity)
             {
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColorLight));
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColor2));
             }
         }
 

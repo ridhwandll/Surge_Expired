@@ -14,6 +14,7 @@
 #include "Editor.hpp"
 
 #include <imgui.h>
+#include <Panels/ContentBrowserPanel.hpp>
 
 
 namespace Surge
@@ -56,9 +57,9 @@ namespace Surge
             ImFont* regularFont = ImGui::GetIO().Fonts->Fonts[0];
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
 
-            constexpr ImVec4 accentColor = ImGuiAux::Colors::ThemeColor;
-            constexpr ImVec4 accentHover = ImGuiAux::Colors::ThemeColorLight;
-            constexpr ImVec4 accentActive = ImGuiAux::Colors::ThemeColor;
+            constexpr ImVec4 accentColor = ImGuiAux::Colors::ThemeColor1;
+            constexpr ImVec4 accentHover = ImGuiAux::Colors::ThemeColor2;
+            constexpr ImVec4 accentActive = ImGuiAux::Colors::ThemeColor1;
 
             constexpr ImVec4 cardBg       = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
             constexpr ImVec4 inputBg      = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
@@ -109,8 +110,7 @@ namespace Surge
                 ImGui::Spacing();
                 ImGui::Dummy(ImVec2(0.0f, 25.0f));
 
-                ImGui::PushFont(boldFont);
-                float tabWidth = 160.0f;
+                float tabWidth = formWidth / 4.0f; // tabWidth is width of 1 tab
                 float tabHeight = 40.0f;
                 float totalTabsWidth = (tabWidth * 2.0f) + 8.0f; // 8px gap
 
@@ -128,8 +128,9 @@ namespace Surge
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 0.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, rounding); // Inner button rounding
 
+                ImGui::PushFont(boldFont, 19.0f);
                 // Tab 1: Create New
-                ImGui::PushStyleColor(ImGuiCol_Button, sActiveTab == 0 ? accentColor : ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_Button, sActiveTab == 0 ? accentColor : ImVec4(0.15f, 0.15f, 0.15f, 0));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sActiveTab == 0 ? accentHover : inputBg);
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, accentActive);
                 ImGui::PushStyleColor(ImGuiCol_Text, sActiveTab == 0 ? ImVec4(0, 0, 0, 1) : textMuted);
@@ -141,7 +142,7 @@ namespace Surge
                 ImGui::SameLine();
 
                 // Tab 2: Open Existing
-                ImGui::PushStyleColor(ImGuiCol_Button, sActiveTab == 1 ? accentColor : ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_Button, sActiveTab == 1 ? accentColor : ImVec4(0.15f, 0.15f, 0.15f, 0));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sActiveTab == 1 ? accentHover : inputBg);
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, accentActive);
                 ImGui::PushStyleColor(ImGuiCol_Text, sActiveTab == 1 ? ImVec4(0, 0, 0, 1) : textMuted);
@@ -204,7 +205,7 @@ namespace Surge
                     ImGui::PushStyleColor(ImGuiCol_Button, inputBg);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, inputHovered);
                     ImGui::PushFont(boldFont);
-                    if(ImGui::Button(" BROWSE "))
+                    if(ImGuiAux::Button(" BROWSE "))
                     {
                         String selectedPath = FileDialog::SaveFile("Surge Project (*.surgeproj)\0*.surgeproj\0All Files (*.*)\0*.*\0", nameBuffer);
                         if(!selectedPath.empty())
@@ -236,7 +237,7 @@ namespace Surge
 
                     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, rounding);
 
-                    if(ImGui::Button("CREATE!", ImVec2(ImGui::GetContentRegionAvail().x, 50.0f)))
+                    if(ImGuiAux::Button("CREATE!", ImVec2(ImGui::GetContentRegionAvail().x, 50.0f)))
                         CreateProject();
 
                     ImGui::PopStyleVar();
@@ -272,7 +273,7 @@ namespace Surge
                     ImGui::PushStyleColor(ImGuiCol_Button, inputBg);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, inputHovered);
                     ImGui::PushFont(boldFont);
-                    if(ImGui::Button(" BROWSE "))
+                    if(ImGuiAux::Button(" BROWSE "))
                     {
                         String selectedPath = FileDialog::OpenFile("Surge Project (*.surgeproj)\0*.surgeproj\0All Files (*.*)\0*.*\0");
                         if(!selectedPath.empty())
@@ -386,11 +387,9 @@ namespace Surge
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, accentHover);
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, accentActive);
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, rounding);
 
-                    // Massive pill-shape rounding
-                    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
-
-                    if(ImGui::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 50.0f)))
+                    if(ImGuiAux::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 50.0f)))
                         OpenProject();
 
                     ImGui::PopStyleVar();
@@ -416,11 +415,14 @@ namespace Surge
 
     void ProjectBrowser::CreateProject()
     {
+        auto* editor = static_cast<Editor*>(Core::GetClient());
+
         // Create Assets directory and initialize AssetManager with it
         const Path assetManagerPath = Filesystem::GetParentPath(sCreateProjectPath) / "Assets";
         Filesystem::CreateOrEnsureDirectory(assetManagerPath);
         AssetManager::Shutdown();
         AssetManager::Initialize(assetManagerPath);
+        editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
 
         // Create Start Scene and serialize it to the new project's Assets folder, then import it to get an AssetID reference
         Ref<Scene> newScene = Ref<Scene>::Create();
@@ -434,17 +436,18 @@ namespace Surge
         Serializer::SerializeProject(sCreateProjectPath, &sTempProjectBuffer);
 
         // Setup editor context with the new project and scene
-        auto* editor = static_cast<Editor*>(Core::GetClient());
+        editor->LoadScene(std::move(newScene));
         editor->SetCurrentProject(sTempProjectBuffer);
-        editor->SetActiveScene(newScene);
-        editor->GetPanelManager().GetPanel<SceneHierarchyPanel>()->SetSceneContext(newScene.Raw());
 
         sTempProjectBuffer.Clear();
         sCreateProjectPath.clear();
+        Core::GetWindow()->Maximize();
     }
 
     void ProjectBrowser::OpenProject()
     {
+        auto* editor = static_cast<Editor*>(Core::GetClient());
+
         // Get the opened project data
         Project openedProject;
         Serializer::DeserializeProject(sOpenProjectPath, &openedProject);
@@ -453,18 +456,18 @@ namespace Surge
         const Path assetManagerPath = Filesystem::GetParentPath(sOpenProjectPath) / "Assets";
         AssetManager::Shutdown();
         AssetManager::Initialize(assetManagerPath);
+        editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
 
         // Load the start scene of the opened project
         Ref<Scene> loadedScene = AssetManager::Load<Scene>(openedProject.StartScene);
         SG_ASSERT(loadedScene, "Failed to load start scene!");
 
         // Setup editor context with the new project and scene
-        auto* editor = static_cast<Editor*>(Core::GetClient());
+        editor->LoadScene(std::move(loadedScene));
         editor->SetCurrentProject(openedProject);
-        editor->SetActiveScene(loadedScene);
-        editor->GetPanelManager().GetPanel<SceneHierarchyPanel>()->SetSceneContext(loadedScene.Raw());
 
         sOpenProjectPath.clear();
+        Core::GetWindow()->Maximize();
     }
 
 } // namespace Surge

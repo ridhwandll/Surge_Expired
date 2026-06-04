@@ -11,6 +11,8 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <glm/gtc/type_ptr.hpp>
+#include "ContentBrowserPanel.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 
 namespace Surge
 {
@@ -119,6 +121,23 @@ namespace Surge
              mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
              ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
              ImGui::Image(mTexID, { mViewportSize.x, mViewportSize.y });
+             if(ImGui::BeginDragDropTarget())
+             {
+                 if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                 {
+                     SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                     AssetID droppedAssetID = *(const AssetID*)payload->Data;
+
+                     if(Ref<Scene> droppedScene = AssetManager::Load<Scene>(droppedAssetID))
+                     {
+                         auto* editor = static_cast<Editor*>(Core::GetClient());
+                         editor->LoadScene(std::move(droppedScene));
+                     }
+                     else
+                         Log<Severity::Error>("[ViewportPanel] Failed to load dropped scene asset!");
+                 }
+                 ImGui::EndDragDropTarget();
+             }
          }
          else
          {
@@ -126,7 +145,7 @@ namespace Surge
              mViewportSize = { 0.0f, 0.0f };
          }
  
-            // Entity transform
+         // GIZMOS
          Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
          if(selectedEntity && mGizmoType > 0)
          {

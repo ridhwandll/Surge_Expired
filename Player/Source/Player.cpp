@@ -224,7 +224,7 @@ namespace Surge
                                                  if(keyEvent.GetKeyCode() == Key::F7)
                                                  {
                                                      showImGui = !showImGui;
-                                                     mRenderer->ShowImGui(showImGui);
+                                                     mRenderer->ShowInternalImGui(showImGui);
                                                  }
                                              });
     }

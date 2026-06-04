@@ -5,6 +5,14 @@
 
 namespace Surge
 {
+    struct TextureLoadData
+    {
+        Byte* Content = nullptr;
+        Uint Width = 0;
+        Uint Height = 0;
+        Uint Channels = 0;
+    };
+
     class Texture2D : public Asset
     {
     public:
@@ -16,6 +24,8 @@ namespace Surge
         ImageHandle GetRHIImage() { return mImageHandle; }
 
         static Ref<Texture2D> Create(const String& path);
+        static TextureLoadData LoadData(const String& path);
+        static void FreeData(TextureLoadData& data);
     private:
         ImageHandle mImageHandle;
     };

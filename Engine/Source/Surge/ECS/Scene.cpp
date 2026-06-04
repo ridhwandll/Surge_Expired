@@ -57,15 +57,22 @@ namespace Surge
                 if(meshComponent.MeshID)
                 {
                     Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComponent.MeshID);
-                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+                    if(mesh) //Asset might be missing/corrupted, so check before submitting
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
                 }
             }
             if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
             {
                const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
-               Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
-               const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-               renderer->SubmitMeshOutline(transform, mesh);
+               if(meshComp.MeshID)
+               {
+                   Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
+                   if (mesh) //Asset might be missing/corrupted, so check before submitting
+                   {
+                       const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                       renderer->SubmitMeshOutline(transform, mesh);
+                   }
+               }
             }
         }
         renderer->EndFrame();
@@ -101,15 +108,23 @@ namespace Surge
                     if(meshComponent.MeshID)
                     {
                         Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComponent.MeshID);
-                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+                        if(mesh) //Asset might be missing/corrupted, so check before submitting
+                            renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+
                     }
                 }
                 if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
                 {
                     const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
-                    Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
-                    const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                    renderer->SubmitMeshOutline(transform, mesh);
+                    if(meshComp.MeshID)
+                    {
+                        Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
+                        if (mesh)  //Asset might be missing/corrupted, so check before submitting
+                        {
+                            const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                            renderer->SubmitMeshOutline(transform, mesh);
+                        }
+                    }
                 }
             }
             renderer->EndFrame();

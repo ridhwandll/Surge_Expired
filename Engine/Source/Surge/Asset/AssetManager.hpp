@@ -24,7 +24,7 @@ namespace Surge
         static AssetID Import(const String& str, AssetType type);
 
         // ImportLive
-        // Registers an already-live asset, stamps its ID, adds it to the loaded cache. Use this when the asset is created in memory before it exists on disk.
+        // Registers an already-live asset, stamps its ID, adds it to the loaded cache. Use this when the asset is created in memory before it exists on disk
         // Serialize the asset to disk first before calling this method, then use the same relativePath in relativePath parameter
         // @param relativePath    Path to which you serialized this asset in before calling this method
         // @param type            Explicit asset type, must match intended usage
@@ -64,10 +64,29 @@ namespace Surge
         // @param id    AssetID of the asset to save
         static void Save(AssetID id);
 
-        static const AssetMetadata& GetMetadata(AssetID id);
+        // UnregisterAsset
+        // Removes the asset from the registry
+        // @param id    AssetID of the asset to unregister
+        static void UnregisterAsset(AssetID id) { sAssetRegistry.erase(id); }
+
+        // GetIDFromPath
+        // Returns the AssetID associated with a given relative path.
+        // This is a linear search, so avoid using this in performance critical code.
+        // It's best to cache the AssetID after the first lookup if you need to reference an asset by path multiple times
+        // @param relativePath    Path to the asset relative to the assets directory
+        // @return                AssetID of the asset, or UUID::INVALID if not found
         static AssetID GetIDFromPath(const String& relativePath);
 
+        static const AssetMetadata& GetMetadata(AssetID id);
         static const String& GetAssetsDirectory() { return sAssetsDirectory; }
+        static const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return sAssetRegistry; }
+        static size_t GetAssetRefCount(AssetID id)
+        {
+            auto it = sLoadedAssets.find(id);
+            if(it != sLoadedAssets.end())
+                return it->second->GetRefCount();
+            return 0;
+        }
 
         // Registry
         static void SerializeRegistry();

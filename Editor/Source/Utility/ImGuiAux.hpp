@@ -14,11 +14,13 @@ namespace Surge::ImGuiAux
 {
     namespace Colors
     {
-        constexpr glm::vec4 ThemeColor = glm::vec4(1.0f, 0.5f, 0.1f, 1.0f);
-        constexpr glm::vec4 ThemeColorLight = glm::vec4(1.0f, 0.6f, 0.1f, 1.0f);
+        constexpr glm::vec4 ThemeColor1 = glm::vec4(1.0f, 0.647f, 0.0f, 1.0f);     // Amber
+        constexpr glm::vec4 ThemeColor2 = glm::vec4(0.545f, 0.361f, 0.965f, 1.0f); // Cyber Violet
+
         constexpr glm::vec4 ExtraDark = glm::vec4(0.05f, 0.05f, 0.05f, 1.0f);
         constexpr glm::vec4 Red = glm::vec4(0.8f, 0.1f, 0.1f, 1.0f);
         constexpr glm::vec4 Green = glm::vec4(0.1f, 0.8f, 0.1f, 1.0f);
+        constexpr glm::vec4 LightGreen = glm::vec4(0.3176, 0.6706, 0.3176, 1.0);
         constexpr glm::vec4 Blue = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
         constexpr glm::vec4 White = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -192,7 +194,7 @@ namespace Surge::ImGuiAux
 
         ImGui::PopItemWidth();
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
         ImGui::PopID();
 
         return result;
@@ -203,7 +205,7 @@ namespace Surge::ImGuiAux
         ImGui::TableNextColumn();
         bool isSlected = ImGui::Selectable(title);
         if (ImGui::IsItemFocused())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
         return isSlected;
     }
 
@@ -218,18 +220,18 @@ namespace Surge::ImGuiAux
         result = ImGui::Button(buttonText);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
         ImGui::PopID();
 
         return result;
     }
 
-    inline bool Button(const char* buttonText)
+    inline bool Button(const char* label, const ImVec2& size = ImVec2(0, 0))
     {
-        bool result = ImGui::Button(buttonText);
+        bool result = ImGui::Button(label, size);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
 
         return result;
     }
@@ -296,25 +298,5 @@ namespace Surge::ImGuiAux
     {
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y);
     }
-
-    class RenamingMechanism
-    {
-    public:
-        RenamingMechanism() = default;
-        RenamingMechanism(const RenamingMechanism&) = delete;
-        RenamingMechanism operator=(const RenamingMechanism&) = delete;
-        ~RenamingMechanism() = default;
-
-        FORCEINLINE void SetRenamingState(bool isRenaming) { mRenaming = isRenaming; }        
-        void Update(String& name, const std::function<void(const String& newName)>& onRenameEnd = [](const String& newName) {}); 
-
-        bool operator!() const { return !mRenaming; }
-
-    private:
-        bool mRenaming = false;
-        String mOldName;
-        String mTempBuffer;
-    };
-
 
 } // namespace Surge::ImGuiAux

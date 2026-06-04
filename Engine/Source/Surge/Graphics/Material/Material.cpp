@@ -57,7 +57,6 @@ namespace Surge
     void Material::Bind(const FrameContext& ctx, PipelineHandle pipeline) const
     {
         UpdateForRendering(ctx);
-        // TODO: remove 1 from here
         mRHI->CmdBindDescriptorSet(ctx, pipeline, mDescriptorSet, mMaterialDescriptorSlot);
     }
 

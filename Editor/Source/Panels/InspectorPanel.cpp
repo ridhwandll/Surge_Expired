@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
+#include "ContentBrowserPanel.hpp"
 
 namespace Surge
 {
@@ -29,7 +30,7 @@ namespace Surge
                     ImGui::TableNextColumn();
                     ImGui::TextUnformatted("Settings");
                     ImGui::TableNextColumn();
-                    if (ImGui::Button(reinterpret_cast<const char*>("REMOVE")))
+                    if (ImGuiAux::Button(reinterpret_cast<const char*>("REMOVE")))
                         remvove = true;
                 }
                 function();
@@ -61,7 +62,7 @@ namespace Surge
             {
                 DrawComponents(entity);
 
-                if (ImGui::Button("Add Component", {ImGui::GetWindowWidth() - 15, 0.0f}))
+                if (ImGuiAux::Button("Add Component", {ImGui::GetWindowWidth() - 15, 0.0f}))
                     ImGui::OpenPopup("AddComponentPopup");
 
                 if (ImGui::BeginPopup("AddComponentPopup"))
@@ -69,7 +70,7 @@ namespace Surge
                     if (ImGui::MenuItem("Camera"))
                         entity.AddComponent<CameraComponent>();
                     if (ImGui::MenuItem("Sprite Renderer"))
-                        entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+                        entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor1);
                     if(ImGui::MenuItem("Mesh Component"))
                         entity.AddComponent<MeshComponent>();
                     if (ImGui::MenuItem("Light"))
@@ -184,12 +185,28 @@ namespace Surge
             MeshComponent& component = entity.GetComponent<MeshComponent>();
             DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
 
-                ImGuiAux::TString("AssetHandle: ", "%llu", component.MeshID.Get());
-                ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
+                if (component.MeshID.IsValid())
+                    ImGuiAux::TString("Asset Handle: ", "%llu", component.MeshID.Get());
+                else
+                    ImGui::TextUnformatted("Drop MESH from Content browser");
 
-                const Ref<Mesh>& mesh = AssetManager::Load<Mesh>(component.MeshID);
-                if(mesh)
+                if(ImGui::BeginDragDropTarget())
                 {
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                    {
+                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                        AssetMetadata meta = AssetManager::GetMetadata(droppedAssetID);
+                        if(meta.Type == AssetType::MESH)
+                            component.MeshID = droppedAssetID;
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+                if(component.MeshID.IsValid())
+                {
+                    ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
+
+                    const Ref<Mesh>& mesh = AssetManager::Load<Mesh>(component.MeshID);
                     const Vector<Ref<Material>>& materials = mesh->GetMaterials();
                     for(size_t i = 0; i < materials.size(); i++)
                     {
@@ -262,7 +279,6 @@ namespace Surge
                         ImGui::PopID();
                     }
                 }
-
                 });
         }
 

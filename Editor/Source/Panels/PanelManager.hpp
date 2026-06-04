@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Panels/IPanel.hpp"
-#include "Surge/Core/Time/Timer.hpp"
 #include "Surge/Core/Defines.hpp"
 #include <unordered_map>
 
@@ -25,6 +24,7 @@ namespace Surge
                 delete element.Panel;
             }
         }
+        SURGE_DISABLE_COPY_AND_MOVE(PanelManager);
 
         template <typename T>
         T* PushPanel(void* panelInitArgs = nullptr)
@@ -45,9 +45,9 @@ namespace Surge
             return static_cast<T*>(mPanels[T::GetStaticCode()].Panel);
         }
 
-        void RenderAll()
+        void RenderPanels()
         {
-            for (auto& [code, element] : mPanels)
+            for(auto& [code, element] : mPanels)
                 element.Panel->Render(&element.Show);
         }
 
@@ -57,10 +57,7 @@ namespace Surge
                 element.Panel->OnEvent(e);
         }
 
-        std::unordered_map<PanelCode, PanelData>& GetAllPanels()
-        {
-            return mPanels;
-        }
+        std::unordered_map<PanelCode, PanelData>& GetAllPanels() { return mPanels; }
 
     private:
         std::unordered_map<PanelCode, PanelData> mPanels;

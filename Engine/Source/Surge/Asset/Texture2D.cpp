@@ -17,8 +17,35 @@ namespace Surge
     {
         Renderer* renderer = Core::GetRenderer();
 
-        stbi_set_flip_vertically_on_load(true);
+        TextureLoadData loadData = LoadData(path);
 
+        ImageDesc desc = {};
+        desc.Width = loadData.Width;
+        desc.Height = loadData.Height;
+        desc.Format = ImageFormat::RGBA8_SRGB;
+        desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
+        desc.DebugName = Filesystem::GetNameWithExtension(path);
+        desc.GenerateImGuiID = true;
+        desc.InitialData = loadData.Content;
+        desc.DataSize = loadData.Width * loadData.Height * 4;
+        desc.Sampler = renderer->GetDefaultSampler();
+        mImageHandle = renderer->GetRHI()->CreateImage(desc);
+        FreeData(loadData);
+    }
+
+    Texture2D::~Texture2D()
+    {
+        Core::GetRenderer()->GetRHI()->DestroyImage(mImageHandle);
+    }
+
+    Ref<Texture2D> Texture2D::Create(const String& path)
+    {
+        return Ref<Texture2D>::Create(path);
+    }
+
+    TextureLoadData Texture2D::LoadData(const String& path)
+    {
+        //stbi_set_flip_vertically_on_load(true);
         int width = 0, height = 0, channels = 0;
         stbi_uc* data = nullptr;
 #ifdef SURGE_PLATFORM_WINDOWS
@@ -39,30 +66,26 @@ namespace Surge
 #endif
 
         if(!data)
+        {
             Log<Severity::Error>("Failed to load texture at path: {0}", path);
+            return TextureLoadData {};
+        }
 
-        ImageDesc desc = {};
-        desc.Width = width;
-        desc.Height = height;
-        desc.Format = ImageFormat::RGBA8_SRGB;
-        desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
-        desc.DebugName = Filesystem::GetNameWithExtension(path);
-        desc.GenerateImGuiID = true;
-        desc.InitialData = data;
-        desc.DataSize = width * height * 4;
-        desc.Sampler = renderer->GetDefaultSampler();
-        mImageHandle = renderer->GetRHI()->CreateImage(desc);
-        stbi_image_free(data);
+        TextureLoadData loadData;
+        loadData.Content = data;
+        loadData.Width = width;
+        loadData.Height = height;
+        loadData.Channels = channels;
+        return loadData;
     }
 
-    Texture2D::~Texture2D()
+    void Texture2D::FreeData(TextureLoadData& data)
     {
-        Core::GetRenderer()->GetRHI()->DestroyImage(mImageHandle);
-    }
-
-    Ref<Texture2D> Texture2D::Create(const String& path)
-    {
-        return Ref<Texture2D>::Create(path);
+        stbi_image_free(data.Content);
+        data.Content = nullptr;
+        data.Width = 0;
+        data.Height = 0;
+        data.Channels = 0;
     }
 
 }

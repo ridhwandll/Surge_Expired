@@ -762,13 +762,38 @@ namespace Surge
 
     void VulkanRHI::ShowPoolDebugImGuiWindow()
     {
+        ImFont* regularFont = ImGui::GetIO().Fonts->Fonts[0];
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
         ImGui::PushFont(boldFont, 25.0f);
         ImGui::TextUnformatted("Vulkan RHI");
         ImGui::Separator();
         ImGui::PopFont();
 
-        ImGui::Text("Frame Time: %f ms", Core::GetClock().GetMilliseconds());
+        float currentFrameTime = Core::GetClock().GetMilliseconds();
+
+        static float smoothedFrameTime = currentFrameTime;
+        smoothedFrameTime = (currentFrameTime * 0.1f) + (smoothedFrameTime * 0.9f);
+
+        static float displayFrameTime = currentFrameTime;
+        static float updateTimer = 0.0f;
+        updateTimer += currentFrameTime;
+        if(updateTimer >= 300.0f) // Update after every 300ms to avoid flickering every frame
+        {
+            displayFrameTime = smoothedFrameTime;
+            updateTimer = 0.0f;
+        }
+
+        ImVec4 color;
+        if(displayFrameTime <= 16.67f)
+            color = ImVec4(0.2f, 1.0f, 0.2f, 1.0f); // Green
+        else if(displayFrameTime <= 33.33f)
+            color = ImVec4(1.0f, 1.0f, 0.2f, 1.0f); // Yellow
+        else
+            color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+
+        ImGui::PushFont(regularFont, 20.0f);
+        ImGui::TextColored(color, "Frame Time: %.2f ms", displayFrameTime);
+        ImGui::PopFont();
 
         constexpr float boldFontSize = 18.0f;
         ImGui::PushFont(boldFont, boldFontSize);
