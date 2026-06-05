@@ -108,11 +108,11 @@ namespace Surge
         LightComponent(LightType type, const glm::vec3& color, float intensity, float radius, float falloff)
             : Type(type), Color(color), Intensity(intensity), Radius(radius) {}
 
-        LightType Type = LightType::POINT;
         glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
         float Intensity = 1.0f;
         float Radius = 3.0f;
         float Falloff = 1.0f;
+        LightType Type = LightType::POINT;
         SURGE_REFLECTION_ENABLE;
     };
 

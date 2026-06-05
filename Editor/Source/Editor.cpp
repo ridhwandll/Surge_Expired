@@ -29,6 +29,8 @@ namespace Surge
         mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
         mPanelManager.PushPanel<ContentBrowserPanel>();
 
+        mProjectBrowser.Init();
+
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 

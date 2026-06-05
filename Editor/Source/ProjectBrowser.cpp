@@ -10,28 +10,31 @@
 #include "Surge/Utility/Filesystem.hpp"
 
 #include "Utility/ImGuiAux.hpp"
-#include "Panels/SceneHierarchyPanel.hpp"
 #include "Editor.hpp"
 
 #include <imgui.h>
 #include <Panels/ContentBrowserPanel.hpp>
+#include "Surge/Utility/Platform.hpp"
+#include <json/json.hpp>
+#include <fstream>
 
+#define RECENT_PROJECTS_FILENAME "RecentProjects.json"
+#define MAX_RECENT_PROJECTS 10
 
 namespace Surge
 {
-    struct RecentProject
-    {
-        String Name;
-        String Filepath;
-        String LastOpened;
-    };
     // TODO: Populate this list from a config file that stores recent projects
     static Vector<RecentProject> sRecentProjects = {};
 
     static Project sTempProjectBuffer;
     static String sOpenProjectPath;
     static String sCreateProjectPath;
-    static int sActiveTab = 0; // 0 = CREATE PROJECT, 1 = OPEN PROJECT
+    static int sActiveTab = 1; // 0 = CREATE PROJECT, 1 = OPEN PROJECT
+
+    void ProjectBrowser::Init()
+    {
+        DeserializeRecentProjects();
+    }
 
     void ProjectBrowser::Render()
     {
@@ -295,19 +298,23 @@ namespace Surge
 
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, listBg);
                     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
-
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
                     if(ImGui::BeginChild("RecentsList", ImVec2(0, listHeight), true))
                     {
-                        if (sRecentProjects.empty())
+                        if(sRecentProjects.empty())
                         {
-                            ImGui::PushFont(boldFont, 20.0f);
+                            constexpr float emptyFontSize = 30.0f;
+                            ImGui::Dummy(ImVec2(0.0f, listHeight * 0.5f - emptyFontSize));
+                            ImGui::PushFont(boldFont, emptyFontSize);
                             ImGui::PushStyleColor(ImGuiCol_Text, textMuted);
-                            ImGuiAux::TextCentered("No recent projects");
+                            ImGuiAux::TextCentered("No PROJECTS to show");
                             ImGui::PopStyleColor();
                             ImGui::PopFont();
                         }
                         else
                         {
+                            int projectToDelete = -1;
+
                             for(size_t i = 0; i < sRecentProjects.size(); ++i)
                             {
                                 const auto& proj = sRecentProjects[i];
@@ -315,52 +322,103 @@ namespace Surge
 
                                 ImGui::PushID(static_cast<int>(i));
 
-                                // Override Selectable colors (Header, HeaderHovered, HeaderActive)
                                 ImGui::PushStyleColor(ImGuiCol_Header, selectedBlack);
                                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, hoverGray);
                                 ImGui::PushStyleColor(ImGuiCol_HeaderActive, activeGray);
 
-                                ImVec2 cursorPos = ImGui::GetCursorPos();
+                                constexpr float kRowH = 67.0f;
+                                constexpr float kLeftPad = 18.0f;
+                                constexpr float kRightPad = 14.0f;
 
-                                // Render an invisible selectable that covers the whole row
-                                if(ImGui::Selectable("##recent", isSelected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, 55.0f)))
+                                const ImVec2 screenPos = ImGui::GetCursorScreenPos();
+                                const ImVec2 cursorPos = ImGui::GetCursorPos();
+                                const float availW = ImGui::GetContentRegionAvail().x;
+                                const float rightEdge = cursorPos.x + availW - kRightPad;
+
+                                if(ImGui::Selectable("##Proj", isSelected, ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, kRowH)))
                                 {
                                     sOpenProjectPath = proj.Filepath;
                                     if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                                         OpenProject();
                                 }
+                                const ImVec2 postCursor = ImGui::GetCursorPos();
 
-                                ImVec2 finalCursorPos = ImGui::GetCursorPos();
+                                if(isSelected)
+                                {
+                                    ImGui::GetWindowDrawList()->AddRectFilled(
+                                        ImVec2(screenPos.x, screenPos.y + 6.0f),
+                                        ImVec2(screenPos.x + 8.0f, screenPos.y + kRowH - 6.0f),
+                                        ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColor2), 2.0f);
+                                }
 
-                                // Overlay the text elements manually on top of the selectable
-                                ImGui::SetCursorPos(ImVec2(cursorPos.x + 15.0f, cursorPos.y + 8.0f));
+                                const float textX = cursorPos.x + kLeftPad;
+
+                                // Left column
+                                // Project name
+                                ImGui::SetCursorPos(ImVec2(textX, cursorPos.y + 12.0f));
+                                ImGui::PushFont(boldFont, 23.0f);
+                                ImGui::TextColored(isSelected ? ImVec4(ImGuiAux::Colors::ThemeColor2) : textActive, "%s", proj.Name.c_str());
+                                ImGui::PopFont();
+
+                                // Filepath
+                                ImGui::SetCursorPos(ImVec2(textX, cursorPos.y + 38.0f));
+                                ImGui::PushFont(regularFont);
+                                ImGui::TextColored(textMuted, "%s", proj.Filepath.c_str());
+                                ImGui::PopFont();
+
+                                // Right column
+                                // Last Opened
+                                const float timeW = ImGui::CalcTextSize(proj.LastOpened.c_str()).x;
+                                ImGui::SetCursorPos(ImVec2(rightEdge - timeW, cursorPos.y + 13.0f));
+                                ImGui::PushFont(regularFont);
+                                ImGui::TextColored(textMuted, "%s", proj.LastOpened.c_str());
+                                ImGui::PopFont();
+
+                                // DELETE
                                 ImGui::PushFont(boldFont);
-                                ImGui::TextColored(textActive, "%s", proj.Name.c_str());
+                                const float deleteW = ImGui::CalcTextSize("DELETE").x + ImGui::GetStyle().FramePadding.x;
+                                const float deleteH = 22.0f;
+                                ImGui::SetCursorPos(ImVec2(rightEdge - deleteW, cursorPos.y + 36.0f));
+                                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.16f, 0.16f, 0.80f));
+                                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.10f, 0.10f, 1.00f));
+                                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+                                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+
+                                if(ImGui::Button("DELETE", ImVec2(deleteW, deleteH)))
+                                    projectToDelete = static_cast<int>(i);
+
+                                ImGui::PopStyleVar(2);
+                                ImGui::PopStyleColor(3);
                                 ImGui::PopFont();
 
-                                ImGui::SetCursorPos(ImVec2(cursorPos.x + 15.0f, cursorPos.y + 32.0f));
-                                ImGui::PushFont(regularFont);
-                                ImGui::TextColored(isSelected ? ImVec4(0.9f, 0.9f, 0.9f, 1.0f) : textMuted, "%s", proj.Filepath.c_str());
-                                ImGui::PopFont();
+                                // Separator skip on last item
+                                if(i + 1 < sRecentProjects.size())
+                                {
+                                    ImGui::GetWindowDrawList()->AddLine(
+                                        ImVec2(screenPos.x + 10.0f, screenPos.y + kRowH),
+                                        ImVec2(screenPos.x + availW - 10.0f, screenPos.y + kRowH),
+                                        ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColor2), 1.0f);
+                                }
 
-                                // Right-aligned "Last Opened" timestamp
-                                ImGui::PushFont(regularFont);
-                                float timeWidth = ImGui::CalcTextSize(proj.LastOpened.c_str()).x;
-                                ImGui::SetCursorPos(ImVec2(ImGui::GetContentRegionMax().x - timeWidth - 15.0f, cursorPos.y + 8.0f));
-                                ImGui::TextColored(isSelected ? ImVec4(0.9f, 0.9f, 0.9f, 1.0f) : textMuted, "%s", proj.LastOpened.c_str());
-                                ImGui::PopFont();
-
-                                // Restore cursor for the next item
-                                ImGui::SetCursorPos(finalCursorPos);
-                                ImGui::Dummy(ImVec2(0.0f, 0.0f));
+                                ImGui::SetCursorPos(postCursor);
+                                ImGui::Dummy(ImVec2(0, 1.0f));
 
                                 ImGui::PopStyleColor(3);
                                 ImGui::PopID();
                             }
+                            if(projectToDelete != -1)
+                            {
+                                if(sOpenProjectPath == sRecentProjects[projectToDelete].Filepath)
+                                    sOpenProjectPath.clear();
+
+                                sRecentProjects.erase(sRecentProjects.begin() + projectToDelete);
+                                SerializeRecentProjects();
+                            }
                         }
                     }
                     ImGui::EndChild();
-                    ImGui::PopStyleVar();
+                    ImGui::PopStyleVar(2);
                     ImGui::PopStyleColor();
 
                     // Action Button
@@ -439,6 +497,8 @@ namespace Surge
         editor->LoadScene(std::move(newScene));
         editor->SetCurrentProject(sTempProjectBuffer);
 
+        SerializeRecentProject(sTempProjectBuffer.Name, sCreateProjectPath);
+
         sTempProjectBuffer.Clear();
         sCreateProjectPath.clear();
         Core::GetWindow()->Maximize();
@@ -466,8 +526,110 @@ namespace Surge
         editor->LoadScene(std::move(loadedScene));
         editor->SetCurrentProject(openedProject);
 
+        SerializeRecentProject(openedProject.Name, sOpenProjectPath);
+
         sOpenProjectPath.clear();
         Core::GetWindow()->Maximize();
+    }
+
+    inline void to_json(nlohmann::json& j, const RecentProject& p)
+    {
+        j = nlohmann::json {
+            {"Name", p.Name},
+            {"Filepath", p.Filepath},
+            {"LastOpened", p.LastOpened}
+        };
+    }
+
+    inline void from_json(const nlohmann::json& j, RecentProject& p)
+    {
+        j.at("Name").get_to(p.Name);
+        j.at("Filepath").get_to(p.Filepath);
+        j.at("LastOpened").get_to(p.LastOpened);
+    }
+
+    void ProjectBrowser::SerializeRecentProject(const String& name, const String& filepath)
+    {
+        RecentProject proj;
+        proj.Name = name;
+        proj.Filepath = Path(filepath).generic_string();
+        proj.LastOpened = GetTimeString();
+
+        sRecentProjects.erase(std::remove_if(sRecentProjects.begin(), sRecentProjects.end(), [&](const RecentProject& p) { return p.Filepath == proj.Filepath; }), sRecentProjects.end());
+        sRecentProjects.insert(sRecentProjects.begin(), proj);
+        SerializeRecentProjects();
+    }
+
+    void ProjectBrowser::SerializeRecentProjects()
+    {
+        if(sRecentProjects.size() > MAX_RECENT_PROJECTS)
+            sRecentProjects.pop_back();
+
+        String storePath = Platform::GetPersistantStoragePath() + "/" + RECENT_PROJECTS_FILENAME;
+        nlohmann::json j;
+
+        j["INFO"] = "Generated by SurgeEngine Editor on " + GetTimeString();
+        j["RecentProjects"] = sRecentProjects;
+
+        std::ofstream file(storePath);
+        if(file.is_open())
+        {
+            file << j.dump(4);
+            file.close();
+        }
+    }
+
+    void ProjectBrowser::DeserializeRecentProjects()
+    {
+        String storePath = Platform::GetPersistantStoragePath() + "/" + RECENT_PROJECTS_FILENAME;
+        if(!Filesystem::Exists(storePath))
+            return;
+
+        std::ifstream file(storePath);
+        if(file.is_open())
+        {
+            try
+            {
+                nlohmann::json j;
+                file >> j;
+
+                if(j.contains("RecentProjects") && j["RecentProjects"].is_array())
+                {
+                    sRecentProjects.clear();
+
+                    for(const auto& item : j["RecentProjects"])
+                    {
+                        auto proj = item.get<RecentProject>();
+
+                        if(Filesystem::Exists(proj.Filepath.c_str()))
+                            sRecentProjects.push_back(proj);
+                    }
+
+                    // If we found and skipped dead projects, update the JSON file automatically
+                    if(sRecentProjects.size() < j["RecentProjects"].size())
+                        SerializeRecentProjects();
+                }
+            }
+            catch(const nlohmann::json::exception& e)
+            {
+                sRecentProjects.clear();
+            }
+            file.close();
+        }
+    }
+
+    String ProjectBrowser::GetTimeString()
+    {
+        auto now = std::chrono::system_clock::now();
+        std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+
+        std::tm local_tm;
+        localtime_s(&local_tm, &nowTime);
+
+        std::stringstream ss;
+        ss << std::put_time(&local_tm, "%b %d, %Y // %I:%M %p");
+
+        return ss.str();
     }
 
 } // namespace Surge

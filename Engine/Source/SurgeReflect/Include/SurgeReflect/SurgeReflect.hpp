@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "SurgeReflect/SurgeReflectRegistry.hpp"
-#include "SurgeReflect/Type.hpp"
 #include "Surge/Core/Defines.hpp"
 
 #define SURGE_REFLECTION_ENABLE                         \
@@ -11,21 +10,21 @@ private:                                                \
         ReflectionRegister();                           \
         void CookClassData(SurgeReflect::Class& clazz); \
     };                                                  \
-    inline static ReflectionRegister sReflectionRegister;
+    inline static ReflectionRegister sReflectionRegister  //User will give ; at the end of this line
 
-#define SURGE_REFLECT_CLASS_REGISTER_BEGIN(ClassName)                             \
-    ClassName::ReflectionRegister::ReflectionRegister()                           \
-    {                                                                             \
-        const SurgeReflect::Class& clazz = SurgeReflect::Class(#ClassName);             \
+#define SURGE_REFLECT_CLASS_REGISTER_BEGIN(ClassName)                                                               \
+    ClassName::ReflectionRegister::ReflectionRegister()                                                             \
+    {                                                                                                               \
+        const SurgeReflect::Class& clazz = SurgeReflect::Class(#ClassName);                                         \
         CookClassData(const_cast<SurgeReflect::Class&>(clazz));                                                     \
         SurgeReflect::Registry::Get()->RegisterReflectionClass(std::move(const_cast<SurgeReflect::Class&>(clazz))); \
-    }                                                                             \
-    void ClassName::ReflectionRegister::CookClassData(SurgeReflect::Class& clazz) \
-    {                                                                             \
+    }                                                                                                               \
+    void ClassName::ReflectionRegister::CookClassData(SurgeReflect::Class& clazz)                                   \
+    {                                                                                                               \
         clazz
 
 // clang-format off
-#define SURGE_REFLECT_CLASS_REGISTER_END(ClassName) ;}
+#define SURGE_REFLECT_CLASS_REGISTER_END() ;}
 // clang-format on
 
 namespace SurgeReflect
