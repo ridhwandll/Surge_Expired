@@ -20,7 +20,7 @@ namespace Surge
     public:
         Scene();
         ~Scene();
-        AssetType GetAssetType() const override { return AssetType::SCENE; }
+        SURGE_ASSET_TYPE(AssetType::SCENE);
 
         void OnRuntimeStart();
         void Update(); // Runtime Update

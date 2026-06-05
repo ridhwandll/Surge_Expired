@@ -13,6 +13,8 @@ namespace Surge
 {
     void Editor::OnInitialize()
     {
+        mActiveScene = Ref<Scene>::Create();
+
         mRenderer = Core::GetRenderer();
         mRenderer->SetOutlineThickness(1);
 
@@ -21,12 +23,12 @@ namespace Surge
 
         // Configure panels
         SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
+        sceneHierarchy->SetSceneContext(mActiveScene.Raw());
+
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
-        mPanelManager.PushPanel<ViewportPanel>(&mCamera);
+        mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
         mPanelManager.PushPanel<ContentBrowserPanel>();
 
-        mActiveScene = Ref<Scene>::Create();
-        sceneHierarchy->SetSceneContext(mActiveScene.Raw());
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 
@@ -47,7 +49,10 @@ namespace Surge
             if(mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
                 mActiveScene->Update();
             else
+            {
+                mCamera.OnUpdate(mViewportPanel->IsViewportHovered());
                 mActiveScene->Update(mCamera);
+            }
         }
         else
         {
@@ -83,8 +88,7 @@ namespace Surge
 
     void Editor::OnEvent(Event& e)
     {
-        ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
-        if (viewportPanel->IsViewportHovered())
+        if (mViewportPanel->IsViewportHovered())
             mCamera.OnEvent(e);
 
         mPanelManager.OnEvent(e);
@@ -110,6 +114,7 @@ namespace Surge
     void Editor::LoadScene(Ref<Scene> scene)
     {
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
+        mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
         mActiveScene = scene;
     }
 

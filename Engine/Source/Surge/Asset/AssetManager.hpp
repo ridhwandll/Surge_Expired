@@ -3,12 +3,14 @@
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
 #include "Surge/Core/Path.hpp"
+#include "SurgeReflect/Enum.hpp"
 #include <unordered_map>
 
 namespace Surge
 {
     template<typename T>
-    concept IsAssetConcept = std::is_base_of_v<Surge::Asset, T> && !std::is_same_v<Surge::Asset, T>;
+    concept IsAssetConcept = std::is_base_of_v<Surge::Asset, T> && !std::is_same_v<Surge::Asset, T>
+        && requires { { T::GetStaticType() } -> std::same_as<AssetType>; };
 
     class AssetManager
     {
@@ -38,7 +40,17 @@ namespace Surge
         template<IsAssetConcept T>
         static Ref<T> Load(AssetID id)
         {
-            return LoadAsset(id).As<T>();
+            const AssetMetadata& metadata = GetMetadata(id);
+            if(metadata.Type != T::GetStaticType())
+            {
+                Log<Severity::Error>("[AssetManager] Load: type mismatch for ID {}! " "Requested '{}' but registry says '{}'.", id.Get(), SurgeReflect::EnumToString(T::GetStaticType()).data(), SurgeReflect::EnumToString(metadata.Type).data());
+                return nullptr;
+            }
+
+            Ref<Asset> asset = LoadAsset(id);
+            SG_ASSERT(!asset || asset->GetAssetType() == T::GetStaticType(), "[AssetManager] LoadInternal returned wrong type, loader bug!");
+            return asset.As<T>();
+            
         }
 
         // Unload

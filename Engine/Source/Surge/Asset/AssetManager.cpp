@@ -2,7 +2,6 @@
 #include "AssetManager.hpp"
 #include "Texture2D.hpp"
 #include "Mesh.hpp"
-#include "SurgeReflect/Enum.hpp"
 #include "Surge/Serializer/Serializer.hpp"
 #include "Surge/ECS/Scene.hpp"
 

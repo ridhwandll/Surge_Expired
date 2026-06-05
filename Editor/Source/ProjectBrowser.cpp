@@ -229,7 +229,7 @@ namespace Surge
                     if(!isProjectValid)
                         ImGui::BeginDisabled();
 
-                    ImGui::PushFont(boldFont);
+                    ImGui::PushFont(boldFont, 23.0f);
                     ImGui::PushStyleColor(ImGuiCol_Button, accentColor);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, accentHover);
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, accentActive);
@@ -382,14 +382,14 @@ namespace Surge
                     if(!isOpenValid)
                         ImGui::BeginDisabled();
 
-                    ImGui::PushFont(boldFont);
+                    ImGui::PushFont(boldFont, 23.0f);
                     ImGui::PushStyleColor(ImGuiCol_Button, accentColor);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, accentHover);
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, accentActive);
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, rounding);
 
-                    if(ImGuiAux::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 50.0f)))
+                    if(ImGuiAux::Button("OPEN PROJECT", ImVec2(ImGui::GetContentRegionAvail().x, 50.0f)))
                         OpenProject();
 
                     ImGui::PopStyleVar();

@@ -33,7 +33,6 @@ namespace Surge
 
     void Scene::Update(EditorCamera& camera)
     {
-        camera.OnUpdate();
         Renderer* renderer = Core::GetRenderer();
 
         auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);

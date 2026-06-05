@@ -31,9 +31,8 @@ namespace Surge
         // @param filepath Pass actual filepath to generate the mesh from disk
         //                 Pass DefaultMesh::X to generate a default mesh from memory
         Mesh(const String& filepath);
-
         ~Mesh();
-        AssetType GetAssetType() const override { return AssetType::MESH; }
+        SURGE_ASSET_TYPE(AssetType::MESH);
 
         BufferHandle GetVertexBuffer() const { return mVertexBuffer; }
         BufferHandle GetIndexBuffer() const { return mIndexBuffer; }

@@ -10,6 +10,7 @@
 
 namespace Surge
 {
+    class ViewportPanel;
     class Editor : public Surge::Client
     {
     public:
@@ -28,6 +29,7 @@ namespace Surge
         void LoadScene(Ref<Scene> scene);
         void SetCurrentProject(const Project& project) { mCurrentProject = project; }
 
+        Ref<Scene> GetCurrentScene() { return mActiveScene; }
         PanelManager& GetPanelManager() { return mPanelManager; }
         EditorCamera& GetCamera() { return mCamera; }
 
@@ -43,6 +45,7 @@ namespace Surge
         Ref<Texture2D> mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
+        ViewportPanel* mViewportPanel;
         ProjectBrowser mProjectBrowser;
         PanelManager mPanelManager;
     };

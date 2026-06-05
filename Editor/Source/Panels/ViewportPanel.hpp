@@ -17,10 +17,13 @@ namespace Surge
         virtual void Render(bool* show) override;
         virtual void Shutdown() override;
 
+        void OnSceneContextChanged() { SetSceneName(); }
         const glm::vec2& GetViewportSize() const { return mViewportSize; }
         bool IsViewportHovered() const { return mIsViewportHovered; }
     public:
         static PanelCode GetStaticCode() { return PanelCode::Viewport; }
+
+        void SetSceneName();
 
     private:
         PanelCode mCode;
@@ -29,6 +32,7 @@ namespace Surge
         bool mGizmoInUse = false;
         bool mIsViewportHovered = false;
         SceneHierarchyPanel* mSceneHierarchy;
+        String mSceneName;
         EditorCamera* mEditorCam;
     };
 } // namespace Surge

@@ -33,9 +33,9 @@ namespace Surge
         mProjection[1][1] *= -1;
     }
 
-    void EditorCamera::OnUpdate()
+    void EditorCamera::OnUpdate(bool viewportHovered)
     {
-        if (Core::GetWindow()->IsWindowMinimized())
+        if (Core::GetWindow()->IsWindowMinimized() || !viewportHovered)
             return;
 
         const float ts = Core::GetClock().GetMilliseconds();
@@ -156,8 +156,8 @@ namespace Surge
     {
         EventDispatcher dispatcher(event);
         dispatcher.Dispatch<MouseScrolledEvent>([this](MouseScrolledEvent& e) { return OnMouseScroll(e); });
-        //dispatcher.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e) { return OnKeyReleased(e); });
-        //dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e) { return OnKeyPressed(e); });
+        dispatcher.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e) { return OnKeyReleased(e); });
+        dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e) { return OnKeyPressed(e); });
     }
 
     bool EditorCamera::OnMouseScroll(MouseScrolledEvent& e)

@@ -159,8 +159,8 @@ vec3 CalculateMobilePBR(Light light, vec3 N, vec3 V, vec3 fragPos)
 
     // Map Roughness to Blinn-Phong exponent (Shininess)
     // Roughness^4 for a more linear artistic feel
-    float alpha = max(uMaterial.Roughness, 0.04); 
-    float shininess = 2.0 / (pow(alpha, 4.0)) - 2.0;
+    float alpha = clamp(uMaterial.Roughness, 0.04, 1.0);
+    float shininess = max(2.0 / (pow(alpha, 4.0)) - 2.0, 1.0);
 
     // Energy Conservation: Metals have no Diffuse
     // f0 represents the base reflectivity (at 0 degrees)
@@ -210,31 +210,31 @@ vec3 CalculateNormal()
 
 vec3 CalculateFastGI(vec3 N, vec3 V)
 {
-    // Hemispherical Diffuse Ambient
-    // Maps standard surface normals to the environment gradient
+    // Hemispherical diffuse ambient
     float skyGroundWeight = N.y * 0.5 + 0.5;
-    vec3 rawSkyColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(N.y, 0.0));
-    vec3 totalAmbientDiffuse = mix(uLights.GroundAmbient, rawSkyColor, skyGroundWeight);
+    vec3  rawSkyColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(N.y, 0.0));
+    vec3  totalAmbientDiffuse = mix(uLights.GroundAmbient, rawSkyColor, skyGroundWeight);
 
+    // Metals have no diffuse — killed by (1 - metallic)
     vec3 diffuseAmbient = totalAmbientDiffuse * gPBRParams.Albedo * (1.0 - uMaterial.Metallic);
 
-    // Calculate Mathematical Specular Ambient (Fake Environment Reflections)
-    // Uses the reflection vector to find where the eye sees the environment glinting
-    vec3 R = reflect(-V, N);
+    // Environment reflection direction
+    vec3  R = reflect(-V, N);
+    float reflSkyWeight = R.y * 0.5 + 0.5;
+    vec3  rawReflColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(R.y, 0.0));
+    vec3  environmentRefl = mix(uLights.GroundAmbient, rawReflColor, reflSkyWeight);
 
-    float reflectionSkyWeight = R.y * 0.5 + 0.5;
-    vec3 rawReflectionColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(R.y, 0.0));
-    vec3 environmentReflection = mix(uLights.GroundAmbient, rawReflectionColor, reflectionSkyWeight);
-    
-    // Base surface reflectivity profile (F0)
     vec3 f0 = vec3(0.04) * uMaterial.Reflectance;
-    vec3 specularColor = mix(f0, gPBRParams.Albedo, uMaterial.Metallic);
-    
-    // Roughness attenuation: Rougher surfaces blur and disperse ambient specular energy
-    float roughnessFactor = 1.0 - uMaterial.Roughness;
-    vec3 specularAmbient = environmentReflection * specularColor * (roughnessFactor * roughnessFactor);
+    vec3 specColor = mix(f0, gPBRParams.Albedo, uMaterial.Metallic);
 
-    // Combine both components for full indirect lighting approximation
+    // Roughness blends BETWEEN mirror-like and hemispherical ambient
+    // roughness = 0 -> sharp directional reflection
+    // roughness = 1 -> hemispherical diffuse ambient (blurry, but NOT zero)
+    // Metals at any roughness always get non-zero specularAmbient
+    float smoothness = 1.0 - uMaterial.Roughness;
+    vec3  ambientEnv = mix(totalAmbientDiffuse, environmentRefl, smoothness * smoothness);
+    vec3  specularAmbient = ambientEnv * specColor;
+
     return diffuseAmbient + specularAmbient;
 }
 

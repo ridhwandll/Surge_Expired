@@ -52,4 +52,9 @@ namespace Surge
         friend class AssetManager;
     };
 
+#define SURGE_ASSET_TYPE(AssetEnum)                                      \
+public:                                                                  \
+    static AssetType GetStaticType() { return AssetEnum; }               \
+    virtual AssetType GetAssetType() const override { return AssetEnum; }
+
 } // namespace Surge

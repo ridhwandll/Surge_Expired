@@ -18,8 +18,7 @@ namespace Surge
     public:
         Texture2D(const String& path);
         ~Texture2D();
-
-        virtual AssetType GetAssetType() const override { return AssetType::TEXTURE2D; }
+        SURGE_ASSET_TYPE(AssetType::TEXTURE2D);
 
         ImageHandle GetRHIImage() { return mImageHandle; }
 
