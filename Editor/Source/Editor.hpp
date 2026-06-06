@@ -5,7 +5,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Panels/PanelManager.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Asset/Texture2D.hpp"
+#include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "ProjectBrowser.hpp"
 
 namespace Surge
@@ -45,6 +45,7 @@ namespace Surge
         Ref<Texture2D> mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
+        AssetManager* mAssetManager;
         ViewportPanel* mViewportPanel;
         ProjectBrowser mProjectBrowser;
         PanelManager mPanelManager;

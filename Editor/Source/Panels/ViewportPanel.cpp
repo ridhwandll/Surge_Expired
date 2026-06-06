@@ -134,13 +134,14 @@ namespace Surge
                 {
                     SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
                     AssetID droppedAssetID = *(const AssetID*)payload->Data;
-                    const AssetMetadata& metadata = AssetManager::GetMetadata(droppedAssetID);
+                    AssetManager* assetManager = Core::GetAssetManager();
+                    const AssetMetadata& metadata = assetManager->GetMetadata(droppedAssetID);
 
                     switch(metadata.Type)
                     {
                         case AssetType::SCENE:
                         {
-                            Ref<Scene> droppedScene = AssetManager::Load<Scene>(droppedAssetID);
+                            Ref<Scene> droppedScene = assetManager->Load<Scene>(droppedAssetID);
                             if(droppedScene)
                             {
                                 auto* editor = static_cast<Editor*>(Core::GetClient());
@@ -151,7 +152,7 @@ namespace Surge
                         }
                         case AssetType::MESH:
                         {
-                            Ref<Mesh> droppedMesh = AssetManager::Load<Mesh>(droppedAssetID);
+                            Ref<Mesh> droppedMesh = assetManager->Load<Mesh>(droppedAssetID);
                             if(droppedMesh)
                             {
                                 auto* editor = static_cast<Editor*>(Core::GetClient());
@@ -266,7 +267,7 @@ namespace Surge
     {
         auto assetID = mSceneHierarchy->GetSceneContext()->GetID();
         if (assetID)
-            mSceneName = Filesystem::GetNameWithExtension(AssetManager::GetMetadata(assetID).RelativePath);
+            mSceneName = Filesystem::GetNameWithExtension(Core::GetAssetManager()->GetMetadata(assetID).RelativePath);
         else
             mSceneName = "Untitled Scene";
     }

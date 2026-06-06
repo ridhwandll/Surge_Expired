@@ -1,27 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Core/Profiler.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Core/Client.hpp"
-#include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Core/Time/Clock.hpp"
 #include <functional>
 
 namespace Surge::Core
-{   
-    struct CoreData
-    {
-        Client* SurgeClient = nullptr; // Provided by the User
-
-        Clock SurgeClock;
-        Window* SurgeWindow = nullptr;
-        Renderer* SurgeRenderer = nullptr;
-
-        bool Running = false;
-        Vector<std::function<void()>> FrameEndCallbacks;
-    };
-
+{
     void Initialize(Client* application);
     void Run();
     void Shutdown();
@@ -33,8 +20,7 @@ namespace Surge::Core
     Clock& GetClock();
 
     Renderer* GetRenderer();
-
+    AssetManager* GetAssetManager();
     Client* GetClient();
-    CoreData* GetData();
 
 } // namespace Surge::Core

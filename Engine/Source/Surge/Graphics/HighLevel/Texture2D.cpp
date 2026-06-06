@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Texture2D.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include "Surge/Platform/Android/AndroidApp.hpp"
@@ -9,7 +10,6 @@
 #endif
 
 #include <stb_image.h>
-#include "../Utility/Filesystem.hpp"
 
 namespace Surge
 {
@@ -17,20 +17,20 @@ namespace Surge
     {
         Renderer* renderer = Core::GetRenderer();
 
-        TextureLoadData loadData = LoadData(path);
-
+        TextureLoadData texData = LoadData(path);
         ImageDesc desc = {};
-        desc.Width = loadData.Width;
-        desc.Height = loadData.Height;
+        desc.Width = texData.Width;
+        desc.Height = texData.Height;
         desc.Format = ImageFormat::RGBA8_SRGB;
         desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
         desc.DebugName = Filesystem::GetNameWithExtension(path);
         desc.GenerateImGuiID = true;
-        desc.InitialData = loadData.Content;
-        desc.DataSize = loadData.Width * loadData.Height * 4;
+        desc.MipLevel = static_cast<Uint>(std::floor(std::log2(std::max(texData.Width, texData.Height)))) + 1;
+        desc.InitialData = texData.Content;
+        desc.DataSize = texData.Width * texData.Height * 4;
         desc.Sampler = renderer->GetDefaultSampler();
         mImageHandle = renderer->GetRHI()->CreateImage(desc);
-        FreeData(loadData);
+        FreeData(texData);
     }
 
     Texture2D::~Texture2D()

@@ -16,6 +16,7 @@ namespace Surge
         TEXTURE2D,
         SPRITE,
         MESH,
+        MATERIAL,
         SCENE,
     };
 
@@ -24,15 +25,14 @@ namespace Surge
         if(strcmp(str, "TEXTURE2D") == 0) return AssetType::TEXTURE2D;
         if(strcmp(str, "SPRITE") == 0) return AssetType::SPRITE;
         if(strcmp(str, "MESH") == 0) return AssetType::MESH;
+        if(strcmp(str, "MATERIAL") == 0) return AssetType::MATERIAL;
         if(strcmp(str, "SCENE") == 0) return AssetType::SCENE;
         return AssetType::NONE;
     }
 
-    // -------------------------------------------------------------------------
-    // Asset: base class for all engine assets
-    //
-    // Concrete types (Texture2D, Mesh, ..) derive from this and implement GetAssetType(). The AssetID is stamped by AssetManager after load;
-    // -------------------------------------------------------------------------
+    // Asset
+    // Base class for all engine assets
+    // Concrete types (Texture2D, Mesh, Material, Scene ...) SURGE_ASSET_TYPE macro. The AssetID is stamped by AssetManager after load;
     class Asset : public RefCounted
     {
     public:

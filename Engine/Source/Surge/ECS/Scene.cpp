@@ -1,11 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Mesh.hpp"
-#include "Surge/Asset/DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -47,7 +47,16 @@ namespace Surge
         {
             auto view = mRegistry.view<LightComponent, TransformComponent>();
             for(const auto& [entity, light, transform] : view.each())
+            {
                 renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
+                if (light.Type == LightType::DIRECTIONAL)
+                {
+                    // Note: Assuming a Right-Handed system where forward is -Z. 
+                    glm::vec3 forwardDir = glm::normalize(glm::vec3(transform.GetTransform()[2]));
+                    glm::vec4 debugColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+                    renderer->SubmitDirLightDebug(transform.Position, forwardDir, debugColor);
+                }
+            }
         }
         {
             // 3D Meshes
@@ -55,7 +64,7 @@ namespace Surge
             {
                 if(meshComponent.MeshID)
                 {
-                    Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComponent.MeshID);
+                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComponent.MeshID);
                     if(mesh) //Asset might be missing/corrupted, so check before submitting
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
                 }
@@ -65,7 +74,7 @@ namespace Surge
                const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
                if(meshComp.MeshID)
                {
-                   Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
+                   Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
                    if (mesh) //Asset might be missing/corrupted, so check before submitting
                    {
                        const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
@@ -106,7 +115,7 @@ namespace Surge
                 {
                     if(meshComponent.MeshID)
                     {
-                        Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComponent.MeshID);
+                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComponent.MeshID);
                         if(mesh) //Asset might be missing/corrupted, so check before submitting
                             renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
 
@@ -117,7 +126,7 @@ namespace Surge
                     const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
                     if(meshComp.MeshID)
                     {
-                        Ref<Mesh> mesh = AssetManager::Load<Mesh>(meshComp.MeshID);
+                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
                         if (mesh)  //Asset might be missing/corrupted, so check before submitting
                         {
                             const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
@@ -247,11 +256,12 @@ namespace Surge
         glm::vec2 windowSize = Core::GetWindow()->GetSize();
         OnResize(windowSize.x, windowSize.y);
 
+        AssetManager* assetManager = Core::GetAssetManager();
         {
             Entity e;
             CreateEntity(e, "Cube");
             MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-            meshComp.MeshID = AssetManager::Import(DefaultMesh::CUBE, AssetType::MESH);
+            meshComp.MeshID = assetManager->Import(DefaultMesh::CUBE, AssetType::MESH);
 
             TransformComponent& t = e.GetComponent<TransformComponent>();
             t.Position = glm::vec3(0.0f, 2.5f, 0.0f);
@@ -263,14 +273,14 @@ namespace Surge
             Entity floor;
             CreateEntity(floor, "Floor");
             MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-            meshComp.MeshID = AssetManager::Import(DefaultMesh::CYLINDER, AssetType::MESH);
+            meshComp.MeshID = assetManager->Import(DefaultMesh::CYLINDER, AssetType::MESH);
 
             TransformComponent& t = floor.GetComponent<TransformComponent>();
             t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
             t.Scale = glm::vec3(15.0f, 1.0f, 15.0f);
             t.MarkDirty();
 
-            Ref<Material>& material = AssetManager::Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
+            Ref<Material>& material = assetManager->Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
             material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
             material->Set<float>("Metallic", 0.1f);
             material->Set<float>("Roughness", 0.9f);

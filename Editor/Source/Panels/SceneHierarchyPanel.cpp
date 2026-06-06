@@ -6,7 +6,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/DefaultMeshes.hpp"
+#include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -77,7 +77,7 @@ namespace Surge
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
                         MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
-                        meshComponent.MeshID = AssetManager::Import(defMesh, AssetType::MESH);
+                        meshComponent.MeshID = Core::GetAssetManager()->Import(defMesh, AssetType::MESH);
                     }
                     ImGui::EndPopup();
                 }

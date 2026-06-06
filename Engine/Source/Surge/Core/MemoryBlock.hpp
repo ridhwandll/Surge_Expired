@@ -12,6 +12,9 @@ namespace Surge
         MemoryBlock()
             : Data(nullptr), Size(0) {}
 
+        MemoryBlock(std::nullptr_t)
+            : Data(nullptr), Size(0) {}
+
         MemoryBlock(void* data, Uint size)
             : Data(data), Size(size) {}
 

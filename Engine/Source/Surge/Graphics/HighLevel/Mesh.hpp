@@ -3,9 +3,9 @@
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Memory.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/Material/Material.hpp"
+#include "Surge/Asset/Asset.hpp"
 #include "SurgeMath/AABB.hpp"
-#include "Asset.hpp"
+#include "Material.hpp"
 
 namespace Surge
 {
@@ -49,8 +49,6 @@ namespace Surge
         BufferHandle mVertexBuffer;
         BufferHandle mIndexBuffer;
 
-        // TODO
-        // Materials associated with this mesh
         Vector<Ref<Material>> mMaterials;
     };
 

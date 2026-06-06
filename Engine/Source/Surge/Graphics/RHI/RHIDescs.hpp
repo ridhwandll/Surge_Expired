@@ -75,7 +75,7 @@ namespace Surge
     {
         Uint Width = 1;
         Uint Height = 1;
-        Uint Mips = 1;
+        Uint MipLevel = 1;
         Uint Layers = 1;
         ImageFormat Format = ImageFormat::RGBA8_SRGB;
         ImageUsage Usage = ImageUsage::SAMPLED;

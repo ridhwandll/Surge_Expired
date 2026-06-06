@@ -15,16 +15,16 @@
 
 namespace Surge
 {
-	namespace LogColor {
-		constexpr const char* Reset = "\x1b[0m";
-		constexpr const char* Red = "\x1b[31m";
-		constexpr const char* Green = "\x1b[32m";
-		constexpr const char* Yellow = "\x1b[33m";
-		constexpr const char* Blue = "\x1b[34m";
-		constexpr const char* Cyan = "\x1b[36m";
-		constexpr const char* Bold = "\x1b[1m";
+    namespace LogColor {
+        constexpr const char* Reset = "\x1b[0m";
+        constexpr const char* Red = "\x1b[31m";
+        constexpr const char* Green = "\x1b[32m";
+        constexpr const char* Yellow = "\x1b[33m";
+        constexpr const char* Blue = "\x1b[34m";
+        constexpr const char* Cyan = "\x1b[36m";
+        constexpr const char* Bold = "\x1b[1m";
         constexpr const char* Fatal = "\x1b[41;97m";
-	}
+    }
 
     enum class Severity
     {
@@ -38,8 +38,8 @@ namespace Surge
 
     static std::mutex sLogMutex;
 
-	template <Severity severity = Severity::Trace, typename... Args>
-	void Log(const std::string& fmtMsg, Args&&... args)
+    template <Severity severity = Severity::Trace, typename... Args>
+    void Log(const std::string& fmtMsg, Args&&... args)
     {
         std::lock_guard<std::mutex> lock(sLogMutex);
 
@@ -69,21 +69,21 @@ namespace Surge
 #elif defined(SURGE_PLATFORM_WINDOWS)
 
         const char* color = nullptr;
-		switch (severity)
-		{
+        switch (severity)
+        {
         case Severity::Trace: color = LogColor::Reset; break;
-		case Severity::Info:  color = LogColor::Green; break;
-		case Severity::Warn:  color = LogColor::Yellow; break;
-		case Severity::Error: color = LogColor::Red; break;
-		case Severity::Debug: color = LogColor::Cyan; break;
-		case Severity::Fatal: color = LogColor::Fatal; break;
-		default: color = LogColor::Reset; break;
-		}
+        case Severity::Info:  color = LogColor::Green; break;
+        case Severity::Warn:  color = LogColor::Yellow; break;
+        case Severity::Error: color = LogColor::Red; break;
+        case Severity::Debug: color = LogColor::Cyan; break;
+        case Severity::Fatal: color = LogColor::Fatal; break;
+        default: color = LogColor::Reset; break;
+        }
 
-		std::fwrite(color, 1, strlen(color), stdout);
-		std::fwrite(finalMsg.data(), 1, finalMsg.size(), stdout);
-		std::fwrite(LogColor::Reset, 1, strlen(LogColor::Reset), stdout);
-		std::fputc('\n', stdout);
+        std::fwrite(color, 1, strlen(color), stdout);
+        std::fwrite(finalMsg.data(), 1, finalMsg.size(), stdout);
+        std::fwrite(LogColor::Reset, 1, strlen(LogColor::Reset), stdout);
+        std::fputc('\n', stdout);
 #endif
     }
 } // namespace Surge

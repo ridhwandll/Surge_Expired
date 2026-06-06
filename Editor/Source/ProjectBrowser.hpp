@@ -11,6 +11,7 @@ namespace Surge
         String LastOpened;
     };
 
+    class AssetManager;
     class ProjectBrowser
     {
     public:
@@ -23,6 +24,8 @@ namespace Surge
         void SerializeRecentProjects();
         void DeserializeRecentProjects();
         String GetTimeString();
+    private:
+        AssetManager* mAssetManager = nullptr;
     };
 
 } // namespace Surge

@@ -28,6 +28,7 @@ namespace Surge
         void RenderAssetRegistry(bool* show);
         void ClearContentBrowserSearchBuffer() { mContentBrowserSearchBuffer[0] = '\0'; }
     private:
+        AssetManager* mAssetManager = nullptr;
         struct ContentBrowserItem
         {
             Path Path_;
@@ -64,8 +65,12 @@ namespace Surge
         Vector<ContentBrowserItem*> mItemsToDisplay;
 
         char mContentBrowserSearchBuffer[256] = {};
-        char mAssetRegistrySearchBuffer[256] = "";
 
         float mThumbnailSize = 90.0f;
+
+        // Asset Registry
+        char mAssetRegistrySearchBuffer[256] = "";
+        Vector<AssetID> mToUnregister;
+        Vector<AssetID> mToUnload;
     };
 } // namespace Surge

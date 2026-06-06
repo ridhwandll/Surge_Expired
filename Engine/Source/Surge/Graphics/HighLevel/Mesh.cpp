@@ -11,21 +11,52 @@
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <android/asset_manager.h>
 #endif
+#include "Surge/Utility/Filesystem.hpp"
+#include "Texture2D.hpp"
 
 namespace Surge
 {
-    //static void LoadTexture(const Path& meshPath, cgltf_texture_view& texView, Ref<Material>& material, const String& texName)
-    //{
-    //    if(!texView.texture || !texView.texture->image || !texView.texture->image->uri)
-    //        return;
-    //
-    //    Path texturePath = Filesystem::GetParentPath(meshPath) / String(texView.texture->image->uri);
-    //    Log<Severity::Trace>("{0} path: {1}", texName, texturePath);
-    //    TextureSpecification spec;
-    //    spec.UseMips = true;
-    //    Ref<Texture2D> texture = Texture2D::Create(texturePath, spec);
-    //    material->Set<Ref<Texture2D>>(texName, texture);
-    //}
+    static bool SetMaterialTexture(const Path& meshPath, cgltf_texture_view& texView, Ref<Material>& material, const String& texName)
+    {
+        if(!texView.texture || !texView.texture->image)
+            return false;
+
+        cgltf_image* image = texView.texture->image;
+        AssetManager* assetManager = Core::GetAssetManager();
+
+        // Embedded Texture (typically from a .glb file)
+        if(image->buffer_view)
+        {
+            const uint8_t* rawData = (const uint8_t*)image->buffer_view->buffer->data + image->buffer_view->offset;
+            size_t dataSize = image->buffer_view->size;
+            if(rawData && dataSize > 0)
+            {
+                //TODO
+                Log<Severity::Error>("[Mesh] Embedded textures(.glb) are not supported yet, mesh is loading without textures", texName);
+            }
+            return false;
+        }
+        // External Texture (typically from a .gltf file)
+        else if(image->uri)
+        {
+            const Path absTexturePath = (Filesystem::GetParentPath(meshPath) / image->uri).lexically_normal();
+            const Path relTexturePath = absTexturePath.lexically_relative(Path(assetManager->GetAssetsDirectory()));
+
+            if(relTexturePath.empty() || *relTexturePath.begin() == "..")
+            {
+                Log<Severity::Warn>("[Mesh] Texture '{}' is outside the assets directory, skipping.", absTexturePath.string());
+                return false;
+            }
+
+            const AssetID texID = assetManager->Import(relTexturePath.generic_string(), AssetType::TEXTURE2D);
+            if(!texID.IsValid())
+                return false;
+
+            material->SetTexture(texName, assetManager->Load<Texture2D>(texID));
+            return true;
+        }
+        return false;
+    }
 
     Mesh::Mesh(const String& filepath)
     {
@@ -195,7 +226,6 @@ namespace Surge
                         (Uint)cgltf_accessor_read_index(prim.indices, i + 2) };
                     indices.push_back(index);
                 }
-
                 vertexCount += submesh.VertexCount;
                 indexCount += submesh.IndexCount;
             }
@@ -229,9 +259,9 @@ namespace Surge
         }
         // Materials
         // glTF PBR metallic-roughness:
-        //   base_color_texture = AlbedoMap
-        //   normal_texture = NormalMap
-        //   metallic_roughness_texture = R = occlusion G = roughness B = metalness
+        //    base_color_texture = AlbedoMap
+        //    normal_texture = NormalMap
+        //    metallic_roughness_texture = R = occlusion G = roughness B = metalness
 
         if (data->materials_count > 0)
         {
@@ -246,6 +276,12 @@ namespace Surge
                 mMaterials[i] = material;
                 material->SetName(materialName);
 
+                // Defaults
+                ImageHandle whiteTexture = Core::GetRenderer()->GetWhiteTexture();
+                material->SetTexture("AlbedoMap", whiteTexture);
+                material->SetTexture("NormalMap", whiteTexture);
+                material->SetTexture("RoughnessMetallicMap", whiteTexture);
+
                 if(mat.has_pbr_metallic_roughness)
                 {
                     auto& pbr = mat.pbr_metallic_roughness;
@@ -255,13 +291,19 @@ namespace Surge
                     material->Set<float>("Metallic", pbr.metallic_factor);
                     material->Set<float>("Reflectance", 0.5f);
 
-                    //LoadTexture(mPath, pbr.base_color_texture, material, "AlbedoMap");
+                    if (SetMaterialTexture(filepath, pbr.base_color_texture, material, "AlbedoMap"))
+                        material->Set<int>("UseAlbedoMap", 1);
                     //glTF packs roughness (G) and metalness (B) into one texture
-                    //LoadTexture(mPath, pbr.metallic_roughness_texture, material, "MetalnessMap");
-                    //LoadTexture(mPath, pbr.metallic_roughness_texture, material, "RoughnessMap");
+                    if (SetMaterialTexture(filepath, pbr.metallic_roughness_texture, material, "RoughnessMetallicMap"))
+                    {
+                        material->Set<int>("UseRoughnessMap", 1);
+                        material->Set<int>("UseMetallicMap", 1);
+                    }
                 }
-        
-                //LoadTexture(mPath, mat.normal_texture, material, "NormalMap");
+                if (SetMaterialTexture(filepath, mat.normal_texture, material, "NormalMap"))
+                    material->Set<int>("UseNormalMap", 1);
+                else
+                    material->Set<int>("UseNormalMap", 0);
             }
         }
 

@@ -8,6 +8,7 @@
 
 // Platform detection
 #ifdef _WIN32
+    // Compiler sets SURGE_PLATFORM_WINDOWS
     #define SCRIPT_API __declspec(dllexport)
 
     #ifdef SURGE_EXPORT
@@ -22,6 +23,7 @@
     #define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
 
 #elif __ANDROID__
+    // Compiler sets SURGE_PLATFORM_ANDROID
     #define SCRIPT_API __attribute__((visibility("default")))
 
     #ifdef SURGE_EXPORT

@@ -8,15 +8,19 @@
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include "Surge/Graphics/Shader/Shader.hpp"
 #include "Surge/Core/MemoryBlock.hpp"
+#include "Surge/Asset/Asset.hpp"
+#include "Texture2D.hpp"
 
 namespace Surge
 {
     class GraphicsRHI;
-    class Material : public RefCounted
+    class Material : public Asset
     {
     public:
+        Material(const String& path);
         Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
         ~Material();
+        SURGE_ASSET_TYPE(AssetType::MATERIAL)
 
         void SetName(const String& name) { mName = name; }
         const String& GetName() const { return mName; }
@@ -46,6 +50,9 @@ namespace Surge
             return mCPUData.Read<T>(member->MemoryOffset);
         }
 
+        void SetTexture(const String& name, const Ref<Texture2D>& texture);
+        void SetTexture(const String& name, ImageHandle handle);
+
         void Bind(const FrameContext& ctx, PipelineHandle pipeline) const;
 
         // Uploads pending GPU data to the registry buffer
@@ -55,8 +62,17 @@ namespace Surge
             for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
                 mIsDirty[i] = true;
         }
+
+        static Ref<Material> Create(const String& path);
+        static Ref<Material> Create(const PipelineHandle& pipeline, const Shader& shader, const String& name = "DefaultMaterial");
+    private:
+        void Initialize(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName);
+        void Serialize(const String& path);
+        void Deserialize(const String& path);
+        const ShaderResource* FindResource(const String& name) const;
     private:
         String mName;
+        String mShaderName;
         ShaderBuffer mRefletedBuffer;
         Vector<ShaderResource> mReflectedResources;
         Uint mBufferBinding;
@@ -66,6 +82,8 @@ namespace Surge
         DescriptorSetHandle mDescriptorSet;
 
         mutable MemoryBlock mCPUData;
+        std::unordered_map<String, Pair<Ref<Texture2D>, ImageHandle>> mTextures;
+
         mutable bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
         GraphicsRHI* mRHI;
     };

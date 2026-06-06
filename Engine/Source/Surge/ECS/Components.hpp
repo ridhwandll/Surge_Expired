@@ -3,7 +3,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Surge/Graphics/Material/Material.hpp"
+#include "Surge/Graphics/HighLevel/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 #include "Surge/Asset/Asset.hpp"

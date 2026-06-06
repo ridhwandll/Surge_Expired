@@ -2,6 +2,7 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include <filesystem>
 #include <fstream>
+#include <Windows.h>
 
 namespace Surge
 {

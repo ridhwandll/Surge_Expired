@@ -15,6 +15,7 @@ namespace Surge
     {
         mActiveScene = Ref<Scene>::Create();
 
+        mAssetManager = Core::GetAssetManager();
         mRenderer = Core::GetRenderer();
         mRenderer->SetOutlineThickness(1);
 
@@ -82,7 +83,7 @@ namespace Surge
     void Editor::RenderEditorSettings()
     {
         ImGui::Begin("Editor Settings");
-        if (ImGuiAux::Button("Save Scene (F2)")) { AssetManager::Save(mActiveScene->GetID()); }
+        if (ImGuiAux::Button("Save Scene (F2)")) { mAssetManager->Save(mActiveScene->GetID()); }
         ImGui::Checkbox("Show Runtime View", &mShowRuntimeView);
         ImGui::Checkbox("Show Axes", &mShowAxes);
         ImGui::End();
@@ -100,7 +101,7 @@ namespace Surge
                                              {
                                                  if(keyEvent.GetKeyCode() == Key::F2)
                                                  {
-                                                     AssetManager::Save(mActiveScene->GetID());
+                                                     mAssetManager->Save(mActiveScene->GetID());
                                                  }
                                              });
     }

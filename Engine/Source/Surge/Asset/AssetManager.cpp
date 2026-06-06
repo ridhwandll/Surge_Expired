@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetManager.hpp"
-#include "Texture2D.hpp"
-#include "Mesh.hpp"
+#include "Surge/Graphics/HighLevel/Texture2D.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Serializer/Serializer.hpp"
 #include "Surge/ECS/Scene.hpp"
 
@@ -12,11 +12,6 @@
 
 namespace Surge
 {
-    String                                       AssetManager::sAssetsDirectory;
-    std::unordered_map<AssetID, AssetMetadata>   AssetManager::sAssetRegistry;
-    std::unordered_map<AssetID, Ref<Asset>>      AssetManager::sLoadedAssets;
-    bool                                         AssetManager::sInitialized = false;
-
     void AssetManager::Initialize(const Path& assetDirectory)
     {
         sAssetsDirectory = assetDirectory.generic_string();
@@ -47,13 +42,12 @@ namespace Surge
             const AssetID existing = GetIDFromPath(relativePath);
             if(existing.IsValid())
             {
-                Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", relativePath.c_str(), existing.Get());
+                //Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", relativePath.c_str(), existing.Get());
                 return existing;
             }
         }
 
-        // If the engine is not created form memory, validate the source file exists on disk
-
+        // If the asset is not created from memory, validate the source file exists on disk
         bool fromMemory = true;
         if(!relativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
         {
@@ -124,7 +118,6 @@ namespace Surge
         }
 
         AssetMetadata& meta = metaIt->second;
-
         if(meta.IsMissing())
         {
             Log<Severity::Error>("[AssetManager] Load: Source file missing for '{}'!", meta.RelativePath);

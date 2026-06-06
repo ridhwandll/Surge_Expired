@@ -33,6 +33,7 @@ namespace Surge
 
     void ProjectBrowser::Init()
     {
+        mAssetManager = Core::GetAssetManager();
         DeserializeRecentProjects();
     }
 
@@ -478,8 +479,8 @@ namespace Surge
         // Create Assets directory and initialize AssetManager with it
         const Path assetManagerPath = Filesystem::GetParentPath(sCreateProjectPath) / "Assets";
         Filesystem::CreateOrEnsureDirectory(assetManagerPath);
-        AssetManager::Shutdown();
-        AssetManager::Initialize(assetManagerPath);
+        mAssetManager->Shutdown();
+        mAssetManager->Initialize(assetManagerPath);
         editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
 
         // Create Start Scene and serialize it to the new project's Assets folder, then import it to get an AssetID reference
@@ -487,8 +488,8 @@ namespace Surge
 
         const String defaultScenePath = "Scenes/Main.srg";
         Filesystem::CreateOrEnsureDirectory(assetManagerPath / "Scenes");
-        Serializer::SerializeScene(AssetManager::GetAbsolutePath(defaultScenePath), newScene.Raw());
-        sTempProjectBuffer.StartScene = AssetManager::ImportLive(defaultScenePath, AssetType::SCENE, newScene);
+        Serializer::SerializeScene(mAssetManager->GetAbsolutePath(defaultScenePath), newScene.Raw());
+        sTempProjectBuffer.StartScene = mAssetManager->ImportLive(defaultScenePath, AssetType::SCENE, newScene);
 
         // Serialize the new project file
         Serializer::SerializeProject(sCreateProjectPath, &sTempProjectBuffer);
@@ -514,12 +515,12 @@ namespace Surge
 
         // Initialize AssetManager with the opened project's Assets directory
         const Path assetManagerPath = Filesystem::GetParentPath(sOpenProjectPath) / "Assets";
-        AssetManager::Shutdown();
-        AssetManager::Initialize(assetManagerPath);
+        mAssetManager->Shutdown();
+        mAssetManager->Initialize(assetManagerPath);
         editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
 
         // Load the start scene of the opened project
-        Ref<Scene> loadedScene = AssetManager::Load<Scene>(openedProject.StartScene);
+        Ref<Scene> loadedScene = mAssetManager->Load<Scene>(openedProject.StartScene);
         SG_ASSERT(loadedScene, "Failed to load start scene!");
 
         // Setup editor context with the new project and scene

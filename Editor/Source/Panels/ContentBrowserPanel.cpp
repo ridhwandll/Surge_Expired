@@ -1,13 +1,13 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/ContentBrowserPanel.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include <SurgeReflect/Enum.hpp>
-#include "Utility/ImGuiAux.hpp"
-#include <Surge/ECS/Scene.hpp>
-#include "Surge/Serializer/Serializer.hpp"
-#include <Surge/Asset/Texture2D.hpp>
-#include <Surge/Graphics/Renderer/Renderer.hpp>
 #include "Surge/Core/Core.hpp"
+#include "Surge/ECS/Scene.hpp"
+#include "Surge/Serializer/Serializer.hpp"
+#include "Surge/Graphics/HighLevel/Texture2D.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Utility/ImGuiAux.hpp"
+#include "SurgeReflect/Enum.hpp"
 
 namespace Surge
 {
@@ -54,11 +54,13 @@ namespace Surge
         mEmptyDirectoryIconHandle = rhi->CreateImage(desc);
         mEmptyDirectoryIconImGuiID = rhi->GetImGuiImage(mEmptyDirectoryIconHandle);
         Texture2D::FreeData(loadData);
+
+        mAssetManager = Core::GetAssetManager();
     }
 
     void ContentBrowserPanel::OnAssetManagerInit()
     {
-        mBaseDirectory = AssetManager::GetAssetsDirectory();
+        mBaseDirectory = Core::GetAssetManager()->GetAssetsDirectory();
         mCurrentDirectory = mBaseDirectory;
         RefreshDirectoryCache();
     }
@@ -83,12 +85,12 @@ namespace Surge
             if(!item.IsDirectory)
             {
                 String relativeToAssets = std::filesystem::relative(item.Path_, mBaseDirectory).generic_string();
-                item.Id = AssetManager::GetIDFromPath(relativeToAssets);
+                item.Id = mAssetManager->GetIDFromPath(relativeToAssets);
 
                 if(item.Id.IsValid())
                 {
                     item.IsRegisteredAsset = true;
-                    AssetMetadata meta = AssetManager::GetMetadata(item.Id);
+                    AssetMetadata meta = mAssetManager->GetMetadata(item.Id);
                     item.AssetTypeStr = SurgeReflect::EnumToString(meta.Type).data();
                 }
             }
@@ -321,7 +323,7 @@ namespace Surge
                                                 if(typeToImport != AssetType::NONE)
                                                 {
                                                     String relativeToAssets = std::filesystem::relative(item.Path_, mBaseDirectory).generic_string();
-                                                    AssetManager::Import(relativeToAssets, typeToImport);
+                                                    mAssetManager->Import(relativeToAssets, typeToImport);
                                                     mNeedsCacheRefresh = true;
                                                 }
                                             }
@@ -373,7 +375,7 @@ namespace Surge
                                 Ref<Scene> newScene = Ref<Scene>::Create();
                                 Serializer::SerializeScene(newFilePath.string(), newScene.Raw());
                                 String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
-                                AssetID newId = AssetManager::ImportLive(relativeToAssets, AssetType::SCENE, newScene);
+                                AssetID newId = mAssetManager->ImportLive(relativeToAssets, AssetType::SCENE, newScene);
 
                                 if(newId.IsValid())
                                     mSelectedPath = newFilePath;
@@ -440,7 +442,7 @@ namespace Surge
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
                 if(ImGuiAux::Button("Save Registry to Disk"))
-                    AssetManager::SerializeRegistry();
+                    mAssetManager->SerializeRegistry();
 
                 ImGui::SameLine();
 
@@ -478,9 +480,7 @@ namespace Surge
                     ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 80.0f);
                     ImGui::TableHeadersRow();
 
-                    const auto& registryMap = AssetManager::GetRegistryMap();
-                    Vector<AssetID> toDelete;
-                    Vector<AssetID> toUnload;
+                    const auto& registryMap = mAssetManager->GetRegistryMap();
 
                     for(const auto& [id, meta] : registryMap)
                     {
@@ -516,7 +516,9 @@ namespace Surge
                         ImGui::TableSetColumnIndex(2);
                         ImGui::PushFont(boldFont);
                         if(HasFlag(meta.Flags, AssetFlags::MISSING))
+                        {
                             ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "MISSING");
+                        }
                         else if(HasFlag(meta.Flags, AssetFlags::MEMORY))
                             ImGui::TextColored(ImVec4(0.8f, 0.5f, 0.2f, 1.0f), "MEMORY");
                         else if(HasFlag(meta.Flags, AssetFlags::LOADED))
@@ -540,7 +542,7 @@ namespace Surge
                         }
                         else if(HasFlag(meta.Flags, AssetFlags::LOADED))
                         {
-                            size_t refCount = AssetManager::GetAssetRefCount(id);
+                            size_t refCount = mAssetManager->GetAssetRefCount(id);
 
                             if(refCount > 1)
                             {
@@ -559,7 +561,7 @@ namespace Surge
                                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
                                 if(ImGuiAux::Button("UNLOAD"))
-                                    toUnload.push_back(id);
+                                    mToUnload.push_back(id);
 
                                 ImGui::PopStyleColor(4);
 
@@ -569,14 +571,15 @@ namespace Surge
                         }
                         else
                         {
-                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+                            bool isMissing = HasFlag(meta.Flags, AssetFlags::MISSING);
+                            ImGui::PushStyleColor(ImGuiCol_Button, isMissing ? ImVec4(0.8f, 0.2f, 0.2f, 1.0f) : ImVec4(0.8f, 0.6f, 0.2f, 1.0f));
                             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
                             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.1f, 0.1f, 1.0f));
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
                             if(ImGuiAux::Button("UNREGISTER"))
                             {
-                                toDelete.push_back(id);
+                                mToUnregister.push_back(id);
                                 mNeedsCacheRefresh = true;
                             }
 
@@ -586,12 +589,15 @@ namespace Surge
                         ImGui::PopID();
                     }
 
-                    for(const AssetID& id : toUnload)
-                        AssetManager::Unload(id);
-                    for(const AssetID& id : toDelete)
-                        AssetManager::UnregisterAsset(id);
+                    for(const AssetID& id : mToUnload)
+                        mAssetManager->Unload(id);
+                    for(const AssetID& id : mToUnregister)
+                        mAssetManager->UnregisterAsset(id);
 
                     ImGui::EndTable();
+
+                    if (!mToUnload.empty()) mToUnload.clear();
+                    if (!mToUnregister.empty()) mToUnregister.clear();
                 }
             }
             else

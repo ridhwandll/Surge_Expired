@@ -3,7 +3,7 @@
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
-#include "Surge/Asset/Mesh.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include <glm/glm.hpp>
 
 #define MAX_SHADOW_CASCADE_COUNT 3

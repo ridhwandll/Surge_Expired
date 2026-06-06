@@ -423,6 +423,7 @@ namespace Surge
         info.addressModeV = VulkanUtils::ToVkWrap(desc.WrapV);
         info.addressModeW = VulkanUtils::ToVkWrap(desc.WrapU);
         info.mipLodBias = desc.MipBias;
+        info.minLod = 0.0f;
         info.maxLod = VK_LOD_CLAMP_NONE;
         info.anisotropyEnable = desc.Anisotropy ? VK_TRUE : VK_FALSE;
         info.maxAnisotropy = desc.MaxAniso;

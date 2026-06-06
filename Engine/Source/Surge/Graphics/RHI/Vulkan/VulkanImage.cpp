@@ -23,7 +23,7 @@ namespace Surge
     {
         SG_ASSERT(desc.Width > 0, "TextureDesc::Width must be > 0");
         SG_ASSERT(desc.Height > 0, "TextureDesc::Height must be > 0");
-        SG_ASSERT(desc.Mips > 0, "TextureDesc::Mips must be > 0");
+        SG_ASSERT(desc.MipLevel > 0, "TextureDesc::Mips must be > 0");
         SG_ASSERT(desc.Layers > 0, "TextureDesc::Layers must be > 0");
 
         // Transient attachments Tf are these?
@@ -47,11 +47,14 @@ namespace Surge
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = VulkanUtils::ImageFormatToVkFormat(desc.Format);
         imageInfo.extent = { desc.Width, desc.Height, 1 };
-        imageInfo.mipLevels = desc.Mips;
+        imageInfo.mipLevels = desc.MipLevel;
         imageInfo.arrayLayers = desc.Layers;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.usage = VulkanUtils::ToVkImageUsage(desc.Usage, desc.Transient);
+
+        if(desc.MipLevel > 1)
+            imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
         // VK_SHARING_MODE_EXCLUSIVE specifies that access to any range or image subresource of the object will be exclusive to a single queue family at a time	
         // VK_SHARING_MODE_CONCURRENT may result in lower performance access to the buffer or image than VK_SHARING_MODE_EXCLUSIVE (Vulkan Docs)
@@ -95,7 +98,7 @@ namespace Surge
         // Thats why I had to create GetAspectFlagsForImageView a separate function which returns only VK_IMAGE_ASPECT_DEPTH_BIT on DepthStencil/DepthOnly format
         viewInfo.subresourceRange.aspectMask = GetAspectFlagsForImageView(desc.Format);
         viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = desc.Mips;
+        viewInfo.subresourceRange.levelCount = desc.MipLevel;
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = desc.Layers;
         VK_CALL(vkCreateImageView(rhi.GetDevice(), &viewInfo, nullptr, &entry.View));
@@ -154,18 +157,14 @@ namespace Surge
 
         const VkCommandBuffer cb = rhi.BeginOneTimeCommands();
 
-        // Transition: UNDEFINED to TRANSFER_DST
+        // Transition all mip levels to TRANSFER_DST
         TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-        VkBufferCopy copyRegion = {};
-        copyRegion.size = size;
-
-        // Copy staging buffer to image, one region per mip 0
         VkBufferImageCopy region = {};
         region.bufferOffset = 0;
-        region.bufferRowLength = 0;// tightly packed
+        region.bufferRowLength = 0;
         region.bufferImageHeight = 0;
-        region.imageSubresource.aspectMask = VulkanUtils::GetVkImageAspectFlags(entry->Desc.Format);
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         region.imageSubresource.mipLevel = 0;
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
@@ -173,12 +172,13 @@ namespace Surge
         region.imageExtent = { entry->Desc.Width, entry->Desc.Height, 1 };
         vkCmdCopyBufferToImage(cb, stagingBuffer, entry->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        // Transition: TRANSFER_DST to SHADER_READ_ONLY
-        TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if(entry->Desc.MipLevel > 1)
+            GenerateMipmaps(rhi, cb, *entry); // leaves all levels at SHADER_READ_ONLY_OPTIMAL
+        else
+            TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         rhi.EndOneTimeCommands(cb);
-
-        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        vmaDestroyBuffer(rhi.GetAllocator(), stagingBuffer, stagingAllocation);
         vkQueueWaitIdle(rhi.GetQueue());
     }
 
@@ -206,9 +206,9 @@ namespace Surge
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
         barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = entry.Desc.Mips;
+        barrier.subresourceRange.levelCount = entry.Desc.MipLevel;
         barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
+        barrier.subresourceRange.layerCount = entry.Desc.Layers;
 
         VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
@@ -306,5 +306,91 @@ namespace Surge
 
         vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         entry.Layout = newLayout;
+    }
+
+    void VulkanImage::GenerateMipmaps(VulkanRHI& rhi, VkCommandBuffer cmd, ImageEntry& entry)
+    {
+        const Uint mipCount = entry.Desc.MipLevel;
+        SG_ASSERT(mipCount > 1, "GenerateMipmaps called on image with Mips <= 1");
+
+        // Validate that the format supports linear filtering required for vkCmdBlitImage
+        VkFormatProperties formatProps;
+        vkGetPhysicalDeviceFormatProperties(rhi.GetGPU(), VulkanUtils::ImageFormatToVkFormat(entry.Desc.Format), &formatProps);
+        SG_ASSERT(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "GenerateMipmaps: image format does not support linear filtering, cannot blit mips!");
+
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.image = entry.Image;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.subresourceRange.levelCount = 1; // one mip at a time
+
+        int32_t mipWidth = static_cast<int32_t>(entry.Desc.Width);
+        int32_t mipHeight = static_cast<int32_t>(entry.Desc.Height);
+
+        for(Uint i = 1; i < mipCount; i++)
+        {
+            // Promote mip i-1: TRANSFER_DST to TRANSFER_SRC so we can read from it
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            vkCmdPipelineBarrier(cmd,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            // Blit mip i-1 to mip i (mip i is already TRANSFER_DST from the upfront transition)
+            const int32_t nextWidth = mipWidth > 1 ? mipWidth / 2 : 1;
+            const int32_t nextHeight = mipHeight > 1 ? mipHeight / 2 : 1;
+
+            VkImageBlit blit = {};
+            blit.srcOffsets[0] = { 0, 0, 0 };
+            blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.mipLevel = i - 1;
+            blit.srcSubresource.baseArrayLayer = 0;
+            blit.srcSubresource.layerCount = 1;
+
+            blit.dstOffsets[0] = { 0, 0, 0 };
+            blit.dstOffsets[1] = { nextWidth, nextHeight, 1 };
+            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.mipLevel = i;
+            blit.dstSubresource.baseArrayLayer = 0;
+            blit.dstSubresource.layerCount = 1;
+
+            vkCmdBlitImage(cmd,
+                           entry.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           entry.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &blit, VK_FILTER_LINEAR);
+
+            // Mip i-1 is done, send it to its final layout
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(cmd,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            mipWidth = nextWidth;
+            mipHeight = nextHeight;
+        }
+
+        // The last mip level was never a blit source, it's still TRANSFER_DST
+        barrier.subresourceRange.baseMipLevel = mipCount - 1;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        vkCmdPipelineBarrier(cmd,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        // All levels are now SHADER_READ_ONLY_OPTIMAL
+        entry.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
 }

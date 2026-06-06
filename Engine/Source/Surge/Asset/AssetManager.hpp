@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "../Core/MemoryBlock.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
 #include "Surge/Core/Path.hpp"
@@ -15,15 +16,15 @@ namespace Surge
     class AssetManager
     {
     public:
-        static void Initialize(const Path& assetDirectory);
-        static void Shutdown();
+        void Initialize(const Path& assetDirectory);
+        void Shutdown();
 
         // Import
         // Registers a source file into the registry. Returns the existing ID if already imported
         // @param str     Path relative to the assets directory e.g. "Textures/Surge.png" OR memoryStr if created from memory e.g. DefaultMeshes::CUBE
         // @param type    Explicit asset type, must match intended usage
         // @return        Stable AssetID, or UUID::INVALID on failure
-        static AssetID Import(const String& str, AssetType type);
+        AssetID Import(const String& str, AssetType type);
 
         // ImportLive
         // Registers an already-live asset, stamps its ID, adds it to the loaded cache. Use this when the asset is created in memory before it exists on disk
@@ -31,55 +32,61 @@ namespace Surge
         // @param relativePath    Path to which you serialized this asset in before calling this method
         // @param type            Explicit asset type, must match intended usage
         // @return                Stable AssetID, or UUID::INVALID on failure
-        static AssetID ImportLive(const String& relativePath, AssetType type, Ref<Asset> asset);
+        AssetID ImportLive(const String& relativePath, AssetType type, Ref<Asset> asset);
 
         // Load<T>
         // Returns a cached Ref<T> immediately if already loaded, performs a full synchronous load (CPU + GPU) otherwise
         // @param id    AssetID of the requested mesh
         // @return      Ref<T> of the requested underlying concrete asset
         template<IsAssetConcept T>
-        static Ref<T> Load(AssetID id)
+        Ref<T> Load(AssetID id)
         {
             const AssetMetadata& metadata = GetMetadata(id);
+
+            if(HasFlag(metadata.Flags, AssetFlags::MISSING))
+            {
+                Log<Severity::Error>("[AssetManager] Load: asset is missing for ID {}!", id.Get());
+                return nullptr;
+            }
             if(metadata.Type != T::GetStaticType())
             {
                 Log<Severity::Error>("[AssetManager] Load: type mismatch for ID {}! " "Requested '{}' but registry says '{}'.", id.Get(), SurgeReflect::EnumToString(T::GetStaticType()).data(), SurgeReflect::EnumToString(metadata.Type).data());
                 return nullptr;
             }
 
+
             Ref<Asset> asset = LoadAsset(id);
             SG_ASSERT(!asset || asset->GetAssetType() == T::GetStaticType(), "[AssetManager] LoadInternal returned wrong type, loader bug!");
             return asset.As<T>();
-            
         }
 
         // Unload
         // Removes the live Ref from the cache. The actual GPU memory is freed once all external Refs (held by scene objects etc.) drop out of scope
         // @param id    AssetID of the asset to be removed
         // @return      true if unload was successful, false otherwise
-        static bool Unload(AssetID id);
+        bool Unload(AssetID id);
 
         // IsLoaded
         // Checks if the asset is currently loaded in memory
         // @param id    AssetID of the asset to check
         // @return      true if the asset is loaded, false otherwise
-        static bool IsLoaded(AssetID id);
+        bool IsLoaded(AssetID id);
 
         // IsRegistered
         // Checks if the asset is registered in the registry (i.e. has been imported)
         // @param id    AssetID of the asset to check
         // @return      true if the asset is registered, false otherwise
-        static bool IsRegistered(AssetID id);
+        bool IsRegistered(AssetID id);
 
         // Save
         // Saves the asset to disk
         // @param id    AssetID of the asset to save
-        static void Save(AssetID id);
+        void Save(AssetID id);
 
         // UnregisterAsset
         // Removes the asset from the registry
         // @param id    AssetID of the asset to unregister
-        static void UnregisterAsset(AssetID id) { sAssetRegistry.erase(id); }
+        void UnregisterAsset(AssetID id) { sAssetRegistry.erase(id); }
 
         // GetIDFromPath
         // Returns the AssetID associated with a given relative path.
@@ -87,12 +94,12 @@ namespace Surge
         // It's best to cache the AssetID after the first lookup if you need to reference an asset by path multiple times
         // @param relativePath    Path to the asset relative to the assets directory
         // @return                AssetID of the asset, or UUID::INVALID if not found
-        static AssetID GetIDFromPath(const String& relativePath);
+        AssetID GetIDFromPath(const String& relativePath);
 
-        static const AssetMetadata& GetMetadata(AssetID id);
-        static const String& GetAssetsDirectory() { return sAssetsDirectory; }
-        static const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return sAssetRegistry; }
-        static size_t GetAssetRefCount(AssetID id)
+        const AssetMetadata& GetMetadata(AssetID id);
+        const String& GetAssetsDirectory() { return sAssetsDirectory; }
+        const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return sAssetRegistry; }
+        size_t GetAssetRefCount(AssetID id)
         {
             auto it = sLoadedAssets.find(id);
             if(it != sLoadedAssets.end())
@@ -101,21 +108,21 @@ namespace Surge
         }
 
         // Registry
-        static void SerializeRegistry();
-        static bool DeserializeRegistry();
+        void SerializeRegistry();
+        bool DeserializeRegistry();
     private:
-        static Ref<Asset> LoadAsset(AssetID id);
-        static Ref<Asset> LoadInternal(const AssetMetadata& metadata);
-        static void SaveInternal(const AssetMetadata& meta, const Ref<Asset>& asset);
+        Ref<Asset> LoadAsset(AssetID id);
+        Ref<Asset> LoadInternal(const AssetMetadata& metadata);
+        void SaveInternal(const AssetMetadata& meta, const Ref<Asset>& asset);
 
         // Utilities
     public:
-        static String GetAbsolutePath(const String& relativePath) { return sAssetsDirectory + '/' + relativePath; }
+        String GetAbsolutePath(const String& relativePath) { return sAssetsDirectory + '/' + relativePath; }
     private:
-        static String sAssetsDirectory;
-        static std::unordered_map<AssetID, AssetMetadata> sAssetRegistry;
-        static std::unordered_map<AssetID, Ref<Asset>> sLoadedAssets;
-        static bool sInitialized;
+        String sAssetsDirectory;
+        std::unordered_map<AssetID, AssetMetadata> sAssetRegistry;
+        std::unordered_map<AssetID, Ref<Asset>> sLoadedAssets;
+        bool sInitialized;
 
         static constexpr const char* kRegistryFilename = "AssetRegistry.surge";
         static constexpr const char* kRegistryDelimiter = "|";

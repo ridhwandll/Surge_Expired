@@ -1,8 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Utility/FileDialogs.hpp"
+#include "Surge/Core/Core.hpp"
+#include <Windows.h>
 #include <commdlg.h>
 #include <ShlObj_core.h>
-#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
@@ -60,12 +61,16 @@ namespace Surge
         ofn.lpstrDefExt = strchr(filter, '\0') + 1;
 
         if(GetSaveFileNameA(&ofn) == TRUE)
-            return ofn.lpstrFile;
+        {
+            String result = ofn.lpstrFile;
+            std::replace(result.begin(), result.end(), '\\', '/');
+            return result;
+        }
 
         return String();
     }
 
-    Surge::String FileDialog::ChooseFolder()
+    String FileDialog::ChooseFolder()
     {
         TCHAR path[MAX_PATH];
 
@@ -89,7 +94,9 @@ namespace Surge
                 imalloc->Release();
             }
 
-            return path;
+            String result = path;
+            std::replace(result.begin(), result.end(), '\\', '/');
+            return result;
         }
         return "";
     }

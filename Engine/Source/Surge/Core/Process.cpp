@@ -6,6 +6,7 @@
 #include <string_view>
 #include <string>
 #include <codecvt>
+#include <Windows.h>
 
 #if defined(SURGE_PLATFORM_WINDOWS)
 #include <corecrt_io.h>
