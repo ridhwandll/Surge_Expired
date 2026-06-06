@@ -255,8 +255,19 @@ vec3 VisuaLizeCascades(vec3 finalColor, int cascadeIndex)
 
 void main()
 {
+    if (uMaterial.UseAlbedoMap == 1)
+    {
+        vec4 tex = texture(AlbedoMap, vInput.TexCoord);
+        // Bad on mobile
+        //if (tex.a < 0.5)
+        //    discard;
+
+        gPBRParams.Albedo = tex.rgb * uMaterial.Albedo;
+    }
+    else
+        gPBRParams.Albedo = uMaterial.Albedo;
+
     gPBRParams.Normal = CalculateNormal();
-    uMaterial.UseAlbedoMap == 1 ? gPBRParams.Albedo = texture(AlbedoMap, vInput.TexCoord).rgb * uMaterial.Albedo : gPBRParams.Albedo = uMaterial.Albedo;
     uMaterial.UseMetallicMap == 1 ? gPBRParams.Metallic = texture(RoughnessMetallicMap, vInput.TexCoord).b * uMaterial.Metallic : gPBRParams.Metallic = uMaterial.Metallic;
     uMaterial.UseRoughnessMap == 1 ? gPBRParams.Roughness = texture(RoughnessMetallicMap, vInput.TexCoord).g * uMaterial.Roughness : gPBRParams.Roughness = uMaterial.Roughness;
 

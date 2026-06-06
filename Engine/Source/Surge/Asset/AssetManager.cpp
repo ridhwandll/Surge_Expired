@@ -1,9 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetManager.hpp"
-#include "Surge/Graphics/HighLevel/Texture2D.hpp"
-#include "Surge/Graphics/HighLevel/Mesh.hpp"
-#include "Surge/Serializer/Serializer.hpp"
 #include "Surge/ECS/Scene.hpp"
+
+#include "Serializer/Texture2DSerializer.hpp"
+#include "Serializer/MeshSerializer.hpp"
+#include "Serializer/SceneSerializer.hpp"
+#include "Serializer/MaterialSerializer.hpp"
 
 #include <fstream>
 #include <cerrno>
@@ -12,24 +14,41 @@
 
 namespace Surge
 {
+    AssetManager::AssetManager()
+    {
+        mSerializers[AssetType::SCENE] = CreateScope<SceneSerializer>();
+        mSerializers[AssetType::TEXTURE2D] = CreateScope<Texture2DSerializer>();
+        mSerializers[AssetType::MESH] = CreateScope<MeshSerializer>();
+        mSerializers[AssetType::MATERIAL] = CreateScope<MaterialSerializer>();
+
+        for(auto& [type, serializer] : mSerializers)
+            serializer->Initialize();
+    }
+
+    AssetManager::~AssetManager()
+    {
+        for(auto& [type, serializer] : mSerializers)
+            serializer->Shutdown();
+    }
+
     void AssetManager::Initialize(const Path& assetDirectory)
     {
         sAssetsDirectory = assetDirectory.generic_string();
         DeserializeRegistry();
-        Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", sAssetsDirectory, sAssetRegistry.size());
-        sInitialized = true;
+        Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", sAssetsDirectory, mAssetRegistry.size());
+        mInitialized = true;
     }
 
     void AssetManager::Shutdown()
     {
-        if (!sInitialized)
+        if (!mInitialized)
             return;
 
         SerializeRegistry();
-        sLoadedAssets.clear();
-        sAssetRegistry.clear();
+        mLoadedAssets.clear();
+        mAssetRegistry.clear();
         Log<Severity::Info>("[AssetManager] Shutdown");
-        sInitialized = false;
+        mInitialized = false;
     }
 
     // Import
@@ -69,33 +88,9 @@ namespace Surge
         fromMemory ? meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY : meta.Flags = AssetFlags::VALID;
 
         meta.RelativePath = relativePath;
-        sAssetRegistry[id] = std::move(meta);
+        mAssetRegistry[id] = std::move(meta);
 
         Log<Severity::Info>("[AssetManager] Imported '{}' | ID: {} | Type: {}", relativePath.c_str(), id.Get(), SurgeReflect::EnumToString(type).data());
-        return id;
-    }
-
-    // We assume the caller has already serialized this asset to disk at the given relativePath, so we just need to register it and add it to the loaded cache
-    AssetID AssetManager::ImportLive(const String& relativePath, AssetType type, Ref<Asset> asset)
-    {
-        SG_ASSERT(asset, "[AssetManager] ImportLive: asset is null!");
-        SG_ASSERT(std::ifstream(GetAbsolutePath(relativePath)).good(), "[AssetManager] ImportLive: serialized file not found! You must serialize the asset to disk yourself before calling this method!");
-
-        AssetID id = Import(relativePath, type);
-        if(!id.IsValid())
-            return UUID::INVALID;
-
-        asset->mID = id;
-
-        // Stamp the loaded flag in metadata (Import never does this)
-        // Also this Live asset is not Loaded via Load<T>() so it won't have gone through LoadInternal which normally stamps this flag
-        {
-            auto it = sAssetRegistry.find(id);
-            SG_ASSERT(it != sAssetRegistry.end(), "[AssetManager] ImportLive: Asset not found in registry! This should not happen.");
-            it->second.Flags |= AssetFlags::LOADED;
-        }
-
-        sLoadedAssets[id] = std::move(asset);
         return id;
     }
 
@@ -104,14 +99,14 @@ namespace Surge
     {
         // Already live in the cache
         {
-            auto cacheIt = sLoadedAssets.find(id);
-            if(cacheIt != sLoadedAssets.end())
+            auto cacheIt = mLoadedAssets.find(id);
+            if(cacheIt != mLoadedAssets.end())
                 return cacheIt->second;
         }
 
         // Validate registry
-        auto metaIt = sAssetRegistry.find(id);
-        if(metaIt == sAssetRegistry.end())
+        auto metaIt = mAssetRegistry.find(id);
+        if(metaIt == mAssetRegistry.end())
         {
             Log<Severity::Error>("[AssetManager] Load: AssetID {} is not registered!", id.Get());
             return nullptr;
@@ -124,7 +119,9 @@ namespace Surge
             return nullptr;
         }
 
-        Ref<Asset> asset = LoadInternal(meta);
+        auto serIt = mSerializers.find(meta.Type);
+        SG_ASSERT(serIt != mSerializers.end() && serIt->second, "[AssetManager] No serializer for type '{}'!", SurgeReflect::EnumToString(meta.Type).data());
+        Ref<Asset> asset = serIt->second->Deserialize(meta);
         if(!asset)
         {
             Log<Severity::Error>("[AssetManager] Load: Loader returned null for '{}'!", meta.RelativePath);
@@ -135,22 +132,26 @@ namespace Surge
         asset->mID = id; // Stamp the ID
         meta.Flags |= AssetFlags::LOADED;
 
-        sLoadedAssets[id] = asset;
+        mLoadedAssets[id] = asset;
         return asset;
     }
 
     // Unload
     bool AssetManager::Unload(AssetID id)
     {
-        auto cacheIt = sLoadedAssets.find(id);
-        if(cacheIt == sLoadedAssets.end())
+        auto cacheIt = mLoadedAssets.find(id);
+        if(cacheIt == mLoadedAssets.end())
             return false;
 
-        sLoadedAssets.erase(cacheIt);
+        // Cannot unload if there are external Refs still alive
+        if (cacheIt->second->GetRefCount() > 1)
+            return false;
+
+        mLoadedAssets.erase(cacheIt);
 
         // Just clear the Loaded flag
-        auto metaIt = sAssetRegistry.find(id);
-        if(metaIt != sAssetRegistry.end())
+        auto metaIt = mAssetRegistry.find(id);
+        if(metaIt != mAssetRegistry.end())
             metaIt->second.Flags &= ~AssetFlags::LOADED;
 
         return true;
@@ -158,36 +159,34 @@ namespace Surge
 
     bool AssetManager::IsLoaded(AssetID id)
     {
-        return sLoadedAssets.find(id) != sLoadedAssets.end();
+        return mLoadedAssets.find(id) != mLoadedAssets.end();
     }
 
     void AssetManager::Save(AssetID id)
     {
-        auto cacheIt = sLoadedAssets.find(id);
-        if(cacheIt == sLoadedAssets.end())
-        {
-            Log<Severity::Warn>("[AssetManager] Save: AssetID {} is not loaded.", id.Get());
-            return;
-        }
-        SaveInternal(sAssetRegistry.at(id), cacheIt->second);
+        auto cacheIt = mLoadedAssets.find(id);
+        SG_ASSERT(cacheIt != mLoadedAssets.end(), "[AssetManager] Save: AssetID {} is not loaded!", id.Get());
+        SG_ASSERT(mAssetRegistry.find(id) != mAssetRegistry.end(), "[AssetManager] Save: AssetID {} is not registered!", id.Get());
+
+        mSerializers[mAssetRegistry.at(id).Type]->Serialize(cacheIt->second);
     }
 
     bool AssetManager::IsRegistered(AssetID id)
     {
-        return sAssetRegistry.find(id) != sAssetRegistry.end();
+        return mAssetRegistry.find(id) != mAssetRegistry.end();
     }
 
     const AssetMetadata& AssetManager::GetMetadata(AssetID id)
     {
         static const AssetMetadata kNull {};
 
-        auto it = sAssetRegistry.find(id);
-        return it != sAssetRegistry.end() ? it->second : kNull;
+        auto it = mAssetRegistry.find(id);
+        return it != mAssetRegistry.end() ? it->second : kNull;
     }
 
     AssetID AssetManager::GetIDFromPath(const String& relativePath)
     {
-        for(const auto& [id, meta] : sAssetRegistry)
+        for(const auto& [id, meta] : mAssetRegistry)
         {
             if(meta.RelativePath == relativePath)
                 return id;
@@ -215,7 +214,7 @@ namespace Surge
         file << "// Surge Asset Registry v1\n";
         file << "// Format: UUID|Type|RelativePath\n";
 
-        for(const auto& [id, meta] : sAssetRegistry)
+        for(const auto& [id, meta] : mAssetRegistry)
         {
             file << id.Get()
                 << kRegistryDelimiter
@@ -225,7 +224,7 @@ namespace Surge
                 << '\n';
         }
 
-        Log<Severity::Info>("[AssetManager] Registry serialized ({} entries) -> '{}'.", sAssetRegistry.size(), registryPath.c_str());
+        Log<Severity::Info>("[AssetManager] Registry serialized ({} entries) -> '{}'.", mAssetRegistry.size(), registryPath.c_str());
     }
 
     bool AssetManager::DeserializeRegistry()
@@ -236,7 +235,7 @@ namespace Surge
         if(!file.is_open())
             return false;
 
-        sAssetRegistry.clear();
+        mAssetRegistry.clear();
 
         String line;
         Uint count = 0;
@@ -290,56 +289,12 @@ namespace Surge
                     Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Source file missing for '{}'.", relPath.c_str());
             }
 
-            sAssetRegistry[id] = std::move(meta);
+            mAssetRegistry[id] = std::move(meta);
             count++;
         }
 
         Log<Severity::Info>("[AssetManager] Registry deserialized ({} entries).", count);
         return count > 0;
-    }
-
-    Ref<Asset> AssetManager::LoadInternal(const AssetMetadata& metadata)
-    {
-        String fullPath;
-
-        if(HasFlag(metadata.Flags, AssetFlags::MEMORY))
-            fullPath = metadata.RelativePath; //metadata.RelativePath contains the memoryStr
-        else
-            fullPath = GetAbsolutePath(metadata.RelativePath);
-
-        switch(metadata.Type)
-        {
-            case AssetType::MESH:      return Mesh::Create(fullPath);
-            case AssetType::TEXTURE2D: return Texture2D::Create(fullPath);
-            case AssetType::SCENE:
-            {
-                Ref<Scene> scene = Ref<Scene>::Create();
-                Serializer::DeserializeScene(fullPath, scene.Raw());
-                return scene;
-            }
-            case AssetType::SPRITE:
-            {
-                SG_ASSERT_INTERNAL("[AssetManager] Sprite loader not yet connected!");
-                return nullptr;
-            }
-            default:
-            {
-                SG_ASSERT_INTERNAL("[AssetManager] LoadInternal: Unknown AssetType!");
-                return nullptr;
-            }
-        }
-    }
-
-    void AssetManager::SaveInternal(const AssetMetadata& meta, const Ref<Asset>& asset)
-    {
-        const String fullPath = GetAbsolutePath(meta.RelativePath);
-        if(meta.Type == AssetType::SCENE)
-        {
-            Ref<Scene> scene = asset.template As<Scene>();
-            Serializer::SerializeScene(fullPath, scene.Raw());
-        }
-        else
-            SG_ASSERT_INTERNAL("[AssetManager] SaveInternal: No save implementation for this AssetType!");
     }
 
 } // namespace Surge

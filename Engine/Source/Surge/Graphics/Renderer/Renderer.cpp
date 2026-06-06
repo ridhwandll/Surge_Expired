@@ -166,13 +166,6 @@ namespace Surge
         mGraph.ForceResize(width, height);
     }
 
-    Ref<Material> Renderer::CreateMaterial(const String& debugName)
-    {
-        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
-        Ref<Material> material = Material::Create(blackBoard.MaterialPipeline, mShaderManager.Get("Renderer3D.glsl"), "Material");
-        return material;
-    }
-
     void Renderer::SubmitDirLightDebug(const glm::vec3& origin, const glm::vec3& forward, const glm::vec4& color)
     {
         const float mainLineLength = 3.0f;

@@ -21,6 +21,7 @@ namespace Surge
         Scene();
         ~Scene();
         SURGE_ASSET_TYPE(AssetType::SCENE);
+        static Ref<Scene> Create() { return Ref<Scene>::Create(); }
 
         void OnRuntimeStart();
         void Update(); // Runtime Update

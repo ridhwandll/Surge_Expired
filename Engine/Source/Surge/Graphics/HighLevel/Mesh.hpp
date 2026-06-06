@@ -6,6 +6,7 @@
 #include "Surge/Asset/Asset.hpp"
 #include "SurgeMath/AABB.hpp"
 #include "Material.hpp"
+#include "DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -24,31 +25,34 @@ namespace Surge
         String NodeName, MeshName;
     };
 
+    struct MeshSpecification
+    {
+        Vector<Submesh> Submeshes;
+        Vector<Vertex> Vertices;
+        Vector<Index> Indices;
+        Vector<Ref<Material>> Materials;
+    };
+
     class Mesh : public Asset
     {
     public:
-        // Mesh Construction
-        // @param filepath Pass actual filepath to generate the mesh from disk
-        //                 Pass DefaultMesh::X to generate a default mesh from memory
-        Mesh(const String& filepath);
+        Mesh(MeshSpecification&& spec);
         ~Mesh();
         SURGE_ASSET_TYPE(AssetType::MESH);
+        static Ref<Mesh> Create(MeshSpecification&& spec);
 
         BufferHandle GetVertexBuffer() const { return mVertexBuffer; }
         BufferHandle GetIndexBuffer() const { return mIndexBuffer; }
 
         const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }
         const Vector<Ref<Material>>& GetMaterials() const { return mMaterials; }
+        Vector<Ref<Material>>& GetMaterials() { return mMaterials; }
         Ref<Material>& GetMaterialAtIndex(Uint index) { return mMaterials[index]; }
 
-        static Ref<Mesh> Create(const String& filepath);
-    private:
-        bool CheckAndGenerateDefaultMesh(const String& filepath);
     private:
         Vector<Submesh> mSubmeshes;
         BufferHandle mVertexBuffer;
         BufferHandle mIndexBuffer;
-
         Vector<Ref<Material>> mMaterials;
     };
 

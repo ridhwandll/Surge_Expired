@@ -30,6 +30,27 @@ namespace Surge
         return AssetType::NONE;
     }
 
+    inline AssetType AssetTypeFromExtension(const char* str)
+    {
+        if(strcmp(str, ".png") == 0 || strcmp(str, ".jpg") == 0 || strcmp(str, ".jpeg") == 0) return AssetType::TEXTURE2D;
+        if(strcmp(str, ".glb") == 0 || strcmp(str, ".gltf") == 0) return AssetType::MESH;
+        if(strcmp(str, ".smat") == 0) return AssetType::MATERIAL;
+        if(strcmp(str, ".srg") == 0) return AssetType::SCENE;
+        return AssetType::NONE;
+    }
+
+    inline const char* GetExtensionFromAssetType(AssetType type)
+    {
+        switch(type)
+        {
+            case AssetType::MATERIAL: return ".smat";
+            case AssetType::SCENE: return ".srg";
+            default:
+                Log<Severity::Error>("[Asset] You should not call GetExtensionFromAssetType for non Surge Types like TEXTURE2D/MESH");
+                return "";
+        }
+    }
+
     // Asset
     // Base class for all engine assets
     // Concrete types (Texture2D, Mesh, Material, Scene ...) SURGE_ASSET_TYPE macro. The AssetID is stamped by AssetManager after load;

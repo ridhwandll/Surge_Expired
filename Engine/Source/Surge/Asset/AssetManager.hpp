@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "../Core/MemoryBlock.hpp"
+#include "Surge/Core/MemoryBlock.hpp"
+#include "Serializer/IAssetSerializer.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
 #include "Surge/Core/Path.hpp"
@@ -16,8 +17,43 @@ namespace Surge
     class AssetManager
     {
     public:
+        AssetManager();
+        ~AssetManager();
+
         void Initialize(const Path& assetDirectory);
         void Shutdown();
+
+        // Create
+        // Instantiates a new asset of type T, saves it to disk at the given path, and registers it.
+        // @param relativePath  Path where the new asset should be saved.
+        // @param args          Arguments to forward to the asset's Create method
+        // @return              Stable AssetID of the newly created asset
+        template<IsAssetConcept T, typename... Args>
+        Ref<T> Create(const String& relativePath, Args&&... args)
+        {
+            if(GetIDFromPath(relativePath).IsValid())
+            {
+                Log<Severity::Warn>("[AssetManager] Create: Asset already exists at path '{}'", relativePath);
+                return nullptr;
+            }
+            AssetID newID = UUID();
+
+            AssetMetadata meta;
+            meta.ID = newID;
+            meta.Type = T::GetStaticType();
+            meta.RelativePath = relativePath;
+            meta.Flags = AssetFlags::VALID | AssetFlags::LOADED;
+            mAssetRegistry[newID] = meta;
+
+            Ref<T> newAsset = T::Create(std::forward<Args>(args)...);
+            newAsset->mID = newID;
+            mLoadedAssets[newID] = newAsset;
+
+            Save(meta.ID);
+
+            Log<Severity::Info>("[AssetManager] Created & Saved new asset: '{}'", relativePath);
+            return newAsset;
+        }
 
         // Import
         // Registers a source file into the registry. Returns the existing ID if already imported
@@ -25,14 +61,6 @@ namespace Surge
         // @param type    Explicit asset type, must match intended usage
         // @return        Stable AssetID, or UUID::INVALID on failure
         AssetID Import(const String& str, AssetType type);
-
-        // ImportLive
-        // Registers an already-live asset, stamps its ID, adds it to the loaded cache. Use this when the asset is created in memory before it exists on disk
-        // Serialize the asset to disk first before calling this method, then use the same relativePath in relativePath parameter
-        // @param relativePath    Path to which you serialized this asset in before calling this method
-        // @param type            Explicit asset type, must match intended usage
-        // @return                Stable AssetID, or UUID::INVALID on failure
-        AssetID ImportLive(const String& relativePath, AssetType type, Ref<Asset> asset);
 
         // Load<T>
         // Returns a cached Ref<T> immediately if already loaded, performs a full synchronous load (CPU + GPU) otherwise
@@ -54,14 +82,13 @@ namespace Surge
                 return nullptr;
             }
 
-
             Ref<Asset> asset = LoadAsset(id);
             SG_ASSERT(!asset || asset->GetAssetType() == T::GetStaticType(), "[AssetManager] LoadInternal returned wrong type, loader bug!");
             return asset.As<T>();
         }
 
         // Unload
-        // Removes the live Ref from the cache. The actual GPU memory is freed once all external Refs (held by scene objects etc.) drop out of scope
+        // Removes the live Ref from the cache if no other objects are referencing it
         // @param id    AssetID of the asset to be removed
         // @return      true if unload was successful, false otherwise
         bool Unload(AssetID id);
@@ -86,7 +113,7 @@ namespace Surge
         // UnregisterAsset
         // Removes the asset from the registry
         // @param id    AssetID of the asset to unregister
-        void UnregisterAsset(AssetID id) { sAssetRegistry.erase(id); }
+        void UnregisterAsset(AssetID id) { mAssetRegistry.erase(id); }
 
         // GetIDFromPath
         // Returns the AssetID associated with a given relative path.
@@ -98,11 +125,11 @@ namespace Surge
 
         const AssetMetadata& GetMetadata(AssetID id);
         const String& GetAssetsDirectory() { return sAssetsDirectory; }
-        const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return sAssetRegistry; }
+        const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return mAssetRegistry; }
         size_t GetAssetRefCount(AssetID id)
         {
-            auto it = sLoadedAssets.find(id);
-            if(it != sLoadedAssets.end())
+            auto it = mLoadedAssets.find(id);
+            if(it != mLoadedAssets.end())
                 return it->second->GetRefCount();
             return 0;
         }
@@ -112,17 +139,16 @@ namespace Surge
         bool DeserializeRegistry();
     private:
         Ref<Asset> LoadAsset(AssetID id);
-        Ref<Asset> LoadInternal(const AssetMetadata& metadata);
-        void SaveInternal(const AssetMetadata& meta, const Ref<Asset>& asset);
 
         // Utilities
     public:
         String GetAbsolutePath(const String& relativePath) { return sAssetsDirectory + '/' + relativePath; }
     private:
         String sAssetsDirectory;
-        std::unordered_map<AssetID, AssetMetadata> sAssetRegistry;
-        std::unordered_map<AssetID, Ref<Asset>> sLoadedAssets;
-        bool sInitialized;
+        std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;
+        std::unordered_map<AssetID, Ref<Asset>> mLoadedAssets;
+        std::unordered_map<AssetType, Scope<AssetSerializer>> mSerializers;
+        bool mInitialized;
 
         static constexpr const char* kRegistryFilename = "AssetRegistry.surge";
         static constexpr const char* kRegistryDelimiter = "|";

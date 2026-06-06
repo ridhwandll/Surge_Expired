@@ -48,10 +48,15 @@ namespace Surge::ImGuiAux
     {
         ScopedBoldFont(const ScopedBoldFont&) = delete;
         ScopedBoldFont operator=(const ScopedBoldFont&) = delete;
+        // Bold font at index 1 (See Surge/Graphics/RHI/Vulkan/VulkanImGui.cpp)
+
+        ScopedBoldFont(float fontSize)
+        {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1], fontSize);
+        }
 
         ScopedBoldFont()
         {
-            // Bold font at index 1 (See Surge/Graphics/RHI/Vulkan/VulkanImGui.cpp)
             ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
         }
         ~ScopedBoldFont()

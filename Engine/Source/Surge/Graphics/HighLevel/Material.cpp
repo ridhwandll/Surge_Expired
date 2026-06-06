@@ -3,10 +3,8 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Texture2D.hpp"
-#include <json/json.hpp>
-#include <fstream>
-#include "SurgeReflect/Enum.hpp"
-#include "Surge/Utility/Filesystem.hpp"
+
+#undef FindResource // FUCK ASS WIN32
 
 namespace Surge
 {
@@ -14,88 +12,6 @@ namespace Surge
     {
         mShaderName = shader.GetName();
         Initialize(pipeline, shader, materialBufferName);
-    }
-
-    Material::Material(const String& path)
-    {
-        std::ifstream file(path);
-        SG_ASSERT(file.is_open(), "[Material] Failed to open: '{}'", path.c_str());
-
-        const nlohmann::json j = nlohmann::json::parse(file, nullptr, false);
-        SG_ASSERT(!j.is_discarded(), "[Material] Failed to parse JSON: '{}'", path.c_str());
-
-        mName = j.value("Name", "Unnamed");
-
-        const String shaderName = j.value("Shader", "");
-        SG_ASSERT(!shaderName.empty(), "[Material] No shader specified in: '{}'", path.c_str());
-
-        Renderer* renderer = Core::GetRenderer();
-        PipelineHandle pipeline = renderer->GetRenderGraphBlackBoard().MaterialPipeline;
-        const Shader& shader = renderer->GetShaderManager().Get(shaderName);
-        SG_ASSERT(pipeline.IsValid(), "[Material] Pipeline not found for shader: '{}'", shaderName.c_str());
-
-        Initialize(pipeline, shader, "Material");
-
-        if(j.contains("Properties"))
-        {
-            for(const auto& [propName, propValue] : j["Properties"].items())
-            {
-                const ShaderBufferMember* member = mRefletedBuffer.GetMember(propName);
-                if(!member)
-                {
-                    Log<Severity::Warn>("[Material] Property '{}' not in reflection, skipping", propName.c_str());
-                    continue;
-                }
-
-                if(propValue.is_number())
-                {
-                    const float val = propValue.get<float>();
-                    mCPUData.Write((void*)&val, sizeof(float), member->MemoryOffset);
-                }
-                else if(propValue.is_array())
-                {
-                    switch(propValue.size())
-                    {
-                        case 2:
-                        {
-                            const glm::vec2 val = { propValue[0].get<float>(), propValue[1].get<float>() };
-                            mCPUData.Write((void*)&val, sizeof(glm::vec2), member->MemoryOffset);
-                            break;
-                        }
-                        case 3:
-                        {
-                            const glm::vec3 val = { propValue[0].get<float>(), propValue[1].get<float>(), propValue[2].get<float>() };
-                            mCPUData.Write((void*)&val, sizeof(glm::vec3), member->MemoryOffset);
-                            break;
-                        }
-                        case 4:
-                        {
-                            const glm::vec4 val = { propValue[0].get<float>(), propValue[1].get<float>(), propValue[2].get<float>(), propValue[3].get<float>() };
-                            mCPUData.Write((void*)&val, sizeof(glm::vec4), member->MemoryOffset);
-                            break;
-                        }
-                        default:
-                            Log<Severity::Warn>("[Material] Unsupported array size {} for '{}', skipping", propValue.size(), propName.c_str());
-                            break;
-                    }
-                }
-            }
-        }
-
-        if(j.contains("Textures"))
-        {
-            for(const auto& [texName, texIDVal] : j["Textures"].items())
-            {
-                const AssetID id(texIDVal.get<uint64_t>());
-                Ref<Texture2D> texture = Core::GetAssetManager()->Load<Texture2D>(id);
-                if(texture)
-                    SetTexture(texName, texture);
-                else
-                    Log<Severity::Warn>("[Material] Texture '{}' (ID: {}) failed to load!", texName.c_str(), id.Get());
-            }
-        }
-
-        MarkDirty();
     }
 
     Material::~Material()
@@ -120,15 +36,24 @@ namespace Surge
         mRHI->CmdBindDescriptorSet(ctx, pipeline, mDescriptorSet, mMaterialDescriptorSlot);
     }
 
-    #undef FindResource // FUCK ASS WIN32
+    const Ref<Texture2D>& Material::GetTexture(const String& name)
+    {
+        const ShaderResource* resource = FindResource(name);
+        SG_ASSERT(resource, "Material::GetTexture: '{}' is not a reflected texture name!", name);
+        return mTextures[name].Data1;
+    }
+
     void Material::SetTexture(const String& name, const Ref<Texture2D>& texture)
     {
-        SG_ASSERT(texture, "Material::SetTexture: texture is null!");
+        //SG_ASSERT(texture, "Material::SetTexture: texture is null!");
 
         const ShaderResource* resource = FindResource(name);
-        SG_ASSERT(resource, "Material::SetTexture: '{}' is not a reflected texture name!", name.c_str());
+        SG_ASSERT(resource, "Material::SetTexture: '{}' is not a reflected texture name!", name);
 
-        mTextures[name] = Pair<Ref<Texture2D>, ImageHandle>(texture, texture->GetRHIImage());
+        texture ?
+        mTextures[name] = Pair<Ref<Texture2D>, ImageHandle>(texture, texture->GetRHIImage()) :
+        mTextures[name] = Pair<Ref<Texture2D>, ImageHandle>(nullptr, mWhiteTexture);
+
         MarkDirty();
     }
 
@@ -136,7 +61,7 @@ namespace Surge
     {
 
         const ShaderResource* resource = FindResource(name);
-        SG_ASSERT(resource, "Material::SetTexture: '{}' is not a reflected texture name!", name.c_str());
+        SG_ASSERT(resource, "Material::SetTexture: '{}' is not a reflected texture name!", name);
 
         mTextures[name] = Pair<Ref<Texture2D>, ImageHandle>(nullptr, handle);
         MarkDirty();
@@ -161,7 +86,7 @@ namespace Surge
         for(const auto& [name, tex] : mTextures)
         {
             const ShaderResource* resource = FindResource(name);
-            SG_ASSERT(resource, "Material::UpdateForRendering: '{}' is not a reflected texture name!", name.c_str());
+            SG_ASSERT(resource, "Material::UpdateForRendering: '{}' is not a reflected texture name!", name);
 
             DescriptorWrite write = {};
             write.Binding = resource->Binding;
@@ -176,24 +101,24 @@ namespace Surge
         mIsDirty[ctx.FrameIndex] = false;
     }
 
-    Ref<Material> Material::Create(const PipelineHandle& pipeline, const Shader& shader, const String& name)
+    Ref<Material> Material::Create()
     {
-        return Ref<Material>::Create(pipeline, shader, name);
-    }
-
-    Ref<Material> Material::Create(const String& path)
-    {
-        return Ref<Material>::Create(path);
+        // TODO: NOT HARDCODE Pipelines and shader names!
+        Renderer* r = Core::GetRenderer();
+        Ref<Material> material = Ref<Material>::Create(r->GetRenderGraphBlackBoard().MaterialPipeline, r->GetShaderManager().Get("Renderer3D.glsl"), "Material");
+        return material;
     }
 
     void Material::Initialize(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName)
     {
-        mRHI = Core::GetRenderer()->GetRHI().get();
+        Renderer* renderer = Core::GetRenderer();
+        mRHI = renderer->GetRHI().get();
         mRefletedBuffer = shader.GetReflectionData().GetBuffer(materialBufferName);
         mReflectedResources = shader.GetReflectionData().GetResources();
 
         mBufferBinding = mRefletedBuffer.Binding;
         mCPUData.Allocate(mRefletedBuffer.Size);
+        mCPUData.ZeroInitialize();
         mMaterialDescriptorSlot = static_cast<DescriptorSetSlot>(mRefletedBuffer.Set);
 
         mDescriptorSet = mRHI->CreateDescriptorSet(pipeline, mMaterialDescriptorSlot, DescriptorUpdateFrequency::DYNAMIC, materialBufferName.c_str());
@@ -224,68 +149,10 @@ namespace Surge
         }
         MarkDirty();
 
-    }
-
-    void Material::Serialize(const String& path)
-    {
-        nlohmann::json j;
-        j["Name"] = mName;
-        j["Shader"] = mShaderName;
-        nlohmann::json& props = j["Properties"];
-        for(const ShaderBufferMember& member : mRefletedBuffer.Members)
-        {
-            switch(member.DataType)
-            {
-                case ShaderDataType::FLOAT:
-                {
-                    props[member.Name] = mCPUData.Read<float>(member.MemoryOffset);
-                    break;
-                }
-                case ShaderDataType::INT:
-                {
-                    props[member.Name] = mCPUData.Read<int>(member.MemoryOffset);
-                    break;
-                }
-                case ShaderDataType::FLOAT2:
-                {
-                    const glm::vec2 v = mCPUData.Read<glm::vec2>(member.MemoryOffset);
-                    props[member.Name] = { v.x, v.y };
-                    break;
-                }
-                case ShaderDataType::FLOAT3:
-                {
-                    const glm::vec3 v = mCPUData.Read<glm::vec3>(member.MemoryOffset);
-                    props[member.Name] = { v.x, v.y, v.z };
-                    break;
-                }
-                case ShaderDataType::FLOAT4:
-                {
-                    const glm::vec4 v = mCPUData.Read<glm::vec4>(member.MemoryOffset);
-                    props[member.Name] = { v.x, v.y, v.z, v.w };
-                    break;
-                }
-                default:
-                    Log<Severity::Warn>("[Material] Skipping property '{}' unsupported type {}.", member.Name, SurgeReflect::EnumToString(member.DataType).data());
-                    break;
-            }
-        }
-
-        nlohmann::json& textures = j["Textures"];
-        for(const auto& [name, tex] : mTextures)
-        {
-            if(tex.Data1) // Ref<Texture2D> owned, has a valid AssetID
-                textures[name] = tex.Data1->GetID().Get();
-        }
-
-        std::ofstream file(path, std::ios::out | std::ios::trunc);
-        SG_ASSERT(file.is_open(), "[Material] Failed to write: '{}'", path);
-        file << j.dump(4);
-        file.close();
-    }
-
-    void Material::Deserialize(const String& path)
-    {
-
+        mWhiteTexture = renderer->GetWhiteTexture();
+        SetTexture("AlbedoMap", mWhiteTexture);
+        SetTexture("NormalMap", mWhiteTexture);
+        SetTexture("RoughnessMetallicMap", mWhiteTexture);
     }
 
     const Surge::ShaderResource* Material::FindResource(const String& name) const

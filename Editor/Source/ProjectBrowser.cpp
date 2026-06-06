@@ -484,20 +484,16 @@ namespace Surge
         editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
 
         // Create Start Scene and serialize it to the new project's Assets folder, then import it to get an AssetID reference
-        Ref<Scene> newScene = Ref<Scene>::Create();
-
         const String defaultScenePath = "Scenes/Main.srg";
         Filesystem::CreateOrEnsureDirectory(assetManagerPath / "Scenes");
-        Serializer::SerializeScene(mAssetManager->GetAbsolutePath(defaultScenePath), newScene.Raw());
-        sTempProjectBuffer.StartScene = mAssetManager->ImportLive(defaultScenePath, AssetType::SCENE, newScene);
-
-        // Serialize the new project file
-        Serializer::SerializeProject(sCreateProjectPath, &sTempProjectBuffer);
+        Ref<Scene> newScene = mAssetManager->Create<Scene>(defaultScenePath);
+        sTempProjectBuffer.StartScene = newScene->GetID();
 
         // Setup editor context with the new project and scene
         editor->LoadScene(std::move(newScene));
         editor->SetCurrentProject(sTempProjectBuffer);
 
+        Serializer::SerializeProject(sCreateProjectPath, &sTempProjectBuffer);
         SerializeRecentProject(sTempProjectBuffer.Name, sCreateProjectPath);
 
         sTempProjectBuffer.Clear();

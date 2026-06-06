@@ -3,14 +3,52 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Scene.hpp"
-#include "Surge/Serializer/Serializer.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "SurgeReflect/Enum.hpp"
+#include "stb_image.h"
 
 namespace Surge
 {
+    struct CBImageLoadData
+    {
+        Byte* Content = nullptr;
+        Uint Width = 0;
+        Uint Height = 0;
+        Uint Channels = 0;
+        String DebugName;
+    };
+
+    static CBImageLoadData LoadIcon(const String& path)
+    {
+        //stbi_set_flip_vertically_on_load(true);
+        int width = 0, height = 0, channels = 0;
+        stbi_uc* data = nullptr;
+        data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+        if(!data)
+        {
+            Log<Severity::Error>("Failed to load texture at path: {0}", path);
+            return CBImageLoadData {};
+        }
+
+        CBImageLoadData loadData;
+        loadData.Content = data;
+        loadData.Width = width;
+        loadData.Height = height;
+        loadData.Channels = channels;
+        return loadData;
+    }
+
+    static void FreeIcon(CBImageLoadData& data)
+    {
+        stbi_image_free(data.Content);
+        data.Content = nullptr;
+        data.Width = 0;
+        data.Height = 0;
+        data.Channels = 0;
+    }
+
     void ContentBrowserPanel::Init(void* panelInitArgs)
     {
         mCode = GetStaticCode();
@@ -25,7 +63,7 @@ namespace Surge
         desc.GenerateImGuiID = true;
         desc.Sampler = renderer->GetDefaultSampler();
 
-        TextureLoadData loadData = Texture2D::LoadData("Editor/Assets/Textures/Folder.png");
+        CBImageLoadData loadData = LoadIcon("Editor/Assets/Textures/Folder.png");
         desc.Width = loadData.Width;
         desc.Height = loadData.Height;
         desc.DebugName = "EditorFolderIcon";
@@ -33,9 +71,9 @@ namespace Surge
         desc.DataSize = loadData.Width * loadData.Height * 4;
         mDirectoryIconHandle = rhi->CreateImage(desc);
         mDirectoryIconImGuiID = rhi->GetImGuiImage(mDirectoryIconHandle);
-        Texture2D::FreeData(loadData);
+        FreeIcon(loadData);
 
-        loadData = Texture2D::LoadData("Editor/Assets/Textures/File.png");
+        loadData = LoadIcon("Editor/Assets/Textures/File.png");
         desc.Width = loadData.Width;
         desc.Height = loadData.Height;
         desc.InitialData = loadData.Content;
@@ -43,9 +81,9 @@ namespace Surge
         desc.DataSize = loadData.Width * loadData.Height * 4;
         mFileIconHandle = rhi->CreateImage(desc);
         mFileIconImGuiID = rhi->GetImGuiImage(mFileIconHandle);
-        Texture2D::FreeData(loadData);
+        FreeIcon(loadData);
 
-        loadData = Texture2D::LoadData("Editor/Assets/Textures/EmptyFolder.png");
+        loadData = LoadIcon("Editor/Assets/Textures/EmptyFolder.png");
         desc.Width = loadData.Width;
         desc.Height = loadData.Height;
         desc.InitialData = loadData.Content;
@@ -53,7 +91,7 @@ namespace Surge
         desc.DataSize = loadData.Width * loadData.Height * 4;
         mEmptyDirectoryIconHandle = rhi->CreateImage(desc);
         mEmptyDirectoryIconImGuiID = rhi->GetImGuiImage(mEmptyDirectoryIconHandle);
-        Texture2D::FreeData(loadData);
+        FreeIcon(loadData);
 
         mAssetManager = Core::GetAssetManager();
     }
@@ -315,11 +353,7 @@ namespace Surge
                                             if(ImGui::MenuItem("IMPORT"))
                                             {
                                                 String extension = item.Path_.extension().string();
-                                                AssetType typeToImport = AssetType::NONE;
-                                                if(extension == ".gltf" || extension == ".glb") typeToImport = AssetType::MESH;
-                                                else if(extension == ".png" || extension == ".jpg" || extension == ".tga") typeToImport = AssetType::TEXTURE2D;
-                                                else if(extension == ".srg") typeToImport = AssetType::SCENE;
-
+                                                AssetType typeToImport = AssetTypeFromExtension(extension.c_str());
                                                 if(typeToImport != AssetType::NONE)
                                                 {
                                                     String relativeToAssets = std::filesystem::relative(item.Path_, mBaseDirectory).generic_string();
@@ -364,25 +398,42 @@ namespace Surge
                         {
                             if(ImGui::MenuItem("Scene"))
                             {
-                                Path newFilePath = mCurrentDirectory / "NewScene.srg";
+                                const char* extension = GetExtensionFromAssetType(AssetType::SCENE);
+                                Path newFilePath = mCurrentDirectory / ("NewScene" + String(extension));
                                 int count = 1;
                                 while(std::filesystem::exists(newFilePath))
                                 {
-                                    newFilePath = mCurrentDirectory / ("NewScene (" + std::to_string(count) + ").srg");
+                                    newFilePath = mCurrentDirectory / ("NewScene (" + std::to_string(count) + ")" + extension);
                                     count++;
                                 }
 
-                                Ref<Scene> newScene = Ref<Scene>::Create();
-                                Serializer::SerializeScene(newFilePath.string(), newScene.Raw());
                                 String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
-                                AssetID newId = mAssetManager->ImportLive(relativeToAssets, AssetType::SCENE, newScene);
+                                Ref<Scene> newScene = mAssetManager->Create<Scene>(relativeToAssets);
 
-                                if(newId.IsValid())
+                                if(newScene)
                                     mSelectedPath = newFilePath;
 
                                 mNeedsCacheRefresh = true;
                             }
-                            if(ImGui::MenuItem("Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new material asset"); }
+                            if(ImGui::MenuItem("Material"))
+                            {
+                                const char* extension = GetExtensionFromAssetType(AssetType::MATERIAL);
+                                Path newFilePath = mCurrentDirectory / ("NewMaterial" + String(extension));
+                                int count = 1;
+                                while(std::filesystem::exists(newFilePath))
+                                {
+                                    newFilePath = mCurrentDirectory / ("NewMaterial (" + std::to_string(count) + ")" + extension);
+                                    count++;
+                                }
+
+                                String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
+                                Ref<Material> newMaterial = mAssetManager->Create<Material>(relativeToAssets);
+
+                                if(newMaterial)
+                                    mSelectedPath = newFilePath;
+
+                                mNeedsCacheRefresh = true;
+                            }
                             if(ImGui::MenuItem("Physics Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new physics material asset"); }
 
                             ImGui::EndMenu();
@@ -529,7 +580,7 @@ namespace Surge
 
                         // Column 3: Relative Path
                         ImGui::TableSetColumnIndex(3);
-                        ImGui::TextWrapped("%s", meta.RelativePath.c_str());
+                        ImGui::Text("%s", meta.RelativePath.c_str());
 
                         // Column 4: Actions
                         ImGui::TableSetColumnIndex(4);

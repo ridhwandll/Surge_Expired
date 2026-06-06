@@ -3,11 +3,13 @@
 #include "Surge/ECS/Components.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Editor.hpp"
+#include "MaterialEditorPanel.hpp"
+#include "ContentBrowserPanel.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
-#include "ContentBrowserPanel.hpp"
 
 namespace Surge
 {
@@ -17,7 +19,8 @@ namespace Surge
         const int64_t& hash = SurgeReflect::GetReflection<XComponent>()->GetHash();
         ImGui::PushID(static_cast<int>(hash));
 
-        bool open = ImGuiAux::PropertyGridHeader(name.c_str());
+
+        bool open = ImGuiAux::PropertyGridHeader(name);
 
         bool remvove = false;
         if (open)
@@ -205,113 +208,50 @@ namespace Surge
                 {
                     ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
 
-                    const Ref<Mesh>& mesh = Core::GetAssetManager()->Load<Mesh>(component.MeshID);
+                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(component.MeshID);
                     if(!mesh)
-                        ImGui::TextUnformatted("MISSING");
+                    {
+                        ImGuiAux::ScopedBoldFont font;
+                        ImGui::TextColored(ImGuiAux::Colors::Red, "MISSING");
+                    }
                     else
                     {
-                        const Vector<Ref<Material>>& materials = mesh->GetMaterials();
+                        Vector<Ref<Material>>& materials = mesh->GetMaterials();
                         for(size_t i = 0; i < materials.size(); i++)
                         {
                             ImGui::PushID(i);
-                            const Ref<Material>& material = materials[i];
+                            Ref<Material>& material = materials[i];
                             const String& matName = material->GetName();
-                            // Force the Tree Node to span across BOTH columns of the main table
+
                             ImGui::TableNextRow();
                             ImGui::TableSetColumnIndex(0);
+                            ImGui::Text("Material [%zu]", i);
 
-                            // ImGuiTreeNodeFlags_SpanAllColumns makes the background highlight stretch beautifully
-                            bool nodeOpen = ImGui::TreeNodeEx(matName.c_str(), ImGuiTreeNodeFlags_SpanAllColumns);
-                            if(nodeOpen)
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::PushItemWidth(-FLT_MIN);
+
+                            if(ImGui::Button(matName.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)))
                             {
-                                // Name
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Name");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                ImGui::TextUnformatted(matName.c_str());
-                                ImGui::PopItemWidth();
-
-                                // Albedo
-                                glm::vec3 albedo = material->Get<glm::vec3>("Albedo");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Albedo");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::ColorEdit3("##v", &albedo.x))
-                                    material->Set<glm::vec3>("Albedo", albedo);
-                                ImGui::PopItemWidth();
-
-                                // Metallic
-                                float metallic = material->Get<float>("Metallic");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Metallic");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::SliderFloat("##Metallic", &metallic, 0.0f, 1.0f))
-                                    material->Set<float>("Metallic", metallic);
-                                ImGui::PopItemWidth();
-
-                                // Roughness
-                                float roughness = material->Get<float>("Roughness");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Roughness");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::SliderFloat("##Roughness", &roughness, 0.0f, 1.0f))
-                                    material->Set<float>("Roughness", roughness);
-                                ImGui::PopItemWidth();
-
-                                // useAlbedoMap
-                                bool useAlbedoMap = material->Get<int>("UseAlbedoMap");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Albedo Map");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::Checkbox("##UseAlbedoMap", &useAlbedoMap))
-                                    material->Set<int>("UseAlbedoMap", useAlbedoMap);
-                                ImGui::PopItemWidth();
-
-                                // useMetallicMap
-                                bool useMetallicMap = material->Get<int>("UseMetallicMap");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Metallic Map");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::Checkbox("##UseMetallicMap", &useMetallicMap))
-                                    material->Set<int>("UseMetallicMap", useMetallicMap);
-                                ImGui::PopItemWidth();
-
-                                // useRoughnessMap
-                                bool useRoughnessMap = material->Get<int>("UseRoughnessMap");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Roughness Map");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::Checkbox("##UseRoughnessMap", &useRoughnessMap))
-                                    material->Set<int>("UseRoughnessMap", useRoughnessMap);
-                                ImGui::PopItemWidth();
-
-                                // useNormalMap
-                                bool useNormalMap = material->Get<int>("UseNormalMap");
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted("Normal Map");
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::PushItemWidth(-FLT_MIN);
-                                if(ImGui::Checkbox("##UseNormalMap", &useNormalMap))
-                                    material->Set<int>("UseNormalMap", useNormalMap);
-                                ImGui::PopItemWidth();
-
-                                ImGui::TreePop();
+                                auto* editor = static_cast<Editor*>(Core::GetClient());
+                                editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(material);
                             }
+
+                            // TODO: Make the material slot a drag & drop target for easier material assignment
+                            //if(ImGui::BeginDragDropTarget())
+                            //{
+                            //    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                            //    {
+                            //        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                            //        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                            //        AssetMetadata meta = Core::GetAssetManager()->GetMetadata(droppedAssetID);
+                            //
+                            //        if(meta.Type == AssetType::MATERIAL)
+                            //            material = Core::GetAssetManager()->Load<Material>(droppedAssetID);
+                            //    }
+                            //    ImGui::EndDragDropTarget();
+                            //}
+
+                            ImGui::PopItemWidth();
                             ImGui::PopID();
                         }
                     }

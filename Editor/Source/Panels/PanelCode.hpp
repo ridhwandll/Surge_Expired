@@ -9,6 +9,7 @@ namespace Surge
         SceneHierarchy,
         Inspector,
         ContentBrowser,
+        MaterialEditor
     };
 
     constexpr const char* PanelCodeToString(PanelCode code)
@@ -19,6 +20,7 @@ namespace Surge
             case PanelCode::SceneHierarchy: return "Hierarchy";
             case PanelCode::Inspector: return "Inspector";
             case PanelCode::ContentBrowser: return "ContentBrowser";
+            case PanelCode::MaterialEditor: return "MaterialEditor";
         }
         return nullptr;
     }

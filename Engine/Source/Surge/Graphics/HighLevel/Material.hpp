@@ -17,10 +17,10 @@ namespace Surge
     class Material : public Asset
     {
     public:
-        Material(const String& path);
         Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
         ~Material();
         SURGE_ASSET_TYPE(AssetType::MATERIAL)
+        static Ref<Material> Create();
 
         void SetName(const String& name) { mName = name; }
         const String& GetName() const { return mName; }
@@ -50,6 +50,7 @@ namespace Surge
             return mCPUData.Read<T>(member->MemoryOffset);
         }
 
+        const Ref<Texture2D>& GetTexture(const String& name);
         void SetTexture(const String& name, const Ref<Texture2D>& texture);
         void SetTexture(const String& name, ImageHandle handle);
 
@@ -63,12 +64,8 @@ namespace Surge
                 mIsDirty[i] = true;
         }
 
-        static Ref<Material> Create(const String& path);
-        static Ref<Material> Create(const PipelineHandle& pipeline, const Shader& shader, const String& name = "DefaultMaterial");
     private:
         void Initialize(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName);
-        void Serialize(const String& path);
-        void Deserialize(const String& path);
         const ShaderResource* FindResource(const String& name) const;
     private:
         String mName;
@@ -83,9 +80,10 @@ namespace Surge
 
         mutable MemoryBlock mCPUData;
         std::unordered_map<String, Pair<Ref<Texture2D>, ImageHandle>> mTextures;
-
+        ImageHandle mWhiteTexture;
         mutable bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
         GraphicsRHI* mRHI;
+        friend class MaterialSerializer;
     };
 
 } // namespace Surge

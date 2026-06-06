@@ -58,7 +58,7 @@ namespace Surge
         ImGuiAux::ScopedStyle headerPaddingAndHeight({ImGuiStyleVar_FramePadding}, ImVec2 {framePaddingX, framePaddingY});
 
         ImGui::PushID(name.c_str());
-        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]); // Bold font
         String uppercaseName = name;
         for (char& n : uppercaseName)
             n = toupper(n);
@@ -73,6 +73,9 @@ namespace Surge
             if (!open)
                 ImGui::SetCursorPosY(ImGui::GetCursorPosY() + headerSpacingOffset);
         }
+
+        if(!open)
+            ImGui::Dummy({ 0.0f, 5.0f });
 
         return open;
     }

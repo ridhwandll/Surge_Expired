@@ -2,12 +2,14 @@
 #include <Surge/Surge.hpp>
 #include "Editor.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 #include "Utility/ImGuiAux.hpp"
 #include "Panels/ViewportPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
 #include "Panels/ContentBrowserPanel.hpp"
+#include "Panels/MaterialEditorPanel.hpp"
 
 namespace Surge
 {
@@ -29,6 +31,7 @@ namespace Surge
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
         mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
         mPanelManager.PushPanel<ContentBrowserPanel>();
+        mPanelManager.PushPanel<MaterialEditorPanel>();
 
         mProjectBrowser.Init();
 

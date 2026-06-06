@@ -44,7 +44,6 @@ namespace Surge
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
         void ShowInternalImGui(bool show) { mGraph.ShowInternalImGui(show); }
-        Ref<Material> CreateMaterial(const String& debugName = "Material");
         void SubmitDirLightDebug(const glm::vec3& origin, const glm::vec3& forward, const glm::vec4& color);
         const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }
         FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }

@@ -2,15 +2,13 @@
 #pragma once
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Panels/PanelManager.hpp"
-#include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "ProjectBrowser.hpp"
 
 namespace Surge
 {
     class ViewportPanel;
+    class Renderer;
     class Editor : public Surge::Client
     {
     public:
@@ -42,7 +40,6 @@ namespace Surge
         bool mShowRuntimeView = false;
         bool mShowAxes = true;
 
-        Ref<Texture2D> mRidTex;
         EditorCamera mCamera;
         Renderer* mRenderer;
         AssetManager* mAssetManager;
