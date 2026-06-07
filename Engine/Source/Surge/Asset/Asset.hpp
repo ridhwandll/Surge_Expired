@@ -3,6 +3,7 @@
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Core/Memory.hpp"
 #include <cstring>
+#include <array>
 
 #define SURGE_MEMORY_ASSET_PREFIX "Engine://"
 
@@ -10,6 +11,7 @@ namespace Surge
 {
     using AssetID = UUID;
 
+    // Register all asset types here
     enum class AssetType : uint8_t
     {
         NONE = 0,
@@ -18,6 +20,14 @@ namespace Surge
         MESH,
         MATERIAL,
         SCENE,
+    };
+
+    inline constexpr auto sAssetTypeArray = std::array {
+        AssetType::TEXTURE2D,
+        AssetType::SPRITE,
+        AssetType::MESH,
+        AssetType::MATERIAL,
+        AssetType::SCENE
     };
 
     inline AssetType AssetTypeFromString(const char* str)
@@ -39,10 +49,11 @@ namespace Surge
         return AssetType::NONE;
     }
 
-    inline const char* GetExtensionFromAssetType(AssetType type)
+    inline constexpr const char* GetExtensionFromAssetType(AssetType type)
     {
         switch(type)
         {
+            case AssetType::MESH: return ".smesh";
             case AssetType::MATERIAL: return ".smat";
             case AssetType::SCENE: return ".srg";
             default:

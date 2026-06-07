@@ -23,6 +23,8 @@ namespace Surge
         SURGE_ASSET_TYPE(AssetType::SCENE);
         static Ref<Scene> Create() { return Ref<Scene>::Create(); }
 
+        SURGE_DISABLE_COPY_AND_MOVE(Scene);
+
         void OnRuntimeStart();
         void Update(); // Runtime Update
         void Update(EditorCamera& camera); // EditorCam Update
@@ -46,6 +48,8 @@ namespace Surge
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
     private:
         void AddStartupEntities();
+
+
     private:
         entt::registry mRegistry;
     };

@@ -10,6 +10,7 @@
 #endif
 #include <cgltf.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <fstream>
 
 namespace Surge
 {
@@ -18,14 +19,41 @@ namespace Surge
         mSerializerType = AssetType::MESH;
     }
 
+    static String GetSidecarPath(const String& meshPath)
+    {
+        return meshPath + ".sasset";
+    }
+
     bool MeshSerializer::Serialize(Ref<Asset> asset) const
     {
-        bool result = false;
-        //AssetManager* assetManager = Core::GetAssetManager();
-        //const AssetMetadata& metadata = assetManager->GetMetadata(asset->GetID());
-        //String absolutePath = assetManager->GetAbsolutePath(metadata.RelativePath);
-        SG_ASSERT_INTERNAL("[MeshSerializer] Serialize: You can not serialize Meshses yet");
-        return result;
+        Ref<Mesh> mesh = asset.As<Mesh>();
+        AssetManager* am = Core::GetAssetManager();
+        const String sidecarPath = GetSidecarPath(am->GetAbsolutePath(am->GetMetadata(asset->GetID()).RelativePath));
+
+        std::ofstream f(sidecarPath, std::ios::binary | std::ios::trunc);
+        if (!f.is_open())
+        {
+            Log<Severity::Error>("[MeshSerializer] Failed to write sidecar!");
+            return false;
+        }
+
+        // Only write slots that actually have a user override
+        const Vector<Ref<Material>>& overrides = mesh->GetMaterialOverrides();
+
+        Uint overrideCount = overrides.size();
+        f.write(reinterpret_cast<const char*>(&overrideCount), sizeof(Uint));
+        for(Uint i = 0; i < overrideCount; i++)
+        {
+            if(!overrides[i])
+                continue;
+
+            Uint slotIndex = i;
+            uint64_t rawID = overrides[i]->GetID().Get();
+            f.write(reinterpret_cast<const char*>(&slotIndex), sizeof(Uint));
+            f.write(reinterpret_cast<const char*>(&rawID), sizeof(uint64_t));
+        }
+
+        return true;
     }
 
     Ref<Asset> MeshSerializer::Deserialize(const AssetMetadata& metadata) const
@@ -39,9 +67,28 @@ namespace Surge
             absolutePath = assetManager->GetAbsolutePath(metadata.RelativePath);
 
         MeshSpecification spec = LoadMesh(absolutePath);
-        Ref<Mesh> mesh = Mesh::Create(std::move(spec));
 
-        return mesh.As<Asset>();
+        const String sidecarPath = GetSidecarPath(absolutePath);
+        std::ifstream sidecar(sidecarPath, std::ios::binary);
+        if(sidecar.is_open())
+        {
+            Uint overrideCount = 0;
+            sidecar.read(reinterpret_cast<char*>(&overrideCount), sizeof(Uint));
+
+            spec.MaterialOverrides.resize(spec.Materials.size(), AssetID::INVALID);
+
+            for(Uint i = 0; i < overrideCount; i++)
+            {
+                Uint slotIndex = 0;
+                uint64_t rawID = 0;
+                sidecar.read(reinterpret_cast<char*>(&slotIndex), sizeof(Uint));
+                sidecar.read(reinterpret_cast<char*>(&rawID), sizeof(uint64_t));
+
+                if(slotIndex < spec.Materials.size())
+                    spec.MaterialOverrides[slotIndex] = AssetID(rawID);
+            }
+        }
+        return Mesh::Create(std::move(spec)).As<Asset>();
     }
 
     void MeshSerializer::Shutdown()
@@ -129,7 +176,7 @@ namespace Surge
         submesh.BoundingBox.Max = maxBound;
 
 
-        outSpec.Materials.emplace_back(Material::Create());
+        outSpec.Materials.emplace_back(Material::Create("DefaultMaterial"));
         outSpec.Materials[0]->SetName("DefaultMaterial");
         outSpec.Materials[0]->Set<glm::vec3>("Albedo", glm::vec3(0.8f));
         outSpec.Materials[0]->Set<float>("Metallic", 0.5f);
@@ -341,7 +388,7 @@ namespace Surge
         //    metallic_roughness_texture = R = occlusion G = roughness B = metalness
 
         {
-            SCOPED_TIMER("MeshSerializer::LoadMesh  Material Extraction");
+            SCOPED_TIMER("MeshSerializer::LoadMesh Material Extraction");
             if(data->materials_count > 0)
             {
                 spec.Materials.resize(data->materials_count);
@@ -349,12 +396,11 @@ namespace Surge
                 for(size_t i = 0; i < data->materials_count; i++)
                 {
                     cgltf_material& mat = data->materials[i];
-                    const String materialName = mat.name ? mat.name : "No Name";
+                    const String materialName = mat.name ? mat.name : "Unnamed";
 
                     // Must not be from AssetManager (loaded form mesh)
-                    Ref<Material> material = Material::Create();
+                    Ref<Material> material = Material::Create(materialName);
                     spec.Materials[i] = material;
-                    material->SetName(materialName);
 
                     // Defaults
                     ImageHandle whiteTexture = Core::GetRenderer()->GetWhiteTexture();

@@ -5,9 +5,15 @@
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 #include "SurgeReflect/Enum.hpp"
-#include "stb_image.h"
+
+#include "Utility/ImGuiAux.hpp"
+#include "MaterialEditorPanel.hpp"
+#include "Editor.hpp"
+
+#include <stb_image.h>
+#include <execution>
 
 namespace Surge
 {
@@ -106,6 +112,7 @@ namespace Surge
     void ContentBrowserPanel::RefreshDirectoryCache()
     {
         mCurrentDirectoryItems.clear();
+        Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
 
         for(auto& directoryEntry : std::filesystem::directory_iterator(mCurrentDirectory))
         {
@@ -129,6 +136,12 @@ namespace Surge
                 {
                     item.IsRegisteredAsset = true;
                     AssetMetadata meta = mAssetManager->GetMetadata(item.Id);
+
+                    if(meta.Type == AssetType::TEXTURE2D && meta.IsLoaded())
+                        item.ThumbnailImGuiID = rhi->GetImGuiImage(mAssetManager->Load<Texture2D>(item.Id)->GetRHIImage());
+                    else
+                        item.ThumbnailImGuiID = NULL;
+
                     item.AssetTypeStr = SurgeReflect::EnumToString(meta.Type).data();
                 }
             }
@@ -158,7 +171,10 @@ namespace Surge
     {
         EventDispatcher dispatcher(e);
         // TODO: Press spacebar to hide/show content browser like in Unreal Engine 5
-        //dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {});
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
+            if(keyEvent.GetKeyCode() == Key::F2)
+                StartRename(mSelectedPath);
+                                             });
     }
 
     void ContentBrowserPanel::Render(bool* show)
@@ -188,6 +204,7 @@ namespace Surge
                         mCurrentDirectory = mCurrentDirectory.parent_path();
                         mSelectedPath.clear();
                         mNeedsCacheRefresh = true;
+                        mIsRenaming = false;
                         ClearContentBrowserSearchBuffer();
                     }
                     ImGui::SameLine();
@@ -246,12 +263,10 @@ namespace Surge
                     {
                         int rowCount = (int)std::ceil((float)mItemsToDisplay.size() / (float)columnCount);
 
-                        // Only loops through items currently visible on the screen
                         ImGuiListClipper clipper;
                         clipper.Begin(rowCount);
                         while(clipper.Step())
                         {
-                            // Note(Rid): This ImGuiListClipper logic is generated via Gemini 3.1 pro (idk tf is going on and how to clip)
                             for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
                             {
                                 for(int col = 0; col < columnCount; ++col)
@@ -271,33 +286,46 @@ namespace Surge
                                     else if(item.IsRegisteredAsset)
                                         itemColor = ImGuiAux::Colors::LightGreen;
 
-                                    if(mSelectedPath == item.Path_)
-                                        itemColor = accentColor;
+                                    bool isSelected = (mSelectedPath == item.Path_);
 
-                                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.0f));
+                                    ImGui::PushStyleColor(ImGuiCol_Button, isSelected ? ImVec4(ImGuiAux::Colors::Nickel) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
                                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(itemColor.x + 0.1f, itemColor.y + 0.1f, itemColor.z + 0.1f, 1.0f));
                                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(itemColor.x - 0.1f, itemColor.y - 0.1f, itemColor.z - 0.1f, 1.0f));
                                     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
 
+                                    ImTextureID iconID = mFileIconImGuiID;
                                     if(item.IsDirectory)
+                                        iconID = item.IsDirectoryEmpty ? mEmptyDirectoryIconImGuiID : mDirectoryIconImGuiID;
+                                    else if(item.IsRegisteredAsset && item.ThumbnailImGuiID != NULL)
+                                        iconID = item.ThumbnailImGuiID;
+
+                                    if(ImGui::ImageButton("##Icon", iconID, ImVec2(mThumbnailSize, mThumbnailSize)))
+                                        mSelectedPath = item.Path_;
+
+                                    ImVec2 btnMin = ImGui::GetItemRectMin();
+                                    ImVec2 btnMax = ImGui::GetItemRectMax();
+
+                                    if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                                     {
-                                        ImTextureID iconID = item.IsDirectoryEmpty ? mEmptyDirectoryIconImGuiID : mDirectoryIconImGuiID;
-                                        if(ImGui::ImageButton("##Directory", iconID, ImVec2(mThumbnailSize, mThumbnailSize)))
+                                        if(item.IsDirectory)
                                         {
                                             mCurrentDirectory /= item.Filename;
                                             mSelectedPath.clear();
                                             mNeedsCacheRefresh = true;
+                                            mIsRenaming = false;
                                             ClearContentBrowserSearchBuffer();
                                         }
+                                        else if(item.IsRegisteredAsset)
+                                        {
+                                            if (item.AssetTypeStr == "MATERIAL")
+                                            {
+                                                Editor* editor = (Editor*)Core::GetClient();
+                                                editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(mAssetManager->Load<Material>(item.Id));
+                                            }
+                                            else // TODO: Double clicking an asset should open it in the Inspector
+                                                Log<Severity::Info>("[ContentBrowser] Double-clicked asset: {}", item.Filename);
+                                        }
                                     }
-                                    else
-                                    {
-                                        if(ImGui::ImageButton("##File", mFileIconImGuiID, ImVec2(mThumbnailSize, mThumbnailSize)))
-                                            mSelectedPath = item.Path_;
-                                    }
-
-                                    ImVec2 btnMin = ImGui::GetItemRectMin();
-                                    ImVec2 btnMax = ImGui::GetItemRectMax();
 
                                     // Drag Drop
                                     if(item.IsRegisteredAsset && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
@@ -307,10 +335,8 @@ namespace Surge
                                         ImGui::EndDragDropSource();
                                     }
 
-                                    //ASSET TYPE OVERLAY
+                                    // ASSET TYPE OVERLAY
                                     const char* overlayText = nullptr;
-
-                                    // Determine what text to show
                                     if(item.IsRegisteredAsset)
                                         overlayText = item.AssetTypeStr.c_str();
                                     else if(item.IsDirectory)
@@ -322,21 +348,16 @@ namespace Surge
                                         constexpr float bannerPadding = 3.0f;
                                         float typeWidth = ImGui::CalcTextSize(overlayText).x;
                                         float actualLineHeight = ImGui::GetTextLineHeight();
-                                        float textHeight = actualLineHeight * 1.5f; // Taller banner
+                                        float textHeight = actualLineHeight * 1.5f;
                                         float bannerHeight = textHeight + (bannerPadding * 2.0f);
-
-                                        // Calculate the starting Y position so the banner sits flush at the bottom
                                         float startY = btnMax.y - bannerHeight;
 
                                         ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-                                        // Draw the dark banner stretching across the bottom of the button
                                         drawList->AddRectFilled(
                                             ImVec2(btnMin.x, startY), btnMax,
                                             ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ExtraDark),
-                                            7.0f, ImDrawFlags_RoundCornersBottom );
+                                            7.0f, ImDrawFlags_RoundCornersBottom);
 
-                                        // Center the text mathematically
                                         float textX = btnMin.x + ((btnMax.x - btnMin.x) - typeWidth) * 0.5f;
                                         float textY = startY + bannerPadding + (textHeight - actualLineHeight) * 0.5f;
                                         drawList->AddText(ImVec2(textX, textY), ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColor1), overlayText);
@@ -346,9 +367,10 @@ namespace Surge
                                     ImGui::PopStyleColor(3);
 
                                     // Context Menu for specific files
-                                    if(!item.IsDirectory && !item.IsRegisteredAsset)
+                                    if(ImGui::BeginPopupContextItem())
                                     {
-                                        if(ImGui::BeginPopupContextItem())
+                                        // IMPORT
+                                        if(!item.IsDirectory && !item.IsRegisteredAsset)
                                         {
                                             if(ImGui::MenuItem("IMPORT"))
                                             {
@@ -361,25 +383,70 @@ namespace Surge
                                                     mNeedsCacheRefresh = true;
                                                 }
                                             }
-                                            ImGui::EndPopup();
                                         }
+                                        if(ImGui::MenuItem("Rename"))
+                                            StartRename(item.Path_);
+
+                                        ImGui::EndPopup();
                                     }
 
-                                    // Filename
                                     ImGui::PushFont(regularFont, 15.0f);
-                                    float textWidth = ImGui::CalcTextSize(item.Filename.c_str()).x;
 
-                                    if(textWidth > mThumbnailSize)
+                                    // RENAME INPUT
+                                    if(mIsRenaming && mRenamingPath == item.Path_)
                                     {
-                                        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + mThumbnailSize);
-                                        ImGui::TextWrapped("%s", item.Filename.c_str());
-                                        ImGui::PopTextWrapPos();
+                                        ImGui::PushItemWidth(mThumbnailSize);
+                                        if(mFocusRenameInput)
+                                        {
+                                            ImGui::SetKeyboardFocusHere();
+                                            mFocusRenameInput = false;
+                                        }
+                                        // Execute rename on Enter key
+                                        if(ImGui::InputText("##Rename", mRenameBuffer, IM_ARRAYSIZE(mRenameBuffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                                        {
+                                            std::filesystem::path newPath = mCurrentDirectory / mRenameBuffer;
+                                            if(newPath != item.Path_ && !std::filesystem::exists(newPath))
+                                            {
+                                                std::filesystem::rename(item.Path_, newPath);
+
+                                                if(item.IsRegisteredAsset)
+                                                {
+                                                    String newRelativePath = std::filesystem::relative(newPath, mBaseDirectory).generic_string();
+                                                    mAssetManager->UpdateAssetPath(item.Id, newRelativePath);
+                                                    if (item.AssetTypeStr == "MATERIAL")
+                                                    {
+                                                        mAssetManager->Load<Material>(item.Id)->SetName(Filesystem::GetNameWithoutExtension(mRenameBuffer));
+                                                        mAssetManager->Save(item.Id);
+                                                        mAssetManager->Unload(item.Id);
+                                                    }
+                                                }
+                                                mSelectedPath = newPath;
+                                                mNeedsCacheRefresh = true;
+                                            }
+                                            mIsRenaming = false;
+                                        }
+
+                                        // Cancel rename if the user clicks anywhere else
+                                        if(!ImGui::IsItemActive() && !mFocusRenameInput && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)))
+                                            mIsRenaming = false;
+
+                                        ImGui::PopItemWidth();
                                     }
-                                    else
+                                    else // FILENAME
                                     {
-                                        float textOffset = (mThumbnailSize - textWidth) * 0.5f;
-                                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textOffset);
-                                        ImGui::Text("%s", item.Filename.c_str());
+                                        float textWidth = ImGui::CalcTextSize(item.Filename.c_str()).x;
+                                        if(textWidth > mThumbnailSize)
+                                        {
+                                            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + mThumbnailSize);
+                                            ImGui::TextWrapped("%s", item.Filename.c_str());
+                                            ImGui::PopTextWrapPos();
+                                        }
+                                        else
+                                        {
+                                            float textOffset = (mThumbnailSize - textWidth) * 0.5f;
+                                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textOffset);
+                                            ImGui::Text("%s", item.Filename.c_str());
+                                        }
                                     }
 
                                     ImGui::PopFont();
@@ -399,38 +466,40 @@ namespace Surge
                             if(ImGui::MenuItem("Scene"))
                             {
                                 const char* extension = GetExtensionFromAssetType(AssetType::SCENE);
-                                Path newFilePath = mCurrentDirectory / ("NewScene" + String(extension));
+                                std::filesystem::path newFilePath = mCurrentDirectory / ("NewScene" + String(extension));
                                 int count = 1;
                                 while(std::filesystem::exists(newFilePath))
                                 {
                                     newFilePath = mCurrentDirectory / ("NewScene (" + std::to_string(count) + ")" + extension);
                                     count++;
                                 }
-
                                 String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
                                 Ref<Scene> newScene = mAssetManager->Create<Scene>(relativeToAssets);
-
                                 if(newScene)
+                                {
                                     mSelectedPath = newFilePath;
+                                    StartRename(newFilePath);
+                                }
 
                                 mNeedsCacheRefresh = true;
                             }
                             if(ImGui::MenuItem("Material"))
                             {
                                 const char* extension = GetExtensionFromAssetType(AssetType::MATERIAL);
-                                Path newFilePath = mCurrentDirectory / ("NewMaterial" + String(extension));
+                                std::filesystem::path newFilePath = mCurrentDirectory / ("NewMaterial" + String(extension));
                                 int count = 1;
                                 while(std::filesystem::exists(newFilePath))
                                 {
                                     newFilePath = mCurrentDirectory / ("NewMaterial (" + std::to_string(count) + ")" + extension);
                                     count++;
                                 }
-
                                 String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
-                                Ref<Material> newMaterial = mAssetManager->Create<Material>(relativeToAssets);
-
+                                Ref<Material> newMaterial = mAssetManager->Create<Material>(relativeToAssets, "New Material");
                                 if(newMaterial)
+                                {
                                     mSelectedPath = newFilePath;
+                                    StartRename(newFilePath);
+                                }
 
                                 mNeedsCacheRefresh = true;
                             }
@@ -454,12 +523,11 @@ namespace Surge
                 constexpr float sliderWidth = 150.0f;
                 float refreshButtonWidth = ImGui::CalcTextSize("Refresh").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 
-                // Calculate checkbox width: Square height + Inner spacing + Text width
                 float checkboxWidth = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x;
                 float spacing = ImGui::GetStyle().ItemSpacing.x;
                 float totalRightWidth = sliderWidth + refreshButtonWidth + checkboxWidth + (spacing * 2.0f);
 
-                ImGui::SameLine(ImGui::GetWindowWidth() - totalRightWidth - ImGui::GetStyle().WindowPadding.x); // Push cursor to the right
+                ImGui::SameLine(ImGui::GetWindowWidth() - totalRightWidth - ImGui::GetStyle().WindowPadding.x);
 
                 ImGui::Checkbox("##RegisteredOnly", &mShowOnlyRegisteredAssets);
                 if(ImGui::IsItemHovered())
@@ -476,10 +544,10 @@ namespace Surge
             ImGui::End();
         }
 
+        RenderAssetRegistry(show);
+
         if(mNeedsCacheRefresh)
             RefreshDirectoryCache();
-
-        RenderAssetRegistry(show);
     }
 
     void ContentBrowserPanel::RenderAssetRegistry(bool* show)
@@ -490,32 +558,76 @@ namespace Surge
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
             if(*show)
             {
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 
-                if(ImGuiAux::Button("Save Registry to Disk"))
+                ImGui::PushFont(boldFont);
+                if(ImGuiAux::Button("SERIALIZE TO DISK"))
                     mAssetManager->SerializeRegistry();
-
                 ImGui::SameLine();
 
-                if (mAssetRegistrySearchBuffer[0] != '\0')
+                if(ImGuiAux::Button("UNLOAD UNUSED"))
+                {
+                    const auto& currentRegistry = mAssetManager->GetRegistryMap();
+                    for(const auto& [id, meta] : currentRegistry)
+                    {
+                        if(HasFlag(meta.Flags, AssetFlags::LOADED) && !HasFlag(meta.Flags, AssetFlags::MEMORY))
+                        {
+                            // If the AssetManager is the ONLY thing holding a reference (refCount <= 1)
+                            if(mAssetManager->GetAssetRefCount(id) <= 1)
+                                mToUnload.push_back(id);
+                        }
+                    }
+                }
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Frees ALL LOADED assets that are NOT actively referenced in the scene");
+                ImGui::SameLine();
+                ImGui::PopFont();
+
+                if(mAssetRegistrySearchBuffer[0] != '\0')
                 {
                     ImGui::PushFont(boldFont);
                     ImGui::TextColored(ImGuiAux::Colors::Gold, "SEARCH FILTER IS ACTIVE");
                     ImGui::PopFont();
                     ImGui::SameLine();
                 }
+                const auto& registryMap = mAssetManager->GetRegistryMap();
 
-                // SEARCH BAR
-                ImGui::SameLine(ImGui::GetWindowWidth() - 250.0f - ImGui::GetStyle().WindowPadding.x);
-                ImGui::SetNextItemWidth(250.0f);
+                float searchBarWidth = 250.0f;
+                float comboWidth = 140.0f;
+                float spacing = ImGui::GetStyle().ItemSpacing.x;
+                float totalRightWidth = searchBarWidth + comboWidth + spacing;
+
+                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - totalRightWidth);
+
+                // FILTER COMBO BOX
+                ImGui::SetNextItemWidth(comboWidth);
+                String currentComboPreview = mSelectedFilterType == AssetType::NONE ? "ALL TYPES" : SurgeReflect::EnumToString(mSelectedFilterType).data();
+                if(ImGui::BeginCombo("##TypeFilter", currentComboPreview.c_str()))
+                {
+                    if(ImGui::Selectable("ALL TYPES", mSelectedFilterType == AssetType::NONE))
+                        mSelectedFilterType = AssetType::NONE;
+
+                    for(AssetType type : sAssetTypeArray)
+                    {
+                        bool isSelected = (mSelectedFilterType == type);
+                        if(ImGui::Selectable(SurgeReflect::EnumToString(type).data(), isSelected))
+                            mSelectedFilterType = type;
+
+                        if(isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SameLine();
+
+                // ASSET REGISTRY SEARCH BAR 
+                ImGui::SetNextItemWidth(searchBarWidth);
                 ImGui::InputTextWithHint("##RegistrySearch", "Search ID, Type, or Path...", mAssetRegistrySearchBuffer, IM_ARRAYSIZE(mAssetRegistrySearchBuffer));
 
-                // Prepare search string
                 String searchStr = mAssetRegistrySearchBuffer;
                 std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
-                bool hasSearch = !searchStr.empty();
+                ImGui::PopStyleVar(); // Frame rounding
 
-                ImGui::PopStyleVar();
                 ImGui::Dummy(ImVec2(0, 5.0f));
                 ImGui::Separator();
                 ImGui::Dummy(ImVec2(0, 5.0f));
@@ -531,24 +643,13 @@ namespace Surge
                     ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 80.0f);
                     ImGui::TableHeadersRow();
 
-                    const auto& registryMap = mAssetManager->GetRegistryMap();
-
-                    for(const auto& [id, meta] : registryMap)
+                    for(const auto& entry : registryMap)
                     {
-                        // APPLY SEARCH FILTER
-                        if(hasSearch)
-                        {
-                            String idStr = std::to_string(id.Get());
-                            String typeStr = SurgeReflect::EnumToString(meta.Type).data();
-                            String pathStr = meta.RelativePath;
+                        const AssetID& id = entry.first;
+                        const AssetMetadata& meta = entry.second;
 
-                            std::transform(typeStr.begin(), typeStr.end(), typeStr.begin(), ::tolower);
-                            std::transform(pathStr.begin(), pathStr.end(), pathStr.begin(), ::tolower);
-
-                            // If the search string isn't found in ID, Type, OR Path, skip this row
-                            if(idStr.find(searchStr) == std::string::npos && typeStr.find(searchStr) == std::string::npos && pathStr.find(searchStr) == std::string::npos)
-                                continue;
-                        }
+                        if (meta.Type != mSelectedFilterType && mSelectedFilterType != AssetType::NONE)
+                            continue;
 
                         ImGui::PushID(id.Get());
                         ImGui::TableNextRow();
@@ -567,9 +668,7 @@ namespace Surge
                         ImGui::TableSetColumnIndex(2);
                         ImGui::PushFont(boldFont);
                         if(HasFlag(meta.Flags, AssetFlags::MISSING))
-                        {
                             ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "MISSING");
-                        }
                         else if(HasFlag(meta.Flags, AssetFlags::MEMORY))
                             ImGui::TextColored(ImVec4(0.8f, 0.5f, 0.2f, 1.0f), "MEMORY");
                         else if(HasFlag(meta.Flags, AssetFlags::LOADED))
@@ -598,7 +697,7 @@ namespace Surge
                             if(refCount > 1)
                             {
                                 ImGui::BeginDisabled();
-                                ImGuiAux::Button(String("REFERENCES: " + std::to_string(refCount - 1)).c_str());
+                                ImGuiAux::Button(String("REFS: " + std::to_string(refCount - 1)).c_str());
                                 ImGui::EndDisabled();
 
                                 if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -629,10 +728,7 @@ namespace Surge
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
                             if(ImGuiAux::Button("UNREGISTER"))
-                            {
                                 mToUnregister.push_back(id);
-                                mNeedsCacheRefresh = true;
-                            }
 
                             ImGui::PopStyleColor(4);
                         }
@@ -640,15 +736,15 @@ namespace Surge
                         ImGui::PopID();
                     }
 
-                    for(const AssetID& id : mToUnload)
-                        mAssetManager->Unload(id);
-                    for(const AssetID& id : mToUnregister)
-                        mAssetManager->UnregisterAsset(id);
+                    for(const AssetID& id : mToUnload) { mAssetManager->Unload(id); }
+                    for(const AssetID& id : mToUnregister) { mAssetManager->UnregisterAsset(id); }
 
                     ImGui::EndTable();
 
-                    if (!mToUnload.empty()) mToUnload.clear();
-                    if (!mToUnregister.empty()) mToUnregister.clear();
+                    if(!mToUnload.empty())
+                        mToUnload.clear();
+                    if(!mToUnregister.empty())
+                        mToUnregister.clear();
                 }
             }
             else
@@ -659,6 +755,19 @@ namespace Surge
             }
         }
         ImGui::End();
+    }
+
+    void ContentBrowserPanel::StartRename(const Path& path)
+    {
+        // We don't allow renaming of directories in this implementation, 
+        // but this can be added in the future if needed. It just requires updating all child paths in the registry when a directory is renamed
+        if (std::filesystem::is_directory(path))
+            return;
+
+        mRenamingPath = path;
+        strncpy(mRenameBuffer, path.filename().string().c_str(), IM_ARRAYSIZE(mRenameBuffer));
+        mIsRenaming = true;
+        mFocusRenameInput = true;
     }
 
     void ContentBrowserPanel::Shutdown()

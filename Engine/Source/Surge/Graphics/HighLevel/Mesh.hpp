@@ -31,6 +31,7 @@ namespace Surge
         Vector<Vertex> Vertices;
         Vector<Index> Indices;
         Vector<Ref<Material>> Materials;
+        Vector<AssetID> MaterialOverrides;
     };
 
     class Mesh : public Asset
@@ -45,15 +46,39 @@ namespace Surge
         BufferHandle GetIndexBuffer() const { return mIndexBuffer; }
 
         const Vector<Submesh>& GetSubmeshes() const { return mSubmeshes; }
-        const Vector<Ref<Material>>& GetMaterials() const { return mMaterials; }
-        Vector<Ref<Material>>& GetMaterials() { return mMaterials; }
-        Ref<Material>& GetMaterialAtIndex(Uint index) { return mMaterials[index]; }
+
+        void SetMaterialOverride(Uint index, Ref<Material> material)
+        {
+            SG_ASSERT(index < mGLTFMaterials.size(), "Slot index out of range!");
+            if(mMaterialOverrides.size() <= index)
+                mMaterialOverrides.resize(mGLTFMaterials.size(), material);
+
+            mMaterialOverrides[index] = material;
+        }
+
+        void ClearMaterialOverride(Uint index)
+        {
+            if(index < mMaterialOverrides.size())
+                mMaterialOverrides[index].Reset();
+        }
+
+        bool HasOverride(Uint index) const
+        {
+            return index < mMaterialOverrides.size() && mMaterialOverrides[index];
+        }
+
+        Ref<Material> GetMaterialAtIndex(Uint index) const;
+
+        const Vector<Ref<Material>>& GetMaterials() const { return mGLTFMaterials; }
+        const Vector<Ref<Material>>& GetMaterialOverrides() const { return mMaterialOverrides; }
 
     private:
         Vector<Submesh> mSubmeshes;
         BufferHandle mVertexBuffer;
         BufferHandle mIndexBuffer;
-        Vector<Ref<Material>> mMaterials;
+
+        Vector<Ref<Material>> mGLTFMaterials;
+        Vector<Ref<Material>> mMaterialOverrides;
     };
 
 } // namespace Surge

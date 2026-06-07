@@ -21,11 +21,14 @@ namespace Surge
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mRHI->DestroyBuffer(mGPUBuffers[i]);
 
-        for(const auto& [name, tex] : mTextures)
-        {
-            if(tex.Data1) // If we have a Ref<Texture2D>, we own the texture and should destroy it. If we only have an ImageHandle, we don't own it and shouldn't destroy it
-                mRHI->DestroyImage(tex.Data2);
-        }
+        // (Rid) DO NOT destroy images here
+        // Ref<Texture2D> is an Asset and lifetime is managed by AssetManager when ref count reaches zero
+        // Asset entries (white texture etc.) are borrowed, never owned by Material
+        //for(const auto& [name, tex] : mTextures)
+        //{
+        //    if(tex.Data1)
+        //        mRHI->DestroyImage(tex.Data2);
+        //}
 
         mRHI->DestroyDescriptorSet(mDescriptorSet);
     }
@@ -101,11 +104,12 @@ namespace Surge
         mIsDirty[ctx.FrameIndex] = false;
     }
 
-    Ref<Material> Material::Create()
+    Ref<Material> Material::Create(const String& name)
     {
         // TODO: NOT HARDCODE Pipelines and shader names!
         Renderer* r = Core::GetRenderer();
         Ref<Material> material = Ref<Material>::Create(r->GetRenderGraphBlackBoard().MaterialPipeline, r->GetShaderManager().Get("Renderer3D.glsl"), "Material");
+        material->SetName(name);
         return material;
     }
 

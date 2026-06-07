@@ -23,7 +23,21 @@ namespace Surge
         mIndexBuffer = rhi->CreateBuffer(ibDesc);
 
         mSubmeshes = std::move(spec.Submeshes);
-        mMaterials = std::move(spec.Materials);
+        mGLTFMaterials = std::move(spec.Materials);
+
+        mMaterialOverrides.resize(mGLTFMaterials.size(), nullptr);
+
+        // Convert stored AssetIDs to live Refs
+        AssetManager* am = Core::GetAssetManager();
+        for(Uint i = 0; i < (Uint)spec.MaterialOverrides.size() && i < (Uint)mGLTFMaterials.size(); i++)
+        {
+            const AssetID& id = spec.MaterialOverrides[i];
+            if(id.IsValid())
+            {
+                mMaterialOverrides[i] = am->Load<Material>(id);
+                mGLTFMaterials[i].Reset(); // (Rid)Release the transient material loaded from glTF, since we have a user override for this slot
+            }
+        }
     }
 
     Mesh::~Mesh()
@@ -38,6 +52,16 @@ namespace Surge
     Ref<Mesh> Mesh::Create(MeshSpecification&& spec)
     {
         return Ref<Mesh>::Create(std::move(spec));
+    }
+
+    Ref<Material> Mesh::GetMaterialAtIndex(Uint index) const
+    {
+        SG_ASSERT(index < mGLTFMaterials.size(), "Material index out of range!");
+
+        if(index < mMaterialOverrides.size() && mMaterialOverrides[index])
+            return mMaterialOverrides[index]; // Actual user override, owned by user, created from editor or runtime
+
+        return mGLTFMaterials[index]; // Transient material from mesh, not owned by anyone, created from glTF
     }
 
 } // namespace Surge

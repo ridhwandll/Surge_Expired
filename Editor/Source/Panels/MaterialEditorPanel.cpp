@@ -104,35 +104,28 @@ namespace Surge
             ImGui::Dummy(ImGui::GetContentRegionAvail());
         }
 
-        if(ImGui::BeginDragDropTarget())
-        {
-            if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
-            {
-                SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
-                AssetID droppedAssetID = *(const AssetID*)payload->Data;
-                AssetMetadata meta = Core::GetAssetManager()->GetMetadata(droppedAssetID);
-
-                if(meta.Type == AssetType::MATERIAL)
-                    mSelectedMaterial = Core::GetAssetManager()->Load<Material>(droppedAssetID);
-            }
-            ImGui::EndDragDropTarget();
-        }
-
         if(mSelectedMaterial)
         {
+            // Do not let users edit the material if it is loaded from gltf (i.e. it doesn't have a valid AssetID and thus cannot be saved)
+            if(mSelectedMaterial->GetID() == AssetID::INVALID)
             {
                 ImGuiAux::ScopedBoldFont font;
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.55f, 0.15f, 1.0f)); // Deep Green
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.65f, 0.2f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.45f, 0.1f, 1.0f));
+                ImGui::TextUnformatted("This material is loaded from a glTF file and cannot be edited/saved");
+                ImGui::TextUnformatted("Create a new material, drop it to the mesh and then edit it!");
+                ImGui::BeginDisabled();
+            }
+            bool clearSelectedMaterial = false;
+            {
+                ImGuiAux::ScopedBoldFont font;
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 6.0f));
 
-                if(ImGui::Button("SAVE MATERIAL", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
+                if(ImGui::Button("SAVE"))
                     Core::GetAssetManager()->Save(mSelectedMaterial->GetID());
+                ImGui::SameLine();
+                if(ImGui::Button("CLEAR"))
+                    clearSelectedMaterial = true;
 
-                ImGui::PopStyleVar(2);
-                ImGui::PopStyleColor(3);
+                ImGui::PopStyleVar();
             }
 
             ImGui::Spacing();
@@ -181,9 +174,29 @@ namespace Surge
 
                 ImGui::EndTable();
             }
-        }
 
+            if(ImGui::BeginDragDropTarget())
+            {
+                if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                {
+                    SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                    AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                    AssetMetadata meta = Core::GetAssetManager()->GetMetadata(droppedAssetID);
+
+                    if(meta.Type == AssetType::MATERIAL)
+                        mSelectedMaterial = Core::GetAssetManager()->Load<Material>(droppedAssetID);
+                }
+                ImGui::EndDragDropTarget();
+            }
+
+            if(mSelectedMaterial->GetID() == AssetID::INVALID)
+                ImGui::EndDisabled();
+
+            if (clearSelectedMaterial)
+                mSelectedMaterial = nullptr;
+        }
         ImGui::End();
+
     }
 
     void MaterialEditorPanel::Shutdown()

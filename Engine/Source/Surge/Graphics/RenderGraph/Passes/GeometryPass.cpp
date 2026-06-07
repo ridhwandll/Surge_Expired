@@ -182,7 +182,6 @@ namespace Surge
             const Mesh& mesh = *cmd.Mesh_;
             mRHI->CmdBindVertexBuffer(ctx, mesh.GetVertexBuffer());
             mRHI->CmdBindIndexBuffer(ctx, mesh.GetIndexBuffer());
-            const Vector<Ref<Material>>& materials = mesh.GetMaterials();
 
             const Submesh* submeshes = mesh.GetSubmeshes().data();
             for(Uint i = 0; i < mesh.GetSubmeshes().size(); i++)
@@ -193,8 +192,9 @@ namespace Surge
                 pushConstants.Transform = cmd.Transform * submesh.Transform;
                 pushConstants.LightCount = (Uint)blackBoard.LightList.size();
 
-                materials[submesh.MaterialIndex]->UpdateForRendering(ctx);
-                materials[submesh.MaterialIndex]->Bind(ctx, m3DPipeline);
+                const Ref<Material> material = mesh.GetMaterialAtIndex(submesh.MaterialIndex);
+                material->UpdateForRendering(ctx);
+                material->Bind(ctx, m3DPipeline);
 
                 mRHI->CmdPushConstants(ctx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
                 mRHI->CmdDrawIndexed(ctx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);

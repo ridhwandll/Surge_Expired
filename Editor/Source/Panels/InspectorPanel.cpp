@@ -187,6 +187,8 @@ namespace Surge
             MeshComponent& component = entity.GetComponent<MeshComponent>();
             DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
 
+                AssetManager* am = Core::GetAssetManager();
+
                 if (component.MeshID.IsValid())
                     ImGuiAux::TString("Asset Handle: ", "%llu", component.MeshID.Get());
                 else
@@ -198,7 +200,7 @@ namespace Surge
                     {
                         SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
                         AssetID droppedAssetID = *(const AssetID*)payload->Data;
-                        AssetMetadata meta = Core::GetAssetManager()->GetMetadata(droppedAssetID);
+                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
                         if(meta.Type == AssetType::MESH)
                             component.MeshID = droppedAssetID;
                     }
@@ -208,7 +210,7 @@ namespace Surge
                 {
                     ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
 
-                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(component.MeshID);
+                    Ref<Mesh> mesh = am->Load<Mesh>(component.MeshID);
                     if(!mesh)
                     {
                         ImGuiAux::ScopedBoldFont font;
@@ -216,16 +218,15 @@ namespace Surge
                     }
                     else
                     {
-                        Vector<Ref<Material>>& materials = mesh->GetMaterials();
-                        for(size_t i = 0; i < materials.size(); i++)
+                        for(size_t i = 0; i < mesh->GetMaterials().size(); i++)
                         {
                             ImGui::PushID(i);
-                            Ref<Material>& material = materials[i];
+                            Ref<Material> material = mesh->GetMaterialAtIndex(i);
                             const String& matName = material->GetName();
 
                             ImGui::TableNextRow();
                             ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("Material [%zu]", i);
+                            ImGui::Text("Material [ %zu ]", i);
 
                             ImGui::TableSetColumnIndex(1);
                             ImGui::PushItemWidth(-FLT_MIN);
@@ -236,20 +237,23 @@ namespace Surge
                                 editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(material);
                             }
 
-                            // TODO: Make the material slot a drag & drop target for easier material assignment
-                            //if(ImGui::BeginDragDropTarget())
-                            //{
-                            //    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
-                            //    {
-                            //        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
-                            //        AssetID droppedAssetID = *(const AssetID*)payload->Data;
-                            //        AssetMetadata meta = Core::GetAssetManager()->GetMetadata(droppedAssetID);
-                            //
-                            //        if(meta.Type == AssetType::MATERIAL)
-                            //            material = Core::GetAssetManager()->Load<Material>(droppedAssetID);
-                            //    }
-                            //    ImGui::EndDragDropTarget();
-                            //}
+                            if(ImGui::BeginDragDropTarget())
+                            {
+                                if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                                {
+                                    SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                                    AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                                    AssetMetadata meta = am->GetMetadata(droppedAssetID);
+                            
+                                    if(meta.Type == AssetType::MATERIAL)
+                                    {
+                                        mesh->SetMaterialOverride(i, am->Load<Material>(droppedAssetID));
+                                        am->Save(meta.ID);
+                                        am->Save(component.MeshID);
+                                    }
+                                }
+                                ImGui::EndDragDropTarget();
+                            }
 
                             ImGui::PopItemWidth();
                             ImGui::PopID();

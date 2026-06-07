@@ -23,6 +23,7 @@ namespace Surge
         j["Name"] = mat->mName;
         j["Shader"] = mat->mShaderName;
 
+        // Save the props and texture to the .surgemat file
         nlohmann::json& props = j["Properties"];
         for(const ShaderBufferMember& member : mat->mRefletedBuffer.Members)
         {
@@ -82,9 +83,9 @@ namespace Surge
         const nlohmann::json j = nlohmann::json::parse(file, nullptr, false);
         SG_ASSERT(!j.is_discarded(), "[MaterialSerializer] Failed to parse JSON: '{}'", absolutePath);
 
-        Ref<Material> material = Material::Create();
-        material->mName = j.value("Name", "Unnamed");
+        Ref<Material> material = Material::Create(j.value("Name", "Unnamed"));
 
+        // Set the props and texture from the .surgemat file
         if(j.contains("Properties"))
         {
             for(const auto& [propName, propValue] : j["Properties"].items())

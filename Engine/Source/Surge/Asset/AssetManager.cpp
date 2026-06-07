@@ -194,8 +194,17 @@ namespace Surge
         return UUID::INVALID;
     }
 
+    void AssetManager::UpdateAssetPath(AssetID id, const String& newRelativePath)
+    {
+        auto it = mAssetRegistry.find(id);
+        if(it != mAssetRegistry.end())
+        {
+            it->second.RelativePath = newRelativePath;
+            SerializeRegistry();
+        }
+    }
+
     // Registry
-    //
     // Format (AssetRegistry.surge):
     //    comment lines start with //
     //    <UUID>|<TypeString>|<Relative/path/to/asset.ext OR MemoryString>
@@ -206,8 +215,7 @@ namespace Surge
         std::ofstream file(registryPath, std::ios::out | std::ios::trunc);
         if(!file.is_open())
         {
-            Log<Severity::Error>("[AssetManager] SerializeRegistry: Failed to open '{}'.",
-                registryPath.c_str());
+            Log<Severity::Error>("[AssetManager] SerializeRegistry: Failed to open '{}'.", registryPath);
             return;
         }
 

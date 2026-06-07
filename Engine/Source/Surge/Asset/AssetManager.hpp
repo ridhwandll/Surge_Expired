@@ -64,7 +64,7 @@ namespace Surge
 
         // Load<T>
         // Returns a cached Ref<T> immediately if already loaded, performs a full synchronous load (CPU + GPU) otherwise
-        // @param id    AssetID of the requested mesh
+        // @param id    AssetID of the requested asset
         // @return      Ref<T> of the requested underlying concrete asset
         template<IsAssetConcept T>
         Ref<T> Load(AssetID id)
@@ -122,6 +122,12 @@ namespace Surge
         // @param relativePath    Path to the asset relative to the assets directory
         // @return                AssetID of the asset, or UUID::INVALID if not found
         AssetID GetIDFromPath(const String& relativePath);
+
+        // UpdateAssetPath
+        // Updates the relative path of an already registered asset. This is used when renaming/moving source files on disk.
+        // @param id                 AssetID of the asset to update
+        // @param newRelativePath    New path relative to the assets directory
+        void UpdateAssetPath(AssetID id, const String& newRelativePath);
 
         const AssetMetadata& GetMetadata(AssetID id);
         const String& GetAssetsDirectory() { return sAssetsDirectory; }

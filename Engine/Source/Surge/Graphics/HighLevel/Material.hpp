@@ -20,7 +20,7 @@ namespace Surge
         Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
         ~Material();
         SURGE_ASSET_TYPE(AssetType::MATERIAL)
-        static Ref<Material> Create();
+        static Ref<Material> Create(const String& name);
 
         void SetName(const String& name) { mName = name; }
         const String& GetName() const { return mName; }

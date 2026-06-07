@@ -18,6 +18,7 @@ namespace Surge
 
     Scene::~Scene()
     {
+
         mRegistry.clear();
     }
 
@@ -280,7 +281,7 @@ namespace Surge
             t.Scale = glm::vec3(15.0f, 1.0f, 15.0f);
             t.MarkDirty();
 
-            Ref<Material>& material = assetManager->Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
+            Ref<Material> material = assetManager->Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
             material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
             material->Set<float>("Metallic", 0.1f);
             material->Set<float>("Roughness", 0.9f);
