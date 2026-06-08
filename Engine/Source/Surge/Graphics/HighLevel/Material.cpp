@@ -41,17 +41,13 @@ namespace Surge
 
     const Ref<Texture2D>& Material::GetTexture(const String& name)
     {
-        const ShaderResource* resource = FindResource(name);
-        SG_ASSERT(resource, "Material::GetTexture: '{}' is not a reflected texture name!", name);
+        SG_ASSERT(FindResource(name), "Material::GetTexture: '{}' is not a reflected texture name!", name);
         return mTextures[name].Data1;
     }
 
     void Material::SetTexture(const String& name, const Ref<Texture2D>& texture)
     {
-        //SG_ASSERT(texture, "Material::SetTexture: texture is null!");
-
-        const ShaderResource* resource = FindResource(name);
-        SG_ASSERT(resource, "Material::SetTexture: '{}' is not a reflected texture name!", name);
+        SG_ASSERT(FindResource(name), "Material::SetTexture: '{}' is not a reflected texture name!", name);
 
         texture ?
         mTextures[name] = Pair<Ref<Texture2D>, ImageHandle>(texture, texture->GetRHIImage()) :
@@ -62,9 +58,7 @@ namespace Surge
 
     void Material::SetTexture(const String& name, ImageHandle handle)
     {
-
-        const ShaderResource* resource = FindResource(name);
-        SG_ASSERT(resource, "Material::SetTexture: '{}' is not a reflected texture name!", name);
+        SG_ASSERT(FindResource(name), "Material::SetTexture: '{}' is not a reflected texture name!", name);
 
         mTextures[name] = Pair<Ref<Texture2D>, ImageHandle>(nullptr, handle);
         MarkDirty();
@@ -85,7 +79,6 @@ namespace Surge
         bufferWrite.BufferRange = mRefletedBuffer.Size;
         writes.push_back(bufferWrite);
 
-        // Textures driven by reflection, no hardcoded bindings
         for(const auto& [name, tex] : mTextures)
         {
             const ShaderResource* resource = FindResource(name);
@@ -94,7 +87,7 @@ namespace Surge
             DescriptorWrite write = {};
             write.Binding = resource->Binding;
             write.Type = DescriptorType::TEXTURE;
-            write.Texture = tex.Data2; // tex.Data2 is always a valid ImageHandle, even if we don't own the texture. If we have a Ref<Texture2D>, we get the ImageHandle from it. If we only have an ImageHandle, we use that directly
+            write.Texture = tex.Data2; // tex.Data2 is always a valid ImageHandle, even if we don't own the texture. If we have a Ref<Texture2D>, we get the ImageHandle from it else we use the Wwhite texture ImageHandle
             write.Sampler = Core::GetRenderer()->GetDefaultSampler();
             writes.push_back(write);
         }

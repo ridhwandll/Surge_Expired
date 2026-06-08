@@ -35,7 +35,7 @@ namespace Surge
 
     void EditorCamera::OnUpdate(bool viewportHovered)
     {
-        if (Core::GetWindow()->IsWindowMinimized() || !viewportHovered)
+        if (Core::GetWindow()->IsWindowMinimized())
             return;
 
         const float ts = Core::GetClock().GetMilliseconds();

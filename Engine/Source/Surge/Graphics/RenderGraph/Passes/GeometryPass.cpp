@@ -1,8 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
-#include <glm/gtc/type_ptr.hpp>
-
 
 namespace Surge
 {
@@ -147,9 +145,18 @@ namespace Surge
             for(Uint i = 0; i < blackBoard.LightList.size(); i++)
                 lightData.Lights[i] = blackBoard.LightList[i].GPULight;
 
-            lightData.SkyAmbient = blackBoard.GIParams.SkyAmbient;
-            lightData.HorizonAmbient = blackBoard.GIParams.HorizonAmbient;
-            lightData.GroundAmbient = blackBoard.GIParams.GroundAmbient;
+            if (blackBoard.Env.HasEnvironment)
+            {
+                lightData.SkyAmbient = blackBoard.Env.SkyAmbient;
+                lightData.HorizonAmbient = blackBoard.Env.HorizonAmbient;
+                lightData.GroundAmbient = blackBoard.Env.GroundAmbient;
+            }
+            else
+            {
+                lightData.SkyAmbient = glm::vec3(0.0f);
+                lightData.HorizonAmbient = glm::vec3(0.0f);
+                lightData.GroundAmbient = glm::vec3(0.0f);
+            }
             mRHI->UploadBuffer(mLightUBOs[ctx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
         }
 
@@ -207,21 +214,7 @@ namespace Surge
         Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.MainPassFramebuffer, width, height); });
     }
 
-    void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard)
-    {
-        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
-        ImGui::PushFont(boldFont, 25.0f);
-        ImGui::TextUnformatted("Geometry Pass");
-        ImGui::Separator();
-        ImGui::PopFont();
-
-        ImGui::PushFont(boldFont, 20.0f);
-        ImGui::TextUnformatted("Global Illumination");
-        ImGui::PopFont();
-        ImGui::ColorEdit3("SkyAmbient", glm::value_ptr(blackBoard.GIParams.SkyAmbient));
-        ImGui::ColorEdit3("HorizonAmbient", glm::value_ptr(blackBoard.GIParams.HorizonAmbient));
-        ImGui::ColorEdit3("GroundAmbient", glm::value_ptr(blackBoard.GIParams.GroundAmbient));
-    }
+    void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard) {}
 
     void GeometryPass::Shutdown(FrameBlackboard& blackBoard)
     {

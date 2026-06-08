@@ -259,7 +259,7 @@ void main()
     {
         vec4 tex = texture(AlbedoMap, vInput.TexCoord);
         // Bad on mobile
-        //if (tex.a < 0.5)
+        //if (tex.a < 1.0)
         //    discard;
 
         gPBRParams.Albedo = tex.rgb * uMaterial.Albedo;

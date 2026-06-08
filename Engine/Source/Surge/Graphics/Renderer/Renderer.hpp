@@ -38,6 +38,7 @@ namespace Surge
             //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
         }
         void SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position);
+        void SubmitEnvironment(const EnvironmentComponent& env);
 
         void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
 

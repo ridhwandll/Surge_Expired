@@ -87,6 +87,11 @@ namespace Surge
                     mSceneContext->CreateEntity(mSelectedEntity, "Light");
                     mSelectedEntity.AddComponent<LightComponent>();
                 }
+                if (ImGui::MenuItem("Environment"))
+                {
+                    mSceneContext->CreateEntity(mSelectedEntity, "Environment");
+                    mSelectedEntity.AddComponent<EnvironmentComponent>();
+                }
                 ImGui::EndPopup();
             }
 

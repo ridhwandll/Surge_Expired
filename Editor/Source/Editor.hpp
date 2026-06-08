@@ -24,7 +24,7 @@ namespace Surge
         void OnRuntimeStart();
         void OnRuntimeEnd();
 
-        void LoadScene(Ref<Scene> scene);
+        void LoadScene(Ref<Scene>&& scene);
         void SetCurrentProject(const Project& project) { mCurrentProject = project; }
 
         Ref<Scene> GetCurrentScene() { return mActiveScene; }

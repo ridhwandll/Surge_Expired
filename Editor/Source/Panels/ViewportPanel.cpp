@@ -54,57 +54,75 @@ namespace Surge
             return;
 
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) -> bool {
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
 
             // Hit F to Focus
-            if (keyEvent.GetKeyCode() == Key::F)
+            if(keyEvent.GetKeyCode() == Key::F)
             {
                 const Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
-                if (selectedEntity)
+                if(selectedEntity)
                 {
                     const TransformComponent& transform = selectedEntity.GetComponent<TransformComponent>();
                     mEditorCam->Focus(transform.Position);
                 }
             }
 
-            if (!Input::IsMouseButtonPressed(Mouse::ButtonRight))
+            if(!Input::IsMouseButtonPressed(Mouse::ButtonRight))
             {
-                switch (keyEvent.GetKeyCode())
+                switch(keyEvent.GetKeyCode())
                 {
-                    // Gizmos
+                    case Key::F11:
+                    {
+                        mIsFullscreen = !mIsFullscreen;
+                        if(!mIsFullscreen)
+                            mRestoreScreenPosBeforeFullscreen = true;
+
+                        ImGui::SetWindowFocus(PanelCodeToString(mCode));
+                        break;
+                    }
+                    case Key::Escape:
+                    {
+                        if(mIsFullscreen)
+                        {
+                            mIsFullscreen = false;
+                            mRestoreScreenPosBeforeFullscreen = true;
+                            ImGui::SetWindowFocus(PanelCodeToString(mCode));
+                        }
+                        break;
+                    }
+
                     case Key::Q:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = -1;
                         break;
                     }
                     case Key::W:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::TRANSLATE;
                         break;
                     }
                     case Key::E:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::ROTATE;
                         break;
                     }
                     case Key::R:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::SCALE;
                         break;
                     }
                     case Key::T:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::UNIVERSAL;
                         break;
                     }
                 }
             }
-            return false;
         });
     }
 
@@ -113,12 +131,30 @@ namespace Surge
         if(!*show)
             return;
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
-
         ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
+        // Fullscreen handling
+        if(mIsFullscreen)
+        {
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+            ImGui::SetNextWindowPos(viewport->Pos);
+            ImGui::SetNextWindowSize(viewport->Size);
+            ImGui::SetNextWindowViewport(viewport->ID);
+            windowFlags |= ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+        }
+        else if(mRestoreScreenPosBeforeFullscreen)
+        {
+            ImGui::SetNextWindowDockID(mPreviousDockID, ImGuiCond_Always);
+            mRestoreScreenPosBeforeFullscreen = false;
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
         if(ImGui::Begin(PanelCodeToString(mCode), show, windowFlags))
         {
+            if(!mIsFullscreen)
+                mPreviousDockID = ImGui::GetWindowDockID();
+
             mIsViewportHovered = ImGui::IsWindowHovered();
             mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
             ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
@@ -175,7 +211,7 @@ namespace Surge
 
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
 
-            // Scene Name
+            // Scene Name Overlay
             ImGui::PushFont(boldFont);
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             float padding = 5.0f;
@@ -187,7 +223,7 @@ namespace Surge
             drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), mSceneName.c_str());
             ImGui::PopFont();
 
-            // Button overlays
+            // Button Overlays
             float buttonWidth = 50.0f;
             float buttonSpacing = ImGui::GetStyle().ItemSpacing.x;
             float totalButtonsWidth = (buttonWidth * 2.0f) + buttonSpacing;
@@ -259,14 +295,12 @@ namespace Surge
         ImGui::PopStyleVar();
     }
 
-    void ViewportPanel::Shutdown()
-    {
-    }
+    void ViewportPanel::Shutdown() {}
 
     void ViewportPanel::SetSceneName()
     {
         auto assetID = mSceneHierarchy->GetSceneContext()->GetID();
-        if (assetID)
+        if(assetID)
             mSceneName = Filesystem::GetNameWithExtension(Core::GetAssetManager()->GetMetadata(assetID).RelativePath);
         else
             mSceneName = "Untitled Scene";

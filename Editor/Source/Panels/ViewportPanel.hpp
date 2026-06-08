@@ -31,6 +31,11 @@ namespace Surge
         int mGizmoType = -1;
         bool mGizmoInUse = false;
         bool mIsViewportHovered = false;
+
+        bool mIsFullscreen = false;
+        bool mRestoreScreenPosBeforeFullscreen = false;
+        ImGuiID mPreviousDockID = 0;
+
         SceneHierarchyPanel* mSceneHierarchy;
         String mSceneName;
         EditorCamera* mEditorCam;

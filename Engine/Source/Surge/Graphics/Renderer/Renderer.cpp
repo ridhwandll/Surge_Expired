@@ -92,6 +92,7 @@ namespace Surge
         blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = camera.GetPosition();
         blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
+        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
 
         FrameUBO frameData = {};
         frameData.View = blackBoard.ViewMatrix;
@@ -114,6 +115,7 @@ namespace Surge
         blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = transform[3];
         blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
+        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
 
         FrameUBO frameData = {};
         frameData.View = blackBoard.ViewMatrix;
@@ -154,6 +156,22 @@ namespace Surge
             gpuLight.PositionType = glm::vec4(position, 1.0f); // w = 1.0f for point lights
 
         bb.LightList.emplace_back(gpuLight);
+    }
+
+    void Renderer::SubmitEnvironment(const EnvironmentComponent& env)
+    {
+        FrameBlackboard& bb = mGraph.GetBlackboard();
+        Environnment& e = bb.Env;
+        e.Elevation = env.Elevation;
+        e.Azimuth = env.Azimuth;
+        e.Turbidity = env.Turbidity;
+        e.Exposure = env.Exposure;
+        e.SunIntensity = env.SunIntensity;
+        e.EnableSunDisk = env.EnableSunDisk;
+        e.SkyAmbient = env.SkyAmbient;
+        e.HorizonAmbient = env.HorizonAmbient;
+        e.GroundAmbient = env.GroundAmbient;
+        e.HasEnvironment = true;
     }
 
     void Renderer::OnWindowResize(Uint width, Uint height)

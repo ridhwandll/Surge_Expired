@@ -69,14 +69,17 @@ namespace Surge
 
                 if (ImGui::BeginPopup("AddComponentPopup"))
                 {
-                    if (ImGui::MenuItem("Camera"))
+                    if (ImGui::MenuItem("Camera") && !entity.HasComponent<CameraComponent>())
                         entity.AddComponent<CameraComponent>();
-                    if (ImGui::MenuItem("Sprite Renderer"))
+                    if (ImGui::MenuItem("Sprite Renderer") && !entity.HasComponent<SpriteRendererComponent>())
                         entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor1);
-                    if(ImGui::MenuItem("Mesh Component"))
+                    if(ImGui::MenuItem("Mesh Component") && !entity.HasComponent<MeshComponent>())
                         entity.AddComponent<MeshComponent>();
-                    if (ImGui::MenuItem("Light"))
+                    if (ImGui::MenuItem("Light") && !entity.HasComponent<LightComponent>())
                         entity.AddComponent<LightComponent>();
+                    if (ImGui::MenuItem("Environment") && !entity.HasComponent<EnvironmentComponent>())
+                        entity.AddComponent<EnvironmentComponent>();
+
                     ImGui::EndPopup();
                 }
             }
@@ -222,40 +225,46 @@ namespace Surge
                         {
                             ImGui::PushID(i);
                             Ref<Material> material = mesh->GetMaterialAtIndex(i);
-                            const String& matName = material->GetName();
-
-                            ImGui::TableNextRow();
-                            ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("Material [ %zu ]", i);
-
-                            ImGui::TableSetColumnIndex(1);
-                            ImGui::PushItemWidth(-FLT_MIN);
-
-                            if(ImGui::Button(matName.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+                            if(material)
                             {
-                                auto* editor = static_cast<Editor*>(Core::GetClient());
-                                editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(material);
-                            }
+                                const String& matName = material->GetName();
+                                ImGui::TableNextRow();
+                                ImGui::TableSetColumnIndex(0);
+                                ImGui::Text("Material [ %zu ]", i);
 
-                            if(ImGui::BeginDragDropTarget())
-                            {
-                                if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::PushItemWidth(-FLT_MIN);
+
+                                if(ImGui::Button(matName.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)))
                                 {
-                                    SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
-                                    AssetID droppedAssetID = *(const AssetID*)payload->Data;
-                                    AssetMetadata meta = am->GetMetadata(droppedAssetID);
-                            
-                                    if(meta.Type == AssetType::MATERIAL)
-                                    {
-                                        mesh->SetMaterialOverride(i, am->Load<Material>(droppedAssetID));
-                                        am->Save(meta.ID);
-                                        am->Save(component.MeshID);
-                                    }
+                                    auto* editor = static_cast<Editor*>(Core::GetClient());
+                                    editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(material);
+                                    ImGui::SetWindowFocus("Material Editor");
                                 }
-                                ImGui::EndDragDropTarget();
-                            }
+                                if(ImGui::BeginDragDropTarget())
+                                {
+                                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                                    {
+                                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
 
-                            ImGui::PopItemWidth();
+                                        if(meta.Type == AssetType::MATERIAL)
+                                        {
+                                            mesh->SetMaterialOverride(i, am->Load<Material>(droppedAssetID));
+                                            am->Save(meta.ID);
+                                            am->Save(component.MeshID);
+                                        }
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                                ImGui::PopItemWidth();
+                            }
+                            else
+                            {
+                                ImGuiAux::ScopedBoldFont font;
+                                ImGui::TextColored(ImGuiAux::Colors::Red, "MISSING MATERIAL [ %zu ]", i);
+                            }
                             ImGui::PopID();
                         }
                     }
@@ -297,8 +306,29 @@ namespace Surge
                 if (component.Type == LightType::POINT)
                 {
                     ImGuiAux::TProperty<float>("Radius", &component.Radius);
-                    ImGuiAux::TSlider<float>("Falloff", component.Falloff, 0.1f, 2.0f);
+                    ImGuiAux::TSlider<float>("Falloff", &component.Falloff, 0.1f, 2.0f);
                 }
+            });
+        }
+        if (entity.HasComponent<EnvironmentComponent>())
+        {
+            EnvironmentComponent& component = entity.GetComponent<EnvironmentComponent>();
+            DrawComponent<EnvironmentComponent>(entity, "Environment", [&component]()
+            {
+                ImGuiAux::TProperty<bool>("Sun Disk", &component.EnableSunDisk);
+                ImGuiAux::TProperty<float>("Azimuth (X)", &component.Azimuth);
+                ImGuiAux::TProperty<float>("Elevation (Y)", &component.Elevation);
+                ImGuiAux::TSlider<float>("Turbidity", &component.Turbidity, 1.5f, 10.0f, "%.2f");
+                ImGuiAux::TSlider<float>("Exposure", &component.Exposure, 0.001, 0.1f, "%.4f");
+                ImGuiAux::TSlider<float>("Sun Intensity", &component.SunIntensity, 0.01, 1.0f, "%.2f");
+                {
+                    ImGuiAux::ScopedBoldFont font;
+                    ImGuiAux::TString("Global Illumination", "");
+                }
+                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("SkyAmbient", &component.SkyAmbient);
+                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("HorizonAmbient", &component.HorizonAmbient);
+                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("GroundAmbient", &component.GroundAmbient);
+
             });
         }
     }

@@ -34,8 +34,14 @@ namespace Surge
             const AssetID& id = spec.MaterialOverrides[i];
             if(id.IsValid())
             {
-                mMaterialOverrides[i] = am->Load<Material>(id);
-                mGLTFMaterials[i].Reset(); // (Rid)Release the transient material loaded from glTF, since we have a user override for this slot
+                Ref<Material> material = am->Load<Material>(id);
+                if (material)
+                {
+                    mMaterialOverrides[i] = material;
+                    mGLTFMaterials[i].Reset(); // (Rid)Release the transient material loaded from glTF, since we have a user override for this slot
+                }
+                else
+                    Log<Severity::Warn>("Failed to load material override for mesh at index %zu. The material is missing probably, falling back to transient material!", i);
             }
         }
     }

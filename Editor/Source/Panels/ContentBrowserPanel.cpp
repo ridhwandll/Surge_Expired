@@ -651,6 +651,24 @@ namespace Surge
                         if (meta.Type != mSelectedFilterType && mSelectedFilterType != AssetType::NONE)
                             continue;
 
+                        if (!searchStr.empty())
+                        {
+                            String idStr = std::to_string(id.Get());
+                            String typeStr = SurgeReflect::EnumToString(meta.Type).data();
+                            String pathStr = meta.RelativePath;
+
+                            std::transform(idStr.begin(), idStr.end(), idStr.begin(), ::tolower);
+                            std::transform(typeStr.begin(), typeStr.end(), typeStr.begin(), ::tolower);
+                            std::transform(pathStr.begin(), pathStr.end(), pathStr.begin(), ::tolower);
+
+                            bool matches = false;
+                            if (idStr.find(searchStr) != String::npos || typeStr.find(searchStr) != String::npos || pathStr.find(searchStr) != String::npos)
+                                matches = true;
+
+                            if (!matches)
+                                continue;
+                        }
+
                         ImGui::PushID(id.Get());
                         ImGui::TableNextRow();
 

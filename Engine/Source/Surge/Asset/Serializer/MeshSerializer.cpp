@@ -33,7 +33,7 @@ namespace Surge
         std::ofstream f(sidecarPath, std::ios::binary | std::ios::trunc);
         if (!f.is_open())
         {
-            Log<Severity::Error>("[MeshSerializer] Failed to write sidecar!");
+            Log<Severity::Error>("[MeshSerializer] Failed to write sidecar for asset {}!", asset->GetID().Get());
             return false;
         }
 
@@ -84,8 +84,9 @@ namespace Surge
                 sidecar.read(reinterpret_cast<char*>(&slotIndex), sizeof(Uint));
                 sidecar.read(reinterpret_cast<char*>(&rawID), sizeof(uint64_t));
 
-                if(slotIndex < spec.Materials.size())
-                    spec.MaterialOverrides[slotIndex] = AssetID(rawID);
+                AssetID assetID = AssetID(rawID);
+                if (assetID.IsValid() && slotIndex < spec.Materials.size())
+                    spec.MaterialOverrides[slotIndex] = assetID;
             }
         }
         return Mesh::Create(std::move(spec)).As<Asset>();

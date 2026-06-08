@@ -14,6 +14,7 @@ namespace Surge
     {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(label);
 
         ImGui::TableSetColumnIndex(1);
@@ -97,84 +98,7 @@ namespace Surge
 
         ImGui::Begin("Material Editor", show);
 
-        if(!mSelectedMaterial)
-        {
-            ImGuiAux::ScopedBoldFont font(17.0f);
-            ImGuiAux::TextCentered("Select a material in the Inspector(Mesh Component)\nor drop a Material Asset here from the Content Browser!");
-            ImGui::Dummy(ImGui::GetContentRegionAvail());
-        }
-
-        if(mSelectedMaterial)
-        {
-            // Do not let users edit the material if it is loaded from gltf (i.e. it doesn't have a valid AssetID and thus cannot be saved)
-            if(mSelectedMaterial->GetID() == AssetID::INVALID)
-            {
-                ImGuiAux::ScopedBoldFont font;
-                ImGui::TextUnformatted("This material is loaded from a glTF file and cannot be edited/saved");
-                ImGui::TextUnformatted("Create a new material, drop it to the mesh and then edit it!");
-                ImGui::BeginDisabled();
-            }
-            bool clearSelectedMaterial = false;
-            {
-                ImGuiAux::ScopedBoldFont font;
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-
-                if(ImGui::Button("SAVE"))
-                    Core::GetAssetManager()->Save(mSelectedMaterial->GetID());
-                ImGui::SameLine();
-                if(ImGui::Button("CLEAR"))
-                    clearSelectedMaterial = true;
-
-                ImGui::PopStyleVar();
-            }
-
-            ImGui::Spacing();
-            ImGui::Text("Editing: %s", mSelectedMaterial->GetName().c_str());
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            if(ImGui::BeginTable("##MaterialProperties", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerH))
-            {
-                // Albedo Color
-                glm::vec3 albedo = mSelectedMaterial->Get<glm::vec3>("Albedo");
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted("Albedo Color");
-                ImGui::TableSetColumnIndex(1);
-                ImGui::PushItemWidth(-FLT_MIN);
-                if(ImGui::ColorEdit3("##v", &albedo.x))
-                    mSelectedMaterial->Set<glm::vec3>("Albedo", albedo);
-                ImGui::PopItemWidth();
-
-                // Metallic
-                float metallic = mSelectedMaterial->Get<float>("Metallic");
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted("Metallic");
-                ImGui::TableSetColumnIndex(1);
-                ImGui::PushItemWidth(-FLT_MIN);
-                if(ImGui::SliderFloat("##Metallic", &metallic, 0.0f, 1.0f))
-                    mSelectedMaterial->Set<float>("Metallic", metallic);
-                ImGui::PopItemWidth();
-
-                // Roughness
-                float roughness = mSelectedMaterial->Get<float>("Roughness");
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted("Roughness");
-                ImGui::TableSetColumnIndex(1);
-                ImGui::PushItemWidth(-FLT_MIN);
-                if(ImGui::SliderFloat("##Roughness", &roughness, 0.0f, 1.0f))
-                    mSelectedMaterial->Set<float>("Roughness", roughness);
-                ImGui::PopItemWidth();
-
-                DrawTextureProperty("Albedo Map", mSelectedMaterial.Raw(), "UseAlbedoMap", "AlbedoMap");
-                DrawTextureProperty("Normal Map", mSelectedMaterial.Raw(), "UseNormalMap", "NormalMap");
-                DrawTextureProperty("RoughnessMetallic Map", mSelectedMaterial.Raw(), "UseMetallicMap", "RoughnessMetallicMap");
-
-                ImGui::EndTable();
-            }
-
+        auto AcceptMaterialDrop = [&]() {
             if(ImGui::BeginDragDropTarget())
             {
                 if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
@@ -188,15 +112,167 @@ namespace Surge
                 }
                 ImGui::EndDragDropTarget();
             }
+            };
 
+        // EMPTY STATE (Drop Zone)
+        if(!mSelectedMaterial)
+        {
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+
+            if(ImGui::BeginChild("EmptyDropZone", ImGui::GetContentRegionAvail(), true))
+            {
+                ImVec2 windowSize = ImGui::GetWindowSize();
+                ImGui::SetCursorPosY((windowSize.y - ImGui::GetTextLineHeight() * 2.5f) * 0.5f);
+
+                ImGuiAux::ScopedBoldFont font;
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.4f, 0.4f, 1.0f)); // Faded text
+                ImGuiAux::TextCentered("No Material Selected");
+                ImGui::PopStyleColor();
+
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // Even more faded
+                ImGuiAux::TextCentered("Select one in the Inspector or drop a Material Asset here.");
+                ImGui::PopStyleColor();
+            }
+            ImGui::EndChild();
+
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+
+            AcceptMaterialDrop();
+        }
+
+        // MATERIAL EDITING
+        if(mSelectedMaterial)
+        {
+            bool clearSelectedMaterial = false;
+
+            // glTF Read-Only Warning Banner
             if(mSelectedMaterial->GetID() == AssetID::INVALID)
-                ImGui::EndDisabled();
+            {
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.25f, 0.18f, 0.05f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.4f, 0.1f, 1.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
 
-            if (clearSelectedMaterial)
+                if(ImGui::BeginChild("glTFWarning", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.5f + 10.0f), true, ImGuiWindowFlags_NoScrollbar))
+                {
+                    ImGui::SetCursorPosY(ImGui::GetStyle().WindowPadding.y);
+                    ImGuiAux::ScopedBoldFont font;
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.1f, 1.0f)); // Golden/Yellow warning text
+                    ImGuiAux::TextCentered("READ-ONLY GLTF MATERIAL");
+                    ImGui::PopStyleColor();
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+                    ImGuiAux::TextCentered("Create a new material and apply it to the mesh to edit properties.");
+                    ImGui::PopStyleColor();
+                }
+                ImGui::EndChild();
+
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(2);
+                ImGui::Spacing();
+            }
+
+            // Header & Toolbar
+            float buttonSizeX = 70.0f;
+            float spacing = ImGui::GetStyle().ItemSpacing.x;
+            float totalButtonsWidth = (mSelectedMaterial->GetID() != AssetID::INVALID) ? (buttonSizeX * 2.0f + spacing) : buttonSizeX;
+
+            if(ImGui::BeginTable("##MaterialHeaderTable", 2))
+            {
+                ImGui::TableSetupColumn("##HeaderText", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("##ToolbarBtns", ImGuiTableColumnFlags_WidthFixed, totalButtonsWidth);
+                ImGui::TableNextRow();
+
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextDisabled("Editing Material");
+                {
+                    ImGuiAux::ScopedBoldFont font;
+                    ImGui::Text("%s", mSelectedMaterial->GetName().c_str());
+                }
+                ImGui::TableSetColumnIndex(1);
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (ImGui::GetTextLineHeight() * 0.35f));
+
+                {
+                    ImGuiAux::ScopedBoldFont font;
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+
+                    if(mSelectedMaterial->GetID() != AssetID::INVALID)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.50f, 0.20f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.60f, 0.25f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.40f, 0.15f, 1.0f));
+                        if(ImGui::Button("SAVE", ImVec2(buttonSizeX, 0)))
+                            Core::GetAssetManager()->Save(mSelectedMaterial->GetID());
+                        ImGui::PopStyleColor(3);
+                        ImGui::SameLine();
+                    }
+                    if(ImGui::Button("CLEAR", ImVec2(buttonSizeX, 0)))
+                        clearSelectedMaterial = true;
+
+                    ImGui::PopStyleVar();
+                }
+                ImGui::EndTable();
+            }
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            // Properties Table
+            if(ImGui::BeginTable("##MaterialProperties", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerH))
+            {
+                // Albedo Color
+                glm::vec3 albedo = mSelectedMaterial->Get<glm::vec3>("Albedo");
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted("Albedo Color");
+                ImGui::TableSetColumnIndex(1);
+                ImGui::PushItemWidth(-FLT_MIN);
+                if(ImGui::ColorEdit3("##v", &albedo.x))
+                    mSelectedMaterial->Set<glm::vec3>("Albedo", albedo);
+                ImGui::PopItemWidth();
+
+                // Metallic
+                float metallic = mSelectedMaterial->Get<float>("Metallic");
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted("Metallic");
+                ImGui::TableSetColumnIndex(1);
+                ImGui::PushItemWidth(-FLT_MIN);
+                if(ImGui::SliderFloat("##Metallic", &metallic, 0.0f, 1.0f))
+                    mSelectedMaterial->Set<float>("Metallic", metallic);
+                ImGui::PopItemWidth();
+
+                // Roughness
+                float roughness = mSelectedMaterial->Get<float>("Roughness");
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted("Roughness");
+                ImGui::TableSetColumnIndex(1);
+                ImGui::PushItemWidth(-FLT_MIN);
+                if(ImGui::SliderFloat("##Roughness", &roughness, 0.0f, 1.0f))
+                    mSelectedMaterial->Set<float>("Roughness", roughness);
+                ImGui::PopItemWidth();
+
+                DrawTextureProperty("Albedo Map", mSelectedMaterial.Raw(), "UseAlbedoMap", "AlbedoMap");
+                DrawTextureProperty("Normal Map", mSelectedMaterial.Raw(), "UseNormalMap", "NormalMap");
+                DrawTextureProperty("Roughness Map", mSelectedMaterial.Raw(), "UseMetallicMap", "RoughnessMetallicMap");
+
+                ImGui::EndTable();
+            }
+
+            AcceptMaterialDrop();
+            ImGui::Dummy(ImGui::GetContentRegionAvail());
+            AcceptMaterialDrop();
+
+            if(clearSelectedMaterial)
                 mSelectedMaterial = nullptr;
         }
         ImGui::End();
-
     }
 
     void MaterialEditorPanel::Shutdown()

@@ -60,6 +60,14 @@ namespace Surge
             }
         }
         {
+            auto view = mRegistry.view<EnvironmentComponent>();
+            for(const auto& [entity, env] : view.each())
+            {
+                renderer->SubmitEnvironment(env);
+                break; // Only submit the first environment component we find
+            }
+        }
+        {
             // 3D Meshes
             for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
             {
@@ -109,6 +117,14 @@ namespace Surge
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
                 for (const auto& [entity, light, transform] : view.each())
                     renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
+            }
+            {
+                auto view = mRegistry.view<EnvironmentComponent>();
+                for(const auto& [entity, env] : view.each())
+                {
+                    renderer->SubmitEnvironment(env);
+                    break; // Only submit the first environment component we find
+                }
             }
             {
                 // 3D Meshes

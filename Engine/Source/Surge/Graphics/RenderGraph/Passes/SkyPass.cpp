@@ -40,6 +40,9 @@ namespace Surge
 
     void SkyPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard)
     {
+        if (!blackBoard.Env.HasEnvironment)
+            return;
+
         mRHI->CmdBindPipeline(ctx, mSkyPipeline);
         mRHI->CmdBindDescriptorSet(ctx, mSkyPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
 
@@ -51,17 +54,17 @@ namespace Surge
             float SunIntensity;
             int EnableSunDisk;
         };
-        float radElevation = glm::radians(blackBoard.Skybox.Elevation);
-        float radAzimuth = glm::radians(blackBoard.Skybox.Azimuth);
+        float radElevation = glm::radians(blackBoard.Env.Elevation);
+        float radAzimuth = glm::radians(blackBoard.Env.Azimuth);
 
         SkyPushConstants pc;
         pc.SunDirection.x = cos(radElevation) * sin(radAzimuth);
         pc.SunDirection.y = sin(radElevation);
         pc.SunDirection.z = cos(radElevation) * cos(radAzimuth);
-        pc.Turbidity = blackBoard.Skybox.Turbidity;
-        pc.Exposure = blackBoard.Skybox.Exposure;
-        pc.SunIntensity = blackBoard.Skybox.SunIntensity;
-        pc.EnableSunDisk = blackBoard.Skybox.EnableSunDisk;
+        pc.Turbidity = blackBoard.Env.Turbidity;
+        pc.Exposure = blackBoard.Env.Exposure;
+        pc.SunIntensity = blackBoard.Env.SunIntensity;
+        pc.EnableSunDisk = blackBoard.Env.EnableSunDisk;
         mRHI->CmdPushConstants(ctx, mSkyPipeline, ShaderType::FRAGMENT | ShaderType::VERTEX, 0, sizeof(SkyPushConstants), &pc);
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
@@ -73,18 +76,6 @@ namespace Surge
 
     void SkyPass::OnImGuiRender(FrameBlackboard& blackBoard)
     {
-        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
-        ImGui::PushFont(boldFont, 25.0f);
-        ImGui::TextUnformatted("Sky Pass");
-        ImGui::Separator();
-        ImGui::PopFont();
-
-        ImGui::Checkbox("Sun Disk", &blackBoard.Skybox.EnableSunDisk);
-        ImGui::SliderFloat("Turbidity", &blackBoard.Skybox.Turbidity, 1.5f, 10.0f, "%.2f");
-        ImGui::DragFloat("Exposure", &blackBoard.Skybox.Exposure, 0.001, 0.001f, 2.0f);
-        ImGui::DragFloat("Sun Intensity", &blackBoard.Skybox.SunIntensity, 0.01, 1.0f, 10.0f);
-        ImGui::DragFloat("Elevation", &blackBoard.Skybox.Elevation, 0.5f);
-        ImGui::DragFloat("Azimuth", &blackBoard.Skybox.Azimuth, 0.5f);
     }
 
     void SkyPass::Shutdown(FrameBlackboard& blackBoard)

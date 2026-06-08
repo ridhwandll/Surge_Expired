@@ -242,7 +242,7 @@ namespace Surge::ImGuiAux
     }
 
     template <typename T>
-    inline bool TSlider(const char* label, T& value, T min, T max)
+    inline bool TSlider(const char* label, T* value, T min, T max, const char* format = "%.3f")
     {
         bool modified = false;
         ImGui::PushID(label);
@@ -257,12 +257,12 @@ namespace Surge::ImGuiAux
             ScopedBoldFont font;
             if constexpr(std::is_same_v<T, float>)
             {
-                if(ImGui::SliderFloat("##label", &value, min, max))
+                if(ImGui::SliderFloat("##label", value, min, max, format))
                     modified = true;
             }
-            else if constexpr(std::is_same_v<T, Uint>)
+            else if constexpr(std::is_same_v<T, int>)
             {
-                if(ImGui::SliderInt("##label", reinterpret_cast<int*>(&value), min, max))
+                if(ImGui::SliderInt("##label", value, min, max))
                     modified = true;
             }
             else

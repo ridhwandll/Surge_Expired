@@ -117,11 +117,11 @@ namespace Surge
     {
     }
 
-    void Editor::LoadScene(Ref<Scene> scene)
+    void Editor::LoadScene(Ref<Scene>&& scene)
     {
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
-        mActiveScene = scene;
+        mActiveScene = std::move(scene);
     }
 
     void Editor::CheckResize()

@@ -180,23 +180,22 @@ namespace Surge
             const SurgeReflect::Type& type = var.GetType();
             Byte* dest = reinterpret_cast<Byte*>(&comp) + var.GetOffset();
 
-            // RuntimeCamera uses custom keys, skip generic check
-            if(!type.EqualTo<RuntimeCamera>() && !inJson.contains(name))
+            if(!inJson.contains(name))
             {
-                Log<Severity::Warn>("DeserializeComponent: Missing field '{}' — skipping", name);
+                Log<Severity::Warn>("DeserializeComponent: Missing field '{}', skipping", name);
                 continue;
             }
 
             if(type.EqualTo<bool>())
-                *reinterpret_cast<bool*>(dest) = inJson[name];
+                *reinterpret_cast<bool*>(dest) = inJson.value(name, false);
             else if(type.EqualTo<float>())
-                *reinterpret_cast<float*>(dest) = inJson[name];
+                *reinterpret_cast<float*>(dest) = inJson.value(name, 0.0f);
             else if(type.EqualTo<UUID>() || type.EqualTo<AssetID>())
-                *reinterpret_cast<uint64_t*>(dest) = inJson[name];
+                *reinterpret_cast<uint64_t*>(dest) = inJson.value(name, 0ULL);
             else if(type.EqualTo<String>())
-                *reinterpret_cast<String*>(dest) = inJson[name].get<String>();
+                *reinterpret_cast<String*>(dest) = inJson.value(name, String());
             else if(type.EqualTo<glm::vec3>())
-                *reinterpret_cast<glm::vec3*>(dest) = inJson[name];
+                *reinterpret_cast<glm::vec3*>(dest) = inJson.value(name, glm::vec3(0.0f));
             else if(type.EqualTo<RuntimeCamera>())
             {
                 RuntimeCamera* cam = reinterpret_cast<RuntimeCamera*>(dest);
@@ -210,7 +209,7 @@ namespace Surge
                 cam->SetProjectionType(camIn["Projection"]);
             }
             else if(type.EqualTo<LightType>())
-                *reinterpret_cast<LightType*>(dest) = inJson[name].get<LightType>();
+                *reinterpret_cast<LightType*>(dest) = inJson.value(name, LightType::DIRECTIONAL);
             else
                 Log<Severity::Warn>("DeserializeComponent: Unhandled type '{}' for field '{}'", type.GetFullName(), name);
         }
