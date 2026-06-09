@@ -113,7 +113,7 @@ namespace Surge
         // UnregisterAsset
         // Removes the asset from the registry
         // @param id    AssetID of the asset to unregister
-        void UnregisterAsset(AssetID id) { mAssetRegistry.erase(id); }
+        void UnregisterAsset(AssetID id) { mAssetRegistry.erase(id); SerializeRegistry(); }
 
         // GetIDFromPath
         // Returns the AssetID associated with a given relative path.

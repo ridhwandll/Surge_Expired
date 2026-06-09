@@ -20,6 +20,7 @@ namespace Surge
 
     Scene::~Scene()
     {
+        sSelectedEntity = Entity(entt::null, nullptr);
         OnRuntimeEnd();
         mRegistry.clear();
     }

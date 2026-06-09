@@ -4,7 +4,6 @@ project(SurgePlayer)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# -----------------------------------------------------------------------
 # Paths
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../..")
 get_filename_component(REPO_ROOT "${REPO_ROOT}" ABSOLUTE)

@@ -415,7 +415,7 @@ namespace Surge
                                                     mAssetManager->UpdateAssetPath(item.Id, newRelativePath);
                                                     if (item.AssetTypeStr == "MATERIAL")
                                                     {
-                                                        mAssetManager->Load<Material>(item.Id)->SetName(Filesystem::GetNameWithoutExtension(mRenameBuffer));
+                                                        mAssetManager->Load<Material>(item.Id)->SetName(Filesystem::GetFilenameWithoutExt(mRenameBuffer));
                                                         mAssetManager->Save(item.Id);
                                                         mAssetManager->Unload(item.Id);
                                                     }

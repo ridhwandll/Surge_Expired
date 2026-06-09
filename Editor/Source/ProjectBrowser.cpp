@@ -478,14 +478,14 @@ namespace Surge
 
         // Create Assets directory and initialize AssetManager with it
         const Path assetManagerPath = Filesystem::GetParentPath(sCreateProjectPath) / "Assets";
-        Filesystem::CreateOrEnsureDirectory(assetManagerPath);
+        Filesystem::CreateOrEnsureDirectories(assetManagerPath);
         mAssetManager->Shutdown();
         mAssetManager->Initialize(assetManagerPath);
         editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
 
         // Create Start Scene and serialize it to the new project's Assets folder, then import it to get an AssetID reference
         const String defaultScenePath = "Scenes/Main.srg";
-        Filesystem::CreateOrEnsureDirectory(assetManagerPath / "Scenes");
+        Filesystem::CreateOrEnsureDirectories(assetManagerPath / "Scenes");
         Ref<Scene> newScene = mAssetManager->Create<Scene>(defaultScenePath);
         sTempProjectBuffer.StartScene = newScene->GetID();
 

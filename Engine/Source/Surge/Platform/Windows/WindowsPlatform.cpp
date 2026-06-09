@@ -19,7 +19,7 @@ namespace Surge
         resultantPath += "/Surge Engine";
 
         if (!sPersistantDirectoryExists)
-            sPersistantDirectoryExists = Filesystem::CreateOrEnsureDirectory(resultantPath);
+            sPersistantDirectoryExists = Filesystem::CreateOrEnsureDirectories(resultantPath);
         return resultantPath;
     }
 

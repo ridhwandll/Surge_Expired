@@ -244,26 +244,11 @@ namespace Surge
         registry.clear();
 
         String jsonContents;
-
-#ifdef SURGE_PLATFORM_ANDROID
-        android_app* app = Android::GAndroidApp;
-        AAssetManager* androidAssetMgr = app->activity->assetManager;
-
-        // AAssetManager expects generic forward-slash paths
-        AAsset* asset = AAssetManager_open(androidAssetMgr, path.generic_string().c_str(), AASSET_MODE_BUFFER);
-        if(!asset)
+        if(!Filesystem::ReadTextFile(path, jsonContents))
         {
-            Log<Severity::Error>("DeserializeScene: Failed to open '{}' via AAssetManager", path.string());
+            Log<Severity::Error>("DeserializeScene: Failed to read file '{}'", path.string());
             return;
         }
-
-        size_t size = AAsset_getLength(asset);
-        jsonContents.resize(size, '\0');
-        AAsset_read(asset, jsonContents.data(), size);
-        AAsset_close(asset);
-#else
-        jsonContents = Filesystem::ReadFile<String>(path);
-#endif
 
         nlohmann::json parsedJson = nlohmann::json::parse(jsonContents, nullptr, false);
         if(parsedJson.is_discarded())
@@ -297,15 +282,8 @@ namespace Surge
 
         String result = outJson.dump(4);
 
-        std::ofstream file(path.string(), std::ios::out | std::ios::trunc);
-        if(!file.is_open())
-        {
-            Log<Severity::Error>("SerializeProject: Failed to open '{}'.", path.string().c_str());
-            return;
-        }
-
-        file << result;
-        file.close();
+        if (!Filesystem::WriteTextFile(path, result))
+            Log<Severity::Error>("SerializeProject: Failed to write to '{}'", path.string());
 #endif
     }
 
@@ -314,48 +292,28 @@ namespace Surge
         SG_ASSERT_NOMSG(out);
 
         String jsonContents;
-
-#ifdef SURGE_PLATFORM_ANDROID
-        android_app* app = Android::GAndroidApp;
-        AAssetManager* androidAssetMgr = app->activity->assetManager;
-
-        AAsset* asset = AAssetManager_open(androidAssetMgr, path.generic_string().c_str(), AASSET_MODE_BUFFER);
-        if(!asset)
+        if (!Filesystem::ReadTextFile(path, jsonContents))
         {
-            Log<Severity::Error>("DeserializeProject: Failed to open '{}' via AAssetManager", path.string());
+            Log<Severity::Error>("DeserializeProject: Failed to read file '{}'", path.string());
             return;
         }
 
-        size_t size = AAsset_getLength(asset);
-        jsonContents.resize(size, '\0');
-        AAsset_read(asset, jsonContents.data(), size);
-        AAsset_close(asset);
-#else
-        jsonContents = Filesystem::ReadFile<String>(path);
-#endif
-
-        if(jsonContents.empty())
+        nlohmann::json parsedJson = nlohmann::json::parse(jsonContents);
+        if(parsedJson.is_discarded())
         {
-            Log<Severity::Error>("DeserializeProject: File is empty or could not be read '{}'!", path.string());
+            Log<Severity::Error>("DeserializeProject: Corrupt or invalid JSON at '{}'", path.string());
             return;
         }
 
-        try
+        if(parsedJson.contains("Project"))
         {
-            nlohmann::json parsedJson = nlohmann::json::parse(jsonContents);
-
-            if(parsedJson.contains("Project"))
-            {
-                const auto& projNode = parsedJson["Project"];
-                out->Name = projNode.value("Name", "");
-                out->Version = projNode.value("Version", "1.0");
-                out->StartScene = static_cast<AssetID>(projNode.value("StartScene", 0ULL));
-            }
+            const auto& projNode = parsedJson["Project"];
+            out->Name = projNode.value("Name", "");
+            out->Version = projNode.value("Version", "1.0");
+            out->StartScene = static_cast<AssetID>(projNode.value("StartScene", 0ULL));
         }
-        catch(const nlohmann::json::exception& e)
-        {
-            Log<Severity::Error>("DeserializeProject: JSON parsing failed for '{}'. Error: {}", path.string(), e.what());
-        }
+        else
+            Log<Severity::Error>("DeserializeProject: Corrupted file '{}'", path.string());
     }
 
 } // namespace Surge

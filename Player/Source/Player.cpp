@@ -3,13 +3,6 @@
 #include "Player.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
-#ifdef SURGE_PLATFORM_ANDROID
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#endif
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 //NOTE THIS VS Project is only for builidng and copying via Editor, it will not run from the VS ///
@@ -22,44 +15,13 @@ namespace Surge
     {
         Path searchDir = "Engine";
         Path foundPath;
-        
-#ifdef SURGE_PLATFORM_ANDROID
-        android_app* app = Android::GAndroidApp;
-        AAssetManager* androidAssetMgr = app->activity->assetManager;
 
-        AAssetDir* assetDir = AAssetManager_openDir(androidAssetMgr, searchDir.string().c_str());
-        if(assetDir)
-        {
-            const char* filename = nullptr;
-            while((filename = AAssetDir_getNextFileName(assetDir)) != nullptr)
-            {
-                String fileStr(filename);
-                if(fileStr.ends_with(".surgeproj"))
-                {
-                    foundPath = searchDir / fileStr;
-                    break;
-                }
-            }
-            AAssetDir_close(assetDir);
-        }
-#else
-        if(Filesystem::Exists(searchDir) && std::filesystem::is_directory(searchDir))
-        {
-            for(const auto& entry : std::filesystem::directory_iterator(searchDir))
-            {
-                if(entry.is_regular_file() && entry.path().extension() == ".surgeproj")
-                {
-                    foundPath = entry.path();
-                    break; // Stop at the very first match
-                }
-            }
-        }
-#endif
+        Vector<Path> files = Filesystem::GetFilesInDirectory("Engine", ".surgeproj");
 
-        if(foundPath.empty())
+        if(files.empty())
             Log<Severity::Fatal>("No .surgeproj file found!");
 
-        return foundPath;
+        return files.front();
     }
 
     void Player::OpenProject()

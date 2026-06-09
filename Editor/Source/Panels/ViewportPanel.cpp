@@ -301,7 +301,7 @@ namespace Surge
         Scene* scene = mSceneHierarchy->GetSceneContext();
         AssetID assetID = scene ? scene->GetID() : AssetID(AssetID::INVALID);
         if(assetID)
-            mSceneName = Filesystem::GetNameWithExtension(Core::GetAssetManager()->GetMetadata(assetID).RelativePath);
+            mSceneName = Filesystem::GetFilenameWithExt(Core::GetAssetManager()->GetMetadata(assetID).RelativePath);
         else
             mSceneName = "Untitled Scene";
     }

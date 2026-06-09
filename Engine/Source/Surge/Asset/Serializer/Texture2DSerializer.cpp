@@ -3,14 +3,8 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 
-#ifdef SURGE_PLATFORM_ANDROID
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#endif
-
-#include <stb_image.h>
 #include <basisu/transcoder/basisu_transcoder.h>
+#include <stb_image.h>
 
 namespace Surge
 {
@@ -23,9 +17,6 @@ namespace Surge
     bool Texture2DSerializer::Serialize(Ref<Asset> asset) const
     {
         bool result = false;
-        //AssetManager* assetManager = Core::GetAssetManager();
-        //const AssetMetadata& metadata = assetManager->GetMetadata(asset->GetID());
-        //String absolutePath = assetManager->GetAbsolutePath(metadata.RelativePath);
         SG_ASSERT_INTERNAL("[Texture2DSerializer] Serialize: You can not serialize Texture2Ds yet");
         return result;
     }
@@ -35,28 +26,18 @@ namespace Surge
         AssetManager* assetManager = Core::GetAssetManager();
         String absolutePath = assetManager->GetAbsolutePath(metadata.RelativePath);
 
+        Vector<uint8_t> fileData;
+        if(!Filesystem::ReadBinaryFile(absolutePath, fileData))
+        {
+            Log<Severity::Error>("[Texture2DSerializer] Failed to read binary file at path: {0}", absolutePath);
+            return nullptr;
+        }
+
         int width = 0, height = 0, channels = 0;
-        stbi_uc* data = nullptr;
-#ifdef SURGE_PLATFORM_WINDOWS
-        data = stbi_load(absolutePath.c_str(), &width, &height, &channels, 4);
-#elif defined(SURGE_PLATFORM_ANDROID)
-        android_app* app = Android::GAndroidApp;
-        AAssetManager* androidAssetManager = app->activity->assetManager;
-        AAsset* asset = AAssetManager_open(androidAssetManager, absolutePath.c_str(), AASSET_MODE_BUFFER);
-
-        Vector<unsigned char> buffer;
-        int bufferSize = AAsset_getLength(asset);
-        buffer.resize(bufferSize);
-
-        AAsset_read(asset, buffer.data(), bufferSize);
-        AAsset_close(asset);
-
-        data = stbi_load_from_memory(buffer.data(), bufferSize, &width, &height, &channels, 4);
-#endif
-
+        stbi_uc* data = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels, 4);
         if(!data)
         {
-            Log<Severity::Error>("Failed to load texture at path: {0}", absolutePath);
+            Log<Severity::Error>("[Texture2DSerializer] STB failed to decode texture at path: {0}", absolutePath);
             return nullptr;
         }
 
@@ -66,7 +47,7 @@ namespace Surge
         spec.Height = height;
         spec.GenerateMips = true;
         spec.Format = ImageFormat::RGBA8_SRGB;
-        spec.DebugName = Filesystem::GetNameWithExtension(absolutePath);
+        spec.DebugName = Filesystem::GetFilenameWithExt(absolutePath);
         Ref<Texture2D> texture2D = Texture2D::Create(spec);
 
         stbi_image_free(spec.Content);
