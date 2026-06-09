@@ -12,15 +12,28 @@ namespace Surge
 {
     static void DrawTextureProperty(const char* label, Material* material, const char* mapUseName, const char* textureName)
     {
+        bool useMap = material->Get<int>(mapUseName);
+
+        Ref<Texture2D> tex = material->GetTexture(textureName);
+        Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        uint64_t imageSize = 0;
+        ImageHandle handle = ImageHandle::Invalid();
+        if(tex)
+        {
+            handle = tex->GetRHIImage();
+            imageSize = rhi->GetImageSize(handle);
+        }
+
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(label);
-
+        {
+            ImGuiAux::ScopedBoldFont boldFont(18.0f);
+            ImGui::TextUnformatted(label);
+        }
+        if(tex)
+            ImGui::Text("Size: %.5f MB", static_cast<float>(imageSize) / (1024.0f * 1024.0f));
         ImGui::TableSetColumnIndex(1);
-
-        bool useMap = material->Get<int>(mapUseName);
-        Ref<Texture2D> tex = material->GetTexture(textureName);
 
         ImGui::PushID(label);
         if(ImGui::Checkbox("##Use", &useMap))
@@ -34,14 +47,14 @@ namespace Surge
 
         if(tex)
         {
-            ImTextureID texID = Core::GetRenderer()->GetRHI()->GetImGuiImage(tex->GetRHIImage());
+            ImTextureID texID = rhi->GetImGuiImage(handle);
             ImGui::Image(texID, ImVec2(thumbnailSize, thumbnailSize));
         }
         else
         {
             if(useMap) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
 
-            ImGuiAux::ScopedBoldFont font;
+            ImGuiAux::ScopedBoldFont font(21.0f);
             ImGui::Button("Drop Texture2D Here", ImVec2(ImGui::GetContentRegionAvail().x, thumbnailSize));
 
             if(useMap) ImGui::PopStyleColor();
@@ -64,8 +77,6 @@ namespace Surge
             {
                 Ref<Texture2D> newTex = Core::GetAssetManager()->Load<Texture2D>(droppedAssetID);
                 material->SetTexture(textureName, newTex);
-
-                // QoL: Automatically check the box when a texture is dropped!
                 material->Set<int>(mapUseName, 1);
             }
         }
@@ -220,7 +231,7 @@ namespace Surge
             ImGui::Spacing();
 
             // Properties Table
-            if(ImGui::BeginTable("##MaterialProperties", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerH))
+            if(ImGui::BeginTable("##MaterialProperties", 2, ImGuiTableFlags_Resizable))
             {
                 // Albedo Color
                 glm::vec3 albedo = mSelectedMaterial->Get<glm::vec3>("Albedo");

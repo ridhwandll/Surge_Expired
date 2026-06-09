@@ -14,8 +14,5 @@ namespace Surge
         virtual bool Serialize(Ref<Asset> asset) const override;
         virtual Ref<Asset> Deserialize(const AssetMetadata& metadata) const override;
         virtual void Shutdown() override;
-    private:
-        bool CheckAndGenerateDefaultMesh(const String& filepath, MeshSpecification& outSpec) const;
-        MeshSpecification LoadMesh(const String& filepath) const;
     };
 }

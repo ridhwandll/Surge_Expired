@@ -322,6 +322,13 @@ namespace Surge
             entry->ImGuiID = mImGuiContext.AddImage(entry->View);
     }
 
+    uint64_t VulkanRHI::GetImageSize(ImageHandle h) const
+    {
+        const ImageEntry* entry = mTexturePool.Get(h);
+        SG_ASSERT(entry, "GetImageSize: invalid TextureHandle");
+        return entry->Size;
+    }
+
     FramebufferHandle VulkanRHI::CreateFramebuffer(const FramebufferDesc& desc)
     {
         VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateFramebuffer of size {0}x{1} with {2} color attachments and depth attachment: {3}", desc.Width, desc.Height, desc.ColorAttachmentCount, desc.HasDepth));
@@ -871,7 +878,7 @@ namespace Surge
                                         ImGui::Text("Dimensions: %dx%d", tDesc.Width, tDesc.Height);
                                         ImGui::Text("Format: %s", SurgeReflect::EnumToString(tDesc.Format).data());
                                         ImGui::Text("Usage: %s", VulkanUtils::TextureUsageToString(tDesc.Usage));
-                                        ImGui::Text("Size: %.3f MB", texEntry->Size / (1024.0f * 1024.0f));
+                                        ImGui::Text("Size: %.5f MB", texEntry->Size / (1024.0f * 1024.0f));
                                         ImGui::TreePop();
                                     }
                                 }
@@ -922,10 +929,8 @@ namespace Surge
             ImGui::TreePop();
         }
         ImGui::Separator();
-        //ImGui::PushFont(mImGuiContext.GetBoldFont(), boldFontSize);
         if (ImGui::TreeNode("TexturePool"))
         {
-            //ImGui::PopFont();
             ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
             mTexturePool.ForEachAlive([this](const ImageHandle& h, ImageEntry& entry)
                 {

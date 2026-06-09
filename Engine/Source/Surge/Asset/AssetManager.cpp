@@ -171,7 +171,9 @@ namespace Surge
         SG_ASSERT(cacheIt != mLoadedAssets.end(), "[AssetManager] Save: AssetID {} is not loaded!", id.Get());
         SG_ASSERT(mAssetRegistry.find(id) != mAssetRegistry.end(), "[AssetManager] Save: AssetID {} is not registered!", id.Get());
 
-        mSerializers[mAssetRegistry.at(id).Type]->Serialize(cacheIt->second);
+        auto serIt = mSerializers.find(mAssetRegistry.at(id).Type);
+        SG_ASSERT(serIt != mSerializers.end() && serIt->second, "[AssetManager] Save: No serializer found!'");
+        serIt->second->Serialize(cacheIt->second);
     }
 
     bool AssetManager::IsRegistered(AssetID id)

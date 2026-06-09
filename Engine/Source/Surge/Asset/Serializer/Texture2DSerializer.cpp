@@ -40,8 +40,8 @@ namespace Surge
         data = stbi_load(absolutePath.c_str(), &width, &height, &channels, 4);
 #elif defined(SURGE_PLATFORM_ANDROID)
         android_app* app = Android::GAndroidApp;
-        AAssetManager* assetManager = app->activity->assetManager;
-        AAsset* asset = AAssetManager_open(assetManager, absolutePath.c_str(), AASSET_MODE_BUFFER);
+        AAssetManager* androidAssetManager = app->activity->assetManager;
+        AAsset* asset = AAssetManager_open(androidAssetManager, absolutePath.c_str(), AASSET_MODE_BUFFER);
 
         Vector<unsigned char> buffer;
         int bufferSize = AAsset_getLength(asset);

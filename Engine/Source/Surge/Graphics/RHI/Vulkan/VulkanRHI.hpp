@@ -53,6 +53,7 @@ namespace Surge
         void DestroyImage(ImageHandle h);
         void UploadImageData(ImageHandle h, const void* data, Uint size);
         void ResizeImage(ImageHandle h, Uint width, Uint height);
+        uint64_t GetImageSize(ImageHandle h) const;
         const ImageDesc& GetDesc(ImageHandle h) const;
 
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);

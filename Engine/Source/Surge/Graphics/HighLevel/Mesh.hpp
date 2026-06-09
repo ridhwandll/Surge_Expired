@@ -30,8 +30,8 @@ namespace Surge
         Vector<Submesh> Submeshes;
         Vector<Vertex> Vertices;
         Vector<Index> Indices;
-        Vector<Ref<Material>> Materials;
         Vector<AssetID> MaterialOverrides;
+        Vector<Ref<Material>> Materials;
     };
 
     class Mesh : public Asset

@@ -314,6 +314,11 @@ namespace Surge
             t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
             t.MarkDirty();
         }
+        {
+            Entity env;
+            CreateEntity(env, "Environemnt");
+            env.AddComponent<EnvironmentComponent>();
+        }
     }
 
 } // namespace Surge

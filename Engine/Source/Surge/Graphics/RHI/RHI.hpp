@@ -47,6 +47,7 @@ namespace Surge
         ImageHandle CreateImage(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
         void DestroyImage(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
         void ResizeImage(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }
+        uint64_t GetImageSize(ImageHandle h) const { return mBackendRHI.GetImageSize(h); }
         const ImageDesc& GetDesc(ImageHandle h) const { return mBackendRHI.GetDesc(h); }
 
         // Framebuffer

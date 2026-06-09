@@ -154,7 +154,7 @@ namespace Surge
         std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;
         std::unordered_map<AssetID, Ref<Asset>> mLoadedAssets;
         std::unordered_map<AssetType, Scope<AssetSerializer>> mSerializers;
-        bool mInitialized;
+        bool mInitialized = false;
 
         static constexpr const char* kRegistryFilename = "AssetRegistry.surge";
         static constexpr const char* kRegistryDelimiter = "|";
