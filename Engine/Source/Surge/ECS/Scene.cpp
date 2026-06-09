@@ -13,12 +13,13 @@ namespace Surge
 
     Scene::Scene()
     {
-        AddStartupEntities();
+        AddStartupEntities(); // TODO: Remove from Player builds
+        OnRuntimeStart();
     }
 
     Scene::~Scene()
     {
-
+        OnRuntimeEnd();
         mRegistry.clear();
     }
 

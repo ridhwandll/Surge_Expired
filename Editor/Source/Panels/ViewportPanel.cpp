@@ -20,7 +20,6 @@ namespace Surge
         mCode = GetStaticCode();
         mSceneHierarchy = static_cast<Editor*>(Core::GetClient())->GetPanelManager().GetPanel<SceneHierarchyPanel>();
         mEditorCam = static_cast<EditorCamera*>(panelInitArgs);
-        SetSceneName();
 
         ImGuizmo::Style& style = ImGuizmo::GetStyle();
 
@@ -299,7 +298,8 @@ namespace Surge
 
     void ViewportPanel::SetSceneName()
     {
-        auto assetID = mSceneHierarchy->GetSceneContext()->GetID();
+        Scene* scene = mSceneHierarchy->GetSceneContext();
+        AssetID assetID = scene ? scene->GetID() : AssetID(AssetID::INVALID);
         if(assetID)
             mSceneName = Filesystem::GetNameWithExtension(Core::GetAssetManager()->GetMetadata(assetID).RelativePath);
         else

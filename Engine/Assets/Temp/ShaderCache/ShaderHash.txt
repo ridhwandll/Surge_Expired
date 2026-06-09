@@ -1,9 +1,0 @@
-{
-    "LightCulling.glsl.Compute.spv": -999735523,
-    "PBR.glsl.Pixel.spv": -188478319,
-    "PBR.glsl.Vertex.spv": -595709282,
-    "PreDepth.glsl.Pixel.spv": 28989053,
-    "PreDepth.glsl.Vertex.spv": -158880289,
-    "ShadowMap.glsl.Pixel.spv": 133726416,
-    "ShadowMap.glsl.Vertex.spv": -631709618
-}

@@ -15,6 +15,7 @@ namespace Surge
 {
     void Editor::OnInitialize()
     {
+        // Dummy Scene to render the project browser ImGui. We can probably find a better way to do this later, but for now it works and doesn't cause any issues
         mActiveScene = Ref<Scene>::Create();
 
         mAssetManager = Core::GetAssetManager();
@@ -26,8 +27,6 @@ namespace Surge
 
         // Configure panels
         SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
-        sceneHierarchy->SetSceneContext(mActiveScene.Raw());
-
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
         mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
         mPanelManager.PushPanel<ContentBrowserPanel>();

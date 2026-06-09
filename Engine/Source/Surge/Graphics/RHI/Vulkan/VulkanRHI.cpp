@@ -89,6 +89,11 @@ namespace Surge
     void VulkanRHI::Shutdown()
     {
         SCOPED_TIMER("VulkanRHI::Shutdown");
+        
+        mIsShuttingDown = true;
+        WaitIdle();
+        for(Uint i = 0; i < mDeletionQueues.size(); i++)
+            FlushDeletionQueue(i);
 
         // Destroy the descriptor pools
         for(VkDescriptorPool& pool : mVkDescriptorPools)
@@ -127,6 +132,7 @@ namespace Surge
         const PerFrame& frame = mFrame.GetCurrentVkFrame();
         Uint swapchainWidth = mSwapchain.GetWidth();
         Uint swapchainHeight = mSwapchain.GetHeight();
+        Uint currentFrameIndex = mFrame.GetCurrentFrameIndex();
 
         // Wait for this SLOT's fence
         // This slot was used N frames ago, wait until the GPU is done with it
@@ -135,13 +141,15 @@ namespace Surge
             vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
         }
 
+        FlushDeletionQueue(currentFrameIndex);
+
         // Ask swapchain which IMAGE is available
         // This is unpredictable, diver may return any index
         // AcquireSemaphore signals when the image is actually ready to write
         Uint imageIndex = 0;
         VkResult result = mSwapchain.AcquireNextImage(*this, frame.AcquireSemaphore, imageIndex);
 
-        outCtx.FrameIndex = mFrame.GetCurrentFrameIndex();
+        outCtx.FrameIndex = currentFrameIndex;
         outCtx.SwapchainIndex = imageIndex;
         outCtx.Width = swapchainWidth;
         outCtx.Height = swapchainHeight;
@@ -213,10 +221,8 @@ namespace Surge
         //VulkanRHI& rhi = Core::GetRenderer()->GetRHI()->GetBackendRHI();
         //vkDestroySurfaceKHR(rhi.GetInstance(), rhi.GetSurface(), nullptr);
         //CreateSurface(Core::GetWindow());
-#endif		
-        Core::AddFrameEndCallback([this]() {
-                ResizeInternal();
-            });
+#endif
+        ResizeInternal();
     }
 
     const RHIStats& VulkanRHI::GetStats()
@@ -253,9 +259,10 @@ namespace Surge
         if (!entry)
             return;
 
-        VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));		
-        VulkanBuffer::Destroy(*this, *entry);// kills VkBuffer + VmaAllocation
-        mBufferPool.Free(buffer); // Return slot to free list
+        VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));
+
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Buffers.push_back(std::move(*entry));
+        mBufferPool.Free(buffer);
     }
 
     ImageHandle VulkanRHI::CreateImage(const ImageDesc& desc)
@@ -288,11 +295,11 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation));
 
-        if (entry->Desc.GenerateImGuiID)
-            DestroyImGuiImage(h);
+        if(entry->Desc.GenerateImGuiID)
+            mImGuiContext.DestroyImage(entry->ImGuiID);
 
-        VulkanImage::Destroy(*this, *entry);
-        mTexturePool.Free(h);		
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
+        mTexturePool.Free(h);
     }
 
     void VulkanRHI::UploadImageData(ImageHandle h, const void* data, Uint size)
@@ -303,8 +310,6 @@ namespace Surge
 
     void VulkanRHI::ResizeImage(ImageHandle h, Uint width, Uint height)
     {
-        //WaitIdle();
-
         ImageEntry* entry = mTexturePool.Get(h);
         if (!entry)
             return;
@@ -312,10 +317,11 @@ namespace Surge
         if (entry->Desc.GenerateImGuiID)
             DestroyImGuiImage(h);
 
-        VulkanImage::Destroy(*this, *entry);
         ImageDesc desc = entry->Desc;
         desc.Width = width;
         desc.Height = height;
+
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
 
         *entry = VulkanImage::Create(*this, desc);
         if (desc.GenerateImGuiID)
@@ -339,23 +345,26 @@ namespace Surge
     void VulkanRHI::DestroyFramebuffer(FramebufferHandle h)
     {
         FramebufferEntry* entry = mFramebufferPool.Get(h);
-        if (!entry)
+        if(!entry)
             return;
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", h.Index, h.Generation));
-        VulkanFramebuffer::Destroy(*this, *entry);
+
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Framebuffers.push_back(std::move(*entry));
         mFramebufferPool.Free(h);
     }
 
     void VulkanRHI::ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height)
     {
         WaitIdle();
-
         FramebufferEntry* entry = mFramebufferPool.Get(h);
         if (!entry)
             return;
 
-        VulkanFramebuffer::Destroy(*this, *entry);
+        // We dont use deletion queque here because we need to destroy the old framebuffer immediately to free up the memory for the new resized attachments
+        // The old framebuffer will be destroyed after WaitIdle() so we are sure the GPU is not using it anymore.
+        FramebufferEntry oldEntry = *entry;
+        VulkanFramebuffer::Destroy(*this, oldEntry);
 
         // Resize the attached Textures
         for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
@@ -369,6 +378,8 @@ namespace Surge
         desc.Height = height;
 
         *entry = VulkanFramebuffer::Create(*this, desc, mRenderPassCache, mTexturePool);
+
+        //EnqueueDeletion([this, oldEntry]() mutable { VulkanFramebuffer::Destroy(*this, oldEntry); });
     }
 
     const FramebufferDesc& VulkanRHI::GetDesc(FramebufferHandle h) const
@@ -411,11 +422,12 @@ namespace Surge
     void VulkanRHI::DestroyPipeline(PipelineHandle h)
     {
         PipelineEntry* entry = mPipelinePool.Get(h);
-        if (!entry)
+        if(!entry)
             return;
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying pipeline with handle index {0} and generation {1}", h.Index, h.Generation));
-        VulkanPipeline::Destroy(*this, *entry);
+
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Pipelines.push_back(std::move(*entry));
         mPipelinePool.Free(h);
     }
 
@@ -453,12 +465,13 @@ namespace Surge
 
     void VulkanRHI::DestroySampler(SamplerHandle h)
     {
-        VK_RHI_LOG(Log<Severity::Info>("Destroying sampler with handle index {0} and generation {1}", h.Index, h.Generation));
         SamplerEntry* entry = mSamplerPool.Get(h);
-        if (!entry)
+        if(!entry)
             return;
 
-        vkDestroySampler(mDevice, entry->Sampler, nullptr);
+        VK_RHI_LOG(Log<Severity::Info>("Destroying sampler with handle index {0} and generation {1}", h.Index, h.Generation));
+
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Samplers.push_back(std::move(*entry));
         mSamplerPool.Free(h);
     }
 
@@ -497,7 +510,7 @@ namespace Surge
         if(!entry)
             return;
 
-        VulkanDescriptorSet::Destroy(*this, *entry);
+        mDeletionQueues[mFrame.GetCurrentFrameIndex()].DescriptorSets.push_back(std::move(*entry));
         mDescriptorSetPool.Free(h);
     }
 
@@ -1235,5 +1248,17 @@ namespace Surge
         Vector<const char*> instanceLayers;
         ENABLE_IF_VK_VALIDATION(mDebugger.AddValidationLayers(instanceLayers));
         return instanceLayers;
+    }
+
+    void VulkanRHI::FlushDeletionQueue(Uint frameIndex)
+    {
+        auto& q = mDeletionQueues[frameIndex];
+        for(auto& e : q.Buffers) VulkanBuffer::Destroy(*this, e);
+        for(auto& e : q.Images) VulkanImage::Destroy(*this, e);
+        for(auto& e : q.Framebuffers) VulkanFramebuffer::Destroy(*this, e);
+        for(auto& e : q.Pipelines) VulkanPipeline::Destroy(*this, e);
+        for(auto& e : q.Samplers) vkDestroySampler(mDevice, e.Sampler, nullptr);
+        for(auto& e : q.DescriptorSets) VulkanDescriptorSet::Destroy(*this, e);
+        q = {};
     }
 }

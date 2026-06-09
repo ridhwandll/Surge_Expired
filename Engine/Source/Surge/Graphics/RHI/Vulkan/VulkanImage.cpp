@@ -112,7 +112,6 @@ namespace Surge
 
     void VulkanImage::Destroy(const VulkanRHI& rhi, ImageEntry& entry)
     {
-        //rhi.WaitIdle();
         if (entry.View != VK_NULL_HANDLE)
         {
             vkDestroyImageView(rhi.GetDevice(), entry.View, nullptr);

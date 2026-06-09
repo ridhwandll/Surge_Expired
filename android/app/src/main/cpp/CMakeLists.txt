@@ -121,12 +121,28 @@ add_library(imgui_android STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui_android PUBLIC "${VENDOR_ROOT}/ImGui" "${VENDOR_ROOT}/volk" "${VENDOR_ROOT}/Vulkan-Headers/Include" "${VENDOR_ROOT}/glm")
 target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR IMGUI_IMPL_VULKAN_USE_VOLK)
 
+# basisu transcoder
+set(BASISU_SOURCES
+    "${VENDOR_ROOT}/basisu/transcoder/basisu_transcoder.cpp"
+    "${VENDOR_ROOT}/basisu/transcoder/basisu_transcoder.h"
+)
+add_library(basisu_android STATIC ${BASISU_SOURCES})
+target_include_directories(basisu_android PUBLIC "${VENDOR_ROOT}/basisu/transcoder")
+target_compile_definitions(basisu_android PRIVATE 
+    BASISD_SUPPORT_KTX2_ZSTD=0
+    BASISD_SUPPORT_PVRTC1=0
+    BASISD_SUPPORT_PVRTC2=0
+    BASISD_SUPPORT_ATC=0
+    BASISD_SUPPORT_FXT1=0
+)
+
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE
     game-activity::game-activity_static
     volk_android
     spirvcross_android
     imgui_android
+    basisu_android
     ${log-lib}
     ${android-lib}
     ${vulkan-lib}

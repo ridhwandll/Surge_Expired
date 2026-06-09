@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Texture2DSerializer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include "Surge/Platform/Android/AndroidApp.hpp"
@@ -9,14 +10,14 @@
 #endif
 
 #include <stb_image.h>
-#include "Surge/Utility/Filesystem.hpp"
-
+#include <basisu/transcoder/basisu_transcoder.h>
 
 namespace Surge
 {
     void Texture2DSerializer::Initialize()
     {
         mSerializerType = AssetType::TEXTURE2D;
+        basist::basisu_transcoder_init();
     }
 
     bool Texture2DSerializer::Serialize(Ref<Asset> asset) const

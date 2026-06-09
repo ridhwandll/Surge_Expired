@@ -25,6 +25,7 @@ set(INCLUDE_DIRS
     Vendor/json/Include
     Vendor/FontAwesome
     Vendor/cgltf
+    Vendor/basisu
 )
 
 set(LIB_LINKS
@@ -32,6 +33,7 @@ set(LIB_LINKS
     SPIRV-Cross
     ImGui
     Optick
+    basisu
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 
