@@ -4,9 +4,15 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include <glm/gtc/type_ptr.hpp>
-#include <filesystem>
 #include <json/json.hpp>
+
+#ifdef SURGE_PLATFORM_ANDROID
+#include "Surge/Platform/Android/AndroidApp.hpp"
+#include <game-activity/native_app_glue/android_native_app_glue.h>
+#include <android/asset_manager.h>
+#else
 #include <fstream>
+#endif
 
 
 // https://github.com/nlohmann/json#arbitrary-types-conversions
@@ -132,7 +138,10 @@ namespace Surge
 
     void Serializer::SerializeScene(const Path& path, Scene* in)
     {
-#ifndef SURGE_PLATFORM_ANDROID
+#ifdef SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("[Serializer] SerializeScene is unsupported on Android runtime. APK assets are readonly!");
+        return;
+#else
         SG_ASSERT_NOMSG(in);
         SCOPED_TIMER("Serialization");
         nlohmann::json outJson = nlohmann::json();
@@ -157,8 +166,7 @@ namespace Surge
 
         file << result;
         file.close();
-        
-#endif // !SURGE_PLATFORM_ANDROID
+#endif
     }
 
     template <typename XComponent>
@@ -235,18 +243,37 @@ namespace Surge
         auto& registry = out->GetRegistry();
         registry.clear();
 
-        String jsonContents = Filesystem::ReadFile<String>(path);
+        String jsonContents;
 
-        // Parse the json
-        nlohmann::json parsedJson = nlohmann::json::parse(jsonContents);
+#ifdef SURGE_PLATFORM_ANDROID
+        android_app* app = Android::GAndroidApp;
+        AAssetManager* androidAssetMgr = app->activity->assetManager;
+
+        // AAssetManager expects generic forward-slash paths
+        AAsset* asset = AAssetManager_open(androidAssetMgr, path.generic_string().c_str(), AASSET_MODE_BUFFER);
+        if(!asset)
+        {
+            Log<Severity::Error>("DeserializeScene: Failed to open '{}' via AAssetManager", path.string());
+            return;
+        }
+
+        size_t size = AAsset_getLength(asset);
+        jsonContents.resize(size, '\0');
+        AAsset_read(asset, jsonContents.data(), size);
+        AAsset_close(asset);
+#else
+        jsonContents = Filesystem::ReadFile<String>(path);
+#endif
+
+        nlohmann::json parsedJson = nlohmann::json::parse(jsonContents, nullptr, false);
         if(parsedJson.is_discarded())
         {
             Log<Severity::Error>("DeserializeScene: Corrupt or invalid JSON at '{}'", path.string());
             return;
         }
 
-        uint64_t size = parsedJson["Scene"]["Size"];
-        for (uint64_t i = 0; i < size; i++)
+        uint64_t sceneSize = parsedJson["Scene"]["Size"];
+        for(uint64_t i = 0; i < sceneSize; i++)
         {
             Entity newEntity;
             out->CreateEntity(newEntity, "");
@@ -257,6 +284,10 @@ namespace Surge
 
     void Serializer::SerializeProject(const Path& path, Project* in)
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("[Serializer] SerializeProject is unsupported on Android runtime. APK assets are readonly!");
+        return;
+#else
         SG_ASSERT_NOMSG(in);
 
         nlohmann::json outJson;
@@ -275,13 +306,33 @@ namespace Surge
 
         file << result;
         file.close();
+#endif
     }
 
     void Serializer::DeserializeProject(const Path& path, Project* out)
     {
         SG_ASSERT_NOMSG(out);
 
-        String jsonContents = Filesystem::ReadFile<String>(path);
+        String jsonContents;
+
+#ifdef SURGE_PLATFORM_ANDROID
+        android_app* app = Android::GAndroidApp;
+        AAssetManager* androidAssetMgr = app->activity->assetManager;
+
+        AAsset* asset = AAssetManager_open(androidAssetMgr, path.generic_string().c_str(), AASSET_MODE_BUFFER);
+        if(!asset)
+        {
+            Log<Severity::Error>("DeserializeProject: Failed to open '{}' via AAssetManager", path.string());
+            return;
+        }
+
+        size_t size = AAsset_getLength(asset);
+        jsonContents.resize(size, '\0');
+        AAsset_read(asset, jsonContents.data(), size);
+        AAsset_close(asset);
+#else
+        jsonContents = Filesystem::ReadFile<String>(path);
+#endif
 
         if(jsonContents.empty())
         {

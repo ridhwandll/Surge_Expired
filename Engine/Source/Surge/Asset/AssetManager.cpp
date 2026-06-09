@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetManager.hpp"
-#include "Surge/ECS/Scene.hpp"
 
 #include "Serializer/Texture2DSerializer.hpp"
 #include "Serializer/MeshSerializer.hpp"
@@ -11,6 +10,12 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+
+#ifdef SURGE_PLATFORM_ANDROID
+#include "Surge/Platform/Android/AndroidApp.hpp"
+#include <game-activity/native_app_glue/android_native_app_glue.h>
+#include <android/asset_manager.h>
+#endif
 
 namespace Surge
 {
@@ -71,7 +76,17 @@ namespace Surge
         if(!relativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
         {
             const String absPath = GetAbsolutePath(relativePath);
-            if(!std::ifstream(absPath).good())
+            bool exists = false;
+#ifdef SURGE_PLATFORM_ANDROID
+            AAsset* asset = AAssetManager_open(Android::GAndroidApp->activity->assetManager, absPath.c_str(), AASSET_MODE_UNKNOWN);
+            exists = (asset != nullptr);
+            if(asset)
+                AAsset_close(asset);
+#else
+            exists = std::ifstream(absPath).good();
+#endif
+
+            if(!exists)
             {
                 Log<Severity::Warn>("[AssetManager] Import failed: file not found: '{}'!", absPath.c_str());
                 return UUID::INVALID;
@@ -201,12 +216,16 @@ namespace Surge
 
     void AssetManager::UpdateAssetPath(AssetID id, const String& newRelativePath)
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("[AssetManager] UpdateAssetPath is an Editor function. APK assets are readonly!");
+#else
         auto it = mAssetRegistry.find(id);
         if(it != mAssetRegistry.end())
         {
             it->second.RelativePath = newRelativePath;
             SerializeRegistry();
         }
+#endif
     }
 
     // Registry
@@ -215,6 +234,10 @@ namespace Surge
     //    <UUID>|<TypeString>|<Relative/path/to/asset.ext OR MemoryString>
     void AssetManager::SerializeRegistry()
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        Log<Severity::Warn>("[AssetManager] SerializeRegistry skipped. APK assets are readonly!");
+        return;
+#else
         const String registryPath = sAssetsDirectory + '/' + kRegistryFilename;
 
         std::ofstream file(registryPath, std::ios::out | std::ios::trunc);
@@ -238,23 +261,50 @@ namespace Surge
         }
 
         Log<Severity::Info>("[AssetManager] Registry serialized ({} entries) -> '{}'.", mAssetRegistry.size(), registryPath.c_str());
+#endif
     }
 
     bool AssetManager::DeserializeRegistry()
     {
         const String registryPath = sAssetsDirectory + '/' + kRegistryFilename;
+        String fileContents;
 
+#ifdef SURGE_PLATFORM_ANDROID
+        AAssetManager* androidAssetMgr = Android::GAndroidApp->activity->assetManager;
+        AAsset* asset = AAssetManager_open(androidAssetMgr, registryPath.c_str(), AASSET_MODE_BUFFER);
+        if(!asset)
+        {
+            Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Failed to open '{}' in APK", registryPath);
+            return false;
+        }
+
+        size_t size = AAsset_getLength(asset);
+        fileContents.resize(size, '\0');
+        AAsset_read(asset, fileContents.data(), size);
+        AAsset_close(asset);
+#else
         std::ifstream file(registryPath);
         if(!file.is_open())
             return false;
 
+        file.seekg(0, std::ios::end);
+        size_t size = file.tellg();
+        fileContents.resize(size, '\0');
+        file.seekg(0);
+        file.read(fileContents.data(), size);
+#endif
+
         mAssetRegistry.clear();
 
+        std::istringstream stream(fileContents);
         String line;
         Uint count = 0;
 
-        while(std::getline(file, line))
+        while(std::getline(stream, line))
         {
+            if(!line.empty() && line.back() == '\r')
+                line.pop_back();
+
             // Ignore the lines starting with "//"
             if(line.empty() || (line.size() >= 2 && line[0] == '/' && line[1] == '/'))
                 continue;
@@ -291,11 +341,23 @@ namespace Surge
             meta.RelativePath = relPath;
 
             if(relPath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
+            {
                 meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY;
+            }
             else
             {
-                const String absPath = GetAbsolutePath(relPath);
-                const bool exists = std::ifstream(absPath).good();
+                String absPath = GetAbsolutePath(relPath);
+                bool exists = false;
+
+#ifdef SURGE_PLATFORM_ANDROID
+                AAsset* testAsset = AAssetManager_open(Android::GAndroidApp->activity->assetManager, absPath.c_str(), AASSET_MODE_BUFFER);
+                exists = (testAsset != nullptr);
+                if(testAsset)
+                    AAsset_close(testAsset);
+#else
+                exists = std::ifstream(absPath).good();
+#endif
+
                 meta.Flags = exists ? AssetFlags::VALID : AssetFlags::MISSING;
 
                 if(!exists)

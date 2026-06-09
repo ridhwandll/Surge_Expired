@@ -70,6 +70,17 @@ namespace Surge
         return meshAbsPath + ".RAsset";
     }
 
+#ifdef SURGE_PLATFORM_ANDROID
+    static String ReadStr(AAsset* f)
+    {
+        Uint len = 0;
+        AAsset_read(f, &len, sizeof(Uint));
+        String s(len, '\0');
+        if(len > 0)
+            AAsset_read(f, s.data(), len);
+        return s;
+    }
+#else
     static void WriteStr(std::ofstream& f, const String& s)
     {
         Uint len = static_cast<Uint>(s.size());
@@ -86,6 +97,7 @@ namespace Surge
             f.read(s.data(), len);
         return s;
     }
+#endif
 
     static cgltf_data* ParseGLTF(const String& filepath)
     {
@@ -412,6 +424,11 @@ namespace Surge
 
     static void WriteSidecar(const String& path, const MeshSpecification& spec, const Vector<Ref<Material>>& overrides)
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        // APK assets are read-only. We should never be cooking sidecars at runtime on mobile!
+        Log<Severity::Error>("[MeshSerializer] Ignored writing sidecar '{}'. APK assets are read-only. Pre-cook in Editor!", path);
+        return;
+#else
         Uint validOverrideCount = 0;
         for(const Ref<Material>& ref : overrides)
         {
@@ -485,10 +502,76 @@ namespace Surge
             f.write(reinterpret_cast<const char*>(&slotIndex), sizeof(Uint));
             f.write(reinterpret_cast<const char*>(&rawID), sizeof(uint64_t));
         }
+#endif
     }
 
     static bool LoadSidecar(const String& path, MeshSpecification& outSpec)
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        AAssetManager* androidAssetMgr = Android::GAndroidApp->activity->assetManager;
+        AAsset* f = AAssetManager_open(androidAssetMgr, path.c_str(), AASSET_MODE_BUFFER);
+        if(!f)
+            return false;
+
+        SurgeMeshHeader header = {};
+        AAsset_read(f, &header, sizeof(SurgeMeshHeader));
+
+        if(header.Magic != kSidecarMagic)
+        {
+            Log<Severity::Warn>("[MeshSerializer] '{}' has bad magic, ignoring sidecar.", path.c_str());
+            AAsset_close(f);
+            return false;
+        }
+        if(header.Version != kSidecarVersion)
+        {
+            Log<Severity::Warn>("[MeshSerializer] '{}' version mismatch (got {}, want {}), re-cooking.", path.c_str(), header.Version, kSidecarVersion);
+            AAsset_close(f);
+            return false;
+        }
+
+        // Vertices
+        outSpec.Vertices.resize(header.VertexCount);
+        if(header.VertexCount > 0)
+            AAsset_read(f, outSpec.Vertices.data(), header.VertexCount * sizeof(Vertex));
+
+        // Indices
+        outSpec.Indices.resize(header.IndexCount);
+        if(header.IndexCount > 0)
+            AAsset_read(f, outSpec.Indices.data(), header.IndexCount * sizeof(Index));
+
+        // Submeshes
+        outSpec.Submeshes.reserve(header.SubmeshCount);
+        for(Uint i = 0; i < header.SubmeshCount; i++)
+        {
+            Submesh& sm = outSpec.Submeshes.emplace_back();
+            AAsset_read(f, &sm.BaseVertex, sizeof(Uint));
+            AAsset_read(f, &sm.BaseIndex, sizeof(Uint));
+            AAsset_read(f, &sm.MaterialIndex, sizeof(Uint));
+            AAsset_read(f, &sm.IndexCount, sizeof(Uint));
+            AAsset_read(f, &sm.VertexCount, sizeof(Uint));
+            AAsset_read(f, &sm.BoundingBox.Min, sizeof(glm::vec3));
+            AAsset_read(f, &sm.BoundingBox.Max, sizeof(glm::vec3));
+            AAsset_read(f, &sm.Transform, sizeof(glm::mat4));
+            AAsset_read(f, &sm.LocalTransform, sizeof(glm::mat4));
+            sm.NodeName = ReadStr(f);
+            sm.MeshName = ReadStr(f);
+        }
+
+        // Overrides
+        outSpec.MaterialOverrides.assign(outSpec.Submeshes.size(), AssetID::INVALID);
+        for(Uint i = 0; i < header.ValidOverrideCount; i++)
+        {
+            Uint slotIndex = 0;
+            uint64_t rawID = 0;
+            AAsset_read(f, &slotIndex, sizeof(Uint));
+            AAsset_read(f, &rawID, sizeof(uint64_t));
+            if(slotIndex < static_cast<Uint>(outSpec.Submeshes.size()))
+                outSpec.MaterialOverrides[slotIndex] = AssetID(rawID);
+        }
+
+        AAsset_close(f);
+        return true;
+#else
         std::ifstream f(path, std::ios::binary);
         if(!f.is_open())
             return false;
@@ -548,6 +631,7 @@ namespace Surge
         }
 
         return f.good() || f.eof();
+#endif
     }
 
     // 
@@ -562,6 +646,10 @@ namespace Surge
     /// Serialize ///
     bool MeshSerializer::Serialize(Ref<Asset> asset) const
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("[MeshSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");
+        return false;
+#else
         AssetManager* am = Core::GetAssetManager();
         const AssetMetadata& meta = am->GetMetadata(asset->GetID());
 
@@ -584,6 +672,7 @@ namespace Surge
         Ref<Mesh> mesh = asset.As<Mesh>();
         WriteSidecar(sidecarPath, existingGeom, mesh->GetMaterialOverrides());
         return true;
+#endif
     }
 
     /// Deserialize ///

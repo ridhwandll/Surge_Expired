@@ -3,6 +3,13 @@
 #include "Player.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
+#ifdef SURGE_PLATFORM_ANDROID
+#include "Surge/Platform/Android/AndroidApp.hpp"
+#include <game-activity/native_app_glue/android_native_app_glue.h>
+#include <android/asset_manager.h>
+#endif
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 //NOTE THIS VS Project is only for builidng and copying via Editor, it will not run from the VS ///
@@ -13,10 +20,29 @@ namespace Surge
 {
     static Path GetProjectPath()
     {
-        // .surgeproj file is located in the Engine folder of the root of shipped .exe
         Path searchDir = "Engine";
         Path foundPath;
+        
+#ifdef SURGE_PLATFORM_ANDROID
+        android_app* app = Android::GAndroidApp;
+        AAssetManager* androidAssetMgr = app->activity->assetManager;
 
+        AAssetDir* assetDir = AAssetManager_openDir(androidAssetMgr, searchDir.string().c_str());
+        if(assetDir)
+        {
+            const char* filename = nullptr;
+            while((filename = AAssetDir_getNextFileName(assetDir)) != nullptr)
+            {
+                String fileStr(filename);
+                if(fileStr.ends_with(".surgeproj"))
+                {
+                    foundPath = searchDir / fileStr;
+                    break;
+                }
+            }
+            AAssetDir_close(assetDir);
+        }
+#else
         if(Filesystem::Exists(searchDir) && std::filesystem::is_directory(searchDir))
         {
             for(const auto& entry : std::filesystem::directory_iterator(searchDir))
@@ -28,6 +54,8 @@ namespace Surge
                 }
             }
         }
+#endif
+
         if(foundPath.empty())
             Log<Severity::Fatal>("No .surgeproj file found!");
 

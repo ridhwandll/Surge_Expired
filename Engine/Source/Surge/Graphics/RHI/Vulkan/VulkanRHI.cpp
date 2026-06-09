@@ -1,4 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"

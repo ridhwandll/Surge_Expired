@@ -2,6 +2,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"

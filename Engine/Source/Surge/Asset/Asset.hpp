@@ -57,7 +57,6 @@ namespace Surge
             case AssetType::MATERIAL: return ".smat";
             case AssetType::SCENE: return ".srg";
             default:
-                Log<Severity::Error>("[Asset] You should not call GetExtensionFromAssetType for non Surge Types like TEXTURE2D/MESH");
                 return "";
         }
     }

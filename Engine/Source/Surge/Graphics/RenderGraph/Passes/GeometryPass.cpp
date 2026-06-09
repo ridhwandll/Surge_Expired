@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
 
 namespace Surge

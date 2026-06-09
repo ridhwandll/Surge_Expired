@@ -2,7 +2,15 @@
 #include "MaterialSerializer.hpp"
 #include "Surge/Core/Core.hpp"
 #include <json/json.hpp>
+
+
+#ifdef SURGE_PLATFORM_ANDROID
+#include "Surge/Platform/Android/AndroidApp.hpp"
+#include <game-activity/native_app_glue/android_native_app_glue.h>
+#include <android/asset_manager.h>
+#else
 #include <fstream>
+#endif
 
 namespace Surge
 {
@@ -13,6 +21,10 @@ namespace Surge
 
     bool MaterialSerializer::Serialize(Ref<Asset> asset) const
     {
+#ifdef SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("[MaterialSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");
+        return false;
+#else
         AssetManager* am = Core::GetAssetManager();
         const AssetMetadata& meta = am->GetMetadata(asset->GetID());
         const String absolutePath = am->GetAbsolutePath(meta.RelativePath);
@@ -70,6 +82,7 @@ namespace Surge
         SG_ASSERT(file.is_open(), "[MaterialSerializer] Failed to write: '{}'", absolutePath);
         file << j.dump(4);
         return true;
+#endif
     }
 
     Ref<Asset> MaterialSerializer::Deserialize(const AssetMetadata& metadata) const
@@ -77,10 +90,29 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String absolutePath = am->GetAbsolutePath(metadata.RelativePath);
 
+        nlohmann::json j;
+#ifdef SURGE_PLATFORM_ANDROID
+        android_app* app = Android::GAndroidApp;
+        AAssetManager* androidAssetMgr = app->activity->assetManager;
+
+        AAsset* asset = AAssetManager_open(androidAssetMgr, absolutePath.c_str(), AASSET_MODE_BUFFER);
+        SG_ASSERT(asset, "[MaterialSerializer] Failed to open: '{}'", absolutePath);
+        if(!asset)
+            return nullptr;
+
+        size_t size = AAsset_getLength(asset);
+        String fileData(size, '\0');
+        AAsset_read(asset, fileData.data(), size);
+        AAsset_close(asset);
+
+        j = nlohmann::json::parse(fileData, nullptr, false);
+#else
         std::ifstream file(absolutePath);
         SG_ASSERT(file.is_open(), "[MaterialSerializer] Failed to open: '{}'", absolutePath);
 
-        const nlohmann::json j = nlohmann::json::parse(file, nullptr, false);
+        j = nlohmann::json::parse(file, nullptr, false);
+#endif
+
         SG_ASSERT(!j.is_discarded(), "[MaterialSerializer] Failed to parse JSON: '{}'", absolutePath);
 
         Ref<Material> material = Material::Create(j.value("Name", "Unnamed"));

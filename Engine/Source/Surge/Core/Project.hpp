@@ -12,6 +12,6 @@ namespace Surge
         AssetID StartScene = AssetID::INVALID;
 
         bool IsValid() const { return !Name.empty(); }
-        void Clear() { Name.clear(); Version.clear(); StartScene = AssetID::INVALID; }
+        void Clear() { Name.clear(); Version.clear(); StartScene = AssetID(AssetID::INVALID); }
     };
 }

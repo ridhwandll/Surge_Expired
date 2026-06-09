@@ -32,38 +32,37 @@ namespace Surge
 
     String Filesystem::RemoveExtension(const Path& path)
     {
-        size_t lastindex = path.Str().find_last_of(".");
-        String rawName = path.Str().substr(0, lastindex);
+        size_t lastindex = path.string().find_last_of(".");
+        String rawName = path.string().substr(0, lastindex);
         return rawName;
     }
 
-    String Filesystem::GetNameWithExtension(const Path& assetFilepath) { return std::filesystem::path(assetFilepath.Str()).filename().string(); }
+    String Filesystem::GetNameWithExtension(const Path& assetFilepath) { return std::filesystem::path(assetFilepath.string()).filename().string(); }
 
     String Filesystem::GetNameWithoutExtension(const Path& assetFilepath)
     {
         String name;
-        auto lastSlash = assetFilepath.Str().find_last_of("/\\");
+        auto lastSlash = assetFilepath.string().find_last_of("/\\");
         lastSlash = lastSlash == String::npos ? 0 : lastSlash + 1;
-        auto lastDot = assetFilepath.Str().rfind('.');
-        auto count = lastDot == String::npos ? assetFilepath.Str().size() - lastSlash : lastDot - lastSlash;
-        name = assetFilepath.Str().substr(lastSlash, count);
+        auto lastDot = assetFilepath.string().rfind('.');
+        auto count = lastDot == String::npos ? assetFilepath.string().size() - lastSlash : lastDot - lastSlash;
+        name = assetFilepath.string().substr(lastSlash, count);
         return name;
     }
 
     Path Filesystem::GetParentPath(const Path& path)
     {
-        std::filesystem::path p = path.Str();
-        return p.parent_path().string();
+        return path.parent_path().string();
     }
 
     bool Filesystem::Exists(const Path& path)
     {
-        return std::filesystem::exists(path.Str());
+        return std::filesystem::exists(path);
     }
 
     void Filesystem::RemoveFile(const Path& path)
     {
-        std::filesystem::remove(path.Str());
+        std::filesystem::remove(path);
     }
 
     template <typename T>
