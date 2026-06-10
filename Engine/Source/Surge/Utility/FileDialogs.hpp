@@ -8,9 +8,9 @@ namespace Surge
     class FileDialog
     {
     public:
-        static SURGE_API String OpenFile(const char* filter);
-        static SURGE_API String SaveFile(const char* filter, const char* defaultName = "");
-        static SURGE_API String ChooseFolder();
+        static String OpenFile(const char* filter);
+        static String SaveFile(const char* filter, const char* defaultName = "");
+        static String ChooseFolder();
     };
 
 } // namespace Surge::FileDialog

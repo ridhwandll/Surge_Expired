@@ -13,5 +13,8 @@ namespace Surge
         virtual bool Serialize(Ref<Asset> asset) const override;
         virtual Ref<Asset> Deserialize(const AssetMetadata& metadata) const override;
         virtual void Shutdown() override;
+    private:
+        Ref<Asset> LoadFromKTX2(const String& ktx2Path) const;
+        Ref<Asset> LoadFromSource(const String& absPath) const;
     };
 }

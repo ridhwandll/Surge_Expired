@@ -1,14 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#ifdef SURGE_PLATFORM_WINDOWS
 #include "Surge/Core/Process.hpp"
+#include "Surge/Core/Logger/Logger.hpp"
 #include <fcntl.h>
-#include <filesystem>
-#include <string_view>
-#include <string>
-#include <codecvt>
-#include <Windows.h>
+
 
 #if defined(SURGE_PLATFORM_WINDOWS)
+#include <Windows.h>
 #include <corecrt_io.h>
 #define fdopen _fdopen
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
@@ -18,13 +15,15 @@
 
 #if defined(SURGE_PLATFORM_WINDOWS)
 using ProcessID = HANDLE;
+#elif defined(SURGE_PLATFORM_ANDROID)
+using ProcessID = int*; //Dummy
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
 using ProcessID = pid_t;
 #endif
 
 namespace Surge
 {
-    static ProcessID StartProcess(const std::wstring& commandLine, FILE* outputStream)
+    static ProcessID StartProcess(const String& commandLine, FILE* outputStream)
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
         STARTUPINFOW startupInfo = {};
@@ -35,14 +34,18 @@ namespace Surge
         startupInfo.hStdError = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(outputStream)));
 
         PROCESS_INFORMATION processInfo;
-        CreateProcessW(nullptr, const_cast<LPWSTR>(commandLine.data()), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startupInfo, &processInfo);
+        std::wstring wstr(commandLine.begin(), commandLine.end());
+        CreateProcessW(nullptr, static_cast<LPWSTR>(wstr.data()), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startupInfo, &processInfo);
         SURGE_GET_WIN32_LAST_ERROR
         CloseHandle(processInfo.hThread);
 
         return processInfo.hProcess;
 
+#elif defined SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("Android process is not supported yet");
+        return nullptr;
+
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
-#error "Linix is not supported yet"
         ProcessID PID = fork();
         if (!PID) // The child
         {
@@ -72,22 +75,23 @@ namespace Surge
         CloseHandle(pid);
 
         return result ? static_cast<int>(exitCode) : -1;
-
+#elif defined SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("Android process is not supported yet");
+        return 0;
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
-#error "Linix is not supported yet"
         int status;
         waitpid(pid, &status, 0);
         return status;
 #endif
     }
 
-    int Process::ResultOf(const std::wstring& commandLine)
+    int Process::ResultOf(const String& commandLine)
     {
         ProcessID pid = StartProcess(commandLine, stdout);
         return WaitProcess(pid);
     }
 
-    std::wstring Process::OutputOf(const std::wstring& commandLine, int& result)
+    String Process::OutputOf(const String& commandLine, int& result)
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
         HANDLE read;
@@ -99,8 +103,8 @@ namespace Surge
 
         if (CreatePipe(&read, &write, &securityAttributes, 0))
         {
-            std::wstring output;
-            std::string ansiBuffer;
+            String output;
+            String ansiBuffer;
             FILE* procOutputHandle = fdopen(_open_osfhandle(reinterpret_cast<intptr_t>(write), _O_APPEND), "w");
             ProcessID PID = StartProcess(commandLine, procOutputHandle);
             result = WaitProcess(PID);
@@ -108,21 +112,25 @@ namespace Surge
             DWORD bytesAvailable;
             if (PeekNamedPipe(read, nullptr, 0, nullptr, &bytesAvailable, nullptr) && bytesAvailable)
             {
+                std::wstring outputWstr;
                 ansiBuffer.resize(bytesAvailable);
-                output.resize(bytesAvailable);
+                outputWstr.resize(bytesAvailable);
 
                 ReadFile(read, ansiBuffer.data(), bytesAvailable, nullptr, nullptr);
-                MultiByteToWideChar(CP_ACP, 0, ansiBuffer.c_str(), bytesAvailable, output.data(), bytesAvailable);
+                outputWstr.resize(bytesAvailable);
+                MultiByteToWideChar(CP_ACP, 0, ansiBuffer.c_str(), bytesAvailable, outputWstr.data(), bytesAvailable);
+                output = String(outputWstr.begin(), outputWstr.end());
             }
             fclose(procOutputHandle);
             CloseHandle(read);
             return output;
         }
-
-        return std::wstring();
+        return {};
+#elif defined SURGE_PLATFORM_ANDROID
+        Log<Severity::Error>("Android process is not supported yet");
+        return {};
 
 #elif defined(SURGE_LINUX) || defined(SURGE_APPLE)
-#error "Linix is not supported yet"
         int fileDescriptors[2];
         pipe(fileDescriptors);
         fcntl(fileDescriptors[0], F_SETFL, O_NONBLOCK);
@@ -133,7 +141,7 @@ namespace Surge
 
         char buffer[1024];
         ssize_t length;
-        std::string output;
+        String output;
 
         while ((length = read(fileDescriptors[0], buffer, std::size(buffer))) > 0)
         {
@@ -147,11 +155,10 @@ namespace Surge
 #endif
     }
 
-    std::wstring Process::OutputOf(const std::wstring& commandLine)
+    String Process::OutputOf(const String& commandLine)
     {
         int result;
         return OutputOf(commandLine, result);
     }
 
 } // namespace Surge
-#endif

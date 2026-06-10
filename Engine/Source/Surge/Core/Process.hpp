@@ -1,13 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#ifdef SURGE_PLATFORM_WINDOWS
-#include <string>
+#include "Surge/Core/String.hpp"
 
 namespace Surge::Process
 {
-    int ResultOf(const std::wstring& commandLine);
-    std::wstring OutputOf(const std::wstring& commandLine, int& result);
-    std::wstring OutputOf(const std::wstring& commandLine);
+    int ResultOf(const String& commandLine);
+    String OutputOf(const String& commandLine, int& result);
+    String OutputOf(const String& commandLine);
 
 } // namespace Surge::Process
-#endif

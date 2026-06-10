@@ -6,14 +6,25 @@
 
 namespace Surge
 {
+    struct MipLevelData
+    {
+        Vector<Byte> Data;
+        Uint Width = 0;
+        Uint Height = 0;
+    };
+
     struct TextureSpecification
     {
-        Byte* Content = nullptr;
         Uint Width = 0;
         Uint Height = 0;
         ImageFormat Format = ImageFormat::RGBA8_SRGB;
+        Byte* Content = nullptr;
         bool GenerateMips = false;
         String DebugName;
+
+        // Only Compressed load paths fill Vector<MipLevelData> Mips;
+        // Windows/Android: all levels pre-baked from KTX2 (no GPU mip gen)
+        Vector<MipLevelData> Mips;
     };
 
     class Texture2D : public Asset

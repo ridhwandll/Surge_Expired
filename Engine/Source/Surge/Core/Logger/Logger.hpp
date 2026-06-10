@@ -1,16 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/String.hpp"
-#include <stdio.h>
 #include <mutex>
 #include <format>
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/log.h>
 #define SURGE_TAG "SurgeEngine"
-#elif defined(SURGE_PLATFORM_WINDOWS)
-//#define WIN32_LEAN_AND_MEAN
-//#include <windows.h>
 #endif
 
 namespace Surge

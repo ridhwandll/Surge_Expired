@@ -140,6 +140,12 @@ namespace Surge
             return 0;
         }
 
+        // GetSidecarPath
+        // Returns the absolute/relative path to the sidecar file for a given asset file. The sidecar file is where the cooked runtime data is stored for an asset
+        // @param filePath    Relative/Absolute, but must include the file extension. The returned sidecar path will just have the sidecar extension
+        // @param type        AssetType of the asset
+        String GetSidecarPath(const String& filePath, AssetType type);
+
         // Registry
         void SerializeRegistry();
         bool DeserializeRegistry();

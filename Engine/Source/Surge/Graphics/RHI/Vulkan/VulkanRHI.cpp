@@ -269,7 +269,8 @@ namespace Surge
     ImageHandle VulkanRHI::CreateImage(const ImageDesc& desc)
     {
         // TRANSFER_DST is required when InitialData is provided
-        SG_ASSERT(!(desc.InitialData && !(desc.Usage & ImageUsage::TRANSFER_DST)), "TextureDesc: InitialData provided but TRANSFER_DST not set in Usage. Add TextureUsage::TRANSFER_DST to upload pixel data");
+        SG_ASSERT(!(desc.InitialData && !(desc.Usage & ImageUsage::TRANSFER_DST)), "ImageDesc: InitialData provided but TRANSFER_DST not set in Usage. Add ImageUsage::TRANSFER_DST to upload pixel data");
+        SG_ASSERT(!(desc.InitialData && desc.MipUploads), "ImageDesc: InitialData and MipUploads cannot be used together!");
 
         ImageEntry entry = VulkanImage::Create(*this, desc);
 
@@ -281,8 +282,10 @@ namespace Surge
 
         ImageHandle h = mTexturePool.Allocate(std::move(entry));
 
-        if (desc.InitialData && desc.DataSize > 0)
-            UploadImageData(h, desc.InitialData, desc.DataSize);
+        if(desc.MipUploads && desc.MipUploadCount > 0)
+            VulkanImage::UploadCompressedData(*this, h, desc.MipUploads, desc.MipUploadCount);
+        else if (desc.InitialData && desc.DataSize > 0)
+            VulkanImage::UploadData(*this, h, desc.InitialData, desc.DataSize);
 
         VK_RHI_LOG(Log<Severity::Trace>("VulkanRHI::CreateTexture of size {0}x{1} with format {2} and usage {3}", desc.Width, desc.Height, static_cast<Uint>(desc.Format), static_cast<Uint>(desc.Usage)));
         return h;
@@ -301,12 +304,6 @@ namespace Surge
 
         mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
         mTexturePool.Free(h);
-    }
-
-    void VulkanRHI::UploadImageData(ImageHandle h, const void* data, Uint size)
-    {
-        SG_ASSERT(data && size > 0, "UploadTextureData: data is null or size is 0");
-        VulkanImage::UploadData(*this, h, data, size);
     }
 
     void VulkanRHI::ResizeImage(ImageHandle h, Uint width, Uint height)

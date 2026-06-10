@@ -190,6 +190,23 @@ namespace Surge
         return it != mAssetRegistry.end() ? it->second : kNull;
     }
 
+    String AssetManager::GetSidecarPath(const String& filePath, AssetType type)
+    {
+        switch(type)
+        {
+            case Surge::AssetType::TEXTURE2D:
+            case Surge::AssetType::SPRITE:
+                return Filesystem::ReplaceExtension(filePath, ".rTex2D").string(); //basically a ktx2z
+            case Surge::AssetType::MESH:
+                return Filesystem::ReplaceExtension(filePath, ".rMesh").string();
+            case Surge::AssetType::MATERIAL:
+            case Surge::AssetType::NONE:
+            case Surge::AssetType::SCENE:
+                break;
+        }
+        return String{};
+    }
+
     AssetID AssetManager::GetIDFromPath(const String& relativePath)
     {
         for(const auto& [id, meta] : mAssetRegistry)
@@ -314,8 +331,10 @@ namespace Surge
             else
             {
                 String absPath = GetAbsolutePath(relPath);
+                String sidecarPath = GetSidecarPath(absPath, type);
+                bool hasSidecar = !sidecarPath.empty();
 
-                bool exists = Filesystem::Exists(absPath);
+                bool exists = Filesystem::Exists(absPath) || (hasSidecar && Filesystem::Exists(sidecarPath));
                 meta.Flags = exists ? AssetFlags::VALID : AssetFlags::MISSING;
 
                 if(!exists)

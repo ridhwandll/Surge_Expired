@@ -2,6 +2,7 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanImage.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
+#include "SurgeReflect/Enum.hpp"
 
 namespace Surge
 {
@@ -172,7 +173,11 @@ namespace Surge
         vkCmdCopyBufferToImage(cb, stagingBuffer, entry->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
         if(entry->Desc.MipLevel > 1)
-            GenerateMipmaps(rhi, cb, *entry); // leaves all levels at SHADER_READ_ONLY_OPTIMAL
+        {
+            const ImageFormat fmt = entry->Desc.Format;
+            SG_ASSERT(fmt != ImageFormat::ASTC4x4_SRGB && fmt != ImageFormat::ASTC4x4_UNORM && fmt != ImageFormat::BC7_SRGB && fmt != ImageFormat::BC7_UNORM, "[VulkanImage] UploadData: cannot generate mips for compressed format {}! Use ImageDesc::MipUploads with pre-baked levels!", SurgeReflect::EnumToString(fmt).data());
+            GenerateMipmaps(rhi, cb, *entry); // Leaves all levels at SHADER_READ_ONLY_OPTIMAL
+        }
         else
             TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -307,6 +312,75 @@ namespace Surge
         entry.Layout = newLayout;
     }
 
+    void VulkanImage::UploadCompressedData(VulkanRHI& rhi, ImageHandle h, const MipUploadData* mips, Uint mipCount)
+    {
+        ImageEntry* entry = rhi.mTexturePool.Get(h);
+        SG_ASSERT(entry, "UploadMips: invalid ImageHandle");
+        SG_ASSERT(mips && mipCount > 0, "UploadMips: null or empty mip data");
+        SG_ASSERT(mipCount == entry->Desc.MipLevel, "UploadMips: mipCount ({}) != ImageDesc.MipLevel ({})", mipCount, entry->Desc.MipLevel);
+
+        VmaAllocator allocator = rhi.GetAllocator();
+
+        // Staging buffer
+        Uint totalSize = 0;
+        for(Uint i = 0; i < mipCount; i++)
+            totalSize += mips[i].Size;
+
+        VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        stagingInfo.size = totalSize;
+        stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+        VmaAllocationCreateInfo stagingAllocInfo = {};
+        stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        stagingAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VmaAllocation stagingAllocation = {};
+        VmaAllocationInfo stagingResult = {};
+
+        VK_CALL(vmaCreateBuffer(allocator, &stagingInfo, &stagingAllocInfo, &stagingBuffer, &stagingAllocation, &stagingResult));
+        SG_ASSERT(stagingResult.pMappedData, "UploadMips: staging buffer map failed");
+
+        // Copy all levels into staging buffer
+        Uint offset = 0;
+        for(Uint i = 0; i < mipCount; i++)
+        {
+            memcpy(static_cast<uint8_t*>(stagingResult.pMappedData) + offset, mips[i].Data, mips[i].Size);
+            offset += mips[i].Size;
+        }
+
+        const VkCommandBuffer cb = rhi.BeginOneTimeCommands();
+
+        TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        // One copy region per mip level
+        Vector<VkBufferImageCopy> regions(mipCount);
+        offset = 0;
+        for(Uint i = 0; i < mipCount; i++)
+        {
+            VkBufferImageCopy& r = regions[i];
+            r = {};
+            r.bufferOffset = offset;
+            r.bufferRowLength = 0;
+            r.bufferImageHeight = 0;
+            r.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            r.imageSubresource.mipLevel = i;
+            r.imageSubresource.baseArrayLayer = 0;
+            r.imageSubresource.layerCount = 1;
+            r.imageOffset = { 0, 0, 0 };
+            r.imageExtent = { mips[i].Width, mips[i].Height, 1 };
+            offset += mips[i].Size;
+        }
+        vkCmdCopyBufferToImage(cb, stagingBuffer, entry->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipCount, regions.data());
+
+        TransitionLayout(cb, *entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        rhi.EndOneTimeCommands(cb);
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        vkQueueWaitIdle(rhi.GetQueue());
+    }
+
     void VulkanImage::GenerateMipmaps(VulkanRHI& rhi, VkCommandBuffer cmd, ImageEntry& entry)
     {
         const Uint mipCount = entry.Desc.MipLevel;
@@ -338,9 +412,7 @@ namespace Surge
             barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            vkCmdPipelineBarrier(cmd,
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
             // Blit mip i-1 to mip i (mip i is already TRANSFER_DST from the upfront transition)
             const int32_t nextWidth = mipWidth > 1 ? mipWidth / 2 : 1;
@@ -361,19 +433,13 @@ namespace Surge
             blit.dstSubresource.baseArrayLayer = 0;
             blit.dstSubresource.layerCount = 1;
 
-            vkCmdBlitImage(cmd,
-                           entry.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           entry.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           1, &blit, VK_FILTER_LINEAR);
+            vkCmdBlitImage(cmd, entry.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, entry.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
-            // Mip i-1 is done, send it to its final layout
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            vkCmdPipelineBarrier(cmd,
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
             mipWidth = nextWidth;
             mipHeight = nextHeight;
@@ -385,9 +451,7 @@ namespace Surge
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(cmd,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         // All levels are now SHADER_READ_ONLY_OPTIMAL
         entry.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

@@ -124,11 +124,14 @@ target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR IMGU
 set(BASISU_SOURCES
     "${VENDOR_ROOT}/basisu/transcoder/basisu_transcoder.cpp"
     "${VENDOR_ROOT}/basisu/transcoder/basisu_transcoder.h"
+
+    "${VENDOR_ROOT}/basisu/zstd/zstd.c"
+    "${VENDOR_ROOT}/basisu/zstd/zstddeclib.c"
 )
 add_library(basisu_android STATIC ${BASISU_SOURCES})
 target_include_directories(basisu_android PUBLIC "${VENDOR_ROOT}/basisu/transcoder")
 target_compile_definitions(basisu_android PRIVATE 
-    BASISD_SUPPORT_KTX2_ZSTD=0
+    BASISD_SUPPORT_KTX2_ZSTD=1
     BASISD_SUPPORT_PVRTC1=0
     BASISD_SUPPORT_PVRTC2=0
     BASISD_SUPPORT_ATC=0

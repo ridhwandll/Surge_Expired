@@ -39,11 +39,6 @@ namespace Surge
     // Static helpers
     //
 
-    static String GetSidecarPath(const String& meshAbsPath)
-    {
-        return Filesystem::ReplaceExtension(meshAbsPath, ".RAsset").string();
-    }
-
     // Binary Buffer Writers
     template <typename T>
     static void WriteData(Vector<Byte>& buffer, const T& data)
@@ -526,7 +521,7 @@ namespace Surge
 
         SCOPED_TIMER("MeshSerializer::Serialize");
         const String absPath = am->GetAbsolutePath(meta.RelativePath);
-        const String sidecarPath = GetSidecarPath(absPath);
+        const String sidecarPath = am->GetSidecarPath(absPath, AssetType::MESH);
 
         MeshSpecification existingGeom;
         if(!LoadSidecar(sidecarPath, existingGeom))
@@ -552,7 +547,7 @@ namespace Surge
 
         AssetManager* am = Core::GetAssetManager();
         const String absPath = am->GetAbsolutePath(metadata.RelativePath);
-        const String sidecarPath = GetSidecarPath(absPath);
+        const String sidecarPath = am->GetSidecarPath(absPath, AssetType::MESH);
 
         if(LoadSidecar(sidecarPath, spec))
         {

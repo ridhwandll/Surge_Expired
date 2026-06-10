@@ -10,6 +10,9 @@
 #include "Panels/InspectorPanel.hpp"
 #include "Panels/ContentBrowserPanel.hpp"
 #include "Panels/MaterialEditorPanel.hpp"
+#include "Panels/ExportPanel.hpp"
+
+#include "AssetCooker/Cookers/Texture2DCooker.hpp"
 
 namespace Surge
 {
@@ -31,8 +34,10 @@ namespace Surge
         mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
         mPanelManager.PushPanel<ContentBrowserPanel>();
         mPanelManager.PushPanel<MaterialEditorPanel>();
+        mPanelManager.PushPanel<ExportPanel>();
 
         mProjectBrowser.Init();
+        mCookerRegistry.Register(CreateScope<Texture2DCooker>());
 
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }

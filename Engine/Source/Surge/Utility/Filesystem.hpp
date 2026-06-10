@@ -26,6 +26,28 @@ namespace Surge::Filesystem
     {
         return path.parent_path();
     }
+    inline bool CopyFile(const Path& from, const Path& to)
+    {
+        std::error_code errorCode;
+        bool result = std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, errorCode);
+        if(errorCode)
+        {
+            Log<Severity::Error>("Failed to copy file from {} to {}. Error: {}", from.string(), to.string(), errorCode.message());
+            return false;
+        }
+        return result;
+    }
+    inline bool CopyDirectory(const Path& from, const Path& to)
+    {
+        std::error_code errorCode;
+        std::filesystem::copy(from, to, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, errorCode);
+        if(errorCode)
+        {
+            Log<Severity::Error>("Failed to copy directory from {} to {}. Error: {}", from.string(), to.string(), errorCode.message());
+            return false;
+        }
+        return true;
+    }
 
     bool CreateOrEnsureDirectories(const Path& path);
     void RemoveFile(const Path& path);

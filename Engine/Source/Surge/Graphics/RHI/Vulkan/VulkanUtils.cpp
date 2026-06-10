@@ -123,6 +123,12 @@ namespace Surge::VulkanUtils
         case ImageFormat::D16_UNORM:  return VK_FORMAT_D16_UNORM;
         case ImageFormat::R16G16B16A16_SFLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
         case ImageFormat::B10G11R11_UFLOAT_PACK32: return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+
+        case ImageFormat::ASTC4x4_SRGB: return VK_FORMAT_ASTC_4x4_SRGB_BLOCK;
+        case ImageFormat::ASTC4x4_UNORM: return VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+        case ImageFormat::BC7_SRGB: return VK_FORMAT_BC7_SRGB_BLOCK;
+        case ImageFormat::BC7_UNORM: return VK_FORMAT_BC7_UNORM_BLOCK;
+
         default:
             SG_ASSERT_INTERNAL("Unsupported TextureFormat !");
         }
