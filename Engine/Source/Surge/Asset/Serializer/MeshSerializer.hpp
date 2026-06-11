@@ -14,5 +14,9 @@ namespace Surge
         virtual bool Serialize(Ref<Asset> asset) const override;
         virtual Ref<Asset> Deserialize(const AssetMetadata& metadata) const override;
         virtual void Shutdown() override;
+
+        static Uint CalculateMaterialSize(const Ref<Material>& mat);
+        static void WriteInlineMaterial(Vector<Byte>& buffer, const Ref<Material>& mat);
+        static Ref<Material> MeshSerializer::ReadInlineMaterial(const Byte*& ptr);
     };
 }

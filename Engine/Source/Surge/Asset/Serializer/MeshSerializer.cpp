@@ -9,19 +9,20 @@
 
 namespace Surge
 {
-    // [Header: 28 bytes]
-    //     Magic            uint32  "RIDM"
-    //     Version          uint32  1
-    //     VertexCount      uint32
-    //     IndexCount       uint32
-    //     SubmeshCount     uint32
-    //     ValidOverrides   uint32  sparse count
-    //     GeomSectionSize  uint32  bytes from end of header to end of submesh section
+    // [Header: 32 bytes]
+    //     Magic                  uint32  "RIDM"
+    //     Version                uint32  1
+    //     VertexCount            uint32
+    //     IndexCount             uint32
+    //     SubmeshCount           uint32
+    //     TransientMaterialCount uint32
+    //     ValidOverrides         uint32  sparse count
+    //     GeomSectionSize        uint32  bytes from end of header to end of submesh section
 
     static_assert(std::is_trivially_copyable_v<Vertex>, "Vertex must be trivially copyable for binary sidecar serialization");
     static_assert(std::is_trivially_copyable_v<Index>, "Index must be trivially copyable for binary sidecar serialization");
     static constexpr Uint kSidecarMagic = 0x4D444952; // RIDM
-    static constexpr Uint kSidecarVersion = 1;
+    static constexpr Uint kSidecarVersion = 2;
 
     struct SurgeMeshHeader
     {
@@ -30,10 +31,11 @@ namespace Surge
         Uint VertexCount;
         Uint IndexCount;
         Uint SubmeshCount;
+        Uint TransientMaterialCount;
         Uint ValidOverrideCount;
         Uint GeomSectionSize;
     };
-    static_assert(sizeof(SurgeMeshHeader) == 28);
+    static_assert(sizeof(SurgeMeshHeader) == 32);
 
     //
     // Static helpers
@@ -50,7 +52,8 @@ namespace Surge
     template <typename T>
     static void WriteDataArray(Vector<Byte>& buffer, const T* data, size_t count)
     {
-        if(count == 0) return;
+        if(count == 0)
+            return;
         const Byte* ptr = reinterpret_cast<const Byte*>(data);
         buffer.insert(buffer.end(), ptr, ptr + (sizeof(T) * count));
     }
@@ -73,7 +76,8 @@ namespace Surge
     template <typename T>
     static void ReadDataArray(const Byte*& ptr, T* data, size_t count)
     {
-        if(count == 0) return;
+        if(count == 0)
+            return;
         memcpy(data, ptr, sizeof(T) * count);
         ptr += sizeof(T) * count;
     }
@@ -86,6 +90,115 @@ namespace Surge
         if(len > 0)
             ReadDataArray(ptr, s.data(), len);
         return s;
+    }
+
+    // [Material]
+    // HasData (1 byte)
+    // Material Name (Uint length + string chars)
+    // UBO / CPU Data (Uint length + buffer bytes)
+    // Textures (Uint count + for each texture: String length + chars + rawID)
+
+    Uint MeshSerializer::CalculateMaterialSize(const Ref<Material>& mat)
+    {
+        Uint size = 1; // hasData boolean flag (1 byte)
+        if(!mat)
+            return size;
+
+        // Material Name (Uint length + string chars)
+        size += sizeof(Uint) + static_cast<Uint>(mat->mName.size());
+
+        // UBO / CPU Data (Uint length + buffer bytes)
+        size += sizeof(Uint) + static_cast<Uint>(mat->mCPUData.GetSize());
+
+        // Textures
+        size += sizeof(Uint); // texCount
+        for(const auto& [name, tex] : mat->mTextures)
+        {
+            if(tex.Data1 && tex.Data1->GetID().IsValid())
+            {
+                size += sizeof(Uint) + static_cast<Uint>(name.size()); // String length + chars
+                size += sizeof(uint64_t); // rawID
+            }
+        }
+        return size;
+    }
+
+    void MeshSerializer::WriteInlineMaterial(Vector<Byte>& buffer, const Ref<Material>& mat)
+    {
+        const Byte hasData = mat ? 1 : 0;
+        WriteData(buffer, hasData);
+
+        if(!hasData)
+            return;
+
+        WriteStr(buffer, mat->mName);
+
+        // Raw CPU buffer direct UBO layout, ready for GPU upload
+        const Uint propsSize = static_cast<Uint>(mat->mCPUData.GetSize());
+        WriteData(buffer, propsSize);
+        WriteDataArray(buffer, mat->mCPUData.As<Byte>(), propsSize);
+
+        // Only owned Ref<Texture2D> slots with a valid AssetID
+        Uint texCount = 0;
+        for(const auto& [name, tex] : mat->mTextures)
+        {
+            if(tex.Data1 && tex.Data1->GetID().IsValid())
+                texCount++;
+        }
+
+        WriteData(buffer, texCount);
+        for(const auto& [name, tex] : mat->mTextures)
+        {
+            if(!tex.Data1 || !tex.Data1->GetID().IsValid())
+                continue;
+
+            WriteStr(buffer, name);
+            const uint64_t rawID = tex.Data1->GetID().Get();
+            WriteData(buffer, rawID);
+        }
+    }
+
+    Ref<Material> MeshSerializer::ReadInlineMaterial(const Byte*& ptr)
+    {
+        Byte hasData = 0;
+        ReadData(ptr, hasData);
+        if(!hasData)
+            return nullptr;
+
+        const String name = ReadStr(ptr);
+
+        Uint propsSize = 0;
+        ReadData(ptr, propsSize);
+
+        // Create with hardcoded pipeline/shader allocates CPU buffer via shader reflection
+        Ref<Material> mat = Material::Create(name);
+
+        SG_ASSERT(propsSize == static_cast<Uint>(mat->mCPUData.GetSize()),
+                  "[MeshSerializer] Inline material {} props size mismatch ({} vs {}). Shader UBO layout changed, delete sidecar and reimport",
+                  name, propsSize, static_cast<Uint>(mat->mCPUData.GetSize()));
+
+        // Overwrite CPU buffer with stored UBO data
+        ReadDataArray(ptr, mat->mCPUData.As<Byte>(), propsSize);
+
+        Uint texCount = 0;
+        ReadData(ptr, texCount);
+
+        AssetManager* am = Core::GetAssetManager();
+        for(Uint i = 0; i < texCount; i++)
+        {
+            const String texName = ReadStr(ptr);
+            uint64_t rawID = 0;
+            ReadData(ptr, rawID);
+
+            Ref<Texture2D> tex = am->Load<Texture2D>(AssetID(rawID));
+            if(tex)
+                mat->SetTexture(texName, tex);
+            else
+                Log<Severity::Warn>("[MeshSerializer] Material '{}': texture ID {} failed to load.", name, rawID);
+        }
+
+        mat->MarkDirty();
+        return mat;
     }
 
     static cgltf_data* ParseGLTF(const String& filepath)
@@ -372,7 +485,8 @@ namespace Surge
         Uint validOverrideCount = 0;
         for(const Ref<Material>& ref : overrides)
         {
-            if(ref) validOverrideCount++;
+            if(ref)
+                validOverrideCount++;
         }
 
         static constexpr Uint sSubmeshPODSize =
@@ -389,6 +503,11 @@ namespace Surge
             geomSize += sizeof(Uint) + static_cast<Uint>(sm.NodeName.size());
             geomSize += sizeof(Uint) + static_cast<Uint>(sm.MeshName.size());
         }
+        for(const Ref<Material>& mat : spec.Materials)
+            geomSize += MeshSerializer::CalculateMaterialSize(mat);
+
+        Vector<Byte> buffer;
+        buffer.reserve(sizeof(SurgeMeshHeader) + geomSize + validOverrideCount * (sizeof(Uint) + sizeof(uint64_t)));
 
         SurgeMeshHeader header = {};
         header.Magic = kSidecarMagic;
@@ -396,11 +515,9 @@ namespace Surge
         header.VertexCount = static_cast<Uint>(spec.Vertices.size());
         header.IndexCount = static_cast<Uint>(spec.Indices.size());
         header.SubmeshCount = static_cast<Uint>(spec.Submeshes.size());
+        header.TransientMaterialCount = static_cast<Uint>(spec.Materials.size());
         header.ValidOverrideCount = validOverrideCount;
         header.GeomSectionSize = geomSize;
-
-        Vector<Byte> buffer;
-        buffer.reserve(sizeof(SurgeMeshHeader) + geomSize + validOverrideCount * (sizeof(Uint) + sizeof(uint64_t)));
 
         WriteData(buffer, header);
         WriteDataArray(buffer, spec.Vertices.data(), spec.Vertices.size());
@@ -421,6 +538,9 @@ namespace Surge
             WriteStr(buffer, sm.MeshName);
         }
 
+        for(const Ref<Material>& mat : spec.Materials)
+            MeshSerializer::WriteInlineMaterial(buffer, mat);
+
         for(Uint i = 0; i < static_cast<Uint>(overrides.size()); i++)
         {
             if(!overrides[i]) continue;
@@ -431,7 +551,9 @@ namespace Surge
         }
 
         Filesystem::WriteBinaryFile(path, buffer.data(), buffer.size());
+        Log<Severity::Trace>("[MeshSerializer] Cooked sidecar: {}", path);
     }
+    
 
     static bool LoadSidecar(const String& path, MeshSpecification& outSpec)
     {
@@ -484,6 +606,10 @@ namespace Surge
             sm.MeshName = ReadStr(ptr);
         }
 
+        outSpec.Materials.resize(header.TransientMaterialCount);
+        for(Uint i = 0; i < header.TransientMaterialCount; i++)
+            outSpec.Materials[i] = MeshSerializer::ReadInlineMaterial(ptr);
+
         outSpec.MaterialOverrides.assign(outSpec.Submeshes.size(), AssetID::INVALID);
         for(Uint i = 0; i < header.ValidOverrideCount; i++)
         {
@@ -521,7 +647,7 @@ namespace Surge
 
         SCOPED_TIMER("MeshSerializer::Serialize");
         const String absPath = am->GetAbsolutePath(meta.RelativePath);
-        const String sidecarPath = am->GetSidecarPath(absPath, AssetType::MESH);
+        const String sidecarPath = am->GetSidecarPath(meta.ID);
 
         MeshSpecification existingGeom;
         if(!LoadSidecar(sidecarPath, existingGeom))
@@ -547,30 +673,28 @@ namespace Surge
 
         AssetManager* am = Core::GetAssetManager();
         const String absPath = am->GetAbsolutePath(metadata.RelativePath);
-        const String sidecarPath = am->GetSidecarPath(absPath, AssetType::MESH);
+        const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
-        if(LoadSidecar(sidecarPath, spec))
+        // Fast Path
         {
-            SCOPED_TIMER("MeshSerializer::Deserialize [FAST PATH]: {} {}", metadata.ID.Get(), metadata.RelativePath);
-            cgltf_data* data = ParseGLTF(absPath);
-            if(data)
-            {
-                ExtractMaterials(absPath, data, spec);
-                FreeGLTF(data);
-            }
+            SCOPED_TIMER("MeshSerializer::Deserialize [FAST PATH]: {}", sidecarPath);
+            if(LoadSidecar(sidecarPath, spec))
+                return Mesh::Create(std::move(spec)).As<Asset>();
         }
-        else
+
+        // Slow path
         {
-            SCOPED_TIMER("MeshSerializer::Deserialize [SLOW PATH]: {} {}", metadata.ID.Get(), metadata.RelativePath);
-            cgltf_data* data = ParseGLTF(absPath);
-            if(!data) return nullptr;
+            SCOPED_TIMER("MeshSerializer::Deserialize [SLOW PATH]: {}", absPath);
+            cgltf_data* data = nullptr;
+            data = ParseGLTF(absPath);
+            if(!data)
+                return nullptr;
 
             ExtractGeometry(data, spec);
             ExtractMaterials(absPath, data, spec);
             FreeGLTF(data);
 
             WriteSidecar(sidecarPath, spec, {});
-            Log<Severity::Trace>("[MeshSerializer] Cooked sidecar: '{}'", sidecarPath.c_str());
         }
 
         return Mesh::Create(std::move(spec)).As<Asset>();

@@ -7,12 +7,12 @@
 
 namespace Surge
 {
-    CookResult Texture2DCooker::Cook(const String& sourceAbsPath) const
+    CookResult Texture2DCooker::Cook(const String& sourceAbsPath, AssetID id) const
     {
         AssetManager* am = Core::GetAssetManager();
         CookResult result;
         const String exe = FindBasisuExe();
-        const String outputPath = am->GetSidecarPath(sourceAbsPath, AssetType::TEXTURE2D);
+        const String outputPath = am->GetSidecarPath(id);
         const bool linear = IsLinearColorSpace(sourceAbsPath);
 
         // Build basisu.exe arguments
@@ -46,10 +46,10 @@ namespace Surge
         return result;
     }
 
-    bool Texture2DCooker::NeedsCook(const String& sourceAbsPath) const
+    bool Texture2DCooker::NeedsCook(AssetID id) const
     {
         AssetManager* am = Core::GetAssetManager();
-        return !Filesystem::Exists(am->GetSidecarPath(sourceAbsPath, AssetType::TEXTURE2D));
+        return !Filesystem::Exists(am->GetSidecarPath(id));
     }
 
     String Texture2DCooker::FindBasisuExe()
@@ -70,16 +70,9 @@ namespace Surge
         String lower = name;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
-        return lower.find("normal") != String::npos ||
-            lower.find("roughness") != String::npos ||
-            lower.find("metallic") != String::npos ||
-            lower.find("metalness") != String::npos ||
-            lower.find("_ao") != String::npos ||
-            lower.find("occlusion") != String::npos ||
-            lower.find("_n.") != String::npos ||
-            lower.find("_r.") != String::npos ||
-            lower.find("_m.") != String::npos ||
-            lower.find("_orm.") != String::npos;
+        return lower.find("normal") != String::npos || lower.find("roughness") != String::npos || lower.find("metallic") != String::npos ||
+            lower.find("metalness") != String::npos || lower.find("_ao") != String::npos || lower.find("occlusion") != String::npos ||
+            lower.find("_n.") != String::npos || lower.find("_r.") != String::npos || lower.find("_m.") != String::npos || lower.find("_orm.") != String::npos;
 
     }
 }

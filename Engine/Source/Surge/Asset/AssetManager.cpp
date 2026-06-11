@@ -37,6 +37,11 @@ namespace Surge
         sAssetsDirectory = assetDirectory.generic_string();
         DeserializeRegistry();
         Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", sAssetsDirectory, mAssetRegistry.size());
+
+        // Ensure at initialization that all sidecar directories exist
+        for (const auto& [type, serializer] : mSerializers)
+            Filesystem::CreateOrEnsureDirectories(GetSidecarDirectory(type));
+
         mInitialized = true;
     }
 
@@ -190,21 +195,20 @@ namespace Surge
         return it != mAssetRegistry.end() ? it->second : kNull;
     }
 
-    String AssetManager::GetSidecarPath(const String& filePath, AssetType type)
+    String AssetManager::GetSidecarPath(AssetID id, AssetType type)
     {
-        switch(type)
-        {
-            case Surge::AssetType::TEXTURE2D:
-            case Surge::AssetType::SPRITE:
-                return Filesystem::ReplaceExtension(filePath, ".rTex2D").string(); //basically a ktx2z
-            case Surge::AssetType::MESH:
-                return Filesystem::ReplaceExtension(filePath, ".rMesh").string();
-            case Surge::AssetType::MATERIAL:
-            case Surge::AssetType::NONE:
-            case Surge::AssetType::SCENE:
-                break;
-        }
-        return String{};
+        const AssetMetadata& meta = GetMetadata(id);
+
+        AssetType t;
+        type != AssetType::NONE ? t = type : t = meta.Type;
+
+        String filename = std::format("{0}.r{1}", id.Get(), SurgeReflect::EnumToString(t).data());
+        return GetSidecarDirectory(t) + "/" + filename;
+    }
+
+    String AssetManager::GetSidecarDirectory(AssetType type)
+    {
+        return sAssetsDirectory + "/__Internal/" + SurgeReflect::EnumToString(type).data();
     }
 
     AssetID AssetManager::GetIDFromPath(const String& relativePath)
@@ -331,7 +335,7 @@ namespace Surge
             else
             {
                 String absPath = GetAbsolutePath(relPath);
-                String sidecarPath = GetSidecarPath(absPath, type);
+                String sidecarPath = GetSidecarPath(meta.ID, type);
                 bool hasSidecar = !sidecarPath.empty();
 
                 bool exists = Filesystem::Exists(absPath) || (hasSidecar && Filesystem::Exists(sidecarPath));

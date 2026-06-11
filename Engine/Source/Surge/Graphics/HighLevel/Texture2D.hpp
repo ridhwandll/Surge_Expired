@@ -18,7 +18,7 @@ namespace Surge
         Uint Width = 0;
         Uint Height = 0;
         ImageFormat Format = ImageFormat::RGBA8_SRGB;
-        Byte* Content = nullptr;
+        void* Content = nullptr;
         bool GenerateMips = false;
         String DebugName;
 

@@ -41,7 +41,7 @@ namespace Surge
                     mGLTFMaterials[i].Reset(); // (Rid)Release the transient material loaded from glTF, since we have a user override for this slot
                 }
                 else
-                    Log<Severity::Warn>("Failed to load material override for mesh at index %zu. The material is missing probably, falling back to transient material!", i);
+                    Log<Severity::Warn>("[Mesh] Failed to load material override for mesh at index {}! The material is missing probably, falling back to transient material!", i);
             }
         }
     }
@@ -49,8 +49,6 @@ namespace Surge
     Mesh::~Mesh()
     {
         Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
-
-        rhi->WaitIdle();
         rhi->DestroyBuffer(mVertexBuffer);
         rhi->DestroyBuffer(mIndexBuffer);
     }

@@ -23,7 +23,7 @@ namespace Surge
             if(it == mCookers.end())
                 return {};
 
-            return it->second->Cook(am->GetAbsolutePath(meta.RelativePath));
+            return it->second->Cook(am->GetAbsolutePath(meta.RelativePath), id);
         }
 
         void CookAll(AssetManager* am) const
@@ -41,13 +41,13 @@ namespace Surge
                 total++;
                 const String absPath = am->GetAbsolutePath(meta.RelativePath);
 
-                if(!it->second->NeedsCook(absPath))
+                if(!it->second->NeedsCook(id))
                 {
                     skipped++;
                     continue;
                 }
 
-                CookResult r = it->second->Cook(absPath);
+                CookResult r = it->second->Cook(absPath, id);
                 r.Success ? cooked++ : failed++;
 
                 if(r.Success)

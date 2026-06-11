@@ -25,7 +25,7 @@ namespace Surge
     {
         AssetManager* am = Core::GetAssetManager();
         const String absPath = am->GetAbsolutePath(metadata.RelativePath);
-        const String ktx2Path = am->GetSidecarPath(absPath, AssetType::TEXTURE2D);
+        const String ktx2Path = am->GetSidecarPath(metadata.ID);
 
 #ifdef SURGE_PLATFORM_ANDROID
         SG_ASSERT(Filesystem::Exists(ktx2Path), "[Texture2DSerializer] KTX2 missing for '{}'. Run cook step first.", absPath);
@@ -36,10 +36,8 @@ namespace Surge
             ktx2Asset = LoadFromKTX2(ktx2Path);
 
         if(!ktx2Asset)
-        {
-            Log<Severity::Warn>("[Texture2DSerializer] No KTX2/Bad KTX2 for {}, using raw source. Run cook step for faster loading!", absPath);
             return LoadFromSource(absPath);
-        }
+
         return ktx2Asset;
 #endif
     }
@@ -56,7 +54,10 @@ namespace Surge
 
         const bool isSRGB = ktx2.get_dfd_transfer_func() == basist::KTX2_KHR_DF_TRANSFER_SRGB;
         if(!ktx2.start_transcoding())
+        {
+            Log<Severity::Error>("[Texture2DSerializer] Failed to start transcoding(from KTX2) for {}", ktx2Path);
             return nullptr;
+        }
 
         TextureSpecification spec;
         spec.DebugName = Filesystem::GetFilenameWithExt(ktx2Path);
@@ -92,7 +93,7 @@ namespace Surge
 
             spec.Mips.push_back({ std::move(levelData), info.m_orig_width, info.m_orig_height });
         }
-        Log<Severity::Info>("[Texture2DSerializer] Created Texture2D form KTX2 {}", ktx2Path);
+        Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form KTX2 {}", Filesystem::GetFilenameWithExt(ktx2Path));
         return Texture2D::Create(spec).As<Asset>();
     }
 
@@ -108,24 +109,23 @@ namespace Surge
         int width = 0, height = 0, channels = 0;
         stbi_uc* data = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels, 4);
 
-        if(!data) return nullptr;
+        if(!data)
+            return nullptr;
 
         TextureSpecification spec;
         spec.Format = ImageFormat::RGBA8_SRGB;
-        spec.GenerateMips = true;
         spec.DebugName = Filesystem::GetFilenameWithExt(absPath);
-
-        const size_t dataSize = static_cast<size_t>(width * height * 4);
-
-        // Copy into the Level 0 vector
-        Vector<Byte> level0Data(data, data + dataSize);
-        spec.Mips.push_back({ std::move(level0Data), static_cast<Uint>(width), static_cast<Uint>(height) });
+        spec.Width = static_cast<Uint>(width);
+        spec.Height = static_cast<Uint>(height);
+        spec.Content = data;
+        spec.GenerateMips = true;
+        Ref<Texture2D> texture = Texture2D::Create(spec);
 
         stbi_image_free(data);
 
-        return Texture2D::Create(spec).As<Asset>();
+        Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form SOURCE {}", Filesystem::GetFilenameWithExt(absPath));
+        return texture.As<Asset>();
     }
-
 
     void Texture2DSerializer::Shutdown()
     {

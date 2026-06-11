@@ -18,8 +18,8 @@ namespace Surge
     public:
         virtual ~IAssetCooker() = default;
 
-        virtual CookResult Cook(const String& sourceAbsPath) const = 0;
-        virtual bool NeedsCook(const String& sourceAbsPath) const = 0;
+        virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const = 0;
+        virtual bool NeedsCook(AssetID id) const = 0;
         virtual AssetType GetAssetType() const = 0;
     };
 }

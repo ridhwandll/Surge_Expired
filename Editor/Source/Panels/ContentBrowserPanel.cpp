@@ -120,7 +120,7 @@ namespace Surge
             item.Path_ = directoryEntry.path();
             item.Filename = item.Path_.filename().string();
 
-            if (item.Filename == "AssetRegistry.surge")
+            if (item.Filename == "AssetRegistry.surge" || item.Filename == "__Internal")
                 continue;
 
             item.IsDirectory = directoryEntry.is_directory();

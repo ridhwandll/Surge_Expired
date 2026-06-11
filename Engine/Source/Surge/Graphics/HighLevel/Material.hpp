@@ -83,7 +83,9 @@ namespace Surge
         ImageHandle mWhiteTexture;
         mutable bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
         GraphicsRHI* mRHI;
+
         friend class MaterialSerializer;
+        friend class MeshSerializer;
     };
 
 } // namespace Surge
