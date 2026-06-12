@@ -11,7 +11,7 @@
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "Utility/ImGuiAux.hpp"
-
+#include "Asset/SourceWriters/MaterialSourceWriter.hpp"
 #include <stb_image.h>
 
 namespace Surge
@@ -411,9 +411,13 @@ namespace Surge
                                                 {
                                                     String newRelativePath = std::filesystem::relative(newPath, mBaseDirectory).generic_string();
                                                     mAssetManager->UpdateAssetPath(item.Id, newRelativePath);
+
                                                     if (item.AssetTypeStr == "MATERIAL")
                                                     {
-                                                        mAssetManager->Load<Material>(item.Id)->SetName(Filesystem::GetFilenameWithoutExt(mRenameBuffer));
+                                                        Ref<Material> newMaterial = mAssetManager->Load<Material>(item.Id);
+                                                        newMaterial->SetName(Filesystem::GetFilenameWithoutExt(mRenameBuffer));
+                                                        MaterialSourceWriter::Write(newMaterial, newPath.generic_string());
+
                                                         mAssetManager->Save(item.Id);
                                                         mAssetManager->Unload(item.Id);
                                                     }
@@ -421,6 +425,9 @@ namespace Surge
                                                 mSelectedPath = newPath;
                                                 mNeedsCacheRefresh = true;
                                             }
+                                            else
+                                                Log<Severity::Warn>("Cannot rename to {0}: File already exists or invalid name", newPath.string());
+
                                             mIsRenaming = false;
                                         }
 
@@ -495,10 +502,10 @@ namespace Surge
                                 Ref<Material> newMaterial = mAssetManager->Create<Material>(relativeToAssets, "New Material");
                                 if(newMaterial)
                                 {
+                                    MaterialSourceWriter::Write(newMaterial, newFilePath.generic_string());
                                     mSelectedPath = newFilePath;
                                     StartRename(newFilePath);
                                 }
-
                                 mNeedsCacheRefresh = true;
                             }
                             if(ImGui::MenuItem("Physics Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new physics material asset"); }

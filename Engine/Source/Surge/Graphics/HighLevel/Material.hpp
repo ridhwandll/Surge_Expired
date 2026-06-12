@@ -30,7 +30,7 @@ namespace Surge
         {
             static_assert(std::is_trivially_copyable_v<T>, "Material::Set can only be used with trivially copyable types!");
 
-            const ShaderBufferMember* member = mRefletedBuffer.GetMember(name);
+            const ShaderBufferMember* member = mReflectedBuffer.GetMember(name);
             SG_ASSERT(member, "Invalid shader member name!");
             SG_ASSERT(sizeof(T) <= member->Size, "The data type you are passing is larger than the allocated shader property block size!");
 
@@ -43,13 +43,14 @@ namespace Surge
         {
             static_assert(std::is_trivially_copyable_v<T>, "Material::Get can only be used with trivially copyable types!");
 
-            const ShaderBufferMember* member = mRefletedBuffer.GetMember(name);
+            const ShaderBufferMember* member = mReflectedBuffer.GetMember(name);
             SG_ASSERT(member, "Invalid shader member name!");
             SG_ASSERT(sizeof(T) <= member->Size, "The data type requested is larger than the actual shader property block size!");
 
             return mCPUData.Read<T>(member->MemoryOffset);
         }
 
+        const auto& GetTextures() const { return mTextures; }
         const Ref<Texture2D>& GetTexture(const String& name);
         void SetTexture(const String& name, const Ref<Texture2D>& texture);
         void SetTexture(const String& name, ImageHandle handle);
@@ -64,13 +65,17 @@ namespace Surge
                 mIsDirty[i] = true;
         }
 
+        const MemoryBlock& GetCPUData() const { return mCPUData; }
+        MemoryBlock& GetCPUData() { return mCPUData; }
+         const ShaderBuffer& GetReflectedBuffer() const { return mReflectedBuffer; }
+
     private:
         void Initialize(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName);
         const ShaderResource* FindResource(const String& name) const;
     private:
         String mName;
         String mShaderName;
-        ShaderBuffer mRefletedBuffer;
+        ShaderBuffer mReflectedBuffer;
         Vector<ShaderResource> mReflectedResources;
         Uint mBufferBinding;
 

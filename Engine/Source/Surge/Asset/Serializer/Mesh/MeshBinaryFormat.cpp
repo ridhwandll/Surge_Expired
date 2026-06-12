@@ -2,7 +2,7 @@
 #include "MeshBinaryFormat.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Asset/Serializer/BinaryHelpers.hpp"
-#include "Surge/Asset/Serializer/MaterialSerializer.hpp"
+#include "Surge/Asset/Serializer/Material/MaterialBinaryFormat.hpp"
 
 namespace Surge::MeshBinary
 {
@@ -47,7 +47,7 @@ namespace Surge::MeshBinary
             geomSize += sizeof(Uint) + static_cast<Uint>(sm.MeshName.size());
         }
         for(const Ref<Material>& mat : spec.Materials)
-            geomSize += MaterialSerializer::CalculateMaterialSize(mat);
+            geomSize += MaterialBinary::CalculateSize(mat);
 
         Vector<Byte> buffer;
         buffer.reserve(sizeof(Header) + geomSize + validOverrideCount * (sizeof(Uint) + sizeof(uint64_t)));
@@ -82,7 +82,7 @@ namespace Surge::MeshBinary
         }
 
         for(const Ref<Material>& mat : spec.Materials)
-            MaterialSerializer::WriteTransientMaterial(buffer, mat);
+            MaterialBinary::WriteBuffer(buffer, mat);
 
         for(Uint i = 0; i < static_cast<Uint>(overrides.size()); i++)
         {
@@ -95,10 +95,10 @@ namespace Surge::MeshBinary
 
         if(!Filesystem::WriteBinaryFile(path, buffer.data(), buffer.size()))
         {
-            Log<Severity::Error>("[MeshSerializer] Failed to write sidecar: {}", path);
+            Log<Severity::Error>("[MeshBinary] Failed to write sidecar: {}", path);
             return false;
         }
-        Log<Severity::Trace>("[MeshSerializer] Cooked sidecar: {}", path);
+        Log<Severity::Trace>("[MeshBinary] Cooked sidecar: {}", path);
         return true;
     }
 
@@ -155,7 +155,7 @@ namespace Surge::MeshBinary
 
         outSpec.Materials.resize(header.TransientMaterialCount);
         for(Uint i = 0; i < header.TransientMaterialCount; i++)
-            outSpec.Materials[i] = MaterialSerializer::ReadTransientMaterial(ptr);
+            outSpec.Materials[i] = MaterialBinary::ReadBuffer(ptr);
 
         outSpec.MaterialOverrides.assign(outSpec.Submeshes.size(), AssetID::INVALID);
         for(Uint i = 0; i < header.ValidOverrideCount; i++)

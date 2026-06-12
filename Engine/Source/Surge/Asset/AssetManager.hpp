@@ -160,7 +160,7 @@ namespace Surge
 
         // Utilities
     public:
-        String GetAbsolutePath(const String& relativePath) { return sAssetsDirectory + '/' + relativePath; }
+        String GetAbsolutePath(const String& relativePath) const { return sAssetsDirectory + '/' + relativePath; }
     private:
         String sAssetsDirectory;
         std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;

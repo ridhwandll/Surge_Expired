@@ -76,7 +76,7 @@ namespace Surge
         bufferWrite.Binding = mBufferBinding;
         bufferWrite.Type = DescriptorType::UNIFORM_BUFFER;
         bufferWrite.Buffer = mGPUBuffers[ctx.FrameIndex];
-        bufferWrite.BufferRange = mRefletedBuffer.Size;
+        bufferWrite.BufferRange = mReflectedBuffer.Size;
         writes.push_back(bufferWrite);
 
         for(const auto& [name, tex] : mTextures)
@@ -110,18 +110,18 @@ namespace Surge
     {
         Renderer* renderer = Core::GetRenderer();
         mRHI = renderer->GetRHI().get();
-        mRefletedBuffer = shader.GetReflectionData().GetBuffer(materialBufferName);
+        mReflectedBuffer = shader.GetReflectionData().GetBuffer(materialBufferName);
         mReflectedResources = shader.GetReflectionData().GetResources();
 
-        mBufferBinding = mRefletedBuffer.Binding;
-        mCPUData.Allocate(mRefletedBuffer.Size);
+        mBufferBinding = mReflectedBuffer.Binding;
+        mCPUData.Allocate(mReflectedBuffer.Size);
         mCPUData.ZeroInitialize();
-        mMaterialDescriptorSlot = static_cast<DescriptorSetSlot>(mRefletedBuffer.Set);
+        mMaterialDescriptorSlot = static_cast<DescriptorSetSlot>(mReflectedBuffer.Set);
 
         mDescriptorSet = mRHI->CreateDescriptorSet(pipeline, mMaterialDescriptorSlot, DescriptorUpdateFrequency::DYNAMIC, materialBufferName.c_str());
 
         BufferDesc bufferDesc = {};
-        bufferDesc.Size = mRefletedBuffer.Size;
+        bufferDesc.Size = mReflectedBuffer.Size;
         bufferDesc.InitialData = nullptr;
         bufferDesc.Usage = BufferUsage::UNIFORM;
         bufferDesc.HostVisible = true;
@@ -141,7 +141,7 @@ namespace Surge
             write.Binding = mBufferBinding;
             write.Buffer = mGPUBuffers[i];
             write.Type = DescriptorType::UNIFORM_BUFFER;
-            write.BufferRange = mRefletedBuffer.Size;
+            write.BufferRange = mReflectedBuffer.Size;
             mRHI->UpdateDescriptorSet(mDescriptorSet, &write, 1, i);
         }
         MarkDirty();

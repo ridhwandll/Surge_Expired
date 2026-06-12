@@ -13,6 +13,7 @@
 #include "Panels/ExportPanel.hpp"
 #include "Asset/Cookers/Texture2DCooker.hpp"
 #include "Asset/Cookers/MeshCooker.hpp"
+#include "Asset/Cookers/MaterialCooker.hpp"
 
 namespace Surge
 {
@@ -38,15 +39,15 @@ namespace Surge
 
         mProjectBrowser.Init();
 
-        Scope<AssetCookerRegistry> cookers = CreateScope<AssetCookerRegistry>();
-        cookers->Register(CreateScope<Texture2DCooker>());
-        cookers->Register(CreateScope<MeshCooker>());
+        mAssetImporter.Initialize(mAssetManager);
+        mAssetImporter.RegisterCooker(CreateScope<Texture2DCooker>());
+        mAssetImporter.RegisterCooker(CreateScope<MaterialCooker>());
+        mAssetImporter.RegisterCooker(CreateScope<MeshCooker>());
 
-        mAssetImporter.Initialize(mAssetManager, std::move(cookers));
 
         mAssetManager->AddAssetLoadHook([this](AssetID id, const AssetMetadata& meta)
                                         {
-                                            if(mAssetImporter.GetCookerRegistry()->NeedsCook(id, meta.Type))
+                                            if(mAssetImporter.NeedsCook(id, meta.Type))
                                             {
                                                 Log<Severity::Warn>("[AssetManager] Cooked file missing on Load, cooking now: {}", meta.RelativePath);
                                                 mAssetImporter.RecookAsset(id);
@@ -140,7 +141,7 @@ namespace Surge
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
         mActiveScene = std::move(scene);
-        mAssetImporter.ScanAndCook();
+        mAssetImporter.ScanAndCookAll();
     }
 
     void Editor::CheckResize()
@@ -163,7 +164,10 @@ namespace Surge
         }
     }
 
-    void Editor::OnShutdown() {}
+    void Editor::OnShutdown()
+    {
+        mAssetImporter.Shutdown();
+    }
 
 } // namespace Surge
 

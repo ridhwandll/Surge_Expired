@@ -1,6 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Asset/Cookers/AssetCookerRegistry.hpp"
+#include "Surge/Asset/AssetMetadata.hpp"
+
+#include "Asset/Cookers/AssetCooker.hpp"
+#include <unordered_map>
 
 namespace Surge
 {
@@ -8,22 +11,17 @@ namespace Surge
     class AssetImporter
     {
     public:
-        void Initialize(AssetManager* am, Scope<AssetCookerRegistry> cookers);
+        void Initialize(AssetManager* am);
+        void RegisterCooker(Scope<AssetCooker> cooker);
         void Shutdown();
 
-        // Called once after AssetManager::Initialize()
-        // Scans every registered asset, cooks any that are missing a cooked file
-        void ScanAndCook() const;
-
-        // Cooks a single just-imported source file immediately
-        Pair<AssetID, CookResult> ImportAndCook(const String& sourceAbsPath, AssetType type) const;
-
+        void ScanAndCookAll() const;
         CookResult RecookAsset(AssetID id);
 
-        AssetCookerRegistry* GetCookerRegistry() { return mCookers.get(); }
-
+        bool NeedsCook(AssetID id, AssetType type) const;
+        CookResult Cook(AssetID id, const AssetMetadata& meta, AssetManager* am) const;
     private:
         AssetManager* mAssetManager = nullptr;
-        Scope<AssetCookerRegistry> mCookers;
+        std::unordered_map<AssetType, Scope<AssetCooker>> mCookers;
     };
 }

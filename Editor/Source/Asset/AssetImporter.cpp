@@ -1,34 +1,37 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetImporter.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
 {
-    void AssetImporter::Initialize(AssetManager* am, Scope<AssetCookerRegistry> cookers)
+    void AssetImporter::Initialize(AssetManager* am)
     {
         mAssetManager = am;
-        mCookers = std::move(cookers);
+    }
+
+    void AssetImporter::RegisterCooker(Scope<AssetCooker> cooker)
+    {
+        mCookers[cooker->GetAssetType()] = std::move(cooker);
     }
 
     void AssetImporter::Shutdown() {}
 
-    void AssetImporter::ScanAndCook() const
+    void AssetImporter::ScanAndCookAll() const
     {
         Uint cooked = 0, skipped = 0;
-
         for(const auto& [id, meta] : mAssetManager->GetRegistryMap())
         {
             if(HasFlag(meta.Flags, AssetFlags::MEMORY) || meta.Type == AssetType::SCENE)
                 continue;
 
-            const String absPath = mAssetManager->GetAbsolutePath(meta.RelativePath);
-            if(!mCookers->NeedsCook(id, meta.Type))
+            if(!NeedsCook(id, meta.Type))
             {
                 skipped++;
                 continue;
             }
 
-            const CookResult r = mCookers->Cook(id, meta, mAssetManager);
+            const CookResult r = Cook(id, meta, mAssetManager);
             if (r.Success)
                 cooked++;
             else
@@ -38,29 +41,32 @@ namespace Surge
         Log<Severity::Info>("[AssetImporter] Startup cook complete cooked: {} | already up to date: {}", cooked, skipped);
     }
 
-    Pair<AssetID, CookResult> AssetImporter::ImportAndCook(const String& sourceAbsPath, AssetType type) const
-    {
-        const String relPath = Filesystem::GetRelativePath(sourceAbsPath, mAssetManager->GetAssetsDirectory()).generic_string();
-        const AssetID id = mAssetManager->Import(relPath, type);
-
-        if(!id.IsValid())
-        {
-            Log<Severity::Error>("[AssetImporter] Import failed: '{}'", sourceAbsPath);
-            return {};
-        }
-        const AssetMetadata& meta = mAssetManager->GetMetadata(id);
-        const CookResult r = mCookers->Cook(id, meta, mAssetManager);
-        if(!r.Success)
-            Log<Severity::Error>("[AssetImporter] Cook failed after import: {}", sourceAbsPath);
-
-        return { id, r };
-    }
-
     CookResult AssetImporter::RecookAsset(AssetID id)
     {
         const AssetMetadata& meta = mAssetManager->GetMetadata(id);
         mAssetManager->Unload(id);
-        return mCookers->Cook(id, meta, mAssetManager);
+        return Cook(id, meta, mAssetManager);
+    }
+
+    bool AssetImporter::NeedsCook(AssetID id, AssetType type) const
+    {
+        auto it = mCookers.find(type);
+        if(it == mCookers.end())
+            return false;
+
+        return it->second->NeedsCook(id);
+    }
+
+    Surge::CookResult AssetImporter::Cook(AssetID id, const AssetMetadata& meta, AssetManager* am) const
+    {
+        if(HasFlag(meta.Flags, AssetFlags::MEMORY))
+            return {};
+
+        auto it = mCookers.find(meta.Type);
+        if(it == mCookers.end())
+            return {};
+
+        return it->second->Cook(am->GetAbsolutePath(meta.RelativePath), id);
     }
 
 }

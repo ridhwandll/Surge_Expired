@@ -48,6 +48,7 @@ namespace Surge
         return result;
     }
 
+#if 0
     Ref<Asset> Texture2DCooker::LoadFromSource(const String& absPath) const
     {
         Vector<uint8_t> fileData;
@@ -77,6 +78,7 @@ namespace Surge
         Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form SOURCE {}", Filesystem::GetFilenameWithExt(absPath));
         return texture.As<Asset>();
     }
+#endif
 
     String Texture2DCooker::FindBasisuExe()
     {

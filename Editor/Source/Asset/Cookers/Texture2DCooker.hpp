@@ -11,7 +11,7 @@ namespace Surge
         virtual AssetType GetAssetType() const override { return AssetType::TEXTURE2D; }
 
     private:
-        Ref<Asset> LoadFromSource(const String& absPath) const;
+        //Ref<Asset> LoadFromSource(const String& absPath) const;
     private:
         static String FindBasisuExe();
         static bool IsLinearColorSpace(const String& sourceAbsPath);

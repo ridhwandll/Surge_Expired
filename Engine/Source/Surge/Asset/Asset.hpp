@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Defines.hpp"
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Core/Memory.hpp"
 #include <cstring>
@@ -49,14 +50,14 @@ namespace Surge
         return AssetType::NONE;
     }
 
-    inline constexpr const char* GetExtensionFromAssetType(AssetType type)
+    inline const char* GetExtensionFromAssetType(AssetType type)
     {
         switch(type)
         {
-            case AssetType::MESH: return ".smesh";
             case AssetType::MATERIAL: return ".smat";
             case AssetType::SCENE: return ".srg";
             default:
+                SG_ASSERT_INTERNAL("GetExtensionFromAssetType: Invalid asset type");
                 return "";
         }
     }

@@ -2,9 +2,9 @@
 #include "AssetManager.hpp"
 
 #include "Serializer/Texture2DSerializer.hpp"
+#include "Serializer/Material/MaterialSerializer.hpp"
 #include "Serializer/Mesh/MeshSerializer.hpp"
 #include "Serializer/SceneSerializer.hpp"
-#include "Serializer/MaterialSerializer.hpp"
 
 #include "Surge/Utility/Filesystem.hpp"
 
@@ -307,7 +307,7 @@ namespace Surge
 
             if(d1 == String::npos || d2 == String::npos)
             {
-                Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Malformed line skipped.");
+                Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Malformed line skipped!");
                 continue;
             }
 
@@ -340,13 +340,17 @@ namespace Surge
             {
                 String absPath = GetAbsolutePath(relPath);
                 String sidecarPath = GetSidecarPath(meta.ID, type);
-                bool hasSidecar = !sidecarPath.empty();
 
-                bool exists = Filesystem::Exists(absPath) || (hasSidecar && Filesystem::Exists(sidecarPath));
+                bool sourceExists = Filesystem::Exists(absPath);
+                bool sidecarExists = Filesystem::Exists(sidecarPath);
+
+                bool exists = sourceExists || sidecarExists;
                 meta.Flags = exists ? AssetFlags::VALID : AssetFlags::MISSING;
 
-                if(!exists)
-                    Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Source file missing for {}.", relPath);
+                if(!sourceExists)
+                    Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Source file missing for {}", relPath);
+                if (!exists)
+                    Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Asset Source & Sidecar is missing for {}", relPath);
             }
 
             mAssetRegistry[id] = std::move(meta);
@@ -357,4 +361,4 @@ namespace Surge
         return count > 0;
     }
 
-} // namespace Surge\
+} // namespace Surge

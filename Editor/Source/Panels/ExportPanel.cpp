@@ -295,7 +295,7 @@ namespace Surge
         Editor* editor = (Editor*)Core::GetClient();
 
         const AssetImporter& assetImporter = editor->GetAssetImporter();
-        assetImporter.ScanAndCook();
+        assetImporter.ScanAndCookAll();
 
         // Project Files
         Path assetsPath = am->GetAssetsDirectory();

@@ -105,6 +105,12 @@ namespace Surge
         }
 
         template <typename T>
+        const T* As() const
+        {
+            return (T*)Data;
+        }
+
+        template <typename T>
         T* As()
         {
             return (T*)Data;

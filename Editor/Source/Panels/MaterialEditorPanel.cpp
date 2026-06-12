@@ -2,11 +2,13 @@
 #include "Panels/MaterialEditorPanel.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+
 #include "ContentBrowserPanel.hpp"
+#include "Utility/ImGuiAux.hpp"
+#include "Asset/SourceWriters/MaterialSourceWriter.hpp"
 
 #include <imgui.h>
 #include <string>
-#include "Utility/ImGuiAux.hpp"
 
 namespace Surge
 {
@@ -221,7 +223,13 @@ namespace Surge
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.60f, 0.25f, 1.0f));
                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.40f, 0.15f, 1.0f));
                         if(ImGui::Button("SAVE", ImVec2(buttonSizeX, 0)))
-                            Core::GetAssetManager()->Save(mSelectedMaterial->GetID());
+                        {
+                            AssetManager* am = Core::GetAssetManager();
+                            String absPath = am->GetAbsolutePath(am->GetMetadata(mSelectedMaterial->GetID()).RelativePath);
+                            MaterialSourceWriter::Write(mSelectedMaterial, absPath);
+                            am->Save(mSelectedMaterial->GetID());
+
+                        }
                         ImGui::PopStyleColor(3);
                         ImGui::SameLine();
                     }
