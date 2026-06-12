@@ -5,8 +5,8 @@
 #include "Surge/Utility/FileDialogs.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Utility/ImGuiAux.hpp"
+#include "Editor.hpp"
 #include <imgui.h>
-#include <Editor.hpp>
 
 #undef CopyDirectory // FUCK ASS Windows.h 
 
@@ -293,8 +293,9 @@ namespace Surge
 
         AssetManager* am = Core::GetAssetManager();
         Editor* editor = (Editor*)Core::GetClient();
-        const AssetCookerRegistry& cookerRegistry = editor->GetAssetCookerRegistry();
-        cookerRegistry.CookAll(am);
+
+        const AssetImporter& assetImporter = editor->GetAssetImporter();
+        assetImporter.ScanAndCook();
 
         // Project Files
         Path assetsPath = am->GetAssetsDirectory();

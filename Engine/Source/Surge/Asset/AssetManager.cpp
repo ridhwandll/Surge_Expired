@@ -2,7 +2,7 @@
 #include "AssetManager.hpp"
 
 #include "Serializer/Texture2DSerializer.hpp"
-#include "Serializer/MeshSerializer.hpp"
+#include "Serializer/Mesh/MeshSerializer.hpp"
 #include "Serializer/SceneSerializer.hpp"
 #include "Serializer/MaterialSerializer.hpp"
 
@@ -127,6 +127,10 @@ namespace Surge
 
         auto serIt = mSerializers.find(meta.Type);
         SG_ASSERT(serIt != mSerializers.end() && serIt->second, "[AssetManager] No serializer for type '{}'!", SurgeReflect::EnumToString(meta.Type).data());
+
+        if (mAssetLoadHook)
+            mAssetLoadHook(id, meta);
+
         Ref<Asset> asset = serIt->second->Deserialize(meta);
         if(!asset)
         {
@@ -342,7 +346,7 @@ namespace Surge
                 meta.Flags = exists ? AssetFlags::VALID : AssetFlags::MISSING;
 
                 if(!exists)
-                    Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Source file missing for '{}'.", relPath.c_str());
+                    Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Source file missing for {}.", relPath);
             }
 
             mAssetRegistry[id] = std::move(meta);

@@ -8,12 +8,11 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "SurgeReflect/Enum.hpp"
 
-#include "Utility/ImGuiAux.hpp"
-#include "MaterialEditorPanel.hpp"
 #include "Editor.hpp"
+#include "MaterialEditorPanel.hpp"
+#include "Utility/ImGuiAux.hpp"
 
 #include <stb_image.h>
-#include <execution>
 
 namespace Surge
 {
@@ -28,7 +27,6 @@ namespace Surge
 
     static CBImageLoadData LoadIcon(const String& path)
     {
-        //stbi_set_flip_vertically_on_load(true);
         int width = 0, height = 0, channels = 0;
         stbi_uc* data = nullptr;
         data = stbi_load(path.c_str(), &width, &height, &channels, 4);
@@ -378,7 +376,7 @@ namespace Surge
                                                 AssetType typeToImport = AssetTypeFromExtension(extension.c_str());
                                                 if(typeToImport != AssetType::NONE)
                                                 {
-                                                    String relativeToAssets = std::filesystem::relative(item.Path_, mBaseDirectory).generic_string();
+                                                    String relativeToAssets =  Filesystem::GetRelativePath(item.Path_, mBaseDirectory).generic_string();
                                                     mAssetManager->Import(relativeToAssets, typeToImport);
                                                     mNeedsCacheRefresh = true;
                                                 }

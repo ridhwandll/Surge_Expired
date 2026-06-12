@@ -2,9 +2,7 @@
 #include "Texture2DSerializer.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-
 #include <basisu/transcoder/basisu_transcoder.h>
-#include <stb_image.h>
 
 namespace Surge
 {
@@ -24,29 +22,22 @@ namespace Surge
     Ref<Asset> Texture2DSerializer::Deserialize(const AssetMetadata& metadata) const
     {
         AssetManager* am = Core::GetAssetManager();
-        const String absPath = am->GetAbsolutePath(metadata.RelativePath);
         const String ktx2Path = am->GetSidecarPath(metadata.ID);
 
-#ifdef SURGE_PLATFORM_ANDROID
-        SG_ASSERT(Filesystem::Exists(ktx2Path), "[Texture2DSerializer] KTX2 missing for '{}'. Run cook step first.", absPath);
-        return LoadFromKTX2(ktx2Path);
-#else
-        Ref<Asset> ktx2Asset = nullptr;
-        if(Filesystem::Exists(ktx2Path))
-            ktx2Asset = LoadFromKTX2(ktx2Path);
-
-        if(!ktx2Asset)
-            return LoadFromSource(absPath);
-
+        Ref<Asset> ktx2Asset = LoadFromKTX2(ktx2Path);
+        SG_ASSERT(ktx2Asset, "[Texture2DSerializer] Failed to deserialize Texture2D: {}", metadata.RelativePath);
         return ktx2Asset;
-#endif
     }
 
     Ref<Asset> Texture2DSerializer::LoadFromKTX2(const String& ktx2Path) const
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(ktx2Path, fileData))
+        {
+            Log<Severity::Error>("[Texture2DSerializer] Failed to read KTX2 file at path: {0} Maybe the file doesn't exist?", ktx2Path);
             return nullptr;
+        }
+
 
         basist::ktx2_transcoder ktx2;
         if(!ktx2.init(fileData.data(), static_cast<Uint>(fileData.size())))
@@ -95,36 +86,6 @@ namespace Surge
         }
         Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form KTX2 {}", Filesystem::GetFilenameWithExt(ktx2Path));
         return Texture2D::Create(spec).As<Asset>();
-    }
-
-    Ref<Asset> Texture2DSerializer::LoadFromSource(const String& absPath) const
-    {
-        Vector<uint8_t> fileData;
-        if(!Filesystem::ReadBinaryFile(absPath, fileData))
-        {
-            Log<Severity::Error>("[Texture2DSerializer::LoadFromSource] Failed to read binary file at path: {0}", absPath);
-            return nullptr;
-        }
-
-        int width = 0, height = 0, channels = 0;
-        stbi_uc* data = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels, 4);
-
-        if(!data)
-            return nullptr;
-
-        TextureSpecification spec;
-        spec.Format = ImageFormat::RGBA8_SRGB;
-        spec.DebugName = Filesystem::GetFilenameWithExt(absPath);
-        spec.Width = static_cast<Uint>(width);
-        spec.Height = static_cast<Uint>(height);
-        spec.Content = data;
-        spec.GenerateMips = true;
-        Ref<Texture2D> texture = Texture2D::Create(spec);
-
-        stbi_image_free(data);
-
-        Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form SOURCE {}", Filesystem::GetFilenameWithExt(absPath));
-        return texture.As<Asset>();
     }
 
     void Texture2DSerializer::Shutdown()

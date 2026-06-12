@@ -85,7 +85,6 @@ namespace Surge
         GraphicsRHI* mRHI;
 
         friend class MaterialSerializer;
-        friend class MeshSerializer;
     };
 
 } // namespace Surge

@@ -1,10 +1,22 @@
 include(${CMAKE_SOURCE_DIR}/scripts/CMakeUtils.cmake)
 
-set(INCLUDE_DIRS Source)
-file(GLOB_RECURSE SOURCE_FILES Source/*.cpp Source/*.hpp)
+set(INCLUDE_DIRS
+    Source
+    Vendor/stb
+    Vendor/cgltf
+    Vendor/meshoptimizer/src
+)
+    
+file(GLOB_RECURSE SOURCE_FILES
+    Source/*.cpp
+    Source/*.hpp
+
+    Vendor/stb/stb_image.cpp
+    Vendor/cgltf/cgltf.cpp)
+
 
 add_executable(Editor ${SOURCE_FILES})
-target_link_libraries(Editor PRIVATE Surge)
+target_link_libraries(Editor PRIVATE Surge meshoptimizer)
 target_include_directories(Editor PRIVATE ${INCLUDE_DIRS})
 
 GroupSourcesByFolder(Editor)
@@ -17,3 +29,5 @@ add_custom_command(TARGET Editor POST_BUILD
         $<TARGET_FILE_DIR:Editor>
     COMMENT "Copying shaderc_shared.dll to Editor.exe directory..."
 )
+
+add_subdirectory(Vendor/meshoptimizer)

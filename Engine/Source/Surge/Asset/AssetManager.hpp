@@ -7,6 +7,7 @@
 #include "Surge/Core/Path.hpp"
 #include "SurgeReflect/Enum.hpp"
 #include <unordered_map>
+#include <functional>
 
 namespace Surge
 {
@@ -149,6 +150,8 @@ namespace Surge
 
         String GetSidecarDirectory(AssetType type);
 
+        void AddAssetLoadHook(std::function<void(AssetID id, const AssetMetadata& meta)>&& hook) { mAssetLoadHook = std::move(hook); }
+
         // Registry
         void SerializeRegistry();
         bool DeserializeRegistry();
@@ -163,6 +166,7 @@ namespace Surge
         std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;
         std::unordered_map<AssetID, Ref<Asset>> mLoadedAssets;
         std::unordered_map<AssetType, Scope<AssetSerializer>> mSerializers;
+        std::function<void(AssetID id, const AssetMetadata& meta)> mAssetLoadHook;
         bool mInitialized = false;
 
         static constexpr const char* kRegistryFilename = "AssetRegistry.surge";

@@ -49,6 +49,7 @@ namespace Surge
     Mesh::~Mesh()
     {
         Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        rhi->WaitIdle();
         rhi->DestroyBuffer(mVertexBuffer);
         rhi->DestroyBuffer(mIndexBuffer);
     }

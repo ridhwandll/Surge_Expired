@@ -114,7 +114,7 @@ namespace Surge
 
     void RenderGraph::SortByDependencies(Vector<RenderPass*>& passes)
     {
-        SCOPED_TIMER("RenderGraph::SortByDependencies");
+        //SCOPED_TIMER("RenderGraph::SortByDependencies");
 
         if(passes.size() <= 1)
             return;

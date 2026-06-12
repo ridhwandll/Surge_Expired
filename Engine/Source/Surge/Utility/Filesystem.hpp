@@ -48,6 +48,14 @@ namespace Surge::Filesystem
         }
         return true;
     }
+    inline float FileSizeInMB(const Path& path)
+    {
+        return static_cast<float>(std::filesystem::file_size(path) / (1000.0 * 1000.0));
+    }
+    inline Path GetRelativePath(const Path& path, const Path& base)
+    {
+        return std::filesystem::relative(path, base);
+    }
 
     bool CreateOrEnsureDirectories(const Path& path);
     void RemoveFile(const Path& path);

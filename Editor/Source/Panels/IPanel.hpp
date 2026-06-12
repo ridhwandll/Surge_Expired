@@ -1,8 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Events/Event.hpp"
-#include "Panels/PanelCode.hpp"
+#include "Panels/PanelCode.hpp" // For convenience
 
 namespace Surge
 {

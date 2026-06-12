@@ -5,7 +5,7 @@
 #include "Panels/PanelManager.hpp"
 #include "ProjectBrowser.hpp"
 
-#include "AssetCooker/AssetCookerRegistry.hpp"
+#include "Asset/AssetImporter.hpp"
 
 namespace Surge
 {
@@ -29,7 +29,7 @@ namespace Surge
         void LoadScene(Ref<Scene>&& scene);
         void SetCurrentProject(const Project& project) { mCurrentProject = project; }
 
-        const AssetCookerRegistry& GetAssetCookerRegistry() const { return mCookerRegistry; }
+        const AssetImporter& GetAssetImporter() const { return mAssetImporter; }
         Ref<Scene> GetCurrentScene() { return mActiveScene; }
         PanelManager& GetPanelManager() { return mPanelManager; }
         EditorCamera& GetCamera() { return mCamera; }
@@ -43,7 +43,7 @@ namespace Surge
         bool mShowRuntimeView = false;
         bool mShowAxes = true;
 
-        AssetCookerRegistry mCookerRegistry;
+        AssetImporter mAssetImporter;
         EditorCamera mCamera;
         Renderer* mRenderer;
         AssetManager* mAssetManager;

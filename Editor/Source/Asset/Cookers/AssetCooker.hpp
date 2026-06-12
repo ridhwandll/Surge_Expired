@@ -13,13 +13,14 @@ namespace Surge
         float OutputMegaBytes = 0;
     };
 
-    class IAssetCooker
+    class AssetCooker
     {
     public:
-        virtual ~IAssetCooker() = default;
+        virtual ~AssetCooker() = default;
 
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const = 0;
-        virtual bool NeedsCook(AssetID id) const = 0;
         virtual AssetType GetAssetType() const = 0;
+
+        bool NeedsCook(AssetID id) const;
     };
 }

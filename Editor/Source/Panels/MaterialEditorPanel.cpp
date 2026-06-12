@@ -17,11 +17,14 @@ namespace Surge
         Ref<Texture2D> tex = material->GetTexture(textureName);
         Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
         uint64_t imageSize = 0;
+        glm::uvec2 imageDimension(0);
         ImageHandle handle = ImageHandle::Invalid();
         if(tex)
         {
             handle = tex->GetRHIImage();
             imageSize = rhi->GetImageSize(handle);
+            const ImageDesc& desc = rhi->GetDesc(handle);
+            imageDimension = { desc.Width, desc.Height };
         }
 
         ImGui::TableNextRow();
@@ -32,7 +35,10 @@ namespace Surge
             ImGui::TextUnformatted(label);
         }
         if(tex)
+        {
             ImGui::Text("Size: %.5f MB", static_cast<float>(imageSize) / (1024.0f * 1024.0f));
+            ImGui::Text("Dimension: %ux%u", imageDimension.x, imageDimension.y);
+        }
         ImGui::TableSetColumnIndex(1);
 
         ImGui::PushID(label);
@@ -271,7 +277,7 @@ namespace Surge
 
                 DrawTextureProperty("Albedo Map", mSelectedMaterial.Raw(), "UseAlbedoMap", "AlbedoMap");
                 DrawTextureProperty("Normal Map", mSelectedMaterial.Raw(), "UseNormalMap", "NormalMap");
-                DrawTextureProperty("Roughness Map", mSelectedMaterial.Raw(), "UseMetallicMap", "RoughnessMetallicMap");
+                DrawTextureProperty("RoughnessMetallic Map", mSelectedMaterial.Raw(), "UseMetallicMap", "RoughnessMetallicMap");
 
                 ImGui::EndTable();
             }

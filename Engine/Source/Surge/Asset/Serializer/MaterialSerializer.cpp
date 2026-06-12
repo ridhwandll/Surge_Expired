@@ -1,16 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MaterialSerializer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Asset/Serializer/BinaryHelpers.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 #include <json/json.hpp>
-
-
-#ifdef SURGE_PLATFORM_ANDROID
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#else
-#include <fstream>
-#endif
 
 namespace Surge
 {
@@ -78,9 +71,7 @@ namespace Surge
                 textures[name] = tex.Data1->GetID().Get();
         }
 
-        std::ofstream file(absolutePath, std::ios::out | std::ios::trunc);
-        SG_ASSERT(file.is_open(), "[MaterialSerializer] Failed to write: '{}'", absolutePath);
-        file << j.dump(4);
+        Filesystem::WriteTextFile(absolutePath, j.dump(4));
         return true;
 #endif
     }
@@ -89,31 +80,11 @@ namespace Surge
     {
         AssetManager* am = Core::GetAssetManager();
         const String absolutePath = am->GetAbsolutePath(metadata.RelativePath);
+        String fileData;
+        Filesystem::ReadTextFile(absolutePath, fileData);
 
-        nlohmann::json j;
-#ifdef SURGE_PLATFORM_ANDROID
-        android_app* app = Android::GAndroidApp;
-        AAssetManager* androidAssetMgr = app->activity->assetManager;
-
-        AAsset* asset = AAssetManager_open(androidAssetMgr, absolutePath.c_str(), AASSET_MODE_BUFFER);
-        SG_ASSERT(asset, "[MaterialSerializer] Failed to open: '{}'", absolutePath);
-        if(!asset)
-            return nullptr;
-
-        size_t size = AAsset_getLength(asset);
-        String fileData(size, '\0');
-        AAsset_read(asset, fileData.data(), size);
-        AAsset_close(asset);
-
-        j = nlohmann::json::parse(fileData, nullptr, false);
-#else
-        std::ifstream file(absolutePath);
-        SG_ASSERT(file.is_open(), "[MaterialSerializer] Failed to open: '{}'", absolutePath);
-
-        j = nlohmann::json::parse(file, nullptr, false);
-#endif
-
-        SG_ASSERT(!j.is_discarded(), "[MaterialSerializer] Failed to parse JSON: '{}'", absolutePath);
+        nlohmann::json j = nlohmann::json::parse(fileData, nullptr, false);
+        SG_ASSERT(!j.is_discarded(), "[MaterialSerializer] Failed to parse JSON: {}", absolutePath);
 
         Ref<Material> material = Material::Create(j.value("Name", "Unnamed"));
 
@@ -188,6 +159,109 @@ namespace Surge
     void MaterialSerializer::Shutdown()
     {
         Log<Severity::Info>("[MaterialSerializer] Shutdown");
+    }
+
+    Uint MaterialSerializer::CalculateMaterialSize(const Ref<Material>& mat)
+    {
+        Uint size = 1; // hasData boolean flag (1 byte)
+        if(!mat)
+            return size;
+
+        // Material Name (Uint length + string chars)
+        size += sizeof(Uint) + static_cast<Uint>(mat->mName.size());
+
+        // UBO / CPU Data (Uint length + buffer bytes)
+        size += sizeof(Uint) + static_cast<Uint>(mat->mCPUData.GetSize());
+
+        // Textures
+        size += sizeof(Uint); // texCount
+        for(const auto& [name, tex] : mat->mTextures)
+        {
+            if(tex.Data1 && tex.Data1->GetID().IsValid())
+            {
+                size += sizeof(Uint) + static_cast<Uint>(name.size()); // String length + chars
+                size += sizeof(uint64_t); // rawID
+            }
+        }
+        return size;
+    }
+
+    void MaterialSerializer::WriteTransientMaterial(Vector<Byte>& buffer, const Ref<Material>& mat)
+    {
+        const Byte hasData = mat ? 1 : 0;
+        WriteData(buffer, hasData);
+
+        if(!hasData)
+            return;
+
+        WriteStr(buffer, mat->mName);
+
+        // Raw CPU buffer direct UBO layout, ready for GPU upload
+        const Uint propsSize = static_cast<Uint>(mat->mCPUData.GetSize());
+        WriteData(buffer, propsSize);
+        WriteDataArray(buffer, mat->mCPUData.As<Byte>(), propsSize);
+
+        // Only owned Ref<Texture2D> slots with a valid AssetID
+        Uint texCount = 0;
+        for(const auto& [name, tex] : mat->mTextures)
+        {
+            if(tex.Data1 && tex.Data1->GetID().IsValid())
+                texCount++;
+        }
+
+        WriteData(buffer, texCount);
+        for(const auto& [name, tex] : mat->mTextures)
+        {
+            if(!tex.Data1 || !tex.Data1->GetID().IsValid())
+                continue;
+
+            WriteStr(buffer, name);
+            const uint64_t rawID = tex.Data1->GetID().Get();
+            WriteData(buffer, rawID);
+        }
+    }
+
+    Ref<Material> MaterialSerializer::ReadTransientMaterial(const Byte*& ptr)
+    {
+        Byte hasData = 0;
+        ReadData(ptr, hasData);
+        if(!hasData)
+            return nullptr;
+
+        const String name = ReadStr(ptr);
+
+        Uint propsSize = 0;
+        ReadData(ptr, propsSize);
+
+        // Create with hardcoded pipeline/shader allocates CPU buffer via shader reflection
+        Ref<Material> mat = Material::Create(name);
+
+        SG_ASSERT(propsSize == static_cast<Uint>(mat->mCPUData.GetSize()),
+                  "[MeshSerializer] Inline material {} props size mismatch ({} vs {}). Shader UBO layout changed, delete sidecar and reimport",
+                  name, propsSize, static_cast<Uint>(mat->mCPUData.GetSize()));
+
+        // Overwrite CPU buffer with stored UBO data
+        ReadDataArray(ptr, mat->mCPUData.As<Byte>(), propsSize);
+
+        Uint texCount = 0;
+        ReadData(ptr, texCount);
+
+        AssetManager* am = Core::GetAssetManager();
+        for(Uint i = 0; i < texCount; i++)
+        {
+            const String texName = ReadStr(ptr);
+            uint64_t rawID = 0;
+            ReadData(ptr, rawID);
+
+            Ref<Texture2D> tex = am->Load<Texture2D>(AssetID(rawID));
+            if(tex)
+                mat->SetTexture(texName, tex);
+            else
+                Log<Severity::Warn>("[MeshSerializer] Material '{}': texture ID {} failed to load.", name, rawID);
+        }
+
+        mat->MarkDirty();
+        return mat;
     }
 }
 

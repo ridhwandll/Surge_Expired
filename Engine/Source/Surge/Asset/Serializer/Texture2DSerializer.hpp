@@ -15,6 +15,5 @@ namespace Surge
         virtual void Shutdown() override;
     private:
         Ref<Asset> LoadFromKTX2(const String& ktx2Path) const;
-        Ref<Asset> LoadFromSource(const String& absPath) const;
     };
 }

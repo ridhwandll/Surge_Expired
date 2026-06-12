@@ -22,4 +22,4 @@ jobs:
     - name: Build Solution
       run: |
         cd build
-        msbuild -property:Configuration=Release,MultiProcessorCompilation=true -maxCpuCount -verbosity:minimal -noLogo Surge.sln
+        msbuild -property:Configuration=Release,MultiProcessorCompilation=true -maxCpuCount -verbosity:minimal -noLogo Surge.slnx
