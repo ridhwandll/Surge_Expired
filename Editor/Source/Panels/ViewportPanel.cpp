@@ -2,12 +2,13 @@
 #include "Panels/ViewportPanel.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Input/Input.hpp"
-#include "Surge/Core/Hash.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "SurgeReflect/TypeTraits.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 #include "SurgeMath/Math.hpp"
-#include "Utility/ImGUIAux.hpp"
 #include "Editor.hpp"
+#include "ContentBrowserPanel.hpp"
+
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -44,7 +45,6 @@ namespace Surge
         style.Colors[ImGuizmo::COLOR::TRANSLATION_LINE] = ImVec4(1.000f, 0.659f, 0.000f, 1.00f);
         style.Colors[ImGuizmo::COLOR::ROTATION_USING_BORDER] = ImVec4(1.000f, 0.659f, 0.000f, 1.00f);
         style.Colors[ImGuizmo::COLOR::ROTATION_USING_FILL] = ImVec4(1.000f, 0.659f, 0.000f, 1.00f);
-
     }
 
     void ViewportPanel::OnEvent(Event& e)
@@ -53,129 +53,257 @@ namespace Surge
             return;
 
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) -> bool {
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
 
             // Hit F to Focus
-            if (keyEvent.GetKeyCode() == Key::F)
+            if(keyEvent.GetKeyCode() == Key::F)
             {
                 const Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
-                if (selectedEntity)
+                if(selectedEntity)
                 {
                     const TransformComponent& transform = selectedEntity.GetComponent<TransformComponent>();
                     mEditorCam->Focus(transform.Position);
                 }
             }
 
-            if (!Input::IsMouseButtonPressed(Mouse::ButtonRight))
+            if(!Input::IsMouseButtonPressed(Mouse::ButtonRight))
             {
-                switch (keyEvent.GetKeyCode())
+                switch(keyEvent.GetKeyCode())
                 {
-                    // Gizmos
+                    case Key::F11:
+                    {
+                        mIsFullscreen = !mIsFullscreen;
+                        if(!mIsFullscreen)
+                            mRestoreScreenPosBeforeFullscreen = true;
+
+                        ImGui::SetWindowFocus(PanelCodeToString(mCode));
+                        break;
+                    }
+                    case Key::Escape:
+                    {
+                        if(mIsFullscreen)
+                        {
+                            mIsFullscreen = false;
+                            mRestoreScreenPosBeforeFullscreen = true;
+                            ImGui::SetWindowFocus(PanelCodeToString(mCode));
+                        }
+                        break;
+                    }
+
                     case Key::Q:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = -1;
                         break;
                     }
                     case Key::W:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::TRANSLATE;
                         break;
                     }
                     case Key::E:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::ROTATE;
                         break;
                     }
                     case Key::R:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::SCALE;
                         break;
                     }
                     case Key::T:
                     {
-                        if (!mGizmoInUse)
+                        if(!mGizmoInUse)
                             mGizmoType = ImGuizmo::OPERATION::UNIVERSAL;
                         break;
                     }
                 }
             }
-            return false;
         });
     }
 
     void ViewportPanel::Render(bool* show)
     {
-        if (!*show)
+        if(!*show)
             return;
 
-         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
-         if (ImGui::Begin(PanelCodeToString(mCode), show))
-         {
-             mIsViewportHovered = ImGui::IsWindowHovered();
-             mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
-             ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
-             ImGui::Image(mTexID, { mViewportSize.x, mViewportSize.y });
-         }
-         else
-         {
-             mIsViewportHovered = false;
-             mViewportSize = { 0.0f, 0.0f };
-         }
- 
-            // Entity transform
-         Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
-         if(selectedEntity && mGizmoType > 0)
-         {
-             ImGuizmo::SetOrthographic(false);
-             ImGuizmo::SetDrawlist();
-             ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, mViewportSize.x, mViewportSize.y);
+        ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
-             glm::mat4 cameraView, cameraProjection;
-             Editor* app = static_cast<Editor*>(Core::GetClient());
-             EditorCamera& camera = app->GetCamera();
-             cameraProjection = camera.GetProjectionMatrix();
-             cameraProjection[1][1] *= -1;
-             cameraView = camera.GetViewMatrix();
+        // Fullscreen handling
+        if(mIsFullscreen)
+        {
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-             TransformComponent& transformComponent = selectedEntity.GetComponent<TransformComponent>();
-             glm::mat4 transform = transformComponent.GetTransform();
+            ImGui::SetNextWindowPos(viewport->Pos);
+            ImGui::SetNextWindowSize(viewport->Size);
+            ImGui::SetNextWindowViewport(viewport->ID);
+            windowFlags |= ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+        }
+        else if(mRestoreScreenPosBeforeFullscreen)
+        {
+            ImGui::SetNextWindowDockID(mPreviousDockID, ImGuiCond_Always);
+            mRestoreScreenPosBeforeFullscreen = false;
+        }
 
-             // Snapping
-             const bool snap = Input::IsKeyPressed(Key::LeftControl);
-             float snapValue = 0.5f; // Snap to 0.5m for translation/scale
-             // Snap to 45 degrees for rotation
-             if(mGizmoType == ImGuizmo::OPERATION::ROTATE)
-                 snapValue = 45.0f;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
+        if(ImGui::Begin(PanelCodeToString(mCode), show, windowFlags))
+        {
+            if(!mIsFullscreen)
+                mPreviousDockID = ImGui::GetWindowDockID();
 
-             float snapValues[3] = { snapValue, snapValue, snapValue };
-             ImGuizmo::SetGizmoSizeClipSpace(0.15f);
-             ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), static_cast<ImGuizmo::OPERATION>(mGizmoType), ImGuizmo::LOCAL, glm::value_ptr(transform), nullptr, snap ? snapValues : nullptr);
-             //ImGuizmo::ViewManipulate(??, camera.GetDistance(), ImVec2(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + 20), ImVec2(64, 64), 0x10101010);
+            mIsViewportHovered = ImGui::IsWindowHovered();
+            mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
+            ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
 
-             if(ImGuizmo::IsUsing())
-             {
-                 mGizmoInUse = true;
+            ImVec2 cursorLocalPos = ImGui::GetCursorPos();
+            ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
 
-                 glm::vec3 translation, rotation, scale;
-                 Math::DecomposeTransform(transform, translation, rotation, scale);
+            ImGui::Image(mTexID, { mViewportSize.x, mViewportSize.y });
 
-                 glm::vec3 deltaRotation = glm::degrees(rotation) - transformComponent.Rotation;
-                 transformComponent.Position = translation;
-                 transformComponent.Rotation += deltaRotation;
-                 transformComponent.Scale = scale;
-             }
-             else
-                 mGizmoInUse = false;
-         }
+            if(ImGui::BeginDragDropTarget())
+            {
+                if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                {
+                    SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                    AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                    AssetManager* assetManager = Core::GetAssetManager();
+                    const AssetMetadata& metadata = assetManager->GetMetadata(droppedAssetID);
 
-         ImGui::End();
-         ImGui::PopStyleVar();
+                    switch(metadata.Type)
+                    {
+                        case AssetType::SCENE:
+                        {
+                            Ref<Scene> droppedScene = assetManager->Load<Scene>(droppedAssetID);
+                            if(droppedScene)
+                            {
+                                auto* editor = static_cast<Editor*>(Core::GetClient());
+                                editor->LoadScene(std::move(droppedScene));
+                                SetSceneName();
+                            }
+                            break;
+                        }
+                        case AssetType::MESH:
+                        {
+                            Ref<Mesh> droppedMesh = assetManager->Load<Mesh>(droppedAssetID);
+                            if(droppedMesh)
+                            {
+                                auto* editor = static_cast<Editor*>(Core::GetClient());
+                                Ref<Scene> currentScene = editor->GetCurrentScene();
+                                Entity newEntity;
+                                currentScene->CreateEntity(newEntity, "Mesh");
+                                newEntity.AddComponent<MeshComponent>().MeshID = droppedAssetID;
+                                mSceneHierarchy->SetSelectedEntity(newEntity);
+                            }
+                            break;
+                        }
+                        default:
+                            Log<Severity::Warn>("[ViewportPanel] Failed to load dropped asset in viewport!");
+                            break;
+                    }
+
+                }
+                ImGui::EndDragDropTarget();
+            }
+
+            ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+
+            // Scene Name Overlay
+            ImGui::PushFont(boldFont);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            float padding = 5.0f;
+            float textHeight = ImGui::GetTextLineHeight();
+            float textWidth = ImGui::CalcTextSize(mSceneName.c_str()).x;
+            ImVec2 bgMax = ImVec2(cursorScreenPos.x + mViewportSize.x - 10.0f, cursorScreenPos.y + 10.0f + textHeight + (padding * 2.0f));
+            ImVec2 bgMin = ImVec2(bgMax.x - textWidth - (padding * 2.0f), cursorScreenPos.y + 10.0f);
+            drawList->AddRectFilled(bgMin, bgMax, IM_COL32(15, 15, 15, 200), 4.0f);
+            drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), mSceneName.c_str());
+            ImGui::PopFont();
+
+            // Button Overlays
+            float buttonWidth = 50.0f;
+            float buttonSpacing = ImGui::GetStyle().ItemSpacing.x;
+            float totalButtonsWidth = (buttonWidth * 2.0f) + buttonSpacing;
+            ImVec2 buttonsPos = ImVec2(cursorLocalPos.x + (mViewportSize.x - totalButtonsWidth) * 0.5f, cursorLocalPos.y + 10.0f);
+            ImGui::SetCursorPos(buttonsPos);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.1f, 0.6f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+
+            if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0))) { Log<Severity::Warn>("[ViewportPanel] TODO: Implement Play button"); }
+            ImGui::SameLine();
+            if(ImGui::Button("PAUSE", ImVec2(buttonWidth, 0))) { Log<Severity::Warn>("[ViewportPanel] TODO: Implement Pause button"); }
+
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+
+            // GIZMOS
+            Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
+            if(selectedEntity && mGizmoType > 0)
+            {
+                ImGuizmo::SetOrthographic(false);
+                ImGuizmo::SetDrawlist();
+
+                ImGuizmo::SetRect(cursorScreenPos.x, cursorScreenPos.y, mViewportSize.x, mViewportSize.y);
+
+                glm::mat4 cameraView, cameraProjection;
+                Editor* app = static_cast<Editor*>(Core::GetClient());
+                EditorCamera& camera = app->GetCamera();
+                cameraProjection = camera.GetProjectionMatrix();
+                cameraProjection[1][1] *= -1; // Vulkan flip
+                cameraView = camera.GetViewMatrix();
+
+                TransformComponent& transformComponent = selectedEntity.GetComponent<TransformComponent>();
+                glm::mat4 transform = transformComponent.GetTransform();
+
+                // Snapping
+                const bool snap = Input::IsKeyPressed(Key::LeftControl);
+                float snapValue = 0.5f;
+                if(mGizmoType == ImGuizmo::OPERATION::ROTATE)
+                    snapValue = 45.0f;
+
+                float snapValues[3] = { snapValue, snapValue, snapValue };
+                ImGuizmo::SetGizmoSizeClipSpace(0.15f);
+                ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), static_cast<ImGuizmo::OPERATION>(mGizmoType), ImGuizmo::LOCAL, glm::value_ptr(transform), nullptr, snap ? snapValues : nullptr);
+
+                if(ImGuizmo::IsUsing())
+                {
+                    mGizmoInUse = true;
+
+                    glm::vec3 translation, rotation, scale;
+                    Math::DecomposeTransform(transform, translation, rotation, scale);
+
+                    glm::vec3 deltaRotation = glm::degrees(rotation) - transformComponent.Rotation;
+                    transformComponent.Position = translation;
+                    transformComponent.Rotation += deltaRotation;
+                    transformComponent.Scale = scale;
+                }
+                else
+                    mGizmoInUse = false;
+            }
+        }
+        else
+        {
+            mIsViewportHovered = false;
+            mViewportSize = { 0.0f, 0.0f };
+        }
+
+        ImGui::End();
+        ImGui::PopStyleVar();
     }
-    void ViewportPanel::Shutdown()
+
+    void ViewportPanel::Shutdown() {}
+
+    void ViewportPanel::SetSceneName()
     {
+        Scene* scene = mSceneHierarchy->GetSceneContext();
+        AssetID assetID = scene ? scene->GetID() : AssetID(AssetID::INVALID);
+        if(assetID)
+            mSceneName = Filesystem::GetFilenameWithExt(Core::GetAssetManager()->GetMetadata(assetID).RelativePath);
+        else
+            mSceneName = "Untitled Scene";
     }
+
 } // namespace Surge

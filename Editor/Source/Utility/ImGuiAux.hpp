@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <cstdarg>
 
 #define HIERARCHY_ENTITY_DND "HiEnT!"
 
@@ -13,11 +14,13 @@ namespace Surge::ImGuiAux
 {
     namespace Colors
     {
-        constexpr glm::vec4 ThemeColor = glm::vec4(1.0f, 0.5f, 0.1f, 1.0f);
-        constexpr glm::vec4 ThemeColorLight = glm::vec4(1.0f, 0.6f, 0.1f, 1.0f);
+        constexpr glm::vec4 ThemeColor1 = glm::vec4(1.0f, 0.647f, 0.0f, 1.0f);     // Amber
+        constexpr glm::vec4 ThemeColor2 = glm::vec4(0.545f, 0.361f, 0.965f, 1.0f); // Cyber Violet
+
         constexpr glm::vec4 ExtraDark = glm::vec4(0.05f, 0.05f, 0.05f, 1.0f);
         constexpr glm::vec4 Red = glm::vec4(0.8f, 0.1f, 0.1f, 1.0f);
         constexpr glm::vec4 Green = glm::vec4(0.1f, 0.8f, 0.1f, 1.0f);
+        constexpr glm::vec4 LightGreen = glm::vec4(0.3176, 0.6706, 0.3176, 1.0);
         constexpr glm::vec4 Blue = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
         constexpr glm::vec4 White = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -45,10 +48,15 @@ namespace Surge::ImGuiAux
     {
         ScopedBoldFont(const ScopedBoldFont&) = delete;
         ScopedBoldFont operator=(const ScopedBoldFont&) = delete;
+        // Bold font at index 1 (See Surge/Graphics/RHI/Vulkan/VulkanImGui.cpp)
+
+        ScopedBoldFont(float fontSize)
+        {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1], fontSize);
+        }
 
         ScopedBoldFont()
         {
-            // Bold font at index 1 (See Surge/Graphics/RHI/Vulkan/VulkanImGui.cpp)
             ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
         }
         ~ScopedBoldFont()
@@ -137,6 +145,22 @@ namespace Surge::ImGuiAux
         ImGui::PopID();
     }
 
+    inline void TString(const char* title, const char* fmt, ...)
+    {
+        ImGui::PushID(title);
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(title);
+        ImGui::TableNextColumn();
+        ImGui::PushItemWidth(-1);
+
+        va_list args;
+        va_start(args, fmt);
+        ImGui::TextV(fmt, args);
+        va_end(args);
+
+        ImGui::PopID();
+    }
+
     template <typename T, CustomProprtyFlag F = CustomProprtyFlag::None>
     bool TProperty(const char* title, T* value, float dragMin = 0.0f, float dragMax = 0.0f)
     {
@@ -162,8 +186,6 @@ namespace Surge::ImGuiAux
                     result = ImGui::DragFloat4("##v", glm::value_ptr(*value), 0.01f, dragMin, dragMax, "%.2f");
                 else if constexpr(std::is_same_v<T, bool>)
                     result = ImGui::Checkbox("##v", value);
-                else if constexpr(std::is_same_v<T, String>)
-                    ImGui::TextUnformatted(value->c_str());
                 else
                     static_assert(false);
             }
@@ -177,7 +199,7 @@ namespace Surge::ImGuiAux
 
         ImGui::PopItemWidth();
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
         ImGui::PopID();
 
         return result;
@@ -188,7 +210,7 @@ namespace Surge::ImGuiAux
         ImGui::TableNextColumn();
         bool isSlected = ImGui::Selectable(title);
         if (ImGui::IsItemFocused())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
         return isSlected;
     }
 
@@ -203,24 +225,24 @@ namespace Surge::ImGuiAux
         result = ImGui::Button(buttonText);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
         ImGui::PopID();
 
         return result;
     }
 
-    inline bool Button(const char* buttonText)
+    inline bool Button(const char* label, const ImVec2& size = ImVec2(0, 0))
     {
-        bool result = ImGui::Button(buttonText);
+        bool result = ImGui::Button(label, size);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
 
         return result;
     }
 
     template <typename T>
-    inline bool TSlider(const char* label, T& value, T min, T max)
+    inline bool TSlider(const char* label, T* value, T min, T max, const char* format = "%.3f")
     {
         bool modified = false;
         ImGui::PushID(label);
@@ -235,12 +257,12 @@ namespace Surge::ImGuiAux
             ScopedBoldFont font;
             if constexpr(std::is_same_v<T, float>)
             {
-                if(ImGui::SliderFloat("##label", &value, min, max))
+                if(ImGui::SliderFloat("##label", value, min, max, format))
                     modified = true;
             }
-            else if constexpr(std::is_same_v<T, Uint>)
+            else if constexpr(std::is_same_v<T, int>)
             {
-                if(ImGui::SliderInt("##label", reinterpret_cast<int*>(&value), min, max))
+                if(ImGui::SliderInt("##label", value, min, max))
                     modified = true;
             }
             else
@@ -281,25 +303,5 @@ namespace Surge::ImGuiAux
     {
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y);
     }
-
-    class RenamingMechanism
-    {
-    public:
-        RenamingMechanism() = default;
-        RenamingMechanism(const RenamingMechanism&) = delete;
-        RenamingMechanism operator=(const RenamingMechanism&) = delete;
-        ~RenamingMechanism() = default;
-
-        FORCEINLINE void SetRenamingState(bool isRenaming) { mRenaming = isRenaming; }        
-        void Update(String& name, const std::function<void(const String& newName)>& onRenameEnd = [](const String& newName) {}); 
-
-        bool operator!() const { return !mRenaming; }
-
-    private:
-        bool mRenaming = false;
-        String mOldName;
-        String mTempBuffer;
-    };
-
 
 } // namespace Surge::ImGuiAux

@@ -2,12 +2,15 @@
 #pragma once
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Panels/PaneManager.hpp"
-#include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Panels/PanelManager.hpp"
+#include "ProjectBrowser.hpp"
+
+#include "Asset/AssetImporter.hpp"
 
 namespace Surge
 {
+    class ViewportPanel;
+    class Renderer;
     class Editor : public Surge::Client
     {
     public:
@@ -23,18 +26,30 @@ namespace Surge
         void OnRuntimeStart();
         void OnRuntimeEnd();
 
+        void LoadScene(Ref<Scene>&& scene);
+        void SetCurrentProject(const Project& project) { mCurrentProject = project; }
+        const Project& GetCurrentProject() const { return mCurrentProject; }
+
+        const AssetImporter& GetAssetImporter() const { return mAssetImporter; }
+        Ref<Scene> GetCurrentScene() { return mActiveScene; }
         PanelManager& GetPanelManager() { return mPanelManager; }
         EditorCamera& GetCamera() { return mCamera; }
 
     private:
         void CheckResize();
         void OnImGuiRender();
-        ImageHandle Editor::LoadTexture();
+        void RenderEditorSettings();
     private:
+        // Editor Settins
         bool mShowRuntimeView = false;
-        ImageHandle mRidTex;
+        bool mShowAxes = true;
+
+        AssetImporter mAssetImporter;
         EditorCamera mCamera;
         Renderer* mRenderer;
+        AssetManager* mAssetManager;
+        ViewportPanel* mViewportPanel;
+        ProjectBrowser mProjectBrowser;
         PanelManager mPanelManager;
     };
 } // namespace Surge

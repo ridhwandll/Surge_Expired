@@ -60,8 +60,13 @@ namespace Surge
             const Mesh& mesh = *cmd.Mesh_;
             mRHI->CmdBindVertexBuffer(ctx, mesh.GetVertexBuffer());
             mRHI->CmdBindIndexBuffer(ctx, mesh.GetIndexBuffer());
+            const Vector<Submesh>& submeshes = mesh.GetSubmeshes();
 
-            for(const Submesh& submesh : mesh.GetSubmeshes())
+            // Dont draw outline if there are too many submeshes
+            if (submeshes.size() > 669)
+                continue;
+
+            for(const Submesh& submesh : submeshes)
             {
                 glm::mat4 modelViewProjection;
                 modelViewProjection = blackBoard.ViewProjection * cmd.Transform * submesh.Transform;

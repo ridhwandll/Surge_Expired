@@ -150,7 +150,7 @@ namespace Surge
         ImGui_ImplVulkan_Init(&vkInfo);
 
         // Load Fonts
-        style.FontSizeBase = 17.0f;
+        style.FontSizeBase = 16.0f;
         
         // ----------------------- ImGui Font Management ----------------------- 
         // Normal font -> index = 0
@@ -159,14 +159,18 @@ namespace Surge
         // Use ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[index]) to use!
         // ----------------------- ImGui Font Management ----------------------- 
 
+        constexpr const char* regularfontPath = "Engine/Assets/Fonts/Roboto_SemiCondensed-Regular.ttf";
+        constexpr const char* boldfontPath    = "Engine/Assets/Fonts/Roboto_SemiCondensed-Bold.ttf";
+        constexpr const char* italicfontPath  = "Engine/Assets/Fonts/Roboto_SemiCondensed-Italic.ttf";
+
 #ifdef SURGE_PLATFORM_WINDOWS
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);		
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
-        io.Fonts->AddFontFromFileTTF("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
+        io.Fonts->AddFontFromFileTTF(regularfontPath, style.FontSizeBase);
+        io.Fonts->AddFontFromFileTTF(boldfontPath, style.FontSizeBase);
+        io.Fonts->AddFontFromFileTTF(italicfontPath, style.FontSizeBase);
 #elif defined(SURGE_PLATFORM_ANDROID)
-        LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Regular.ttf", style.FontSizeBase);
-        LoadImGuiFont("Engine/Assets/Fonts/FiraSans-SemiBold.ttf", style.FontSizeBase);
-        LoadImGuiFont("Engine/Assets/Fonts/FiraSans-Italic.ttf", style.FontSizeBase);
+        LoadImGuiFont(regularfontPath, style.FontSizeBase);
+        LoadImGuiFont(boldfontPath, style.FontSizeBase);
+        LoadImGuiFont(italicfontPath, style.FontSizeBase);
 #else
         io.Fonts->AddFontDefault();
 #endif
@@ -253,7 +257,7 @@ namespace Surge
     {
         auto colorFromBytes = [](const uint8_t r, const uint8_t g, const uint8_t b) { return ImVec4(static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f, static_cast<float>(b) / 255.0f, 1.0f); };
         auto colorFromBytesS = [&colorFromBytes](const uint8_t s) { return colorFromBytes(s, s, s); };
-        ImVec4 themeColor = colorFromBytes(32, 32, 32);
+        ImVec4 themeColor = colorFromBytesS(30);
 
         auto& style = ImGui::GetStyle();
 
@@ -278,9 +282,9 @@ namespace Surge
         colors[ImGuiCol_HeaderActive] = colorFromBytesS(22);
         colors[ImGuiCol_CheckMark] = colorFromBytes(10, 200, 10); // Green
 
-        colors[ImGuiCol_Button] = themeColor;
-        colors[ImGuiCol_ButtonHovered] = colorFromBytesS(66);
-        colors[ImGuiCol_ButtonActive] = colorFromBytesS(120);
+        colors[ImGuiCol_Button] = colorFromBytesS(20);
+        colors[ImGuiCol_ButtonHovered] = colorFromBytesS(15);
+        colors[ImGuiCol_ButtonActive] = colorFromBytesS(50);
         colors[ImGuiCol_SeparatorHovered] = { 0.8f, 0.4f, 0.1f, 1.0f };
         colors[ImGuiCol_SeparatorActive] = { 1.0f, 0.5f, 0.1f, 1.0f };
 

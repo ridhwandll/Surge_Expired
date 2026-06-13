@@ -53,7 +53,7 @@ namespace Surge
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
 
-        void ShowImGui(bool show) { mShowImGui = show; }
+        void ShowInternalImGui(bool show) { mShowImGui = show; }
 
         // Destroys all passses and registry resources
         void Shutdown();

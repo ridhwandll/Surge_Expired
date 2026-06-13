@@ -13,11 +13,3 @@
 #include <vector>
 #include <unordered_map>
 #include <array>
-#include <deque>
-
-#ifdef SURGE_PLATFORM_WINDOWS
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#elif SURGE_PLATFORM_ANDROID
-#include <android/log.h>
-#endif

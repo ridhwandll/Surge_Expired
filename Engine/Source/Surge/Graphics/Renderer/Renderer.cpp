@@ -2,6 +2,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
@@ -42,8 +43,9 @@ namespace Surge
         samplerDesc.DebugName = "DefaultSampler";
         samplerDesc.Min = FilterMode::NEAREST; // We set to NEAREST as Rendergraph Passes uses this internally
         samplerDesc.Mag = FilterMode::NEAREST;
-        samplerDesc.WrapU = WrapMode::CLAMP;
-        samplerDesc.WrapV = WrapMode::CLAMP;
+        samplerDesc.Mip = MipmapMode::LINEAR;
+        samplerDesc.WrapU = WrapMode::REPEAT;
+        samplerDesc.WrapV = WrapMode::REPEAT;
         samplerDesc.Anisotropy = true;
         samplerDesc.MaxAniso = 4;
         blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
@@ -91,6 +93,7 @@ namespace Surge
         blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = camera.GetPosition();
         blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
+        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
 
         FrameUBO frameData = {};
         frameData.View = blackBoard.ViewMatrix;
@@ -113,6 +116,7 @@ namespace Surge
         blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = transform[3];
         blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
+        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
 
         FrameUBO frameData = {};
         frameData.View = blackBoard.ViewMatrix;
@@ -155,6 +159,22 @@ namespace Surge
         bb.LightList.emplace_back(gpuLight);
     }
 
+    void Renderer::SubmitEnvironment(const EnvironmentComponent& env)
+    {
+        FrameBlackboard& bb = mGraph.GetBlackboard();
+        Environnment& e = bb.Env;
+        e.Elevation = env.Elevation;
+        e.Azimuth = env.Azimuth;
+        e.Turbidity = env.Turbidity;
+        e.Exposure = env.Exposure;
+        e.SunIntensity = env.SunIntensity;
+        e.EnableSunDisk = env.EnableSunDisk;
+        e.SkyAmbient = env.SkyAmbient;
+        e.HorizonAmbient = env.HorizonAmbient;
+        e.GroundAmbient = env.GroundAmbient;
+        e.HasEnvironment = true;
+    }
+
     void Renderer::OnWindowResize(Uint width, Uint height)
     {
         mGraph.OnWindowResize(width, height);
@@ -165,11 +185,39 @@ namespace Surge
         mGraph.ForceResize(width, height);
     }
 
-    Ref<Material> Renderer::CreateMaterial(const String& debugName)
+    void Renderer::SubmitDirLightDebug(const glm::vec3& origin, const glm::vec3& forward, const glm::vec4& color)
     {
-        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
-        Ref<Material> material = Ref<Material>::Create(blackBoard.MaterialPipeline, mShaderManager.Get("Renderer3D.glsl"), "Material");
-        return material;
+        const float mainLineLength = 3.0f;
+        const float parallelLineLength = 2.0f;
+        const float radius = 0.75f;
+
+        glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        if(glm::abs(glm::dot(forward, worldUp)) > 0.999f)
+            worldUp = glm::vec3(0.0f, 0.0f, 1.0f);
+
+        glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+        glm::vec3 up = glm::normalize(glm::cross(right, forward));
+
+        glm::vec3 mainEnd = origin + (forward * mainLineLength);
+        SubmitLine(origin, mainEnd, color);
+
+        glm::vec3 offsets[4] = {
+            up * radius,          // Top
+            -up * radius,         // Bottom
+            right * radius,       // Right
+            -right * radius       // Left
+        };
+
+        for(int i = 0; i < 4; i++)
+        {
+            glm::vec3 rayStart = origin + offsets[i];
+            glm::vec3 rayEnd = rayStart + (forward * parallelLineLength);
+            SubmitLine(rayStart, rayEnd, color);
+            glm::vec3 nextRayStart = origin + offsets[(i + 1) % 4];
+            SubmitLine(rayStart, nextRayStart, color);
+            glm::vec3 arrowBase = mainEnd - (forward * 0.5f);
+            SubmitLine(mainEnd, arrowBase + offsets[i] * 0.5f, color);
+        }
     }
 
     void Renderer::Shutdown()

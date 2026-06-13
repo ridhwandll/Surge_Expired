@@ -13,11 +13,24 @@
 #elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #endif
+#include "../Asset/AssetManager.hpp"
 
 
 #define ENV_VAR_KEY "SURGE_DIR"
 namespace Surge::Core
 {
+    struct CoreData
+    {
+        Client* SurgeClient = nullptr; // Provided by the User
+
+        Clock SurgeClock;
+        Window* SurgeWindow = nullptr;
+        Renderer* SurgeRenderer = nullptr;
+        AssetManager* SurgeAssetManager = nullptr;
+
+        bool Running = false;
+        Vector<std::function<void()>> FrameEndCallbacks;
+    };
     static CoreData GCoreData;
 
     void OnEvent(Event& e)
@@ -34,6 +47,9 @@ namespace Surge::Core
         SG_ASSERT(application, "Invalid Application!");
 
         GCoreData.SurgeClock.Start();
+
+        // Reflection Engine
+        SurgeReflect::Registry::Initialize();
 
         String path = Platform::GetEnvVariable(ENV_VAR_KEY);
         if (!Filesystem::Exists(path))
@@ -54,11 +70,12 @@ namespace Surge::Core
         GCoreData.SurgeRenderer = new Renderer();
         GCoreData.SurgeRenderer->Initialize();
 
-        // Reflection Engine
-        SurgeReflect::Registry::Initialize();
+        // Asset Manager
+        GCoreData.SurgeAssetManager = new AssetManager();
+        GCoreData.SurgeAssetManager->Initialize("Engine/Assets");
+
 
         GCoreData.Running = true;
-
         GCoreData.SurgeClient->OnInitialize();
     }
 
@@ -95,24 +112,27 @@ namespace Surge::Core
         // NOTE(Rid): Order Matters here
         GCoreData.SurgeClient->OnShutdown();
         delete GCoreData.SurgeClient;
-        GCoreData.SurgeClient = nullptr;
+
+        GCoreData.SurgeAssetManager->Shutdown();
+        delete GCoreData.SurgeAssetManager;
 
         GCoreData.SurgeRenderer->Shutdown();
         delete GCoreData.SurgeRenderer;
 
         delete GCoreData.SurgeWindow;
+
         SurgeReflect::Registry::Shutdown();
     }
 
     void Core::AddFrameEndCallback(const std::function<void()>& func)
-    {
+{
         GCoreData.FrameEndCallbacks.push_back(func);
     }
 
     Window* GetWindow() { return GCoreData.SurgeWindow; }
     Renderer* GetRenderer() { return GCoreData.SurgeRenderer; }
-    CoreData* GetData() { return &GCoreData; }
+    AssetManager* GetAssetManager() { return GCoreData.SurgeAssetManager; }
     Client* GetClient() { return GCoreData.SurgeClient; }
-    Surge::Clock& GetClock() { return GCoreData.SurgeClock; }
+    Clock& GetClock() { return GCoreData.SurgeClock; }
 
 } // namespace Surge::Core

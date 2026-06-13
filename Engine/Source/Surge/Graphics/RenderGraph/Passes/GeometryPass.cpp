@@ -1,8 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
-#include <glm/gtc/type_ptr.hpp>
-
 
 namespace Surge
 {
@@ -147,9 +146,18 @@ namespace Surge
             for(Uint i = 0; i < blackBoard.LightList.size(); i++)
                 lightData.Lights[i] = blackBoard.LightList[i].GPULight;
 
-            lightData.SkyAmbient = blackBoard.GIParams.SkyAmbient;
-            lightData.HorizonAmbient = blackBoard.GIParams.HorizonAmbient;
-            lightData.GroundAmbient = blackBoard.GIParams.GroundAmbient;
+            if (blackBoard.Env.HasEnvironment)
+            {
+                lightData.SkyAmbient = blackBoard.Env.SkyAmbient;
+                lightData.HorizonAmbient = blackBoard.Env.HorizonAmbient;
+                lightData.GroundAmbient = blackBoard.Env.GroundAmbient;
+            }
+            else
+            {
+                lightData.SkyAmbient = glm::vec3(0.0f);
+                lightData.HorizonAmbient = glm::vec3(0.0f);
+                lightData.GroundAmbient = glm::vec3(0.0f);
+            }
             mRHI->UploadBuffer(mLightUBOs[ctx.FrameIndex], &lightData, sizeof(LightUBOData), 0);
         }
 
@@ -182,7 +190,6 @@ namespace Surge
             const Mesh& mesh = *cmd.Mesh_;
             mRHI->CmdBindVertexBuffer(ctx, mesh.GetVertexBuffer());
             mRHI->CmdBindIndexBuffer(ctx, mesh.GetIndexBuffer());
-            const Vector<Ref<Material>>& materials = mesh.GetMaterials();
 
             const Submesh* submeshes = mesh.GetSubmeshes().data();
             for(Uint i = 0; i < mesh.GetSubmeshes().size(); i++)
@@ -193,8 +200,9 @@ namespace Surge
                 pushConstants.Transform = cmd.Transform * submesh.Transform;
                 pushConstants.LightCount = (Uint)blackBoard.LightList.size();
 
-                materials[submesh.MaterialIndex]->UpdateForRendering(ctx);
-                materials[submesh.MaterialIndex]->Bind(ctx, m3DPipeline);
+                const Ref<Material> material = mesh.GetMaterialAtIndex(submesh.MaterialIndex);
+                material->UpdateForRendering(ctx);
+                material->Bind(ctx, m3DPipeline);
 
                 mRHI->CmdPushConstants(ctx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
                 mRHI->CmdDrawIndexed(ctx, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
@@ -207,21 +215,7 @@ namespace Surge
         Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.MainPassFramebuffer, width, height); });
     }
 
-    void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard)
-    {
-        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
-        ImGui::PushFont(boldFont, 25.0f);
-        ImGui::TextUnformatted("Geometry Pass");
-        ImGui::Separator();
-        ImGui::PopFont();
-
-        ImGui::PushFont(boldFont, 20.0f);
-        ImGui::TextUnformatted("Global Illumination");
-        ImGui::PopFont();
-        ImGui::ColorEdit3("SkyAmbient", glm::value_ptr(blackBoard.GIParams.SkyAmbient));
-        ImGui::ColorEdit3("HorizonAmbient", glm::value_ptr(blackBoard.GIParams.HorizonAmbient));
-        ImGui::ColorEdit3("GroundAmbient", glm::value_ptr(blackBoard.GIParams.GroundAmbient));
-    }
+    void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard) {}
 
     void GeometryPass::Shutdown(FrameBlackboard& blackBoard)
     {

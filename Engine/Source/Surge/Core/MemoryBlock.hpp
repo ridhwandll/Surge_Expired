@@ -12,6 +12,9 @@ namespace Surge
         MemoryBlock()
             : Data(nullptr), Size(0) {}
 
+        MemoryBlock(std::nullptr_t)
+            : Data(nullptr), Size(0) {}
+
         MemoryBlock(void* data, Uint size)
             : Data(data), Size(size) {}
 
@@ -99,6 +102,12 @@ namespace Surge
         Byte operator[](int index) const
         {
             return ((Byte*)Data)[index];
+        }
+
+        template <typename T>
+        const T* As() const
+        {
+            return (T*)Data;
         }
 
         template <typename T>

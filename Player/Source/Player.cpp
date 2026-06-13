@@ -1,330 +1,66 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
-#include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include <random>
-#include <imgui_internal.h>
-#include "stb_image.h"
+#include "Surge/Asset/AssetManager.hpp"
 
-#ifdef SURGE_PLATFORM_ANDROID
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#endif
-#include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
+//NOTE THIS VS Project is only for builidng and copying via Editor, it will not run from the VS ///
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace Surge
 {
-    static glm::vec3 HSVtoRGB(float h, float s, float v)
+    static Path GetProjectPath()
     {
-        float c = v * s;
-        float x = c * (1.0f - fabs(fmod(h * 6.0f, 2.0f) - 1.0f));
-        float m = v - c;
+        Path searchDir = "Engine";
+        Path foundPath;
 
-        glm::vec3 rgb;
+        Vector<Path> files = Filesystem::GetFilesInDirectory("Engine", ".surgeproj");
 
-        if(h < 1.0f / 6.0f) rgb = { c, x, 0 };
-        else if(h < 2.0f / 6.0f) rgb = { x, c, 0 };
-        else if(h < 3.0f / 6.0f) rgb = { 0, c, x };
-        else if(h < 4.0f / 6.0f) rgb = { 0, x, c };
-        else if(h < 5.0f / 6.0f) rgb = { x, 0, c };
-        else rgb = { c, 0, x };
+        if(files.empty())
+            Log<Severity::Fatal>("No .surgeproj file found!");
 
-        return rgb + glm::vec3(m);
+        return files.front();
     }
 
-    static float GenRandomHue()
+    void Player::OpenProject()
     {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> hueDist(0.0f, 1.0f);
-        float h = hueDist(gen);
-        return h;
-    }
+        const Path projectPath = GetProjectPath();
 
-    static glm::vec2 GenRandomPosition(float halfWidth, float halfHeight)
-    {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        static std::uniform_real_distribution<float> distX(-halfWidth, halfWidth);
-        static std::uniform_real_distribution<float> distY(-halfHeight, halfHeight);
-        return glm::vec2(distX(gen), distY(gen));
-    }
+        Project openedProject;
+        Serializer::DeserializeProject(projectPath, &openedProject);
 
-    void Player::FillTextures(Uint texCount)
-    {
-        stbi_set_flip_vertically_on_load(1);
-        SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
-        for (int i = 0; i < texCount; i++)
-        {
-            String path = "Engine/Assets/Textures/RidWhite.png";
-            int width, height, channels;
-            stbi_uc* data = nullptr;
-#ifdef SURGE_PLATFORM_WINDOWS
-            data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-#elif defined(SURGE_PLATFORM_ANDROID)
-            android_app* app = Android::GAndroidApp;
-            AAssetManager* assetManager = app->activity->assetManager;
-            AAsset* asset = AAssetManager_open(assetManager, path.c_str(), AASSET_MODE_BUFFER);
+        //const Path assetManagerPath = Filesystem::GetParentPath(projectPath) / "Assets";
+        //mAssetManager->Shutdown();
+        //mAssetManager->Initialize(assetManagerPath);
 
-            Vector<unsigned char> buffer;
-            int bufferSize = AAsset_getLength(asset);
-            buffer.resize(bufferSize);
-
-            AAsset_read(asset, buffer.data(), bufferSize);
-            AAsset_close(asset);
-
-            data = stbi_load_from_memory(buffer.data(), bufferSize, &width, &height, &channels, 4);
-#endif
-            if (data)
-            {
-                ImageDesc desc = {};
-                desc.Width = width;
-                desc.Height = height;
-                desc.Format = ImageFormat::RGBA8_SRGB;
-                desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
-                desc.GenerateImGuiID = true;
-                desc.DebugName = String(std::to_string(i + 1) + ".png");
-                desc.InitialData = data;
-                desc.DataSize = width * height * 4;
-                desc.Sampler = defautSampler;
-                ImageHandle texture = mRenderer->GetRHI()->CreateImage(desc);
-                mTextures.push_back(texture);
-                stbi_image_free(data);
-            }
-            else
-                Log<Severity::Error>("Failed to load texture at path: {0}", path);
-        }
+        mActiveScene = mAssetManager->Load<Scene>(openedProject.StartScene);
+        mCurrentProject = std::move(openedProject);
     }
 
     void Player::OnInitialize()
     {
         mRenderer = Core::GetRenderer();
-        mActiveScene = Ref<Scene>::Create(false);
-        Entity runtimeCamera;
+        mAssetManager = Core::GetAssetManager();
+        mRenderer->ShowInternalImGui(false);
 
-        glm::vec2 windowSize = Core::GetWindow()->GetSize();
-        float halfWidth = 0;
-        float halfHeight = 0;
+        OpenProject();
 
-        {
-            mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
-            CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-            cam.Primary = true;
-            cam.FixedAspectRatio = true;
-        
-            cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
-            TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-10, 6, 10);
-            transform.Rotation = glm::vec3(-30, -45, 0);
-        
-            cam.Camera.SetViewportSize(windowSize.x, windowSize.y);
-            float size = cam.Camera.GetOrthographicSize();
-            float aspect = cam.Camera.GetAspectRatio();
-            halfWidth = size * aspect * 0.5f;
-            halfHeight = size * 0.5f;
-        }
-        //{
-        //    //Isometric camera
-        //    mActiveScene->CreateEntity(runtimeCamera, "RuntimeCamera");
-        //    CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-        //    cam.Primary = true;
-        //    cam.FixedAspectRatio = false;
-        //
-        //    cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Orthographic);
-        //    TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-        //    transform.Position = glm::vec3(0, 0, 0);
-        //    transform.Rotation = glm::vec3(-35, 45, 0);
-        //
-        //    cam.Camera.SetOrthographicSize(15);
-        //    cam.Camera.SetOrthographicFarClip(1000);
-        //    cam.Camera.SetOrthographicNearClip(-100);
-        //}
-        {
-            {
-                mActiveScene->CreateEntity(mEntity, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
-                MeshComponent& meshComp = mEntity.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-            
-                TransformComponent& t = mEntity.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 0.5f, 0.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-            {
-                Entity floor;
-                mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
-                MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-            
-                TransformComponent& t = floor.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-                t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
-                t.MarkDirty();
-            
-                Ref<Material>& material = meshComp.Mesh->GetMaterialAtIndex(0);
-                material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
-                material->Set<float>("Metallic", 0.3f);
-                material->Set<float>("Roughness", 0.8f);
-            }
-            //{
-            //    mActiveScene->CreateEntity(mVkScene, "Vulkan Scene");
-            //    MeshComponent& meshComp = mVkScene.AddComponent<MeshComponent>();
-            //    meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-            //
-            //    TransformComponent& t = mVkScene.GetComponent<TransformComponent>();
-            //    t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-            //    t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-            //    t.MarkDirty();
-            //}
-        }
-        {
-            Entity directionalLight;
-            mActiveScene->CreateEntity(directionalLight, "Directional Light");
-            LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
-            lightComp.Type = LightType::DIRECTIONAL;
-            lightComp.Intensity = 5.5f;
-            lightComp.Radius = 1.0f;
-            TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
-            t.MarkDirty();
-        }
-        mActiveScene->OnResize(windowSize.x, windowSize.y);
-        mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
-
-        FrameBlackboard& bb =  mRenderer->GetRenderGraphBlackBoard();
-        bb.VignetteGrain.Intensity = 0.7f;
-        bb.VignetteGrain.Softness = 0.3f;
-        bb.VignetteGrain.Grain = 0.01f;
-
-        bb.Skybox.EnableSunDisk = false;
-        bb.Skybox.Elevation = 10.0f;
+        const glm::vec2 size = Core::GetWindow()->GetSize();
+        mActiveScene->OnResize(static_cast<float>(size.x), static_cast<float>(size.y));
+        //mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 
     void Player::OnUpdate()
     {
-        constexpr float axesLength = 10000.0f;
-        mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
-        mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
-        mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
-
-        float dt = Core::GetClock().GetSeconds();
-
-        TransformComponent& floorTransform = mEntity.GetComponent<TransformComponent>();
-        floorTransform.Rotation.y += 50.0f * dt;
-        floorTransform.MarkDirty();
-
-        if (mMoveEnabled && mColoredQuads.size() > 0)
-        {
-            for (Uint i = 0; i < mColoredQuads.size(); i++)
-            {
-                TransformComponent& transform = mColoredQuads[i].GetComponent<TransformComponent>();
-        
-                float rotSpeed = 10.0f + (i % 15);
-                float moveSpeed = 100.0f;
-                float dir = (i % 3 == 0) ? -1.0f : 1.0f;
-        
-                transform.Rotation.z += dir * rotSpeed * dt;
-        
-                transform.Position.x += sin(dt + i) * 0.001f * dt * moveSpeed;
-                transform.Position.y += cos(dt + i * 0.5f) * 0.001f * dt * moveSpeed;
-                transform.MarkDirty();
-            }
-        }
-
         mActiveScene->Update();
     }
 
     void Player::OnImGuiRender()
     {
-        Clock& clock = Core::GetClock();
-        ImGuiID dockspaceID = ImGui::GetID("DockSpace");
-
-#ifdef SURGE_PLATFORM_ANDROID
-        // On mobile we need a padding, else docking/undocking becomes a nightmare
-        float padding = 2.0f;
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + padding, viewport->WorkPos.y + padding));
-        ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - (padding * 2), viewport->WorkSize.y - (padding * 2)));
-        ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
-        ImGui::Begin("SafeDockSpaceHost", nullptr, hostFlags);
-        ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
-        ImGui::End();
-        ImGui::PopStyleColor();
-#elif defined(SURGE_PLATFORM_WINDOWS)
-        ImGui::DockSpaceOverViewport(dockspaceID, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-#endif
-
-        ImGui::Begin("Control & Stats");
-
-        if (ImGui::BeginMenuBar())
-        {
-            if (ImGui::Button("Undock"))
-            {
-                ImGuiContext& g = *GImGui;
-                ImGuiWindow* window = g.CurrentWindow;
-
-                if (window->DockNode != nullptr || window->DockId != 0)
-                    ImGui::SetWindowDock(window, 0, ImGuiCond_Always);
-            }
-            ImGui::EndMenuBar();
-        }
-
-        const FrameBlackboard& bb = mRenderer->GetRenderGraphBlackBoard();
-
-        ImGui::Text("Vertices: %i\n%.1fms (FPS: %.1f)", bb.QuadList.size() * 4, clock.GetMilliseconds(), 1 / clock.GetSeconds());
-        ImGui::Text("Textured Quads: %d", mTexturedQuadCount);
-        ImGui::Text("Non-Textured Quads: %d", mColoredQuads.size());
-        ImGui::Text("Total Quads: %d", bb.QuadList.size());
-        ImGui::Checkbox("Move quads", &mMoveEnabled);
-
-        if(ImGui::SliderInt("ColorQuads", &mChangeQuadAmount, mTexturedQuadCount, Renderer2DPass::MAX_QUADS_TOTAL))
-        {
-            RuntimeCamera* cam = mActiveScene->GetMainCameraEntity().Data1;
-            float size = cam->GetOrthographicSize();
-            float aspect = cam->GetAspectRatio();
-            float halfWidth = size * aspect * 0.5f;
-            float halfHeight = size * 0.5f;
-
-            Uint currentQuadCount = bb.QuadList.size();
-            if (currentQuadCount > mChangeQuadAmount)
-            {
-                Uint toRemove = currentQuadCount - mChangeQuadAmount;
-                for (Uint i = 0; i < toRemove; i++)
-                {
-                    mActiveScene->DestroyEntity(mColoredQuads.back());
-                    mColoredQuads.pop_back();
-                }
-            }
-            else if (currentQuadCount < mChangeQuadAmount)
-            {
-                Uint toAdd = mChangeQuadAmount - currentQuadCount;
-                for (Uint i = 0; i < toAdd; i++)
-                {
-                    glm::vec2 pos = GenRandomPosition(halfWidth, halfHeight);
-                    Entity& quad = mColoredQuads.emplace_back();
-                    mActiveScene->CreateEntity(quad, "StressQuad");
-
-                    float h = GenRandomHue();
-                    float s = 1.0f;
-                    float v = 1.0f;
-                    glm::vec3 rgb = HSVtoRGB(h, s, v);
-                    quad.AddComponent<SpriteRendererComponent>(rgb, 1.0f);
-
-                    auto& t = quad.GetComponent<TransformComponent>();
-                    t.Position = glm::vec3(pos.x, pos.y, 0.0f);
-                    t.Scale = glm::vec3(0.08f, 0.08f, 1.0f);
-                }
-            }
-        }
-
-        ImGui::End();
     }
 
-    static bool showImGui = true;
     void Player::OnEvent(Event& e)
     {
         EventDispatcher dispatcher(e);
@@ -332,27 +68,16 @@ namespace Surge
                                                {
                                                    Resize(resizeEvent.GetWidth(), resizeEvent.GetHeight());
                                                });
-
-        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent)
-                                             {
-                                                 if(keyEvent.GetKeyCode() == Key::F7)
-                                                 {
-                                                     showImGui = !showImGui;
-                                                     mRenderer->ShowImGui(showImGui);
-                                                 }
-                                             });
     }
 
     void Player::Resize(Uint width, Uint height)
     {
-        if (width != 0 && height != 0)		
-            mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));		
+        if (width != 0 && height != 0)
+            mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));
     }
 
     void Player::OnShutdown()
     {
-        for (auto& texture : mTextures)
-            mRenderer->GetRHI()->DestroyImage(texture);
     }
 
 } // namespace Surge
@@ -363,7 +88,7 @@ int main()
 {
     Surge::ClientOptions clientOptions;
     clientOptions.RenderFinalImageToSwapchian = true;
-    clientOptions.WindowDescription = { 1280, 720, "Player", Surge::WindowFlags::CreateDefault /*| Surge::WindowFlags::NoTitlebar*/ };
+    clientOptions.WindowDescription = { 1280, 720, "Runtime", Surge::WindowFlags::CreateDefault /*| Surge::WindowFlags::NoTitlebar*/ };
 
     Surge::Player* app = Surge::MakeClient<Surge::Player>();
     app->SetOptions(clientOptions);

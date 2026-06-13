@@ -5,6 +5,8 @@
 #include "Surge/Core/Input/Input.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 
 namespace Surge
 {
@@ -25,7 +27,7 @@ namespace Surge
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
         if (ImGui::Begin(PanelCodeToString(mCode), show))
         {
-            if (ImGui::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
+            if (ImGuiAux::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
                 ImGui::OpenPopup("Add Entity");
 
             if (ImGui::BeginPopup("Add Entity") || (ImGui::BeginPopupContextWindow(nullptr, 1)))
@@ -43,39 +45,39 @@ namespace Surge
                 if (ImGui::MenuItem("Sprite Renderer"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Sprite");
-                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
+                    mSelectedEntity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor2);
                 }
                 ImGui::Separator();
                 if (ImGui::BeginMenu("Mesh"))
                 {
-                    int defMesh = -1;
+                    const char* defMesh = "";
                     if (ImGui::MenuItem("Empty Mesh"))
-                        defMesh = -2;
+                        defMesh = "Empty";
                     if (ImGui::MenuItem("Cube"))
-                        defMesh = static_cast<int>(DefaultMesh::CUBE);
+                        defMesh = DefaultMesh::CUBE;
                     if (ImGui::MenuItem("Sphere"))
-                       defMesh = static_cast<int>(DefaultMesh::SPHERE);
+                       defMesh = DefaultMesh::SPHERE;
                     if (ImGui::MenuItem("Bean"))
-                        defMesh = static_cast<int>(DefaultMesh::BEAN);
+                        defMesh = DefaultMesh::BEAN;
                     if (ImGui::MenuItem("Cone"))
-                        defMesh = static_cast<int>(DefaultMesh::CONE);
+                        defMesh = DefaultMesh::CONE;
                     if (ImGui::MenuItem("Cylinder"))
-                        defMesh = static_cast<int>(DefaultMesh::CYLINDER);
+                        defMesh = DefaultMesh::CYLINDER;
                     if (ImGui::MenuItem("Torus"))
-                        defMesh = static_cast<int>(DefaultMesh::TORUS);
+                        defMesh = DefaultMesh::TORUS;
                     if (ImGui::MenuItem("Plane"))
-                        defMesh = static_cast<int>(DefaultMesh::PLANE);
+                        defMesh = DefaultMesh::PLANE;
 
-                    if(defMesh == -2)
+                    if(strcmp(defMesh, "Empty") == 0)
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
-                        MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
+                        mSelectedEntity.AddComponent<MeshComponent>();
                     }
-                    else if (defMesh != -1)
+                    else if (strcmp(defMesh, "") != 0)
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
                         MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
-                        meshComponent.Mesh = Ref<Mesh>::Create(static_cast<DefaultMesh>(defMesh));
+                        meshComponent.MeshID = Core::GetAssetManager()->Import(defMesh, AssetType::MESH);
                     }
                     ImGui::EndPopup();
                 }
@@ -84,6 +86,11 @@ namespace Surge
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Light");
                     mSelectedEntity.AddComponent<LightComponent>();
+                }
+                if (ImGui::MenuItem("Environment"))
+                {
+                    mSceneContext->CreateEntity(mSelectedEntity, "Environment");
+                    mSelectedEntity.AddComponent<EnvironmentComponent>();
                 }
                 ImGui::EndPopup();
             }
@@ -145,7 +152,7 @@ namespace Surge
         {
             if (mSelectedEntity)
             {
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColorLight));
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::ColorConvertFloat4ToU32(ImGuiAux::Colors::ThemeColor2));
             }
         }
 

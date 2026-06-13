@@ -51,8 +51,8 @@ namespace Surge
 
         ImageHandle CreateImage(const ImageDesc& desc);
         void DestroyImage(ImageHandle h);
-        void UploadImageData(ImageHandle h, const void* data, Uint size);
         void ResizeImage(ImageHandle h, Uint width, Uint height);
+        uint64_t GetImageSize(ImageHandle h) const;
         const ImageDesc& GetDesc(ImageHandle h) const;
 
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
@@ -139,6 +139,7 @@ namespace Surge
         Vector<const char*> GetRequiredInstanceExtensions();
         Vector<const char*> GetRequiredInstanceLayers();
 
+        void FlushDeletionQueue(Uint frameIndex);
     private:
         RHIStats mStats;
 
@@ -165,6 +166,19 @@ namespace Surge
         HandlePool<ImageHandle, ImageEntry> mTexturePool;
         HandlePool<SamplerHandle, SamplerEntry> mSamplerPool;
         HandlePool<DescriptorSetHandle, DescriptorSetEntry> mDescriptorSetPool;
+
+        // Deletion queue
+        struct DeferredDeletes
+        {
+            Vector<BufferEntry> Buffers;
+            Vector<ImageEntry> Images;
+            Vector<FramebufferEntry> Framebuffers;
+            Vector<PipelineEntry> Pipelines;
+            Vector<SamplerEntry> Samplers;
+            Vector<DescriptorSetEntry> DescriptorSets;
+        };
+        std::array<DeferredDeletes, RHISettings::FRAMES_IN_FLIGHT> mDeletionQueues;
+        bool mIsShuttingDown = false;
 
         friend class VulkanPipeline;
         friend class VulkanImage;

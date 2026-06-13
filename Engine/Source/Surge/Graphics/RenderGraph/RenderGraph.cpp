@@ -114,7 +114,7 @@ namespace Surge
 
     void RenderGraph::SortByDependencies(Vector<RenderPass*>& passes)
     {
-        SCOPED_TIMER("RenderGraph::SortByDependencies");
+        //SCOPED_TIMER("RenderGraph::SortByDependencies");
 
         if(passes.size() <= 1)
             return;
@@ -185,10 +185,9 @@ namespace Surge
                         if(write == read && !barrierAdded.count(write))
                         {
                             const ImageDesc& writeDesc = mRHI->GetDesc(write);
-
-                            Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
-                            Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
-                            Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
+                            //Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
+                            //Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
+                            //Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
                             //Log<Severity::Warn>("From: {} -> To: SAMPLED", VulkanUtils::TextureUsageToString(writeDesc.Usage)); //TODO: Remove
                             readGroup.BarriersBeforeGroup.push_back({ write, ImageUsage::SAMPLED });
                             barrierAdded.insert(write);
@@ -204,11 +203,11 @@ namespace Surge
     ///////////
     void RenderGraph::OnImGuiRender()
     {
-        if(!mShowImGui)
-            return;
-
         for(auto& callback : mImGuiRenderCallbacks)
             callback();
+
+        if(!mShowImGui)
+            return;
 
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
         if(ImGui::Begin("RenderGraph"))

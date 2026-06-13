@@ -3,12 +3,12 @@
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Time/Timer.hpp"
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 
 // Platform detection
 #ifdef _WIN32
+    // Compiler sets SURGE_PLATFORM_WINDOWS
     #define SCRIPT_API __declspec(dllexport)
 
     #ifdef SURGE_EXPORT
@@ -23,6 +23,7 @@
     #define SCRIPT_API "Compiler dependent kekw! Fill this with correct alterantive of __declspec(dllexport)"
 
 #elif __ANDROID__
+    // Compiler sets SURGE_PLATFORM_ANDROID
     #define SCRIPT_API __attribute__((visibility("default")))
 
     #ifdef SURGE_EXPORT
@@ -133,9 +134,6 @@ namespace Surge
     {
         return std::make_unique<T>(std::forward<Args>(args)...);
     }
-
-    template <typename T1, typename T2>
-    using HashMap = std::unordered_map<T1, T2>;
 
     template <typename T1, typename T2>
     struct Pair

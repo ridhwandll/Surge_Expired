@@ -10,7 +10,7 @@ namespace Surge
         return String();
     }
 
-    String FileDialog::SaveFile(const char* filter)
+    String FileDialog::SaveFile(const char* filter, const char* defaultName)
     {
         return String();
     }

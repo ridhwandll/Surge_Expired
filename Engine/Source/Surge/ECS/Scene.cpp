@@ -1,21 +1,27 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "SurgeMath/Math.hpp"
-#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Profiler.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 
 namespace Surge
 {
     static Entity sSelectedEntity;
 
-    Scene::Scene(bool runtime)
+    Scene::Scene()
     {
-        mRuntime = runtime;
+        AddStartupEntities(); // TODO: Remove from Player builds
+        OnRuntimeStart();
     }
 
     Scene::~Scene()
     {
+        sSelectedEntity = Entity(entt::null, nullptr);
+        OnRuntimeEnd();
         mRegistry.clear();
     }
 
@@ -31,7 +37,6 @@ namespace Surge
 
     void Scene::Update(EditorCamera& camera)
     {
-        camera.OnUpdate();
         Renderer* renderer = Core::GetRenderer();
 
         auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
@@ -41,25 +46,53 @@ namespace Surge
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
-                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
+                renderer->SubmitQuad(transform.GetTransform(), sprite.Color);
         }
         {
             auto view = mRegistry.view<LightComponent, TransformComponent>();
             for(const auto& [entity, light, transform] : view.each())
+            {
                 renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
+                if (light.Type == LightType::DIRECTIONAL)
+                {
+                    // Note: Assuming a Right-Handed system where forward is -Z. 
+                    glm::vec3 forwardDir = glm::normalize(glm::vec3(transform.GetTransform()[2]));
+                    glm::vec4 debugColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+                    renderer->SubmitDirLightDebug(transform.Position, forwardDir, debugColor);
+                }
+            }
+        }
+        {
+            auto view = mRegistry.view<EnvironmentComponent>();
+            for(const auto& [entity, env] : view.each())
+            {
+                renderer->SubmitEnvironment(env);
+                break; // Only submit the first environment component we find
+            }
         }
         {
             // 3D Meshes
-            for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
+            for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
             {
-                if(mesh.Mesh)
-                    renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
+                if(meshComponent.MeshID)
+                {
+                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComponent.MeshID);
+                    if(mesh) //Asset might be missing/corrupted, so check before submitting
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+                }
             }
             if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
             {
-               const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
-               const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-               renderer->SubmitMeshOutline(transform, mesh);
+               const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
+               if(meshComp.MeshID)
+               {
+                   Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+                   if (mesh) //Asset might be missing/corrupted, so check before submitting
+                   {
+                       const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                       renderer->SubmitMeshOutline(transform, mesh);
+                   }
+               }
             }
         }
         renderer->EndFrame();
@@ -81,7 +114,7 @@ namespace Surge
             {
                 auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
                 for (const auto& [entity, sprite, transform] : view.each())
-                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Image);
+                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color);
             }
             {
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
@@ -89,17 +122,37 @@ namespace Surge
                     renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
             }
             {
-                // 3D Meshes
-                for(const auto& [entity, mesh, transformComponent] : meshGroup.each())
+                auto view = mRegistry.view<EnvironmentComponent>();
+                for(const auto& [entity, env] : view.each())
                 {
-                    if(mesh.Mesh)
-                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Mesh, mesh.DropShadow);
+                    renderer->SubmitEnvironment(env);
+                    break; // Only submit the first environment component we find
+                }
+            }
+            {
+                // 3D Meshes
+                for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
+                {
+                    if(meshComponent.MeshID)
+                    {
+                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComponent.MeshID);
+                        if(mesh) //Asset might be missing/corrupted, so check before submitting
+                            renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+
+                    }
                 }
                 if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
                 {
-                    const Ref<Mesh>& mesh = sSelectedEntity.GetComponent<MeshComponent>().Mesh;
-                    const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                    renderer->SubmitMeshOutline(transform, mesh);
+                    const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
+                    if(meshComp.MeshID)
+                    {
+                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+                        if (mesh)  //Asset might be missing/corrupted, so check before submitting
+                        {
+                            const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                            renderer->SubmitMeshOutline(transform, mesh);
+                        }
+                    }
                 }
             }
             renderer->EndFrame();
@@ -107,7 +160,7 @@ namespace Surge
     }
 
     template <typename T>
-    static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const HashMap<UUID, entt::entity>& enttMap)
+    static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const std::unordered_map<UUID, entt::entity>& enttMap)
     {
         auto components = srcRegistry.view<T>();
         for (entt::entity srcEntity : components)
@@ -121,7 +174,7 @@ namespace Surge
 
     void Scene::CopyTo(Scene* other)
     {
-        HashMap<UUID, entt::entity> enttMap;
+        std::unordered_map<UUID, entt::entity> enttMap;
         auto idComponents = mRegistry.view<IDComponent>();
         for (entt::entity entity : idComponents)
         {
@@ -205,6 +258,70 @@ namespace Surge
             }
         }
         return result;
+    }
+
+    void Scene::AddStartupEntities()
+    {
+        // Add default perspective camera
+        Entity runtimeCamera;
+        CreateEntity(runtimeCamera, "Runtime Camera");
+        CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
+        cam.Primary = true;
+        cam.FixedAspectRatio = true;
+        cam.Camera.SetProjectionType(RuntimeCamera::ProjectionType::Perspective);
+        TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
+        transform.Position = glm::vec3(-10, 6, 10);
+        transform.Rotation = glm::vec3(-30, -45, 0);
+
+        glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        OnResize(windowSize.x, windowSize.y);
+
+        AssetManager* assetManager = Core::GetAssetManager();
+        {
+            Entity e;
+            CreateEntity(e, "Cube");
+            MeshComponent& meshComp = e.AddComponent<MeshComponent>();
+            meshComp.MeshID = assetManager->Import(DefaultMesh::CUBE, AssetType::MESH);
+
+            TransformComponent& t = e.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(0.0f, 2.5f, 0.0f);
+            t.Rotation = glm::vec3(45.0f, 60.0f, 20.0f);
+            t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+            t.MarkDirty();
+        }
+        {
+            Entity floor;
+            CreateEntity(floor, "Floor");
+            MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
+            meshComp.MeshID = assetManager->Import(DefaultMesh::CYLINDER, AssetType::MESH);
+
+            TransformComponent& t = floor.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+            t.Scale = glm::vec3(15.0f, 1.0f, 15.0f);
+            t.MarkDirty();
+
+            Ref<Material> material = assetManager->Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
+            material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
+            material->Set<float>("Metallic", 0.1f);
+            material->Set<float>("Roughness", 0.9f);
+        }
+        {
+            Entity directionalLight;
+            CreateEntity(directionalLight, "Directional Light");
+            LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
+            lightComp.Type = LightType::DIRECTIONAL;
+            lightComp.Intensity = 5.5f;
+            lightComp.Radius = 1.0f;
+            TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
+            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
+            t.MarkDirty();
+        }
+        {
+            Entity env;
+            CreateEntity(env, "Environemnt");
+            env.AddComponent<EnvironmentComponent>();
+        }
     }
 
 } // namespace Surge

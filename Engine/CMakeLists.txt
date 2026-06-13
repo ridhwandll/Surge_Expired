@@ -3,9 +3,6 @@ include(${CMAKE_SOURCE_DIR}/scripts/CMakeUtils.cmake)
 file(GLOB_RECURSE SOURCE_FILES
     Source/*.cpp
     Source/*.hpp
-
-    Vendor/stb/stb_image.cpp
-    Vendor/cgltf/cgltf.cpp
 )
 
 set(INCLUDE_DIRS
@@ -18,13 +15,12 @@ set(INCLUDE_DIRS
     Vendor/volk
     Vendor/shaderc/Include
     Vendor/SPIRV-Cross/Include
-    Vendor/stb
     Vendor/ImGui
     Vendor/Optick/Include
     Vendor/entt/Include
     Vendor/json/Include
     Vendor/FontAwesome
-    Vendor/cgltf
+    Vendor/basisu
 )
 
 set(LIB_LINKS
@@ -32,6 +28,7 @@ set(LIB_LINKS
     SPIRV-Cross
     ImGui
     Optick
+    basisu
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 

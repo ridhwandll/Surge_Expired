@@ -3,6 +3,7 @@
 #include "Surge/Core/Core.hpp"
 #include <imgui.h>
 #include <dwmapi.h>
+#include <windowsx.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -97,6 +98,16 @@ namespace Surge
     void WindowsWindow::RestoreFromMaximize()
     {
         Core::AddFrameEndCallback([this]() { ShowWindow(mWin32Window, SW_SHOWNORMAL); });
+    }
+
+    bool WindowsWindow::IsWindowMaximized() const
+    {
+        return IsMaximized(mWin32Window);
+    }
+
+    bool WindowsWindow::IsWindowMinimized() const
+    {
+        return IsIconic(mWin32Window);
     }
 
     void WindowsWindow::SetTitle(const String& name)

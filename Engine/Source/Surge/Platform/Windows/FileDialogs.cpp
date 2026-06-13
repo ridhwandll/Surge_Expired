@@ -1,8 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Utility/FileDialogs.hpp"
+#include "Surge/Core/Core.hpp"
+#include <Windows.h>
 #include <commdlg.h>
 #include <ShlObj_core.h>
-#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
@@ -32,18 +33,26 @@ namespace Surge
         return String();
     }
 
-    String FileDialog::SaveFile(const char* filter)
+    String FileDialog::SaveFile(const char* filter, const char* defaultName)
     {
         OPENFILENAMEA ofn;
-        CHAR szFile[260] = {0};
-        CHAR currentDir[256] = {0};
+        CHAR szFile[260] = { 0 };
+        CHAR currentDir[256] = { 0 };
+
+        if(defaultName != nullptr && strlen(defaultName) > 0)
+            strncpy_s(szFile, sizeof(szFile), defaultName, _TRUNCATE);
+
         ZeroMemory(&ofn, sizeof(OPENFILENAME));
         ofn.lStructSize = sizeof(OPENFILENAME);
         ofn.hwndOwner = static_cast<HWND>(Core::GetWindow()->GetNativeWindowHandle());
+
+        // szFile now contains the default name, which Windows will read
         ofn.lpstrFile = szFile;
         ofn.nMaxFile = sizeof(szFile);
-        if (GetCurrentDirectoryA(256, currentDir))
+
+        if(GetCurrentDirectoryA(256, currentDir))
             ofn.lpstrInitialDir = currentDir;
+
         ofn.lpstrFilter = filter;
         ofn.nFilterIndex = 1;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
@@ -51,13 +60,17 @@ namespace Surge
         // Sets the default extension by extracting it from the filter
         ofn.lpstrDefExt = strchr(filter, '\0') + 1;
 
-        if (GetSaveFileNameA(&ofn) == TRUE)
-            return ofn.lpstrFile;
+        if(GetSaveFileNameA(&ofn) == TRUE)
+        {
+            String result = ofn.lpstrFile;
+            std::replace(result.begin(), result.end(), '\\', '/');
+            return result;
+        }
 
         return String();
     }
 
-    Surge::String FileDialog::ChooseFolder()
+    String FileDialog::ChooseFolder()
     {
         TCHAR path[MAX_PATH];
 
@@ -81,7 +94,9 @@ namespace Surge
                 imalloc->Release();
             }
 
-            return path;
+            String result = path;
+            std::replace(result.begin(), result.end(), '\\', '/');
+            return result;
         }
         return "";
     }

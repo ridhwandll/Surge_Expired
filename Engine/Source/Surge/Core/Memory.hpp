@@ -9,6 +9,7 @@
 extern "C" long _InterlockedIncrement(long volatile* Addend);
 extern "C" long _InterlockedDecrement(long volatile* Addend);
 extern "C" long _InterlockedExchange(long volatile* Target, long Value);
+extern "C" long _InterlockedExchangeAdd(long volatile* Target, long Value);
 //#include <intrin.h>
 #endif
 
@@ -51,7 +52,7 @@ namespace Surge
 #if defined(__clang__) || defined(__GNUC__)
             return __atomic_load_n(&mRefCount, __ATOMIC_RELAXED);
 #elif defined(_MSC_VER)
-            return static_cast<uint32_t>(mRefCount);
+            return static_cast<uint32_t>(_InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&mRefCount), 0)); //Not tested! Is this good?
 #endif
         }
 
@@ -67,7 +68,7 @@ namespace Surge
             : mInstance(nullptr)
         {}
 
-        Ref(std::nullptr_t n)
+        Ref(std::nullptr_t)
             : mInstance(nullptr)
         {}
 
@@ -78,29 +79,32 @@ namespace Surge
             IncRef();
         }
 
-        template <typename Ts>
-        Ref(const Ref<Ts>& other)
-        {
-            mInstance = static_cast<T*>(other.mInstance);
-            IncRef();
-        }
-
+        // COPY
         Ref(const Ref<T>& other)
             : mInstance(other.mInstance)
         {
             IncRef();
         }
 
+        // TEMPLATED COPY
         template <typename Ts>
-        Ref(Ref<Ts>&& other)
+        Ref(const Ref<Ts>& other)
+            : mInstance(static_cast<T*>(other.mInstance))
         {
-            mInstance = static_cast<T*>(other.mInstance);
+            IncRef();
+        }
+
+        // MOVE
+        Ref(Ref<T>&& other) noexcept
+            : mInstance(other.mInstance)
+        {
             other.mInstance = nullptr;
         }
 
-        // [FIXED] Non-templated move constructor for identical types (Ref<T>)
-        Ref(Ref<T>&& other) noexcept
-            : mInstance(other.mInstance)
+        // TEMPLATED MOVE
+        template <typename Ts>
+        Ref(Ref<Ts>&& other) noexcept
+            : mInstance(static_cast<T*>(other.mInstance))
         {
             other.mInstance = nullptr;
         }
@@ -112,6 +116,7 @@ namespace Surge
             return *this;
         }
 
+        // COPY ASSIGNMENT
         Ref& operator=(const Ref<T>& other)
         {
             if(this == &other)
@@ -119,26 +124,21 @@ namespace Surge
 
             other.IncRef();
             DecRef();
-
             mInstance = other.mInstance;
             return *this;
         }
 
+        // TEMPLATED COPY ASSIGNMENT
         template <typename Ts>
         Ref& operator=(const Ref<Ts>& other)
         {
-            // Protect against cross-type self-assignment (e.g. Base = Derived)
-            if(mInstance == static_cast<T*>(other.mInstance))
-                return *this;
-
             other.IncRef();
             DecRef();
-
             mInstance = static_cast<T*>(other.mInstance);
             return *this;
         }
 
-        // [FIXED] Non-templated move assignment operator for identical types (Ref<T>)
+        // STANDARD MOVE ASSIGNMENT
         Ref& operator=(Ref<T>&& other) noexcept
         {
             if(this == &other)
@@ -148,34 +148,27 @@ namespace Surge
             mInstance = other.mInstance;
             other.mInstance = nullptr;
 
-            if(oldInstance)
-            {
-                if(oldInstance->DecRefCount())
-                    delete oldInstance;
-            }
+            if(oldInstance && oldInstance->DecRefCount())
+                delete oldInstance;
 
             return *this;
         }
 
+        // TEMPLATED MOVE ASSIGNMENT
         template <typename Ts>
-        Ref& operator=(Ref<Ts>&& other)
+        Ref& operator=(Ref<Ts>&& other) noexcept
         {
             T* oldInstance = mInstance;
-
             mInstance = static_cast<T*>(other.mInstance);
             other.mInstance = nullptr;
 
-            if(oldInstance)
-            {
-                if(oldInstance->DecRefCount())
-                    delete oldInstance;
-            }
+            if(oldInstance && oldInstance->DecRefCount())
+                delete oldInstance;
 
             return *this;
         }
 
-        operator bool() { return mInstance != nullptr; }
-        operator bool() const { return mInstance != nullptr; }
+        explicit operator bool() const { return mInstance != nullptr; }
 
         T* operator->() { return mInstance; }
         const T* operator->() const { return mInstance; }
@@ -183,10 +176,12 @@ namespace Surge
         T& operator*() { return *mInstance; }
         const T& operator*() const { return *mInstance; }
 
-        T* Raw() { return mInstance; }
+        [[nodiscard]] T* Raw() { return mInstance; }
         [[nodiscard]] const T* Raw() const { return mInstance; }
 
-        void Release()
+        // Potentially dangerous, use with caution. This will forcibly destroy the managed object regardless of
+        // current ref count which can lead to dangling pointers if other Refs are still referencing it
+        void ForceDestroy()
         {
             if(mInstance)
             {
@@ -200,6 +195,7 @@ namespace Surge
         {
             DecRef();
             mInstance = instance;
+            IncRef();
         }
 
         template <typename... Args>
@@ -228,11 +224,8 @@ namespace Surge
 
         void DecRef() const
         {
-            if(mInstance)
-            {
-                if(mInstance->DecRefCount())
-                    delete mInstance;
-            }
+            if(mInstance && mInstance->DecRefCount())
+                delete mInstance;
         }
 
         template <typename U>

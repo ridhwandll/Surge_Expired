@@ -2,13 +2,14 @@
 #include "Panels/InspectorPanel.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Utility/ImGuiAux.hpp"
-#include "Surge/Utility/FileDialogs.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Editor.hpp"
+#include "MaterialEditorPanel.hpp"
+#include "ContentBrowserPanel.hpp"
+
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
-#include <IconsFontAwesome.hpp>
-#include <filesystem>
 
 namespace Surge
 {
@@ -18,7 +19,8 @@ namespace Surge
         const int64_t& hash = SurgeReflect::GetReflection<XComponent>()->GetHash();
         ImGui::PushID(static_cast<int>(hash));
 
-        bool open = ImGuiAux::PropertyGridHeader(name.c_str());
+
+        bool open = ImGuiAux::PropertyGridHeader(name);
 
         bool remvove = false;
         if (open)
@@ -30,7 +32,7 @@ namespace Surge
                     ImGui::TableNextColumn();
                     ImGui::TextUnformatted("Settings");
                     ImGui::TableNextColumn();
-                    if (ImGui::Button(reinterpret_cast<const char*>("REMOVE")))
+                    if (ImGuiAux::Button(reinterpret_cast<const char*>("REMOVE")))
                         remvove = true;
                 }
                 function();
@@ -62,22 +64,22 @@ namespace Surge
             {
                 DrawComponents(entity);
 
-                if (ImGui::Button("Add Component", {ImGui::GetWindowWidth() - 15, 0.0f}))
+                if (ImGuiAux::Button("Add Component", {ImGui::GetWindowWidth() - 15, 0.0f}))
                     ImGui::OpenPopup("AddComponentPopup");
 
                 if (ImGui::BeginPopup("AddComponentPopup"))
                 {
-                    if (ImGui::MenuItem("Camera"))
+                    if (ImGui::MenuItem("Camera") && !entity.HasComponent<CameraComponent>())
                         entity.AddComponent<CameraComponent>();
-                    if (ImGui::MenuItem("Sprite Renderer"))
-                        entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor);
-                    if(ImGui::MenuItem("Mesh Component"))
-                    {
+                    if (ImGui::MenuItem("Sprite Renderer") && !entity.HasComponent<SpriteRendererComponent>())
+                        entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor1);
+                    if(ImGui::MenuItem("Mesh Component") && !entity.HasComponent<MeshComponent>())
                         entity.AddComponent<MeshComponent>();
-                        MeshComponent& meshComponent = entity.AddComponent<MeshComponent>();
-                    }
-                    if (ImGui::MenuItem("Light"))
+                    if (ImGui::MenuItem("Light") && !entity.HasComponent<LightComponent>())
                         entity.AddComponent<LightComponent>();
+                    if (ImGui::MenuItem("Environment") && !entity.HasComponent<EnvironmentComponent>())
+                        entity.AddComponent<EnvironmentComponent>();
+
                     ImGui::EndPopup();
                 }
             }
@@ -187,81 +189,86 @@ namespace Surge
         {
             MeshComponent& component = entity.GetComponent<MeshComponent>();
             DrawComponent<MeshComponent>(entity, "Mesh Component", [&component]() {
-                String kek = "TODO: Implement Asset Manager";
-                ImGuiAux::TProperty<String>("AssetHandle: ", &kek);
-                ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
-                const Vector<Ref<Material>>& materials = component.Mesh->GetMaterials();
-                for(size_t i = 0; i < materials.size(); i++)
+
+                AssetManager* am = Core::GetAssetManager();
+
+                if (component.MeshID.IsValid())
+                    ImGuiAux::TString("Asset Handle: ", "%llu", component.MeshID.Get());
+                else
+                    ImGui::TextUnformatted("Drop MESH from Content browser");
+
+                if(ImGui::BeginDragDropTarget())
                 {
-                    ImGui::PushID(i);
-                    const Ref<Material>& material = materials[i];
-                    const String& matName = material->GetName();
-                    // Force the Tree Node to span across BOTH columns of the main table
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-
-                    // ImGuiTreeNodeFlags_SpanAllColumns makes the background highlight stretch beautifully
-                    bool nodeOpen = ImGui::TreeNodeEx(matName.c_str(), ImGuiTreeNodeFlags_SpanAllColumns);
-                    if(nodeOpen)
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
                     {
-                        // Name
-                        ImGui::TableNextRow();
-                        ImGui::TableSetColumnIndex(0);
-                        ImGui::TextUnformatted("Name");
-                        ImGui::TableSetColumnIndex(1);
-                        ImGui::PushItemWidth(-FLT_MIN);
-                        ImGui::TextUnformatted(matName.c_str());
-                        ImGui::PopItemWidth();
-
-                        // Albedo
-                        glm::vec3 albedo = material->Get<glm::vec3>("Albedo");
-                        ImGui::TableNextRow();
-                        ImGui::TableSetColumnIndex(0);
-                        ImGui::TextUnformatted("Albedo");
-                        ImGui::TableSetColumnIndex(1);
-                        ImGui::PushItemWidth(-FLT_MIN);
-                        if (ImGui::ColorEdit3("##v", &albedo.x))
-                            material->Set<glm::vec3>("Albedo", albedo);
-                        ImGui::PopItemWidth();
-
-                        // Metallic
-                        float metallic = material->Get<float>("Metallic");
-                        ImGui::TableNextRow();
-                        ImGui::TableSetColumnIndex(0);
-                        ImGui::TextUnformatted("Metallic");
-                        ImGui::TableSetColumnIndex(1);
-                        ImGui::PushItemWidth(-FLT_MIN);
-                        if(ImGui::SliderFloat("##Metallic", &metallic, 0.0f, 1.0f))
-                            material->Set<float>("Metallic", metallic);
-                        ImGui::PopItemWidth();
-
-                        // Roughness
-                        float roughness = material->Get<float>("Roughness");
-                        ImGui::TableNextRow();
-                        ImGui::TableSetColumnIndex(0);
-                        ImGui::TextUnformatted("Roughness");
-                        ImGui::TableSetColumnIndex(1);
-                        ImGui::PushItemWidth(-FLT_MIN);
-                        if(ImGui::SliderFloat("##Roughness", &roughness, 0.0f, 1.0f))
-                            material->Set<float>("Roughness", roughness);
-                        ImGui::PopItemWidth();
-
-                        // Reflectance 
-                        float reflectance = material->Get<float>("Reflectance");
-                        ImGui::TableNextRow();
-                        ImGui::TableSetColumnIndex(0);
-                        ImGui::TextUnformatted("Reflectance");
-                        ImGui::TableSetColumnIndex(1);
-                        ImGui::PushItemWidth(-FLT_MIN);
-                        if(ImGui::SliderFloat("##Reflectance", &reflectance, 0.1f, 1.0f))
-                            material->Set<float>("Reflectance", reflectance);
-                        ImGui::PopItemWidth();
-
-                        ImGui::TreePop();
+                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
+                        if(meta.Type == AssetType::MESH)
+                            component.MeshID = droppedAssetID;
                     }
-                    ImGui::PopID();
+                    ImGui::EndDragDropTarget();
                 }
+                if(component.MeshID.IsValid())
+                {
+                    ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
 
+                    Ref<Mesh> mesh = am->Load<Mesh>(component.MeshID);
+                    if(!mesh)
+                    {
+                        ImGuiAux::ScopedBoldFont font;
+                        ImGui::TextColored(ImGuiAux::Colors::Red, "MISSING");
+                    }
+                    else
+                    {
+                        for(size_t i = 0; i < mesh->GetMaterials().size(); i++)
+                        {
+                            ImGui::PushID(i);
+                            Ref<Material> material = mesh->GetMaterialAtIndex(i);
+                            if(material)
+                            {
+                                const String& matName = material->GetName();
+                                ImGui::TableNextRow();
+                                ImGui::TableSetColumnIndex(0);
+                                ImGui::Text("Material [ %zu ]", i);
+
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::PushItemWidth(-FLT_MIN);
+
+                                if(ImGui::Button(matName.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+                                {
+                                    auto* editor = static_cast<Editor*>(Core::GetClient());
+                                    editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(material);
+                                    ImGui::SetWindowFocus("Material Editor");
+                                }
+                                if(ImGui::BeginDragDropTarget())
+                                {
+                                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                                    {
+                                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
+
+                                        if(meta.Type == AssetType::MATERIAL)
+                                        {
+                                            mesh->SetMaterialOverride(i, am->Load<Material>(droppedAssetID));
+                                            am->Save(meta.ID);
+                                            am->Save(component.MeshID);
+                                        }
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                                ImGui::PopItemWidth();
+                            }
+                            else
+                            {
+                                ImGuiAux::ScopedBoldFont font;
+                                ImGui::TextColored(ImGuiAux::Colors::Red, "MISSING MATERIAL [ %zu ]", i);
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+                }
                 });
         }
 
@@ -270,7 +277,7 @@ namespace Surge
             LightComponent& component = entity.GetComponent<LightComponent>();
             DrawComponent<LightComponent>(entity, "Light", [&component]()
             {
-                const char* lightTypeStrings[] = { "POINT", "DIRECTIONAL" };
+                const char* lightTypeStrings[] = { "DIRECTIONAL", "POINT" };
                 const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted("TYPE");
@@ -299,8 +306,29 @@ namespace Surge
                 if (component.Type == LightType::POINT)
                 {
                     ImGuiAux::TProperty<float>("Radius", &component.Radius);
-                    ImGuiAux::TSlider<float>("Falloff", component.Falloff, 0.1f, 2.0f);
+                    ImGuiAux::TSlider<float>("Falloff", &component.Falloff, 0.1f, 2.0f);
                 }
+            });
+        }
+        if (entity.HasComponent<EnvironmentComponent>())
+        {
+            EnvironmentComponent& component = entity.GetComponent<EnvironmentComponent>();
+            DrawComponent<EnvironmentComponent>(entity, "Environment", [&component]()
+            {
+                ImGuiAux::TProperty<bool>("Sun Disk", &component.EnableSunDisk);
+                ImGuiAux::TProperty<float>("Azimuth (X)", &component.Azimuth);
+                ImGuiAux::TProperty<float>("Elevation (Y)", &component.Elevation);
+                ImGuiAux::TSlider<float>("Turbidity", &component.Turbidity, 1.5f, 10.0f, "%.2f");
+                ImGuiAux::TSlider<float>("Exposure", &component.Exposure, 0.001, 0.1f, "%.4f");
+                ImGuiAux::TSlider<float>("Sun Intensity", &component.SunIntensity, 0.01, 1.0f, "%.2f");
+                {
+                    ImGuiAux::ScopedBoldFont font;
+                    ImGuiAux::TString("Global Illumination", "");
+                }
+                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("SkyAmbient", &component.SkyAmbient);
+                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("HorizonAmbient", &component.HorizonAmbient);
+                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("GroundAmbient", &component.GroundAmbient);
+
             });
         }
     }

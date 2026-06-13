@@ -42,7 +42,12 @@ namespace Surge
         D16_UNORM,
         D24_UNORM_S8_UINT,
         R16G16B16A16_SFLOAT,
-        B10G11R11_UFLOAT_PACK32
+        B10G11R11_UFLOAT_PACK32,
+
+        ASTC4x4_SRGB,
+        ASTC4x4_UNORM,
+        BC7_SRGB,
+        BC7_UNORM
     };
 
     enum class ImageUsage : Uint
@@ -71,23 +76,35 @@ namespace Surge
         String DebugName;
     };
 
+    struct MipUploadData
+    {
+        const void* Data = nullptr;
+        Uint Size = 0; // bytes for this level
+        Uint Width = 0;
+        Uint Height = 0;
+    };
     struct ImageDesc
     {
         Uint Width = 1;
         Uint Height = 1;
-        Uint Mips = 1;
+        Uint MipLevel = 1;
         Uint Layers = 1;
         ImageFormat Format = ImageFormat::RGBA8_SRGB;
-        ImageUsage Usage = ImageUsage::SAMPLED;
+        ImageUsage  Usage = ImageUsage::SAMPLED;
         bool Transient = false;
         SamplerHandle Sampler = {};
 
-        // Optional, if set, pixel data is uploaded to GPU immediately after creation; Usage must include TRANSFER_DST if InitialData is provided
+        // Level 0 only, RHI generates remaining mips via vkCmdBlitImage if MipLevel > 1
+        // This is not supported for compressed formats, they must provide all levels via MipUploads
         const void* InitialData = nullptr;
-        Uint DataSize = 0; // total bytes of InitialData
+        Uint DataSize = 0;
+
+        // If set, InitialData/DataSize are ignored
+        // MipLevel must match MipUploadCount
+        const MipUploadData* MipUploads = nullptr;
+        Uint MipUploadCount = 0;
 
         bool GenerateImGuiID = false;
-
         String DebugName;
     };
 

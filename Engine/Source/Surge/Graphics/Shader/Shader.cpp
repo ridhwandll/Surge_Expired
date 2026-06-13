@@ -18,7 +18,10 @@ namespace Surge
     void Shader::ParseShader()
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
-        String source = Filesystem::ReadFile<String>(mPath);
+        String source;
+        if (!Filesystem::ReadTextFile(mPath, source))
+            Log<Severity::Error>("Failed to read shader file at path: {0}", mPath);
+
         const char* typeToken = "//SURGE:[Shader:";
         size_t typeTokenLength = strlen(typeToken);
         size_t pos = source.find(typeToken, 0);
@@ -71,8 +74,8 @@ namespace Surge
         {
             SPIRVHandle spirvHandle;
             spirvHandle.Type = stage;
-
-            shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), Filesystem::GetNameWithoutExtension(mPath).c_str(), options);
+            
+            shaderc::CompilationResult result = compiler.CompileGlslToSpv(source, ShadercShaderKindFromSurgeShaderType(stage), Filesystem::GetFilenameWithoutExt(mPath).c_str(), options);
             if (result.GetCompilationStatus() != shaderc_compilation_status_success)
             {
                 Log<Severity::Error>("{}:{} Shader compilation failure!", VulkanUtils::ShaderTypeToString(stage), mPath);
@@ -131,16 +134,16 @@ namespace Surge
         }
 #endif
         ShaderReflector reflector;
-        mReflectionData = reflector.Reflect(Filesystem::GetNameWithExtension(mPath), mShaderSPIRVs);
+        mReflectionData = reflector.Reflect(Filesystem::GetFilenameWithExt(mPath), mShaderSPIRVs);
         //mReflectionData.LogAll();
     }
 
     String Shader::GetShaderCachePath(ShaderType type)
     {
-        String parentPath = Filesystem::GetParentPath(mPath);
-        String shaderName = Filesystem::GetNameWithExtension(mPath);
+        String parentPath = Filesystem::GetParentPath(mPath).string();
+        String shaderName = Filesystem::GetFilenameWithExt(mPath);
         String spirVDirectory = std::format("{0}/SPIRV", parentPath);
-        Filesystem::CreateOrEnsureDirectory(spirVDirectory); //Filesystem::CreateOrEnsureDirectory is a Windows only function, reurns false on Android
+        Filesystem::CreateOrEnsureDirectories(spirVDirectory);
 
         String path = std::format("{0}/{1}_{2}.spv", spirVDirectory, shaderName, VulkanUtils::ShaderTypeToString(type));
         return path;

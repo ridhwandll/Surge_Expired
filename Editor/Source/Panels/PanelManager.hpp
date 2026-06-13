@@ -1,0 +1,66 @@
+// Copyright (c) - SurgeTechnologies - All rights reserved
+#pragma once
+#include "Panels/IPanel.hpp"
+#include "Surge/Core/Defines.hpp"
+#include <unordered_map>
+
+namespace Surge
+{
+    struct PanelData
+    {
+        IPanel* Panel = nullptr;
+        bool Show = true;
+    };
+
+    class PanelManager
+    {
+    public:
+        PanelManager() = default;
+        ~PanelManager()
+        {
+            for (auto& [code, element] : mPanels)
+            {
+                element.Panel->Shutdown();
+                delete element.Panel;
+            }
+        }
+        SURGE_DISABLE_COPY_AND_MOVE(PanelManager);
+
+        template <typename T>
+        T* PushPanel(void* panelInitArgs = nullptr)
+        {
+            static_assert(std::is_base_of_v<IPanel, T>, "T must derive from IPanel!");
+            PanelData panelData {};
+            panelData.Panel = new T;
+
+            mPanels[T::GetStaticCode()] = panelData;
+            panelData.Panel->Init(panelInitArgs);
+            return static_cast<T*>(panelData.Panel);
+        }
+
+        template <typename T> //TODO: Switch to C++20 Concepts
+        T* GetPanel()
+        {
+            static_assert(std::is_base_of_v<IPanel, T>, "T must derive from IPanel!");
+            return static_cast<T*>(mPanels[T::GetStaticCode()].Panel);
+        }
+
+        void RenderPanels()
+        {
+            for(auto& [code, element] : mPanels)
+                element.Panel->Render(&element.Show);
+        }
+
+        void OnEvent(Event& e) const
+        {
+            for (auto& [code, element] : mPanels)
+                element.Panel->OnEvent(e);
+        }
+
+        std::unordered_map<PanelCode, PanelData>& GetAllPanels() { return mPanels; }
+
+    private:
+        std::unordered_map<PanelCode, PanelData> mPanels;
+    };
+
+} // namespace Surge

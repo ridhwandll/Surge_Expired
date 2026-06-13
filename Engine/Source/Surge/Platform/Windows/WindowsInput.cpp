@@ -37,14 +37,33 @@ namespace Surge
 
     void Input::SetCursorMode(CursorMode cursorMode)
     {
-        if (cursorMode == CursorMode::Normal)
+        static CursorMode sLastCursorMode = CursorMode::Normal;
+        if(sLastCursorMode == cursorMode)
+            return;
+
+        HWND hWnd = (HWND)Core::GetWindow()->GetNativeWindowHandle();
+
+        if(cursorMode == CursorMode::Normal)
         {
-            SetCursor(LoadCursor(nullptr, IDC_ARROW));
             ClipCursor(NULL);
+            ShowCursor(TRUE);
         }
-        else if (cursorMode == CursorMode::Locked)
+        else if(cursorMode == CursorMode::Locked)
         {
-            SetCursor(nullptr);
-		}
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+
+            POINT ul = { rect.left, rect.top };
+            POINT lr = { rect.right, rect.bottom };
+            ClientToScreen(hWnd, &ul);
+            ClientToScreen(hWnd, &lr);
+
+            RECT screenRect = { ul.x, ul.y, lr.x, lr.y };
+
+            ClipCursor(&screenRect);
+            ShowCursor(FALSE);
+        }
+
+        sLastCursorMode = cursorMode;
     }
 } // namespace Surge

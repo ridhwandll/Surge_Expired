@@ -4,7 +4,6 @@ project(SurgePlayer)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# -----------------------------------------------------------------------
 # Paths
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../..")
 get_filename_component(REPO_ROOT "${REPO_ROOT}" ABSOLUTE)
@@ -26,9 +25,6 @@ file(GLOB_RECURSE ENGINE_SOURCES
     "${ENGINE_SRC_ROOT}/*.cpp" "${ENGINE_SRC_ROOT}/*.hpp"
 )
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Windows/.*")
-
-# Vendor helper source (header-only library with a single .cpp)
-list(APPEND ENGINE_SOURCES "${VENDOR_ROOT}/stb/stb_image.cpp" "${VENDOR_ROOT}/cgltf/cgltf.cpp")
 
 # Player sources
 file(GLOB PLAYER_SOURCES
@@ -121,12 +117,31 @@ add_library(imgui_android STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui_android PUBLIC "${VENDOR_ROOT}/ImGui" "${VENDOR_ROOT}/volk" "${VENDOR_ROOT}/Vulkan-Headers/Include" "${VENDOR_ROOT}/glm")
 target_compile_definitions(imgui_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR IMGUI_IMPL_VULKAN_USE_VOLK)
 
+# basisu transcoder
+set(BASISU_SOURCES
+    "${VENDOR_ROOT}/basisu/transcoder/basisu_transcoder.cpp"
+    "${VENDOR_ROOT}/basisu/transcoder/basisu_transcoder.h"
+
+    "${VENDOR_ROOT}/basisu/zstd/zstd.c"
+    "${VENDOR_ROOT}/basisu/zstd/zstddeclib.c"
+)
+add_library(basisu_android STATIC ${BASISU_SOURCES})
+target_include_directories(basisu_android PUBLIC "${VENDOR_ROOT}/basisu/transcoder")
+target_compile_definitions(basisu_android PRIVATE 
+    BASISD_SUPPORT_KTX2_ZSTD=1
+    BASISD_SUPPORT_PVRTC1=0
+    BASISD_SUPPORT_PVRTC2=0
+    BASISD_SUPPORT_ATC=0
+    BASISD_SUPPORT_FXT1=0
+)
+
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE
     game-activity::game-activity_static
     volk_android
     spirvcross_android
     imgui_android
+    basisu_android
     ${log-lib}
     ${android-lib}
     ${vulkan-lib}

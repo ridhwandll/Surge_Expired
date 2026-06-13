@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include <unordered_map>
 #include <map>
 
 namespace Surge
@@ -119,7 +120,7 @@ namespace Surge
         const Vector<ShaderResource>& GetResources() const { return mShaderResources; }
 
         //Returns HashMap<ShaderType, std::map<location, Input>>
-        const HashMap<ShaderType, std::map<Uint, ShaderStageInput>>& GetStageInputs() const { return mStageInputs; }
+        const std::unordered_map<ShaderType, std::map<Uint, ShaderStageInput>>& GetStageInputs() const { return mStageInputs; }
 
         void LogAll() const;
     private:
@@ -141,7 +142,7 @@ namespace Surge
         Vector<ShaderPushConstant> mPushConstants;
 
         // Stage inputs, per shader stage
-        HashMap<ShaderType, std::map<Uint /*location*/, ShaderStageInput /*Data*/>> mStageInputs{};
+        std::unordered_map<ShaderType, std::map<Uint /*location*/, ShaderStageInput /*Data*/>> mStageInputs{};
         friend class ShaderReflector;
     };
 

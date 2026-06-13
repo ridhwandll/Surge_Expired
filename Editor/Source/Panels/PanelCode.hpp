@@ -8,9 +8,9 @@ namespace Surge
         Viewport = 0,
         SceneHierarchy,
         Inspector,
-        Performance,
-        RenderProcedure,
-        ProjectSettings
+        ContentBrowser,
+        MaterialEditor,
+        Export
     };
 
     constexpr const char* PanelCodeToString(PanelCode code)
@@ -20,9 +20,9 @@ namespace Surge
             case PanelCode::Viewport: return "Viewport";
             case PanelCode::SceneHierarchy: return "Hierarchy";
             case PanelCode::Inspector: return "Inspector";
-            case PanelCode::Performance: return "Performance";
-            case PanelCode::RenderProcedure: return "RenderProcedure";
-            case PanelCode::ProjectSettings: return "ProjectSettings";
+            case PanelCode::ContentBrowser: return "ContentBrowser";
+            case PanelCode::MaterialEditor: return "MaterialEditor";
+            case PanelCode::Export: return "Export";
         }
         return nullptr;
     }

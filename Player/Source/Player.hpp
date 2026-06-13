@@ -19,16 +19,9 @@ namespace Surge
     private:
         void Resize(Uint width, Uint height);
         void OnImGuiRender();
-        void FillTextures(Uint texCount);
+        void OpenProject();
     private:
-
-        Uint mTexturedQuadCount = 500;
-        Vector<ImageHandle> mTextures;
-        int mChangeQuadAmount;
-        bool mMoveEnabled = true;
-        Vector<Entity> mColoredQuads;
-        Entity mEntity;
-
         Renderer* mRenderer;
+        AssetManager* mAssetManager;
     };
 } // namespace Surge

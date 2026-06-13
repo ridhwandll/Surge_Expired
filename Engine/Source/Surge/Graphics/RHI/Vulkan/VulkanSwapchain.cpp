@@ -206,13 +206,13 @@ namespace Surge
 
         // On mobile -> FIFO is preferred (vsync, battery friendly)
         // MAILBOX gives lower latency(ImGui feels smooth) but burns more power
-#ifdef SURGE_PLATFORM_WINDOWS
-        for (auto& m : modes)
-        {
-            if (m == VK_PRESENT_MODE_MAILBOX_KHR) //VK_PRESENT_MODE_MAILBOX_KHR to non Vsync
-                return m;
-        }
-#endif
+//#ifdef SURGE_PLATFORM_WINDOWS
+//        for(auto& m : modes)
+//        {
+//            if(m == VK_PRESENT_MODE_MAILBOX_KHR) //VK_PRESENT_MODE_MAILBOX_KHR to non Vsync
+//                return m;
+//        }
+//#endif
         // FIFO must be supported by all implementations
         return VK_PRESENT_MODE_FIFO_KHR;
     }

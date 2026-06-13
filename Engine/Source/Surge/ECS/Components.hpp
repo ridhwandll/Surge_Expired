@@ -3,11 +3,11 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Surge/Graphics/RHI/RHIHandle.hpp"
-#include "Surge/Graphics/Mesh/Mesh.hpp"
-#include "Surge/Graphics/Material/Material.hpp"
+#include "Surge/Graphics/HighLevel/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
+#include "Surge/Asset/Asset.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -73,14 +73,11 @@ namespace Surge
     {
         SpriteRendererComponent() = default;
         SpriteRendererComponent(const glm::vec4& color)
-            : Color(color), Image(ImageHandle::Invalid()) {}
+            : Color(color) {}
         SpriteRendererComponent(const glm::vec3& color, float alpha)
-            : Color(glm::vec4(color, alpha)), Image(ImageHandle::Invalid()) {}
-        SpriteRendererComponent(const glm::vec4& colorTint, ImageHandle texture)
-            : Color(colorTint), Image(texture) {}
+            : Color(glm::vec4(color, alpha)){}
 
         glm::vec4 Color;
-        ImageHandle Image = ImageHandle::Invalid();
 
         SURGE_REFLECTION_ENABLE;
     };
@@ -100,7 +97,7 @@ namespace Surge
 
     struct MeshComponent
     {
-        Ref<Mesh> Mesh;
+        AssetID MeshID = AssetID::INVALID;
         bool DropShadow = true;
         SURGE_REFLECTION_ENABLE;
     };
@@ -111,18 +108,35 @@ namespace Surge
         LightComponent(LightType type, const glm::vec3& color, float intensity, float radius, float falloff)
             : Type(type), Color(color), Intensity(intensity), Radius(radius) {}
 
-        LightType Type = LightType::POINT;
         glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
         float Intensity = 1.0f;
         float Radius = 3.0f;
         float Falloff = 1.0f;
+        LightType Type = LightType::POINT;
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct EnvironmentComponent
+    {
+        EnvironmentComponent() = default;
+
+        float Elevation = 30.0f; // In degrees
+        float Azimuth = 0.0f;   // In degrees
+        float Turbidity = 2.0f;
+        float Exposure = 0.02f;
+        float SunIntensity = 5.0f;
+        bool EnableSunDisk = true;
+
+        glm::vec3 SkyAmbient { 0.35f, 0.55f, 0.90f };
+        glm::vec3 HorizonAmbient { 0.45f, 0.52f, 0.60f };
+        glm::vec3 GroundAmbient { 0.12f, 0.11f, 0.10f };
+
+        SURGE_REFLECTION_ENABLE;
+    };
 
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define SERIALIZABLE_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
                              ::Surge::CameraComponent, ::Surge::SpriteRendererComponent,\
-                             ::Surge::MeshComponent, ::Surge::LightComponent \
+                             ::Surge::MeshComponent, ::Surge::LightComponent, ::Surge::EnvironmentComponent \
 
 } // namespace Surge

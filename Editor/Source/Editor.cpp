@@ -1,17 +1,28 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include <Surge/Surge.hpp>
 #include "Editor.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+
 #include "Utility/ImGuiAux.hpp"
 #include "Panels/ViewportPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Panels/InspectorPanel.hpp"
-#include <stb_image.h>
-#include "SurgeReflect/Enum.hpp"
+#include "Panels/ContentBrowserPanel.hpp"
+#include "Panels/MaterialEditorPanel.hpp"
+#include "Panels/ExportPanel.hpp"
+#include "Asset/Cookers/Texture2DCooker.hpp"
+#include "Asset/Cookers/MeshCooker.hpp"
+#include "Asset/Cookers/MaterialCooker.hpp"
 
 namespace Surge
 {
     void Editor::OnInitialize()
     {
+        // Dummy Scene to render the project browser ImGui. We can probably find a better way to do this later, but for now it works and doesn't cause any issues
+        mActiveScene = Ref<Scene>::Create();
+
+        mAssetManager = Core::GetAssetManager();
         mRenderer = Core::GetRenderer();
         mRenderer->SetOutlineThickness(1);
 
@@ -19,109 +30,90 @@ namespace Surge
         mCamera.SetActive(true);
 
         // Configure panels
-        SceneHierarchyPanel* sceneHierarchy;
-        sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
+        SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
         mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
-        mPanelManager.PushPanel<ViewportPanel>(&mCamera);
+        mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
+        mPanelManager.PushPanel<ContentBrowserPanel>();
+        mPanelManager.PushPanel<MaterialEditorPanel>();
+        mPanelManager.PushPanel<ExportPanel>();
 
-        mActiveScene = Ref<Scene>::Create(false);
-        sceneHierarchy->SetSceneContext(mActiveScene.Raw());
-        
-        Entity runtimeCamera;
-        {
-            mActiveScene->CreateEntity(runtimeCamera, "Runtime Camera");
-            CameraComponent& cam = runtimeCamera.AddComponent<CameraComponent>();
-            cam.Primary = true;
-            TransformComponent& transform = runtimeCamera.GetComponent<TransformComponent>();
-            transform.Position = glm::vec3(-10, 6, 10);
-            transform.Rotation = glm::vec3(-30, -45, 0);
-        }
-            
-        mRidTex = LoadTexture();
-        {
-            {
-                Entity floor;
-                mActiveScene->CreateEntity(floor, MeshGenerator::DefaultMeshToString(DefaultMesh::CUBE));
-                MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::CUBE);
-                TransformComponent& t = floor.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-                t.Scale = glm::vec3(10.0f, 1.0f, 10.0f);
-                t.MarkDirty();
-            }
-            {
-                Entity cube;
-                mActiveScene->CreateEntity(cube, MeshGenerator::DefaultMeshToString(DefaultMesh::SPHERE));
-                MeshComponent& meshComp = cube.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create(DefaultMesh::SPHERE);
-            
-                TransformComponent& t = cube.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(0.0f, 2.0f, 0.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-            {
-                Entity e;
-                mActiveScene->CreateEntity(e, "Vulkan Scene");
-                MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-                meshComp.Mesh = Ref<Mesh>::Create("Engine/Assets/Mesh/VulkanScene.glb");
-                TransformComponent& t = e.GetComponent<TransformComponent>();
-                t.Position = glm::vec3(2.0f, 1.7f, 1.0f);
-                t.Scale = glm::vec3(1.0f, 1.0f, 1.0f);
-                t.MarkDirty();
-            }
-        }
-        //{
-        //    Entity pointLight;
-        //    mActiveScene->CreateEntity(pointLight, "Point Light");
-        //    LightComponent& lightComp = pointLight.AddComponent<LightComponent>();
-        //    lightComp.Type = LightType::POINT;
-        //    lightComp.Intensity = 1.2f;
-        //    lightComp.Radius = 10.0f;
-        //    TransformComponent& t = pointLight.GetComponent<TransformComponent>();
-        //    t.Position = glm::vec3(1.0f, 2.0f, 1.0f);
-        //    t.MarkDirty();
-        //}
-        {
-            Entity directionalLight;
-            mActiveScene->CreateEntity(directionalLight, "Directional Light");
-            LightComponent& lightComp = directionalLight.AddComponent<LightComponent>();
-            lightComp.Type = LightType::DIRECTIONAL;
-            lightComp.Intensity = 4.5f;
-            TransformComponent& t = directionalLight.GetComponent<TransformComponent>();
-            t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-            t.Rotation = glm::vec3(30.0f, -30.0f, 30.0f);
-            t.MarkDirty();
-        }
+        mProjectBrowser.Init();
+
+        mAssetImporter.Initialize(mAssetManager);
+        mAssetImporter.RegisterCooker(CreateScope<Texture2DCooker>());
+        mAssetImporter.RegisterCooker(CreateScope<MaterialCooker>());
+        mAssetImporter.RegisterCooker(CreateScope<MeshCooker>());
+
+
+        mAssetManager->AddAssetLoadHook([this](AssetID id, const AssetMetadata& meta)
+                                        {
+                                            if(mAssetImporter.NeedsCook(id, meta.Type))
+                                            {
+                                                Log<Severity::Warn>("[AssetManager::AddAssetLoadHook] Cooked file missing on Load, cooking now: {}", meta.RelativePath);
+                                                mAssetImporter.RecookAsset(id);
+                                            }
+                                        });
 
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }
 
     void Editor::OnUpdate()
     {
-        // Axes
-        constexpr float axesLength = 10000.0f;
-        mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
-        mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
-        mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+        if(mCurrentProject.IsValid())
+        {
+            // Axes
+            constexpr float axesLength = 10000.0f;
+            if (mShowAxes)
+            {
+                mRenderer->SubmitLine({ -axesLength, 0.0f, 0.0f }, { axesLength, 0.0f, 0.0f }, { 1.0f, 0.3f, 0.3f, 1.0f }); // X
+                mRenderer->SubmitLine({ 0.0f, -axesLength, 0.0f }, { 0.0f, axesLength, 0.0f }, { 0.3f, 0.8f, 0.3f, 1.0f }); // Y
+                mRenderer->SubmitLine({ 0.0f, 0.0f, -axesLength }, { 0.0f, 0.0f, axesLength }, { 0.3f, 0.3f, 1.0f, 1.0f }); // Z
+            }
 
-        CheckResize();
-        if (mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
-            mActiveScene->Update();
+            CheckResize();
+            if(mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
+                mActiveScene->Update();
+            else
+            {
+                mCamera.OnUpdate(mViewportPanel->IsViewportHovered());
+                mActiveScene->Update(mCamera);
+            }
+        }
         else
+        {
+            // (Rid) We have to do this to render the ImGUI! Is this a design flaw? Maybe. But it works for now and we can refactor later if needed
             mActiveScene->Update(mCamera);
+        }
     }
 
     void Editor::OnImGuiRender()
     {
-        ImGuiAux::DockSpace();
-        mPanelManager.RenderAll();
+        if(mCurrentProject.IsValid())
+        {
+            mRenderer->ShowInternalImGui(true);
+            ImGuiAux::DockSpace();
+            mPanelManager.RenderPanels();
+            RenderEditorSettings();
+        }
+        else
+        {
+            mRenderer->ShowInternalImGui(false);
+            mProjectBrowser.Render();
+        }
+    }
+
+    void Editor::RenderEditorSettings()
+    {
+        ImGui::Begin("Editor Settings");
+        if (ImGuiAux::Button("Save Scene (F2)")) { mAssetManager->Save(mActiveScene->GetID()); }
+        ImGui::Checkbox("Show Runtime View", &mShowRuntimeView);
+        ImGui::Checkbox("Show Axes", &mShowAxes);
+        ImGui::End();
     }
 
     void Editor::OnEvent(Event& e)
     {
-        ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
-        if (viewportPanel->IsViewportHovered())
+        if (mViewportPanel->IsViewportHovered())
             mCamera.OnEvent(e);
 
         mPanelManager.OnEvent(e);
@@ -129,8 +121,10 @@ namespace Surge
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent)
                                              {
-                                                 if(keyEvent.GetKeyCode() == Key::F5)
-                                                     mShowRuntimeView = !mShowRuntimeView;
+                                                 if(keyEvent.GetKeyCode() == Key::F2)
+                                                 {
+                                                     mAssetManager->Save(mActiveScene->GetID());
+                                                 }
                                              });
     }
 
@@ -142,6 +136,14 @@ namespace Surge
     {
     }
 
+    void Editor::LoadScene(Ref<Scene>&& scene)
+    {
+        mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
+        mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
+        mActiveScene = std::move(scene);
+        //mAssetImporter.ScanAndCookAll();
+    }
+
     void Editor::CheckResize()
     {
         ViewportPanel* viewportPanel = mPanelManager.GetPanel<ViewportPanel>();
@@ -151,7 +153,7 @@ namespace Surge
         FramebufferHandle fbHandle = mRenderer->GetFinalFramebuffer();
         FramebufferDesc desc = rhi->GetDesc(fbHandle);
 
-        if (viewportSize.x > 0.0f && viewportSize.y > 0.0f && (desc.Width != viewportSize.x || desc.Height != viewportSize.y))
+        if (viewportSize.x > 0.0f && viewportSize.y > 0.0f && (desc.Width != (Uint)viewportSize.x || desc.Height != (Uint)viewportSize.y))
         {
             rhi->WaitIdle();
 
@@ -164,38 +166,7 @@ namespace Surge
 
     void Editor::OnShutdown()
     {
-        auto& rhi = mRenderer->GetRHI();
-        rhi->DestroyImage(mRidTex);
-    }
-
-    ImageHandle Editor::LoadTexture()
-    {
-        ImageHandle texture = ImageHandle::Invalid();
-        stbi_set_flip_vertically_on_load(1);
-        SamplerHandle defautSampler = mRenderer->GetDefaultSampler();
-        String path = "Engine/Assets/Textures/RidWhite.png";
-        int width, height, channels;
-        stbi_uc* data = nullptr;
-        data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-        if(data)
-        {
-            ImageDesc desc = {};
-            desc.Width = width;
-            desc.Height = height;
-            desc.Format = ImageFormat::RGBA8_SRGB;
-            desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
-            desc.DebugName = "Tex.png";
-            desc.GenerateImGuiID = true;
-            desc.InitialData = data;
-            desc.DataSize = width * height * 4;
-            desc.Sampler = defautSampler;
-            texture = mRenderer->GetRHI()->CreateImage(desc);
-            stbi_image_free(data);
-        }
-        else
-            Log<Severity::Error>("Failed to load texture at path: {0}", path);
-
-        return texture;
+        mAssetImporter.Shutdown();
     }
 
 } // namespace Surge

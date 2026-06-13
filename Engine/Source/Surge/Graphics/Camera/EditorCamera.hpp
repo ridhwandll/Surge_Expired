@@ -5,14 +5,18 @@
 
 namespace Surge
 {
-    class SURGE_API EditorCamera : public Camera
+    // 
+    // TODO MOVE THIS FILE IN Editor Project, this should not be used in runtime code, only editor code
+    // 
+
+    class EditorCamera : public Camera
     {
     public:
         EditorCamera() = default;
         EditorCamera(float fov, float aspectRatio, float nearClip, float farClip);
 
         void Focus(const glm::vec3& focusPoint);
-        void OnUpdate();
+        void OnUpdate(bool viewportHovered);
         void OnEvent(Event& e);
 
         bool IsActive() const { return mIsActive; }
@@ -81,4 +85,5 @@ namespace Surge
         float mFOV = 45.0f, mAspectRatio = 1.778f, mNearClip = 0.1f, mFarClip = 1000.0f;
         CameraMode mCameraMode {CameraMode::Arcball};
     };
+
 } // namespace Surge

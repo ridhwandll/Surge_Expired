@@ -38,14 +38,14 @@ namespace Surge
             //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
         }
         void SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position);
+        void SubmitEnvironment(const EnvironmentComponent& env);
 
         void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
 
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
-        void ShowImGui(bool show) { mGraph.ShowImGui(show); }
-        Ref<Material> CreateMaterial(const String& debugName = "Material");
-
+        void ShowInternalImGui(bool show) { mGraph.ShowInternalImGui(show); }
+        void SubmitDirLightDebug(const glm::vec3& origin, const glm::vec3& forward, const glm::vec4& color);
         const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }
         FrameBlackboard& GetRenderGraphBlackBoard() { return mGraph.GetBlackboard(); }
 

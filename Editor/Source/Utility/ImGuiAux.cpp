@@ -3,15 +3,16 @@
 #include "Surge/Core/Input/Input.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Editor.hpp"
+#include "imgui_internal.h"
 
 namespace Surge
 {
     void ImGuiAux::DrawRectAroundWidget(const glm::vec4& color, float thickness, float rounding)
     {
-        //ImGuiContext& g = *GImGui;
-        //const ImRect& rect = (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? g.LastItemData.DisplayRect : g.LastItemData.Rect;
-        //ImDrawList* drawList = ImGui::GetWindowDrawList();
-        //drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawCornerFlags_All, thickness);
+        ImGuiContext& g = *GImGui;
+        const ImRect& rect = (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? g.LastItemData.DisplayRect : g.LastItemData.Rect;
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->AddRect(rect.Min, rect.Max, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, color.w)), rounding, ImDrawFlags_RoundCornersAll, thickness);
     }
 
     void ImGuiAux::TextCentered(const char* text)
@@ -57,7 +58,7 @@ namespace Surge
         ImGuiAux::ScopedStyle headerPaddingAndHeight({ImGuiStyleVar_FramePadding}, ImVec2 {framePaddingX, framePaddingY});
 
         ImGui::PushID(name.c_str());
-        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]); // Bold font
         String uppercaseName = name;
         for (char& n : uppercaseName)
             n = toupper(n);
@@ -73,6 +74,9 @@ namespace Surge
                 ImGui::SetCursorPosY(ImGui::GetCursorPosY() + headerSpacingOffset);
         }
 
+        if(!open)
+            ImGui::Dummy({ 0.0f, 5.0f });
+
         return open;
     }
 
@@ -84,7 +88,7 @@ namespace Surge
         bool res = ImGui::Button(title);
 
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            DrawRectAroundWidget(Colors::ThemeColor, 1.5f, 1.0f);
+            DrawRectAroundWidget(Colors::ThemeColor2, 1.5f, 1.0f);
 
         return res;
     }
@@ -126,44 +130,6 @@ namespace Surge
 
         window->DrawList->PathStroke(4293097241, false, thickness);
         return true;
-    }
-
-    void ImGuiAux::RenamingMechanism::Update(String& name, const std::function<void(const String& newName)>& onRenameEnd)
-    {
-        if (ImGui::IsWindowHovered() && Input::IsKeyPressed(Key::F2))
-            mRenaming = true;
-
-        if (mRenaming)
-        {
-            if (!name.empty())
-            {
-                mTempBuffer = name;
-                mOldName = mTempBuffer;
-                name.clear();
-            }
-            ImGui::SameLine();
-
-            // Copy the name from mTempBuffer
-            //if (ImGui::InputText("##Txt", &mTempBuffer, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue))
-            //{
-            //    mRenaming = false;
-            //    name = mTempBuffer;
-            //    onRenameEnd(mTempBuffer);
-            //    mTempBuffer.clear();
-            //    mOldName.clear();
-            //}
-            ImGui::SetKeyboardFocusHere();
-            ImGuiAux::DrawRectAroundWidget({0.1f, 0.3f, 1.0f, 1.0f}, 1.5f, 1.0f);
-
-            // Revert to old name if user hits Escape
-            if (Input::IsKeyPressed(Key::Escape))
-            {
-                mRenaming = false;
-                name = mOldName;
-                mOldName.clear();
-                mTempBuffer.clear();
-            }
-        }
     }
 
 } // namespace Surge

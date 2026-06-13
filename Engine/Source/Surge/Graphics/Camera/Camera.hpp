@@ -1,18 +1,18 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include <glm/glm.hpp>
 #include "Surge/Core/Defines.hpp"
+#include <glm/glm.hpp>
 
 namespace Surge
 {
-    enum class SURGE_API CameraMode
+    enum class CameraMode
     {
         None,
         Flycam,
         Arcball
     };
 
-    class SURGE_API Camera
+    class Camera
     {
     public:
         Camera() = default;

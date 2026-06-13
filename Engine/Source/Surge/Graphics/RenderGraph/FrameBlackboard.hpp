@@ -3,7 +3,7 @@
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
-#include "Surge/Graphics/Mesh/Mesh.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include <glm/glm.hpp>
 
 #define MAX_SHADOW_CASCADE_COUNT 3
@@ -37,19 +37,19 @@ namespace Surge
         bool ShowCascades = false;
     };
 
-    // TODO: Move to a SkyComponent
-    struct Sky
+    struct Environnment
     {
+        bool HasEnvironment = false;
+
+        // Sky
         float Elevation = 30.0f; // In degrees
         float Azimuth = 0.0f;   // In degrees
         float Turbidity = 2.0f;
         float Exposure = 0.02f;
         float SunIntensity = 5.0f;
         bool EnableSunDisk = true;
-    };
 
-    struct GIParameters
-    {
+        // GI
         glm::vec3 SkyAmbient { 0.35f, 0.55f, 0.90f };
         glm::vec3 HorizonAmbient { 0.45f, 0.52f, 0.60f };
         glm::vec3 GroundAmbient { 0.12f, 0.11f, 0.10f };
@@ -134,8 +134,7 @@ namespace Surge
         ShadowSettings ShadowSettings_;
 
         // GI & skybox
-        GIParameters GIParams;
-        Sky Skybox;
+        Environnment Env;
 
         // Screen Space options
         glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
@@ -157,9 +156,6 @@ namespace Surge
             QuadList.clear();
             LineList.clear();
             OutlineList.clear();
-
-            //QuadList.reserve(Renderer2DPass::MAX_QUADS_TOTAL);
-            //LineList.reserve(Renderer2DPass::MAX_LINES_TOTAL);
         }
     };
 }

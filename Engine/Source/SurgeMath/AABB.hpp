@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include <glm/glm.hpp>
+#include <glm/ext/vector_float3.hpp>
 
 namespace Surge
 {

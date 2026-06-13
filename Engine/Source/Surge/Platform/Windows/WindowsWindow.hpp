@@ -1,11 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Window/Window.hpp"
-#include <windowsx.h>
+#include <wtypes.h>
 
 namespace Surge
 {
-    class SURGE_API WindowsWindow : public Window
+    class WindowsWindow : public Window
     {
     public:
         WindowsWindow(const WindowDesc& windowData);
@@ -16,8 +16,8 @@ namespace Surge
         virtual void Maximize() override;
         virtual void RestoreFromMaximize() override;
         virtual void RegisterEventCallback(std::function<void(Event&)> eventCallback) override { mEventCallback = eventCallback; }
-        virtual bool IsWindowMaximized() const override { return IsMaximized(mWin32Window); }
-        virtual bool IsWindowMinimized() const override { return IsIconic(mWin32Window); }
+        virtual bool IsWindowMaximized() const override;
+        virtual bool IsWindowMinimized() const override;
 
         virtual String GetTitle() const override { return mWindowData.Title; }
         virtual void SetTitle(const String& name) override;

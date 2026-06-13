@@ -43,10 +43,10 @@ namespace SurgeReflect
 
         const std::string& GetFullName() const { return mFullName; }
         const int64_t& GetHashCode() const { return mHashCode; }
-        const bool& IsEnum() const { return mIsEnum; }
-        const bool& IsClass() const { return mIsClass; }
-        const bool& IsUnion() const { return mIsUnion; }
-        const bool& IsPrimitive() const { return mIsPrimitive; }
+        bool IsEnum() const { return mIsEnum; }
+        bool IsClass() const { return mIsClass; }
+        bool IsUnion() const { return mIsUnion; }
+        bool IsPrimitive() const { return mIsPrimitive; }
 
         template <typename T>
         void Initialize()
@@ -69,13 +69,5 @@ namespace SurgeReflect
         bool mIsUnion = false;
         bool mIsPrimitive = false;
     };
-
-    template <class T>
-    Type GetType()
-    {
-        Type type;
-        type.Initialize<T>();
-        return type;
-    }
 
 } // namespace SurgeReflect
