@@ -287,11 +287,12 @@ namespace Surge
         ExtractGeometry(data, spec);
         ExtractMaterials(sourceAbsPath, data, spec);
         FreeGLTF(data);
-
         OptimizeMesh(spec);
 
+        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
+
         const String sidecarPath = am->GetSidecarPath(id);
-        bool res = MeshBinary::Write(sidecarPath, spec, {});
+        bool res = MeshBinary::Write(sidecarPath, stamp, spec, {});
 
         CookResult result;
         result.Success = res;

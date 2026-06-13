@@ -212,7 +212,7 @@ namespace Surge
 
     String AssetManager::GetSidecarDirectory(AssetType type)
     {
-        return sAssetsDirectory + "/__Internal/" + SurgeReflect::EnumToString(type).data();
+        return sAssetsDirectory + "/Internal/" + SurgeReflect::EnumToString(type).data();
     }
 
     AssetID AssetManager::GetIDFromPath(const String& relativePath)

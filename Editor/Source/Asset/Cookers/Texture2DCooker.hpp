@@ -9,6 +9,7 @@ namespace Surge
     public:
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
         virtual AssetType GetAssetType() const override { return AssetType::TEXTURE2D; }
+        virtual Uint GetCookerVersion() const override { return 2; }
 
     private:
         //Ref<Asset> LoadFromSource(const String& absPath) const;

@@ -65,6 +65,7 @@ namespace Surge::Filesystem
     Vector<Path> GetFilesInDirectory(const Path& directory, const String& extension = "");
 
     bool ReadBinaryFile(const Path& path, Vector<uint8_t>& outData);
+    bool ReadBinaryFilePartial(const Path& path, Vector<Byte>& outBuffer, size_t maxBytes);
     bool ReadTextFile(const Path& path, String& outData);
 
     // PC Only (Logs error on Android)

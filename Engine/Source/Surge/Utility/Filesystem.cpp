@@ -74,6 +74,21 @@ namespace Surge::Filesystem
         return true;
     }
 
+    bool ReadBinaryFilePartial(const Path& path, Vector<Byte>& outBuffer, size_t maxBytes)
+    {
+        AAssetManager* am = Android::GAndroidApp->activity->assetManager;
+        AAsset* asset = AAssetManager_open(am, SanitizeAndroidPath(path).c_str(), AASSET_MODE_STREAMING);
+        if(!asset)
+            return false;
+
+        const size_t fileSize = static_cast<size_t>(AAsset_getLength(asset));
+        const size_t readSize = std::min(maxBytes, fileSize);
+        outBuffer.resize(readSize);
+        const bool ok = AAsset_read(asset, outBuffer.data(), readSize) == static_cast<int>(readSize);
+        AAsset_close(asset);
+        return ok;
+    }
+
     bool ReadTextFile(const Path& path, String& outData)
     {
         AAssetManager* mgr = Android::GAndroidApp->activity->assetManager;
@@ -159,6 +174,31 @@ namespace Surge::Filesystem
         DWORD bytesRead = 0;
 
         if(!ReadFile(hFile, outData.data(), static_cast<DWORD>(fileSize.QuadPart), &bytesRead, NULL) || bytesRead != fileSize.QuadPart)
+        {
+            CloseHandle(hFile);
+            return false;
+        }
+
+        CloseHandle(hFile);
+        return true;
+    }
+
+    bool ReadBinaryFilePartial(const Path& path, Vector<Byte>& outBuffer, size_t maxBytes)
+    {
+        HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if(hFile == INVALID_HANDLE_VALUE)
+            return false;
+
+        LARGE_INTEGER fileSize;
+        if(!GetFileSizeEx(hFile, &fileSize))
+        {
+            CloseHandle(hFile);
+            return false;
+        }
+
+        outBuffer.resize(maxBytes);
+        DWORD bytesRead = 0;
+        if(!ReadFile(hFile, outBuffer.data(), maxBytes, &bytesRead, NULL) || bytesRead != maxBytes)
         {
             CloseHandle(hFile);
             return false;

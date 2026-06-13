@@ -118,7 +118,7 @@ namespace Surge
             item.Path_ = directoryEntry.path();
             item.Filename = item.Path_.filename().string();
 
-            if (item.Filename == "AssetRegistry.surge" || item.Filename == "__Internal")
+            if (item.Filename == "AssetRegistry.surge" || item.Filename == "Internal")
                 continue;
 
             item.IsDirectory = directoryEntry.is_directory();
@@ -182,7 +182,6 @@ namespace Surge
         {
             ImFont* regularFont = ImGui::GetIO().Fonts->Fonts[0];
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
-            ImVec4 accentColor = ImGuiAux::Colors::ThemeColor1;
 
             if(ImGui::Begin("Content Browser", show))
             {

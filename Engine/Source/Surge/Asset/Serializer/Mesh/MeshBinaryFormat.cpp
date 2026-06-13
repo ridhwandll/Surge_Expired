@@ -23,7 +23,7 @@ namespace Surge::MeshBinary
     };
     static_assert(sizeof(Header) == 32);
 
-    bool Write(const String& path, const MeshSpecification& spec, const Vector<Ref<Material>>& overrides)
+    bool Write(const String& path, const AssetStamp& stamp, const MeshSpecification& spec, const Vector<Ref<Material>>& overrides)
     {
         Uint validOverrideCount = 0;
         for(const Ref<Material>& ref : overrides)
@@ -50,7 +50,7 @@ namespace Surge::MeshBinary
             geomSize += MaterialBinary::CalculateSize(mat);
 
         Vector<Byte> buffer;
-        buffer.reserve(sizeof(Header) + geomSize + validOverrideCount * (sizeof(Uint) + sizeof(uint64_t)));
+        buffer.reserve(sizeof(AssetStamp) + sizeof(Header) + geomSize + validOverrideCount * (sizeof(Uint) + sizeof(uint64_t)));
 
         Header header = {};
         header.Magic = kSidecarMagic;
@@ -62,6 +62,7 @@ namespace Surge::MeshBinary
         header.ValidOverrideCount = validOverrideCount;
         header.GeomSectionSize = geomSize;
 
+        WriteData(buffer, stamp);
         WriteData(buffer, header);
         WriteDataArray(buffer, spec.Vertices.data(), spec.Vertices.size());
         WriteDataArray(buffer, spec.Indices.data(), spec.Indices.size());
@@ -102,7 +103,7 @@ namespace Surge::MeshBinary
         return true;
     }
 
-    bool Read(const String& path, MeshSpecification& outSpec)
+    bool Read(const String& path, AssetStamp& outstamp, MeshSpecification& outSpec)
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(path, fileData))
@@ -111,8 +112,10 @@ namespace Surge::MeshBinary
         const Byte* ptr = fileData.data();
         const Byte* endPtr = fileData.data() + fileData.size();
 
-        if(fileData.size() < sizeof(Header))
+        if(fileData.size() < sizeof(AssetStamp) + sizeof(Header))
             return false;
+
+        ReadData(ptr, outstamp);
 
         Header header = {};
         ReadData(ptr, header);

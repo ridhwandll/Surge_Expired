@@ -22,7 +22,12 @@ namespace Surge
         Ref<Material> material = asset.As<Material>();
         const String sidecarPath = am->GetSidecarPath(meta.ID);
 
-        bool result = MaterialBinary::Write(sidecarPath, material);
+        // Just read the stamp
+        AssetStamp stamp;
+        Ref<Material> tempMat = nullptr;
+        MaterialBinary::Read(sidecarPath, stamp, tempMat);
+
+        bool result = MaterialBinary::Write(sidecarPath, stamp, material);
         return result;
 #endif
     }
@@ -32,8 +37,13 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
+        AssetStamp stamp;
         Ref<Material> material;
-        MaterialBinary::Read(sidecarPath, material);
+        if(!MaterialBinary::Read(sidecarPath, stamp, material))
+        {
+            Log<Severity::Error>("[MaterialSerializer] Failed to read material binary for asset {}", metadata.RelativePath);
+            return nullptr;
+        }
         return material.As<Asset>();
     }
 

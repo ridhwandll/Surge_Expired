@@ -3,6 +3,7 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <basisu/transcoder/basisu_transcoder.h>
+#include "AssetStamp.hpp"
 
 namespace Surge
 {
@@ -38,9 +39,10 @@ namespace Surge
             return nullptr;
         }
 
-
+        const Byte* ktx2Start = fileData.data() + sizeof(AssetStamp);
+        const Uint ktx2Size = static_cast<Uint>(fileData.size() - sizeof(AssetStamp));
         basist::ktx2_transcoder ktx2;
-        if(!ktx2.init(fileData.data(), static_cast<Uint>(fileData.size())))
+        if(!ktx2.init(ktx2Start, ktx2Size))
             return nullptr;
 
         const bool isSRGB = ktx2.get_dfd_transfer_func() == basist::KTX2_KHR_DF_TRANSFER_SRGB;

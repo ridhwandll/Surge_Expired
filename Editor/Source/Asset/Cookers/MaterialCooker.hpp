@@ -9,5 +9,6 @@ namespace Surge
     public:
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
         virtual AssetType GetAssetType() const override { return AssetType::MATERIAL; }
+        virtual Uint GetCookerVersion() const override { return 1; }
     };
 }

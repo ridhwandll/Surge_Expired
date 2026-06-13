@@ -26,9 +26,6 @@ file(GLOB_RECURSE ENGINE_SOURCES
 )
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Windows/.*")
 
-# Vendor helper source (header-only library with a single .cpp)
-list(APPEND ENGINE_SOURCES "${VENDOR_ROOT}/stb/stb_image.cpp" "${VENDOR_ROOT}/cgltf/cgltf.cpp")
-
 # Player sources
 file(GLOB PLAYER_SOURCES
     "${PLAYER_SRC_ROOT}/*.cpp"

@@ -72,9 +72,11 @@ namespace Surge
         Ref<Mesh> mesh = asset.As<Mesh>();
         const String sidecarPath = am->GetSidecarPath(meta.ID);
 
+        AssetStamp existingStamp;
         MeshSpecification existingGeom;
-        bool result = MeshBinary::Read(sidecarPath, existingGeom);
-        MeshBinary::Write(sidecarPath, existingGeom, mesh->GetMaterialOverrides());
+        bool result = MeshBinary::Read(sidecarPath, existingStamp, existingGeom);
+
+        MeshBinary::Write(sidecarPath, existingStamp, existingGeom, mesh->GetMaterialOverrides()); //Just override the materials
         return result;
 #endif
     }
@@ -91,9 +93,9 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
-        // Fast Path
         SCOPED_TIMER("MeshSerializer::Deserialize: {}", sidecarPath);
-        if(!MeshBinary::Read(sidecarPath, spec))
+        AssetStamp existingStamp;
+        if(!MeshBinary::Read(sidecarPath, existingStamp, spec))
         {
             Log<Severity::Error>("[MeshSerializer] Failed to read sidecar for mesh {}, returing a default sweet cube!", metadata.RelativePath);
             CheckAndGenerateDefaultMesh(DefaultMesh::CUBE, spec);

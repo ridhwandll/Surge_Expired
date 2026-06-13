@@ -12,8 +12,7 @@
 namespace Surge
 {
     template<typename T>
-    concept IsAssetConcept = std::is_base_of_v<Surge::Asset, T> && !std::is_same_v<Surge::Asset, T>
-        && requires { { T::GetStaticType() } -> std::same_as<AssetType>; };
+    concept IsAssetConcept = std::is_base_of_v<Surge::Asset, T> && !std::is_same_v<Surge::Asset, T> && requires { { T::GetStaticType() } -> std::same_as<AssetType>; };
 
     class AssetManager
     {
@@ -89,7 +88,8 @@ namespace Surge
         }
 
         // Unload
-        // Removes the live Ref from the cache if no other objects are referencing it
+        // Removes the live Ref from the cache if no other objects are referencing it i.e. ref count = 1, otherwise does nothing since it's still in use 
+        // somewhere else in the program Note that the asset will still be registered and can be loaded again later, this just removes it from memory
         // @param id    AssetID of the asset to be removed
         // @return      true if unload was successful, false otherwise
         bool Unload(AssetID id);
@@ -133,6 +133,11 @@ namespace Surge
         const AssetMetadata& GetMetadata(AssetID id);
         const String& GetAssetsDirectory() { return sAssetsDirectory; }
         const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return mAssetRegistry; }
+
+        // GetAssetRefCount
+        // Returns the current reference count of the asset, asset ref count = 1 means only the AssetManager is referencing it, and it can be safely unloaded if desired
+        // @param id    AssetID of the asset to check
+        // @return      Reference count of the asset, or 0 if the asset is not loaded
         size_t GetAssetRefCount(AssetID id)
         {
             auto it = mLoadedAssets.find(id);
@@ -145,22 +150,24 @@ namespace Surge
         // Returns the absolute/relative path to the sidecar file for a given asset file. The sidecar file is where the cooked runtime data is stored for an asset
         // @param filePath    Relative/Absolute, but must include the file extension. The returned sidecar path will just have the sidecar extension
         // @param id          AssetID of the asset
-        // @param type        [Internal] Used for internal purposes, do not specify
+        // @param type        [Internal] Used for internal purposes, do NOT specify
         String GetSidecarPath(AssetID id, AssetType type = AssetType::NONE);
 
-        String GetSidecarDirectory(AssetType type);
-
+        // AddAssetLoadHook
+        // Add a callback function that will be called every time an asset is loaded
+        // @param hook    Function to call on asset load, parameters are the AssetID and AssetMetadata of the loaded asset
         void AddAssetLoadHook(std::function<void(AssetID id, const AssetMetadata& meta)>&& hook) { mAssetLoadHook = std::move(hook); }
 
         // Registry
         void SerializeRegistry();
         bool DeserializeRegistry();
-    private:
-        Ref<Asset> LoadAsset(AssetID id);
 
         // Utilities
-    public:
         String GetAbsolutePath(const String& relativePath) const { return sAssetsDirectory + '/' + relativePath; }
+    private:
+        Ref<Asset> LoadAsset(AssetID id);
+        String GetSidecarDirectory(AssetType type);
+
     private:
         String sAssetsDirectory;
         std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;

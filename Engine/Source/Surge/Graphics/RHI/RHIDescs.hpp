@@ -94,7 +94,7 @@ namespace Surge
         bool Transient = false;
         SamplerHandle Sampler = {};
 
-        // Level 0 only, RHI generates remaining mips via vkCmdBlitImage if MipLevel > 1 and GenerateMips is true
+        // Level 0 only, RHI generates remaining mips via vkCmdBlitImage if MipLevel > 1
         // This is not supported for compressed formats, they must provide all levels via MipUploads
         const void* InitialData = nullptr;
         Uint DataSize = 0;

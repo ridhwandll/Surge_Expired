@@ -49,7 +49,7 @@ namespace Surge
                                         {
                                             if(mAssetImporter.NeedsCook(id, meta.Type))
                                             {
-                                                Log<Severity::Warn>("[AssetManager] Cooked file missing on Load, cooking now: {}", meta.RelativePath);
+                                                Log<Severity::Warn>("[AssetManager::AddAssetLoadHook] Cooked file missing on Load, cooking now: {}", meta.RelativePath);
                                                 mAssetImporter.RecookAsset(id);
                                             }
                                         });
@@ -141,7 +141,7 @@ namespace Surge
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
         mActiveScene = std::move(scene);
-        mAssetImporter.ScanAndCookAll();
+        //mAssetImporter.ScanAndCookAll();
     }
 
     void Editor::CheckResize()

@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/Material.hpp"
+#include "Surge/Asset/Serializer/AssetStamp.hpp"
 
 namespace Surge::MeshBinary
 {
@@ -18,16 +19,9 @@ namespace Surge::MeshBinary
     //    [BLOB: Vertices          ]
     //    [BLOB: Indices           ]
     //    [BLOB: Submeshes         ]
-    //    [BLOB: TransientMaterials]
-    //    MaterialOverrides         For each override: Uint slotIndex + RawID: Uint64
+    //    [BLOB: TransientMaterials] (Look into MaterialBinaryFormat.hpp for sizes)
+    //    MaterialOverrides          For each override: Uint slotIndex + RawID: Uint64
 
-    // Each [TransientMaterials] (Look into MaterialSerializer.cpp)
-    // HasData (1 byte)
-    // Material Name (Uint length + String chars)
-    // CPUBufferData (Uint length + Buffer bytes)
-    // Texture Count (Uint count)
-    // Textures      (For each texture: Name: (Uint length + String chars) + RawID: Uint64)
-
-    bool Write(const String& path, const MeshSpecification& spec, const Vector<Ref<Material>>& overrides);
-    bool Read(const String& path, MeshSpecification& outSpec);
+    bool Write(const String& path, const AssetStamp& stamp, const MeshSpecification& spec, const Vector<Ref<Material>>& overrides);
+    bool Read(const String& path, AssetStamp& outstamp, MeshSpecification& outSpec);
 }

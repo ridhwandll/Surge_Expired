@@ -17,7 +17,9 @@ namespace Surge
         Ref<Material> material = Material::Create("MaterialCooker::Cook");
         MaterialSourceWriter::Read(material, sourceAbsPath);
 
-        bool success = MaterialBinary::Write(sidecarPath, material);
+        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
+
+        bool success = MaterialBinary::Write(sidecarPath, stamp, material);
 
         CookResult result;
         result.Success = success;

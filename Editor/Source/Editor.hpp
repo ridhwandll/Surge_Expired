@@ -28,6 +28,7 @@ namespace Surge
 
         void LoadScene(Ref<Scene>&& scene);
         void SetCurrentProject(const Project& project) { mCurrentProject = project; }
+        const Project& GetCurrentProject() const { return mCurrentProject; }
 
         const AssetImporter& GetAssetImporter() const { return mAssetImporter; }
         Ref<Scene> GetCurrentScene() { return mActiveScene; }

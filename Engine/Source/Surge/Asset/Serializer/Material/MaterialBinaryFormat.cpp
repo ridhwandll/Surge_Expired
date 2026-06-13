@@ -107,10 +107,16 @@ namespace Surge::MaterialBinary
         return mat;
     }
 
-    bool Write(const String& path, const Ref<Material>& mat)
+    bool Write(const String& path, const AssetStamp& stamp, const Ref<Material>& mat)
     {
+        Vector<Byte> stampBuffer;
+        WriteData(stampBuffer, stamp);
+
         Vector<Byte> outBuffer;
         WriteBuffer(outBuffer, mat);
+
+        // Prepend the stamp to the output buffer
+        outBuffer.insert(outBuffer.begin(), stampBuffer.begin(), stampBuffer.end());
 
         if(!Filesystem::WriteBinaryFile(path, outBuffer.data(), outBuffer.size()))
         {
@@ -121,14 +127,16 @@ namespace Surge::MaterialBinary
         return true;
     }
 
-    bool Read(const String& path, Ref<Material>& outMat)
+    bool Read(const String& path, AssetStamp& outStamp, Ref<Material>& outMat)
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(path, fileData))
             return false;
 
         const Byte* ptr = fileData.data();
+        ReadData(ptr, outStamp);
         outMat = ReadBuffer(ptr);
+
         return true;
     }
 }

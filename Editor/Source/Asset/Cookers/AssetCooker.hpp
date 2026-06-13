@@ -20,6 +20,7 @@ namespace Surge
 
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const = 0;
         virtual AssetType GetAssetType() const = 0;
+        virtual Uint GetCookerVersion() const = 0;
 
         bool NeedsCook(AssetID id) const;
     };
