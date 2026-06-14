@@ -21,6 +21,7 @@ set(INCLUDE_DIRS
     Vendor/json/Include
     Vendor/FontAwesome
     Vendor/basisu
+    Vendor/JoltPhysics
 )
 
 set(LIB_LINKS
@@ -29,6 +30,7 @@ set(LIB_LINKS
     ImGui
     Optick
     basisu
+    Jolt
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 

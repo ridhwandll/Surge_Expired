@@ -8,6 +8,9 @@
 #include "SurgeReflect/SurgeReflect.hpp"
 #include "Surge/Asset/Asset.hpp"
 
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -35,7 +38,7 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API TransformComponent
+    struct TransformComponent
     {
         TransformComponent() = default;
         TransformComponent(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
@@ -67,7 +70,6 @@ namespace Surge
         mutable glm::mat4 mCachedTransform{ 1.0f };
         mutable bool mDirty = true;
     };
-
 
     struct SpriteRendererComponent
     {
@@ -119,6 +121,7 @@ namespace Surge
     struct EnvironmentComponent
     {
         EnvironmentComponent() = default;
+        EnvironmentComponent(const EnvironmentComponent&) = default;
 
         float Elevation = 30.0f; // In degrees
         float Azimuth = 0.0f;   // In degrees
@@ -134,9 +137,42 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    //Physics
+    enum class RigidbodyType { STATIC, DYNAMIC, KINEMATIC };
+
+    struct RigidbodyComponent
+    {
+        JPH::BodyID RuntimeBodyID; // Jolt's internal handle
+        RigidbodyType Type = RigidbodyType::DYNAMIC;
+        float Mass = 1.0f;
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct BoxColliderComponent
+    {
+        glm::vec3 HalfExtents = { 0.5f, 0.5f, 0.5f }; // A 1x1x1 meter cube
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct SphereColliderComponent
+    {
+        float Radius = 0.5f;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct CapsuleColliderComponent
+    {
+        float Height = 1.0f;
+        float Radius = 0.25f;
+        SURGE_REFLECTION_ENABLE;
+    };
+
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
-#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
-                             ::Surge::CameraComponent, ::Surge::SpriteRendererComponent,\
-                             ::Surge::MeshComponent, ::Surge::LightComponent, ::Surge::EnvironmentComponent \
+#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
+                                ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent,     \
+                                ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
+                                ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
+                                ::Surge::CapsuleColliderComponent \
 
 } // namespace Surge

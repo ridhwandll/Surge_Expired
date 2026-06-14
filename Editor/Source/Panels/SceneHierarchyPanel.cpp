@@ -2,7 +2,6 @@
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "Surge/Core/Input/Input.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "Surge/Asset/AssetManager.hpp"
@@ -15,6 +14,26 @@ namespace Surge
         mCode = GetStaticCode();
         mSceneContext = nullptr;
         mSelectedEntity = {};
+    }
+
+    void SceneHierarchyPanel::OnEvent(Event& e)
+    {
+        if(!mSelectedEntity || !mSceneContext)
+            return;
+
+        EventDispatcher dispatcher(e);
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
+            if(keyEvent.GetKeyCode() == Key::Delete)
+            {
+                mSceneContext->DestroyEntity(mSelectedEntity);
+                mSelectedEntity = {};
+            }
+            if(keyEvent.GetKeyCode() == Key::ScrollLock)
+            {
+                Entity e = mSceneContext->DuplicateEntity(mSelectedEntity);
+                mSelectedEntity = e;
+            }
+                                             });
     }
 
     void SceneHierarchyPanel::Render(bool* show)

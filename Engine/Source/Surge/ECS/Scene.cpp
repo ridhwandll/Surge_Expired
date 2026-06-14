@@ -8,6 +8,11 @@
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
+#include "Surge/Physics/Physics.hpp"
+#include "Jolt/Physics/Body/BodyInterface.h"
+#include "Jolt/Physics/PhysicsSystem.h"
+#include "Jolt/Physics/Body/BodyCreationSettings.h"
+
 namespace Surge
 {
     static Entity sSelectedEntity;
@@ -15,30 +20,33 @@ namespace Surge
     Scene::Scene()
     {
         AddStartupEntities(); // TODO: Remove from Player builds
-        OnRuntimeStart();
     }
 
     Scene::~Scene()
     {
-        sSelectedEntity = Entity(entt::null, nullptr);
-        OnRuntimeEnd();
         mRegistry.clear();
+        sSelectedEntity = Entity(entt::null, nullptr);
     }
 
     void Scene::OnRuntimeStart()
     {
-        // TODO: Create physics scene here
+        mIsRunning = true;
+        mRegistry.on_construct<RigidbodyComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<BoxColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<SphereColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<CapsuleColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
     }
 
     void Scene::OnRuntimeEnd()
     {
-        // Cleanup physics system here
+        mIsRunning = false;
     }
 
     void Scene::Update(EditorCamera& camera)
     {
+        UpdatePhysics();
         Renderer* renderer = Core::GetRenderer();
-
         auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
         Uint submitCount3D = meshGroup.size();
 
@@ -102,6 +110,8 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::Update()");
         //Timer timer("Scene::Update()", true);
+        UpdatePhysics();
+
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
         auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
@@ -174,6 +184,8 @@ namespace Surge
 
     void Scene::CopyTo(Scene* other)
     {
+        other->mRegistry.clear();
+
         std::unordered_map<UUID, entt::entity> enttMap;
         auto idComponents = mRegistry.view<IDComponent>();
         for (entt::entity entity : idComponents)
@@ -186,9 +198,16 @@ namespace Surge
 
         CopyComponent<NameComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<TransformComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<SpriteRendererComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<LightComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<EnvironmentComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<RigidbodyComponent>(other->mRegistry, mRegistry, enttMap);
+
+        CopyComponent<BoxColliderComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<SphereColliderComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<CapsuleColliderComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -213,6 +232,14 @@ namespace Surge
         outEntity.AddComponent<TransformComponent>();
     }
 
+    void Scene::CreateEntityEmpty(Entity& outEntity, const String& name)
+    {
+        entt::entity e = mRegistry.create();
+        outEntity = Entity(e, this);
+        outEntity.AddComponent<IDComponent>();
+        outEntity.AddComponent<NameComponent>(name);
+    }
+
     void Scene::CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name)
     {
         entt::entity e = mRegistry.create();
@@ -225,6 +252,31 @@ namespace Surge
     void Scene::DestroyEntity(Entity entity)
     {
         mRegistry.destroy(entity.Raw());
+    }
+
+    Entity Scene::DuplicateEntity(Entity entity)
+    {
+        Entity newEntity;
+        CreateEntityEmpty(newEntity, entity.GetComponent<NameComponent>().Name + " (Clone)");
+
+        auto CopyIfHas = [&](auto componentType) {
+            using T = typename decltype(componentType)::type;
+            if(entity.HasComponent<T>())
+            {
+                newEntity.AddComponent<T>(entity.GetComponent<T>());
+            }
+            };
+
+        CopyIfHas(std::type_identity<TransformComponent>{});
+        CopyIfHas(std::type_identity<MeshComponent>{});
+        CopyIfHas(std::type_identity<RigidbodyComponent>{});
+        CopyIfHas(std::type_identity<BoxColliderComponent>{});
+        CopyIfHas(std::type_identity<SphereColliderComponent>{});
+        CopyIfHas(std::type_identity<CapsuleColliderComponent>{});
+        CopyIfHas(std::type_identity<LightComponent>{});
+        CopyIfHas(std::type_identity<SpriteRendererComponent>{});
+
+        return newEntity;
     }
 
     void Scene::SetSlectedEntity(Entity entity)
@@ -258,6 +310,33 @@ namespace Surge
             }
         }
         return result;
+    }
+
+    void Scene::UpdatePhysics()
+    {
+        if(mIsRunning)
+        {
+            Physics* physics = Core::GetPhysics();
+            JPH::PhysicsSystem* physicsSystem = physics->Get();
+            JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
+
+            auto view = mRegistry.view<TransformComponent, RigidbodyComponent>();
+            for(auto [entity, transformComp, rb] : view.each())
+            {
+                if(rb.RuntimeBodyID.IsInvalid())
+                    continue;
+
+                if(!bodyInterface.IsActive(rb.RuntimeBodyID))
+                    continue;
+
+                JPH::Vec3 joltPosition = bodyInterface.GetPosition(rb.RuntimeBodyID);
+                JPH::Quat joltRotation = bodyInterface.GetRotation(rb.RuntimeBodyID);
+
+                transformComp.Position = glm::vec3(joltPosition.GetX(), joltPosition.GetY(), joltPosition.GetZ());
+                transformComp.Rotation = glm::degrees(glm::eulerAngles(glm::quat(joltRotation.GetW(), joltRotation.GetX(), joltRotation.GetY(), joltRotation.GetZ())));
+                transformComp.MarkDirty();
+            }
+        }
     }
 
     void Scene::AddStartupEntities()
@@ -322,6 +401,55 @@ namespace Surge
             CreateEntity(env, "Environemnt");
             env.AddComponent<EnvironmentComponent>();
         }
+    }
+
+    inline JPH::Quat GlmToJolt(const glm::vec3& v)
+    {
+        glm::quat q = glm::quat(glm::radians(v));
+        return JPH::Quat(q.x, q.y, q.z, q.w);
+    }
+
+    void Scene::OnColliderAdded(entt::registry& registry, entt::entity entity)
+    {
+        if(!registry.all_of<RigidbodyComponent, TransformComponent>(entity) ||
+           !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent>(entity)))
+            return;
+
+        Physics* physics = Core::GetPhysics();
+        JPH::PhysicsSystem* physicsSystem = physics->Get();
+
+        JPH::ShapeRefC shape = physics->CreateShape(Entity(entity, this));
+
+        auto& transform = registry.get<TransformComponent>(entity);
+        auto& rb = registry.get<RigidbodyComponent>(entity);
+
+        JPH::BodyCreationSettings settings(
+            shape, JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z), GlmToJolt(transform.Rotation),
+            (rb.Type == RigidbodyType::STATIC) ? JPH::EMotionType::Static : JPH::EMotionType::Dynamic,
+            (rb.Type == RigidbodyType::STATIC) ? PhysicsLayers::STATIC : PhysicsLayers::DYNAMIC);
+
+        JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
+        JPH::Body* body = bodyInterface.CreateBody(settings);
+
+        rb.RuntimeBodyID = body->GetID();
+        bodyInterface.AddBody(rb.RuntimeBodyID, JPH::EActivation::Activate);
+    }
+
+    void Scene::OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        auto& rb = registry.get<RigidbodyComponent>(entity);
+
+        if(rb.RuntimeBodyID.IsInvalid())
+            return;
+
+        Physics* physics = Core::GetPhysics();
+        JPH::PhysicsSystem* physicsSystem = physics->Get();
+
+        JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
+        bodyInterface.RemoveBody(rb.RuntimeBodyID);
+        bodyInterface.DestroyBody(rb.RuntimeBodyID);
+
+        rb.RuntimeBodyID = JPH::BodyID();
     }
 
 } // namespace Surge

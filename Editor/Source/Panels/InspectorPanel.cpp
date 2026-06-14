@@ -79,7 +79,19 @@ namespace Surge
                         entity.AddComponent<LightComponent>();
                     if (ImGui::MenuItem("Environment") && !entity.HasComponent<EnvironmentComponent>())
                         entity.AddComponent<EnvironmentComponent>();
+                    if(ImGui::BeginMenu("Physics"))
+                    {
+                        if(ImGui::MenuItem("Rigidbody") && !entity.HasComponent<RigidbodyComponent>())
+                            entity.AddComponent<RigidbodyComponent>();
+                        if(ImGui::MenuItem("Box Collider") && !entity.HasComponent<BoxColliderComponent>())
+                            entity.AddComponent<BoxColliderComponent>();
+                        if(ImGui::MenuItem("Sphere Collider") && !entity.HasComponent<SphereColliderComponent>())
+                            entity.AddComponent<SphereColliderComponent>();
+                        if(ImGui::MenuItem("Capsule Collider") && !entity.HasComponent<CapsuleColliderComponent>())
+                            entity.AddComponent<CapsuleColliderComponent>();
 
+                        ImGui::EndPopup();
+                    }
                     ImGui::EndPopup();
                 }
             }
@@ -331,6 +343,62 @@ namespace Surge
 
             });
         }
+        if(entity.HasComponent<RigidbodyComponent>())
+        {
+            RigidbodyComponent& component = entity.GetComponent<RigidbodyComponent>();
+            DrawComponent<RigidbodyComponent>(entity, "Rigidbody", [&component]()
+            {
+                const char* rbTypeStrings[] = { "STATIC", "DYNAMIC", "KINEMATIC" };
+                const char* currentRbTypeString = rbTypeStrings[static_cast<int>(component.Type)];
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("TYPE");
+                ImGui::TableNextColumn();
+                ImGui::PushItemWidth(-1);
+                if (ImGui::BeginCombo("##RBTYPE", currentRbTypeString))
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        const bool isSelected = currentRbTypeString == rbTypeStrings[i];
+                        if (ImGui::Selectable(rbTypeStrings[i], isSelected))
+                        {
+                            currentRbTypeString = rbTypeStrings[i];
+                            component.Type = static_cast<RigidbodyType>(i);
+                        }
+                        if (isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopItemWidth();
+                ImGuiAux::TProperty<float>("Mass", &component.Mass);
+            });
+        }
+        if(entity.HasComponent<BoxColliderComponent>())
+        {
+            BoxColliderComponent& component = entity.GetComponent<BoxColliderComponent>();
+            DrawComponent<BoxColliderComponent>(entity, "Box Collider", [&component]()
+            {
+                ImGuiAux::TProperty<glm::vec3>("Half Extents", &component.HalfExtents);
+            });
+        }
+        if(entity.HasComponent<SphereColliderComponent>())
+        {
+            SphereColliderComponent& component = entity.GetComponent<SphereColliderComponent>();
+            DrawComponent<SphereColliderComponent>(entity, "Sphere Collider", [&component]()
+            {
+                ImGuiAux::TProperty<float>("Radius", &component.Radius);
+            });
+        }
+        if(entity.HasComponent<CapsuleColliderComponent>())
+        {
+            CapsuleColliderComponent& component = entity.GetComponent<CapsuleColliderComponent>();
+            DrawComponent<CapsuleColliderComponent>(entity, "Capsule Collider", [&component]()
+            {
+                ImGuiAux::TProperty<float>("Radius", &component.Radius);
+                ImGuiAux::TProperty<float>("Height", &component.Height);
+            });
+        }
+
     }
 
 } // namespace Surge

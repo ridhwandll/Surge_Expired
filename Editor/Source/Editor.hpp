@@ -40,9 +40,9 @@ namespace Surge
         void OnImGuiRender();
         void RenderEditorSettings();
     private:
-        // Editor Settins
-        bool mShowRuntimeView = false;
         bool mShowAxes = true;
+
+        Ref<Scene> mRuntimeScene;
 
         AssetImporter mAssetImporter;
         EditorCamera mCamera;

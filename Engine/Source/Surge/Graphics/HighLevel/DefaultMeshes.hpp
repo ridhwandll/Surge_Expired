@@ -437,14 +437,25 @@ namespace Surge
                 }
             }
 
-            for (Uint r = 0; r < rings * 2; ++r)
+            Uint rows = (rings * 2) + 1;
+            Uint cols = segments + 1;
+            for(Uint r = 0; r < rows - 1; ++r)
             {
-                for (Uint s = 0; s < segments; ++s)
+                for(Uint s = 0; s < segments; ++s)
                 {
-                    Uint current = r * (segments + 1) + s;
-                    Uint next = current + segments + 1;
-                    mesh.Indices.push_back({ current, next, current + 1 });
-                    mesh.Indices.push_back({ current + 1, next, next + 1 });
+                    Uint currentRow = r * cols;
+                    Uint nextRow = (r + 1) * cols;
+
+                    Uint a = currentRow + s;
+                    Uint b = currentRow + s + 1;
+                    Uint c = nextRow + s + 1;
+                    Uint d = nextRow + s;
+
+                    // Triangle 1: a -> b -> c
+                    mesh.Indices.push_back({ a, b, c });
+
+                    // Triangle 2: a -> c -> d
+                    mesh.Indices.push_back({ a, c, d });
                 }
             }
             return mesh;

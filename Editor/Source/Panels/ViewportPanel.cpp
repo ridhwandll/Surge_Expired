@@ -232,9 +232,14 @@ namespace Surge
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.1f, 0.6f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
-            if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0))) { Log<Severity::Warn>("[ViewportPanel] TODO: Implement Play button"); }
+            Editor* editor = static_cast<Editor*>(Core::GetClient());
+
+            if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0)))
+                editor->OnRuntimeStart();
+
             ImGui::SameLine();
-            if(ImGui::Button("PAUSE", ImVec2(buttonWidth, 0))) { Log<Severity::Warn>("[ViewportPanel] TODO: Implement Pause button"); }
+            if(ImGui::Button("STOP", ImVec2(buttonWidth, 0)))
+                editor->OnRuntimeEnd();
 
             ImGui::PopStyleVar();
             ImGui::PopStyleColor();

@@ -7,20 +7,26 @@
 #include "Surge/Core/Time/Clock.hpp"
 #include <functional>
 
-namespace Surge::Core
+
+namespace Surge
 {
-    void Initialize(Client* application);
-    void Run();
-    void Shutdown();
+    class Physics;
+    namespace Core
+    {
+        void Initialize(Client* application);
+        void Run();
+        void Shutdown();
 
-    void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
+        void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
 
-    // Window should be a part of core
-    Window* GetWindow();
-    Clock& GetClock();
+        // Window should be a part of core
+        Window* GetWindow();
+        Clock& GetClock();
 
-    Renderer* GetRenderer();
-    AssetManager* GetAssetManager();
-    Client* GetClient();
+        Physics* GetPhysics();
+        Renderer* GetRenderer();
+        AssetManager* GetAssetManager();
+        Client* GetClient();
+    }
 
 } // namespace Surge::Core

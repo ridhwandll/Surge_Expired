@@ -5,7 +5,8 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
 #include "Profiler.hpp"
-#include <filesystem>
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Physics/Physics.hpp"
 
 
 #ifdef SURGE_PLATFORM_WINDOWS
@@ -13,7 +14,6 @@
 #elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #endif
-#include "../Asset/AssetManager.hpp"
 
 
 #define ENV_VAR_KEY "SURGE_DIR"
@@ -27,6 +27,7 @@ namespace Surge::Core
         Window* SurgeWindow = nullptr;
         Renderer* SurgeRenderer = nullptr;
         AssetManager* SurgeAssetManager = nullptr;
+        Physics* SurgePhysics = nullptr;
 
         bool Running = false;
         Vector<std::function<void()>> FrameEndCallbacks;
@@ -74,6 +75,9 @@ namespace Surge::Core
         GCoreData.SurgeAssetManager = new AssetManager();
         GCoreData.SurgeAssetManager->Initialize("Engine/Assets");
 
+        // Physics
+        GCoreData.SurgePhysics = new Physics();
+        GCoreData.SurgePhysics->Initialize();
 
         GCoreData.Running = true;
         GCoreData.SurgeClient->OnInitialize();
@@ -90,6 +94,7 @@ namespace Surge::Core
             if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
                 continue;
 
+            GCoreData.SurgePhysics->Update(GCoreData.SurgeClock.GetMilliseconds());
             GCoreData.SurgeClient->OnUpdate();
 
             if (!GCoreData.FrameEndCallbacks.empty())
@@ -116,6 +121,9 @@ namespace Surge::Core
         GCoreData.SurgeAssetManager->Shutdown();
         delete GCoreData.SurgeAssetManager;
 
+        GCoreData.SurgePhysics->Shutdown();
+        delete GCoreData.SurgePhysics;
+
         GCoreData.SurgeRenderer->Shutdown();
         delete GCoreData.SurgeRenderer;
 
@@ -130,6 +138,7 @@ namespace Surge::Core
     }
 
     Window* GetWindow() { return GCoreData.SurgeWindow; }
+    Physics* GetPhysics() { return GCoreData.SurgePhysics; }
     Renderer* GetRenderer() { return GCoreData.SurgeRenderer; }
     AssetManager* GetAssetManager() { return GCoreData.SurgeAssetManager; }
     Client* GetClient() { return GCoreData.SurgeClient; }

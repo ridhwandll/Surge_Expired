@@ -53,3 +53,21 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::EnvironmentComponent)
     .AddVariable<&Surge::EnvironmentComponent::HorizonAmbient>("HorizonAmbient")
     .AddVariable<&Surge::EnvironmentComponent::GroundAmbient>("GroundAmbient")
 SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::RigidbodyComponent)
+    .AddVariable<&Surge::RigidbodyComponent::Type>("Type")
+    .AddVariable<&Surge::RigidbodyComponent::Mass>("Mass")
+SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::BoxColliderComponent)
+    .AddVariable<&Surge::BoxColliderComponent::HalfExtents>("HalfExtents")
+SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::SphereColliderComponent)
+    .AddVariable<&Surge::SphereColliderComponent::Radius>("Radius")
+SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CapsuleColliderComponent)
+    .AddVariable<&Surge::CapsuleColliderComponent::Height>("Height")
+    .AddVariable<&Surge::CapsuleColliderComponent::Radius>("Radius")
+SURGE_REFLECT_CLASS_REGISTER_END()

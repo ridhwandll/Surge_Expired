@@ -62,6 +62,7 @@ namespace Surge
     // Enum Mappings
     NLOHMANN_JSON_SERIALIZE_ENUM(RuntimeCamera::ProjectionType, { {RuntimeCamera::ProjectionType::Perspective, "Perspective"}, {RuntimeCamera::ProjectionType::Orthographic, "Orthographic"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(LightType, { {LightType::POINT, "POINT"}, {LightType::DIRECTIONAL, "DIRECTIONAL"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(RigidbodyType, { {RigidbodyType::STATIC, "STATIC"}, {RigidbodyType::DYNAMIC, "DYNAMIC"}, {RigidbodyType::KINEMATIC, "KINEMATIC"} });
 
     template <typename XComponent>
     FORCEINLINE static void SerializeComponent(nlohmann::json& j, Entity& e)
@@ -114,6 +115,10 @@ namespace Surge
                 else if(type.EqualTo<LightType>())
                 {
                     out[name] = *reinterpret_cast<const LightType*>(source);
+                }
+                else if(type.EqualTo<RigidbodyType>())
+                {
+                    out[name] = *reinterpret_cast<const RigidbodyType*>(source);
                 }
                 else
                     Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
@@ -218,6 +223,8 @@ namespace Surge
             }
             else if(type.EqualTo<LightType>())
                 *reinterpret_cast<LightType*>(dest) = inJson.value(name, LightType::DIRECTIONAL);
+            else if(type.EqualTo<RigidbodyType>())
+                *reinterpret_cast<RigidbodyType*>(dest) = inJson.value(name, RigidbodyType::STATIC);
             else
                 Log<Severity::Warn>("DeserializeComponent: Unhandled type '{}' for field '{}'", type.GetFullName(), name);
         }

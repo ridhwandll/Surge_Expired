@@ -14,6 +14,7 @@
 #include "Asset/Cookers/Texture2DCooker.hpp"
 #include "Asset/Cookers/MeshCooker.hpp"
 #include "Asset/Cookers/MaterialCooker.hpp"
+#include "Surge/Physics/Physics.hpp"
 
 namespace Surge
 {
@@ -71,8 +72,8 @@ namespace Surge
             }
 
             CheckResize();
-            if(mShowRuntimeView && mActiveScene->GetMainCameraEntity().Data1)
-                mActiveScene->Update();
+            if(mRuntimeScene && mRuntimeScene->GetMainCameraEntity().Data1)
+                mRuntimeScene->Update();
             else
             {
                 mCamera.OnUpdate(mViewportPanel->IsViewportHovered());
@@ -94,6 +95,22 @@ namespace Surge
             ImGuiAux::DockSpace();
             mPanelManager.RenderPanels();
             RenderEditorSettings();
+
+            ImGui::Begin("Physics Stats");
+
+            Surge::Physics* physics = Core::GetPhysics();
+            if(physics)
+            {
+                int total = 0;
+                int active = 0;
+                physics->GetDebugStats(active, total);
+
+                ImGui::Text("Total Bodies: %d", total);
+                ImGui::Text("Active Bodies: %d", active);
+                ImGui::Text("Sleeping Bodies: %d", total - active);
+            }
+
+            ImGui::End();
         }
         else
         {
@@ -106,7 +123,7 @@ namespace Surge
     {
         ImGui::Begin("Editor Settings");
         if (ImGuiAux::Button("Save Scene (F2)")) { mAssetManager->Save(mActiveScene->GetID()); }
-        ImGui::Checkbox("Show Runtime View", &mShowRuntimeView);
+
         ImGui::Checkbox("Show Axes", &mShowAxes);
         ImGui::End();
     }
@@ -130,10 +147,24 @@ namespace Surge
 
     void Editor::OnRuntimeStart()
     {
+        mRuntimeScene = Ref<Scene>::Create();
+        mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(mRuntimeScene.Raw());
+        mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
+
+        mRuntimeScene->OnRuntimeStart();
+        mActiveScene->CopyTo(mRuntimeScene.Raw());
+        mRuntimeScene->SetRunning(true);
+
     }
 
     void Editor::OnRuntimeEnd()
     {
+        mRuntimeScene->OnRuntimeEnd();
+        mRuntimeScene->SetRunning(false);
+        mRuntimeScene.Reset();
+
+        mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(mActiveScene.Raw());
+        mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
     }
 
     void Editor::LoadScene(Ref<Scene>&& scene)
