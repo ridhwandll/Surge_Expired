@@ -1,6 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Physics.hpp"
+#include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Scene.hpp"
+
+#include <glm/glm.hpp>
 
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
@@ -12,10 +15,92 @@
 #include "Jolt/Physics/Body/BodyCreationSettings.h"
 #include "Jolt/Physics/Collision/Shape/SphereShape.h"
 #include "Jolt/Physics/Collision/Shape/CapsuleShape.h"
+#include <Jolt/Renderer/DebugRenderer.h>
 #include <cstdarg>
 
 namespace Surge
 {
+    // Debug renderer
+    class PhysicsDebugBatch : public JPH::RefTargetVirtual
+    {
+    public:
+        virtual void AddRef() override { mRefCount++; }
+        virtual void Release() override { if(--mRefCount == 0) delete this; }
+        uint32_t mRefCount = 0;
+        struct Triangle { JPH::Float3 v[3]; };
+        Vector<Triangle> mTriangles;
+
+        PhysicsDebugBatch(const JPH::DebugRenderer::Vertex* inVertices, int inVertexCount, const uint32_t* inIndices, int inIndexCount)
+        {
+            for(int i = 0; i < inIndexCount; i += 3)
+            {
+                Triangle t;
+                t.v[0] = inVertices[inIndices[i]].mPosition;
+                t.v[1] = inVertices[inIndices[i + 1]].mPosition;
+                t.v[2] = inVertices[inIndices[i + 2]].mPosition;
+                mTriangles.push_back(t);
+            }
+        }
+
+        PhysicsDebugBatch(const JPH::DebugRenderer::Triangle* inTriangles, int inTriangleCount)
+        {
+            for(int i = 0; i < inTriangleCount; i++)
+            {
+                Triangle t;
+                t.v[0] = inTriangles[i].mV[0].mPosition;
+                t.v[1] = inTriangles[i].mV[1].mPosition;
+                t.v[2] = inTriangles[i].mV[2].mPosition;
+                mTriangles.push_back(t);
+            }
+        }
+    };
+    class PhysicsDebugRenderer final : public JPH::DebugRenderer
+    {
+    public:
+        PhysicsDebugRenderer()
+        {
+            JPH::DebugRenderer::Initialize();
+        }
+
+        virtual void DrawLine(JPH::RVec3Arg inFrom, JPH::RVec3Arg inTo, JPH::ColorArg inColor) override
+        {
+            glm::vec3 from(inFrom.GetX(), inFrom.GetY(), inFrom.GetZ());
+            glm::vec3 to(inTo.GetX(), inTo.GetY(), inTo.GetZ());
+            Core::GetRenderer()->SubmitLine(from, to, glm::vec4(inColor.r / 255.0f, inColor.g / 255.0f, inColor.b / 255.0f, inColor.a / 255.0f));
+        }
+
+        virtual void DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow) override {}
+        virtual void DrawText3D(JPH::RVec3Arg inPosition, const std::string_view& inString, JPH::ColorArg inColor, float inHeight) override {}
+
+        virtual Batch CreateTriangleBatch(const Triangle* inTriangles, int inTriangleCount) override { return new PhysicsDebugBatch(inTriangles, inTriangleCount);; }
+        virtual Batch CreateTriangleBatch(const Vertex* inVertices, int inVertexCount, const uint32_t* inIndices, int inIndexCount) override { return new PhysicsDebugBatch(inVertices, inVertexCount, inIndices, inIndexCount); }
+        virtual void DrawGeometry(JPH::RMat44Arg inModelMatrix, const JPH::AABox& inWorldSpaceBounds, float inLODScaleSq, JPH::ColorArg inModelColor, const GeometryRef& inGeometry, ECullMode inCullMode, ECastShadow inCastShadow, EDrawMode inDrawMode) override
+        {
+            if(inGeometry->mLODs.empty())
+                return;
+
+            PhysicsDebugBatch* batch = static_cast<PhysicsDebugBatch*>(inGeometry->mLODs[0].mTriangleBatch.GetPtr());
+            if(!batch)
+                return;
+
+            glm::vec4 color(inModelColor.r / 255.0f, inModelColor.g / 255.0f, inModelColor.b / 255.0f, inModelColor.a / 255.0f);
+            for(const auto& tri : batch->mTriangles)
+            {
+                JPH::RVec3 v0 = inModelMatrix * JPH::Vec3(tri.v[0].x, tri.v[0].y, tri.v[0].z);
+                JPH::RVec3 v1 = inModelMatrix * JPH::Vec3(tri.v[1].x, tri.v[1].y, tri.v[1].z);
+                JPH::RVec3 v2 = inModelMatrix * JPH::Vec3(tri.v[2].x, tri.v[2].y, tri.v[2].z);
+
+                glm::vec3 glmV0(v0.GetX(), v0.GetY(), v0.GetZ());
+                glm::vec3 glmV1(v1.GetX(), v1.GetY(), v1.GetZ());
+                glm::vec3 glmV2(v2.GetX(), v2.GetY(), v2.GetZ());
+
+                Core::GetRenderer()->SubmitLine(glmV0, glmV1, color);
+                Core::GetRenderer()->SubmitLine(glmV1, glmV2, color);
+                Core::GetRenderer()->SubmitLine(glmV2, glmV0, color);
+            }
+        }
+    };
+
     class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
     {
     public:
@@ -87,6 +172,7 @@ namespace Surge
         mBPLayerInterface = new BPLayerInterfaceImpl();
         mObjVsBPLayerFilter = new ObjectVsBroadPhaseLayerFilterImpl();
         mObjVsObjLayerFilter = new ObjectLayerPairFilterImpl();
+        mDebugRenderer = new PhysicsDebugRenderer();
 
         mPhysicsSystem = new JPH::PhysicsSystem();
 
@@ -125,6 +211,7 @@ namespace Surge
 
     void Physics::Shutdown()
     {
+        delete mDebugRenderer;
         delete mPhysicsSystem;
 
         delete static_cast<ObjectLayerPairFilterImpl*>(mObjVsObjLayerFilter);
@@ -147,15 +234,35 @@ namespace Surge
     {
         auto& registry = entity.GetScene()->GetRegistry();
 
-        if(auto* box = registry.try_get<BoxColliderComponent>(entity.Raw()))
-            return new JPH::BoxShape(JPH::Vec3(box->HalfExtents.x, box->HalfExtents.y, box->HalfExtents.z));
-        if(auto* sphere = registry.try_get<SphereColliderComponent>(entity.Raw()))
-            return new JPH::SphereShape(sphere->Radius);
-        if(auto* capsule = registry.try_get<CapsuleColliderComponent>(entity.Raw()))
-            return new JPH::CapsuleShape(capsule->Height * 0.5f, capsule->Radius);
+        glm::vec3 scale = entity.GetComponent<TransformComponent>().Scale;
+        glm::vec3 absScale(std::abs(scale.x), std::abs(scale.y), std::abs(scale.z));
 
-        Log<Severity::Warn>("[Physics] CreateShape: Entity {} has no recognized collider component, using default box shape!", (Uint)entity);
+        if(auto* box = registry.try_get<BoxColliderComponent>(entity.Raw()))
+        {
+            return new JPH::BoxShape(JPH::Vec3(box->HalfExtents.x * absScale.x, box->HalfExtents.y * absScale.y, box->HalfExtents.z * absScale.z));
+        }
+        if(auto* sphere = registry.try_get<SphereColliderComponent>(entity.Raw()))
+        {
+            float maxScale = std::max({ absScale.x, absScale.y, absScale.z });
+            return new JPH::SphereShape(sphere->Radius * maxScale);
+        }
+
+        if(auto* capsule = registry.try_get<CapsuleColliderComponent>(entity.Raw()))
+        {
+            // Radius scales along X/Z plane, Height scales along Y
+            float maxRadiusScale = std::max(absScale.x, absScale.z);
+            float scaledRadius = capsule->Radius * maxRadiusScale;
+            float scaledTotalHeight = capsule->Height * absScale.y;
+
+            float halfHeightOfCylinder = (scaledTotalHeight * 0.5f) - scaledRadius;
+            if(halfHeightOfCylinder < 0.0f)
+                halfHeightOfCylinder = 0.0f;
+
+            return new JPH::CapsuleShape(halfHeightOfCylinder, scaledRadius);
+        }
+
         // Default fallback
+        Log<Severity::Fatal>("[Physics] CreateShape: THIS SHOULD NOT HAPPEN Entity {} has no recognized collider component, using default box shape!", (Uint)entity);
         return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
     }
 

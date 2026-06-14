@@ -164,18 +164,21 @@ namespace Surge
 
     struct BoxColliderComponent
     {
+        bool ShowCollider = true;
         glm::vec3 HalfExtents = { 0.5f, 0.5f, 0.5f }; // A 1x1x1 meter cube
         SURGE_REFLECTION_ENABLE;
     };
 
     struct SphereColliderComponent
     {
+        bool ShowCollider = true;
         float Radius = 0.5f;
         SURGE_REFLECTION_ENABLE;
     };
 
     struct CapsuleColliderComponent
     {
+        bool ShowCollider = true;
         float Height = 1.0f;
         float Radius = 0.25f;
         SURGE_REFLECTION_ENABLE;

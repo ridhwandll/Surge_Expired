@@ -3,9 +3,7 @@ add_library(Jolt STATIC ${JOLT_SOURCES})
 target_include_directories(Jolt PUBLIC "")
 target_compile_definitions(Jolt PUBLIC JPH_DEBUG_RENDERER)
 
-
 set_target_properties(Jolt PROPERTIES FOLDER Dependencies)
-
 if(WIN32)
 
     target_compile_definitions(Jolt PUBLIC 
@@ -17,7 +15,7 @@ if(WIN32)
         JPH_USE_F16C 
         JPH_USE_FMADD
     )
-    target_compile_options(Jolt PRIVATE /arch:AVX2 /fp:fast)
+    target_compile_options(Jolt PUBLIC /arch:AVX2 /fp:fast)
 elseif(ANDROID)
-    target_compile_options(Jolt PRIVATE -ffast-math)    
+    target_compile_options(Jolt PUBLIC -ffast-math)
 endif()

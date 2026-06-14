@@ -16,6 +16,11 @@
 namespace Surge
 {
     static Entity sSelectedEntity;
+    inline JPH::Quat GlmToJolt(const glm::vec3& v)
+    {
+        glm::quat q = glm::quat(glm::radians(v));
+        return JPH::Quat(q.x, q.y, q.z, q.w);
+    }
 
     Scene::Scene()
     {
@@ -98,20 +103,50 @@ namespace Surge
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
                 }
             }
-            if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
+            if(sSelectedEntity)
             {
-               const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
-               if(meshComp.MeshID)
-               {
-                   Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
-                   if (mesh) //Asset might be missing/corrupted, so check before submitting
-                   {
-                       const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                       renderer->SubmitMeshOutline(transform, mesh);
-                   }
-               }
+                if(sSelectedEntity.HasComponent<MeshComponent>())
+                {
+                    const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
+                    if(meshComp.MeshID)
+                    {
+                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+                        if(mesh) //Asset might be missing/corrupted, so check before submitting
+                        {
+                            const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                            renderer->SubmitMeshOutline(transform, mesh);
+                        }
+                    }
+                }
+                if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent>(sSelectedEntity))
+                {
+                    bool showCollider = false;
+                    if(sSelectedEntity.HasComponent<BoxColliderComponent>())
+                        showCollider = sSelectedEntity.GetComponent<BoxColliderComponent>().ShowCollider;
+                    else if(sSelectedEntity.HasComponent<SphereColliderComponent>())
+                        showCollider = sSelectedEntity.GetComponent<SphereColliderComponent>().ShowCollider;
+                    else if(sSelectedEntity.HasComponent<CapsuleColliderComponent>())
+                        showCollider = sSelectedEntity.GetComponent<CapsuleColliderComponent>().ShowCollider;
+
+                    if(showCollider)
+                    {
+                        auto& transformComp = sSelectedEntity.GetComponent<TransformComponent>();
+                        JPH::ShapeRefC shape = Core::GetPhysics()->CreateShape(sSelectedEntity);
+
+                        if(shape)
+                        {
+                            JPH::Vec3 joltPos(transformComp.Position.x, transformComp.Position.y, transformComp.Position.z);
+                            JPH::Quat joltRot = GlmToJolt(transformComp.Rotation);
+                            JPH::RMat44 joltTransform = JPH::RMat44::sRotationTranslation(joltRot, joltPos);
+
+                            JPH::DebugRenderer* debugRenderer = Core::GetPhysics()->GetDebugRenderer();
+                            shape->Draw(debugRenderer, joltTransform, JPH::Vec3::sReplicate(1.0f), JPH::Color::sGreen, false, true);
+                        }
+                    }
+                }
             }
         }
+
         renderer->EndFrame();
     }
 
@@ -174,6 +209,16 @@ namespace Surge
                     }
                 }
             }
+
+            //JPH::PhysicsSystem* system = Core::GetPhysics()->Get();
+            //JPH::BodyManager::DrawSettings settings;
+            //settings.mDrawBoundingBox = true;
+            //settings.mDrawShape = false;
+            //settings.mDrawShapeWireframe = false;
+            //settings.mDrawSleepStats = false;
+            //settings.mDrawVelocity = true;
+            //system->DrawBodies(settings, Core::GetPhysics()->GetDebugRenderer());
+
             renderer->EndFrame();
         }
     }
@@ -410,12 +455,6 @@ namespace Surge
             CreateEntity(env, "Environemnt");
             env.AddComponent<EnvironmentComponent>();
         }
-    }
-
-    inline JPH::Quat GlmToJolt(const glm::vec3& v)
-    {
-        glm::quat q = glm::quat(glm::radians(v));
-        return JPH::Quat(q.x, q.y, q.z, q.w);
     }
 
     void Scene::OnColliderAdded(entt::registry& registry, entt::entity entity)

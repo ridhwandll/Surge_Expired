@@ -6,12 +6,15 @@
 #include <Jolt/Physics/Collision/ObjectLayer.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <Jolt/Physics/Collision/Shape/Shape.h>
+#include "Jolt/Renderer/DebugRenderer.h"
+
 
 namespace JPH
 {
     class PhysicsSystem;
     class JobSystemThreadPool;
     class TempAllocatorImpl;
+    class DebugRenderer;
 }
 
 namespace Surge
@@ -44,6 +47,7 @@ namespace Surge
 
         // Getters for the ECS to use
         JPH::PhysicsSystem* Get() { return mPhysicsSystem; }
+        JPH::DebugRenderer* GetDebugRenderer() { return mDebugRenderer; }
 
         void GetDebugStats(int& outActiveBodies, int& outTotalBodies);
     private:
@@ -57,6 +61,7 @@ namespace Surge
         void* mBPLayerInterface;
         void* mObjVsBPLayerFilter;
         void* mObjVsObjLayerFilter;
+        JPH::DebugRenderer* mDebugRenderer;
     };
 
 } // namespace Surge
