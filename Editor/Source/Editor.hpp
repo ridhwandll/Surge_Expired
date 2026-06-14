@@ -23,6 +23,7 @@ namespace Surge
         virtual void OnShutdown() override;
 
         // Editor specific
+        bool IsPlaying() const { return (bool)mRuntimeScene; }
         void OnRuntimeStart();
         void OnRuntimeEnd();
 

@@ -122,7 +122,7 @@ namespace Surge
                     }
                 }
             }
-        });
+                                             });
     }
 
     void ViewportPanel::Render(bool* show)
@@ -210,37 +210,41 @@ namespace Surge
 
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
 
-            // Scene Name Overlay
+            Editor* editor = static_cast<Editor*>(Core::GetClient());
+            bool isPlaying = editor->IsPlaying();
+
+            // Scene Name
+            const char* displayText = isPlaying ? "RUNTIME" : mSceneName.c_str();
             ImGui::PushFont(boldFont);
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             float padding = 5.0f;
             float textHeight = ImGui::GetTextLineHeight();
-            float textWidth = ImGui::CalcTextSize(mSceneName.c_str()).x;
+            float textWidth = ImGui::CalcTextSize(displayText).x;
             ImVec2 bgMax = ImVec2(cursorScreenPos.x + mViewportSize.x - 10.0f, cursorScreenPos.y + 10.0f + textHeight + (padding * 2.0f));
             ImVec2 bgMin = ImVec2(bgMax.x - textWidth - (padding * 2.0f), cursorScreenPos.y + 10.0f);
             drawList->AddRectFilled(bgMin, bgMax, IM_COL32(15, 15, 15, 200), 4.0f);
-            drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), mSceneName.c_str());
-            ImGui::PopFont();
+            drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), displayText);
 
-            // Button Overlays
-            float buttonWidth = 50.0f;
-            float buttonSpacing = ImGui::GetStyle().ItemSpacing.x;
-            float totalButtonsWidth = (buttonWidth * 2.0f) + buttonSpacing;
+            // Play Button
+            const float buttonWidth = ImGui::CalcTextSize("STOP").x + 10.0f; //OR PLAY, both 4 chars
+            float totalButtonsWidth = buttonWidth;
             ImVec2 buttonsPos = ImVec2(cursorLocalPos.x + (mViewportSize.x - totalButtonsWidth) * 0.5f, cursorLocalPos.y + 10.0f);
             ImGui::SetCursorPos(buttonsPos);
 
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.1f, 0.6f));
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.1f, 0.5f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+            if(isPlaying)
+            {
+                if(ImGui::Button("STOP", ImVec2(buttonWidth, 0)))
+                    editor->OnRuntimeEnd();
+            }
+            else
+            {
+                if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0)))
+                    editor->OnRuntimeStart();
+            }
 
-            Editor* editor = static_cast<Editor*>(Core::GetClient());
-
-            if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0)))
-                editor->OnRuntimeStart();
-
-            ImGui::SameLine();
-            if(ImGui::Button("STOP", ImVec2(buttonWidth, 0)))
-                editor->OnRuntimeEnd();
-
+            ImGui::PopFont();
             ImGui::PopStyleVar();
             ImGui::PopStyleColor();
 

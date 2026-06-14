@@ -96,6 +96,9 @@ namespace Surge
             *static_cast<ObjectVsBroadPhaseLayerFilterImpl*>(mObjVsBPLayerFilter),
             *static_cast<ObjectLayerPairFilterImpl*>(mObjVsObjLayerFilter)
         );
+
+        JPH::Vec3 globalGravity(0.0f, -9.81f, 0.0f);
+        mPhysicsSystem->SetGravity(globalGravity);
     }
 
     void Physics::Update(float deltaTime)
@@ -103,13 +106,21 @@ namespace Surge
         if(!mPhysicsSystem)
             return;
 
-        // TODO: This should be fixed timestep with an accumulator
-        float clampedDelta = std::min(deltaTime, 1.0f / 30.0f);
-
         const int collisionSteps = 1;
 
-        // Advance the physics world
-        mPhysicsSystem->Update(clampedDelta, collisionSteps, mTempAllocator, mJobSystem);
+        const float cFixedTimeStep = 1.0f / 60.0f;
+        static float sAccumulatedTime = 0.0f;
+
+        float frameDeltaTime = deltaTime;
+        if(frameDeltaTime > 0.25f)
+            frameDeltaTime = 0.25f;
+
+        sAccumulatedTime += frameDeltaTime;
+        while(sAccumulatedTime >= cFixedTimeStep)
+        {
+            mPhysicsSystem->Update(cFixedTimeStep, collisionSteps, mTempAllocator, mJobSystem);
+            sAccumulatedTime -= cFixedTimeStep;
+        }
     }
 
     void Physics::Shutdown()
@@ -125,6 +136,11 @@ namespace Surge
 
         delete JPH::Factory::sInstance;
         JPH::Factory::sInstance = nullptr;
+    }
+
+    void Physics::OptimizeBroadPhase()
+    {
+        mPhysicsSystem->OptimizeBroadPhase();
     }
 
     JPH::ShapeRefC Physics::CreateShape(Entity entity)

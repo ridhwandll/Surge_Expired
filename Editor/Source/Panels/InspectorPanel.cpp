@@ -350,27 +350,50 @@ namespace Surge
             {
                 const char* rbTypeStrings[] = { "STATIC", "DYNAMIC", "KINEMATIC" };
                 const char* currentRbTypeString = rbTypeStrings[static_cast<int>(component.Type)];
+
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted("TYPE");
                 ImGui::TableNextColumn();
                 ImGui::PushItemWidth(-1);
-                if (ImGui::BeginCombo("##RBTYPE", currentRbTypeString))
+                if(ImGui::BeginCombo("##RBTYPE", currentRbTypeString))
                 {
-                    for (int i = 0; i < 2; i++)
+                    for(int i = 0; i < 3; i++)
                     {
-                        const bool isSelected = currentRbTypeString == rbTypeStrings[i];
-                        if (ImGui::Selectable(rbTypeStrings[i], isSelected))
+                        const bool isSelected = (component.Type == static_cast<RigidbodyType>(i));
+                        if(ImGui::Selectable(rbTypeStrings[i], isSelected))
                         {
-                            currentRbTypeString = rbTypeStrings[i];
                             component.Type = static_cast<RigidbodyType>(i);
                         }
-                        if (isSelected)
+                        if(isSelected)
                             ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
                 ImGui::PopItemWidth();
-                ImGuiAux::TProperty<float>("Mass", &component.Mass);
+
+                if(component.Type != RigidbodyType::STATIC)
+                    ImGuiAux::TProperty<float>("Mass", &component.Mass);
+
+                ImGuiAux::TSperator("Collision Settings");
+                ImGuiAux::TProperty<bool>("Use Gravity", &component.UseGravity);
+                ImGuiAux::TProperty<bool>("Is Sensor", &component.IsSensor);
+                ImGuiAux::TProperty<bool>("Continuous Collision (CCD)", &component.ContinuousCollision);
+
+                ImGuiAux::TSperator("Material Properties");
+                ImGuiAux::TProperty<float>("Friction", &component.Friction);
+                ImGuiAux::TProperty<float>("Bounciness", &component.Bounciness);
+
+                if(component.Type != RigidbodyType::STATIC)
+                {
+                    ImGuiAux::TSperator("Damping");
+                    ImGuiAux::TProperty<float>("Linear Damping", &component.LinearDamping);
+                    ImGuiAux::TProperty<float>("Angular Damping", &component.AngularDamping);
+
+                    ImGuiAux::TSperator("Freeze Rotation Axes");
+                    ImGuiAux::TProperty<bool>("Freeze X", &component.FreezeRotationX);
+                    ImGuiAux::TProperty<bool>("Freeze Y", &component.FreezeRotationY);
+                    ImGuiAux::TProperty<bool>("Freeze Z", &component.FreezeRotationZ);
+                }
             });
         }
         if(entity.HasComponent<BoxColliderComponent>())

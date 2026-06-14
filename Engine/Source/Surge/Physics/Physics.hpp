@@ -38,6 +38,8 @@ namespace Surge
         void Update(float deltaTime);
         void Shutdown();
 
+        void OptimizeBroadPhase();
+
         JPH::ShapeRefC CreateShape(Entity entity);
 
         // Getters for the ECS to use

@@ -19,11 +19,13 @@ namespace Surge
 
     Scene::Scene()
     {
-        AddStartupEntities(); // TODO: Remove from Player builds
+        AddStartupEntities();
     }
 
     Scene::~Scene()
     {
+        OnRuntimeEnd();
+
         mRegistry.clear();
         sSelectedEntity = Entity(entt::null, nullptr);
     }
@@ -31,11 +33,18 @@ namespace Surge
     void Scene::OnRuntimeStart()
     {
         mIsRunning = true;
+
+        for (const auto& [entity, rigidbody] : mRegistry.view<RigidbodyComponent>().each())
+            OnColliderAdded(mRegistry, entity);
+
         mRegistry.on_construct<RigidbodyComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<BoxColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<SphereColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<CapsuleColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
+
+        Physics* physics = Core::GetPhysics();
+        physics->OptimizeBroadPhase();
     }
 
     void Scene::OnRuntimeEnd()
@@ -411,8 +420,7 @@ namespace Surge
 
     void Scene::OnColliderAdded(entt::registry& registry, entt::entity entity)
     {
-        if(!registry.all_of<RigidbodyComponent, TransformComponent>(entity) ||
-           !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent>(entity)))
+        if(!registry.all_of<RigidbodyComponent, TransformComponent>(entity) || !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent>(entity)))
             return;
 
         Physics* physics = Core::GetPhysics();
@@ -423,10 +431,46 @@ namespace Surge
         auto& transform = registry.get<TransformComponent>(entity);
         auto& rb = registry.get<RigidbodyComponent>(entity);
 
-        JPH::BodyCreationSettings settings(
-            shape, JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z), GlmToJolt(transform.Rotation),
-            (rb.Type == RigidbodyType::STATIC) ? JPH::EMotionType::Static : JPH::EMotionType::Dynamic,
-            (rb.Type == RigidbodyType::STATIC) ? PhysicsLayers::STATIC : PhysicsLayers::DYNAMIC);
+        JPH::EMotionType motionType = JPH::EMotionType::Dynamic;
+        JPH::ObjectLayer objectLayer = PhysicsLayers::DYNAMIC;
+
+        if(rb.Type == RigidbodyType::STATIC)
+        {
+            motionType = JPH::EMotionType::Static;
+            objectLayer = PhysicsLayers::STATIC;
+        }
+        else if(rb.Type == RigidbodyType::KINEMATIC)
+        {
+            motionType = JPH::EMotionType::Kinematic;
+            objectLayer = PhysicsLayers::DYNAMIC; // Kinematic objects move, so they belong in dynamic layers
+        }
+
+        JPH::BodyCreationSettings settings( shape,
+            JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z),
+            GlmToJolt(transform.Rotation), motionType, objectLayer);
+
+        settings.mGravityFactor = rb.UseGravity ? 1.0f : 0.0f;
+        settings.mIsSensor = rb.IsSensor;
+        settings.mMotionQuality = rb.ContinuousCollision ? JPH::EMotionQuality::LinearCast : JPH::EMotionQuality::Discrete;
+        settings.mLinearDamping = rb.LinearDamping;
+        settings.mAngularDamping = rb.AngularDamping;
+        settings.mFriction = rb.Friction;
+        settings.mRestitution = rb.Bounciness;
+
+        if(motionType == JPH::EMotionType::Dynamic)
+        {
+            settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+            settings.mMassPropertiesOverride.mMass = rb.Mass;
+        }
+        if(rb.FreezeRotationX || rb.FreezeRotationY || rb.FreezeRotationZ)
+        {
+            JPH::EAllowedDOFs allowedDOFs = JPH::EAllowedDOFs::All;
+            if(rb.FreezeRotationX) allowedDOFs &= ~JPH::EAllowedDOFs::RotationX;
+            if(rb.FreezeRotationY) allowedDOFs &= ~JPH::EAllowedDOFs::RotationY;
+            if(rb.FreezeRotationZ) allowedDOFs &= ~JPH::EAllowedDOFs::RotationZ;
+
+            settings.mAllowedDOFs = allowedDOFs;
+        }
 
         JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
         JPH::Body* body = bodyInterface.CreateBody(settings);

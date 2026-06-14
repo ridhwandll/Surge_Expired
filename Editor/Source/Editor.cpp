@@ -155,6 +155,10 @@ namespace Surge
         mActiveScene->CopyTo(mRuntimeScene.Raw());
         mRuntimeScene->SetRunning(true);
 
+        glm::vec2 viewportSize = mPanelManager.GetPanel<ViewportPanel>()->GetViewportSize();
+        mRuntimeScene->OnResize(viewportSize.x, viewportSize.y);
+
+        mShowAxes = false;
     }
 
     void Editor::OnRuntimeEnd()
@@ -165,6 +169,7 @@ namespace Surge
 
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(mActiveScene.Raw());
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
+        mShowAxes = true;
     }
 
     void Editor::LoadScene(Ref<Scene>&& scene)
@@ -191,7 +196,10 @@ namespace Surge
             mCamera.SetViewportSize(viewportSize);
             mRenderer->ForceResize((Uint)viewportSize.x, (Uint)viewportSize.y);
 
-            mActiveScene->OnResize(viewportSize.x, viewportSize.y);
+            if(mRuntimeScene && mRuntimeScene->GetMainCameraEntity().Data1)
+                mRuntimeScene->OnResize(viewportSize.x, viewportSize.y);
+            else
+                mActiveScene->OnResize(viewportSize.x, viewportSize.y);
         }
     }
 

@@ -119,6 +119,15 @@ namespace Surge::ImGuiAux
     void TextCentered(const char* text);
     bool ButtonCentered(const char* title);
 
+    inline void TSperator(const char* text)
+    {
+        ScopedBoldFont font;
+        ScopedColor color({ ImGuiCol_Separator }, Colors::ThemeColor1);
+        ImGui::TableNextColumn();
+        ImGui::SeparatorText(text);
+        ImGui::TableNextColumn();
+    }
+
     template <typename T>
     void TComboBox(const char* title, const char** stringArray, Uint stringArraySize, Uint currentStringIndexInArray, T callbackFunction)
     {

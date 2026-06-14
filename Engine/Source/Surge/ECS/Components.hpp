@@ -146,6 +146,19 @@ namespace Surge
         RigidbodyType Type = RigidbodyType::DYNAMIC;
         float Mass = 1.0f;
 
+        bool UseGravity = true;
+        bool IsSensor = false;
+        bool ContinuousCollision = false;
+
+        bool FreezeRotationX = false;
+        bool FreezeRotationY = false;
+        bool FreezeRotationZ = false;
+
+        float LinearDamping = 0.05f;
+        float AngularDamping = 0.05f;
+        float Friction = 0.2f;
+        float Bounciness = 0.0f;
+
         SURGE_REFLECTION_ENABLE;
     };
 
