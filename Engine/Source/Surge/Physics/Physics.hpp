@@ -4,6 +4,7 @@
 
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Collision/Shape/Shape.h>
+#include <glm/ext/vector_float3.hpp>
 
 namespace JPH
 {

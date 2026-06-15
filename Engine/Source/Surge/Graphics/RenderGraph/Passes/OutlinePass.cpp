@@ -81,9 +81,7 @@ namespace Surge
         Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.OutlineFramebuffer, width, height); }); // (Player)
     }
 
-    void OutlinePass::OnImGuiRender(FrameBlackboard& blackBoard)
-    {
-    }
+    void OutlinePass::OnImGuiRender(FrameBlackboard&) {}
 
     void OutlinePass::Shutdown(FrameBlackboard& blackBoard)
     {

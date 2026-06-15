@@ -76,7 +76,7 @@ namespace Surge
                 mRuntimeScene->Update();
             else
             {
-                mCamera.OnUpdate(mViewportPanel->IsViewportHovered());
+                mCamera.OnUpdate();
                 mActiveScene->Update(mCamera);
             }
         }

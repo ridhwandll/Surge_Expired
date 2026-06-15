@@ -101,14 +101,14 @@ namespace Surge
                 const char* titleText = "Surge Engine";
                 float titleWidth = ImGui::CalcTextSize(titleText).x;
                 ImGui::SetCursorPosX((formWidth - titleWidth) * 0.5f);
-                ImGui::TextColored(accentColor, titleText);
+                ImGui::TextColored(accentColor, "%s", titleText);
                 ImGui::PopFont();
 
                 ImGui::PushFont(regularFont, 19.0f);
                 const char* subText = "Project Browser";
                 float subWidth = ImGui::CalcTextSize(subText).x;
                 ImGui::SetCursorPosX((formWidth - subWidth) * 0.5f);
-                ImGui::TextColored(textMuted, subText);
+                ImGui::TextColored(textMuted, "%s", subText);
                 ImGui::PopFont();
 
                 ImGui::Spacing();

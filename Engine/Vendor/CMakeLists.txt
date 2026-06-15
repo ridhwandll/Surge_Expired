@@ -1,9 +1,10 @@
 function(DisableTargetWarnings TARGET_NAME)
-    if(MSVC)
-        target_compile_options(${TARGET_NAME} PRIVATE /W0)
-    else()
-        # GCC and Clang use -w (lowercase) to disable all warnings
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         target_compile_options(${TARGET_NAME} PRIVATE -w)
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        target_compile_options(${TARGET_NAME} PRIVATE /W0)
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        message(FATAL_ERROR "Use Clang/MSVC")
     endif()
 endfunction()
 
@@ -14,8 +15,10 @@ add_subdirectory(Optick)
 add_subdirectory(basisu)
 add_subdirectory(JoltPhysics)
 
+
 DisableTargetWarnings(volk)
 DisableTargetWarnings(SPIRV-Cross)
 DisableTargetWarnings(ImGui)
+DisableTargetWarnings(Optick)
 DisableTargetWarnings(basisu)
 DisableTargetWarnings(Jolt)

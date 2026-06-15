@@ -56,7 +56,7 @@ namespace Surge
         struct Triangle { JPH::Float3 v[3]; };
         Vector<Triangle> mTriangles;
 
-        PhysicsDebugBatch(const JPH::DebugRenderer::Vertex* inVertices, int inVertexCount, const uint32_t* inIndices, int inIndexCount)
+        PhysicsDebugBatch(const JPH::DebugRenderer::Vertex* inVertices, int /*inVertexCount*/, const uint32_t* inIndices, int inIndexCount)
         {
             for(int i = 0; i < inIndexCount; i += 3)
             {
@@ -95,12 +95,12 @@ namespace Surge
             Core::GetRenderer()->SubmitLine(from, to, glm::vec4(inColor.r / 255.0f, inColor.g / 255.0f, inColor.b / 255.0f, inColor.a / 255.0f));
         }
 
-        virtual void DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow) override {}
-        virtual void DrawText3D(JPH::RVec3Arg inPosition, const std::string_view& inString, JPH::ColorArg inColor, float inHeight) override {}
+        virtual void DrawTriangle(JPH::RVec3Arg /*inV1*/, JPH::RVec3Arg /*inV2*/, JPH::RVec3Arg /*inV3*/, JPH::ColorArg /*inColor*/, ECastShadow /*inCastShadow*/) override {}
+        virtual void DrawText3D(JPH::RVec3Arg /*inPosition*/, const std::string_view& /*inString*/, JPH::ColorArg /*inColor*/, float /*inHeight*/) override {}
 
         virtual Batch CreateTriangleBatch(const Triangle* inTriangles, int inTriangleCount) override { return new PhysicsDebugBatch(inTriangles, inTriangleCount);; }
         virtual Batch CreateTriangleBatch(const Vertex* inVertices, int inVertexCount, const uint32_t* inIndices, int inIndexCount) override { return new PhysicsDebugBatch(inVertices, inVertexCount, inIndices, inIndexCount); }
-        virtual void DrawGeometry(JPH::RMat44Arg inModelMatrix, const JPH::AABox& inWorldSpaceBounds, float inLODScaleSq, JPH::ColorArg inModelColor, const GeometryRef& inGeometry, ECullMode inCullMode, ECastShadow inCastShadow, EDrawMode inDrawMode) override
+        virtual void DrawGeometry(JPH::RMat44Arg inModelMatrix, const JPH::AABox& /*inWorldSpaceBounds*/, float /*inLODScaleSq*/, JPH::ColorArg inModelColor, const GeometryRef& inGeometry, ECullMode, ECastShadow, EDrawMode) override
         {
             if(inGeometry->mLODs.empty())
                 return;

@@ -28,16 +28,15 @@ namespace Surge
     VkResult VulkanSwapchain::Present(const VulkanRHI& rhi, VkSemaphore releaseSemaphore, Uint imageIndex)
     {
         VkQueue queue = rhi.GetQueue();
-        VkPresentInfoKHR present{
-            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .pNext = nullptr,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &releaseSemaphore,
-            .swapchainCount = 1,
-            .pSwapchains = &mSwapchain,
-            .pImageIndices = &imageIndex,
-        };
-        
+        VkPresentInfoKHR present {};
+        present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present.pNext = nullptr;
+        present.waitSemaphoreCount = 1;
+        present.pWaitSemaphores = &releaseSemaphore;
+        present.swapchainCount = 1;
+        present.pSwapchains = &mSwapchain;
+        present.pImageIndices = &imageIndex;
+
         return vkQueuePresentKHR(queue, &present);
     }
 
@@ -138,13 +137,13 @@ namespace Surge
         for (size_t i = 0; i < imageCount; i++)
         {
             // Create an image view which we can render into
-            VkImageViewCreateInfo view_info{
-                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext = nullptr,
-                .image = swapchainImages[i],
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = mDimensions.Format,
-                .subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1} };
+            VkImageViewCreateInfo view_info{};
+            view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            view_info.pNext = nullptr;
+            view_info.image = swapchainImages[i];
+            view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            view_info.format = mDimensions.Format;
+            view_info.subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 };
 
             VkImageView imageView;
             VK_CALL(vkCreateImageView(device, &view_info, nullptr, &imageView));

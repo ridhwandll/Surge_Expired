@@ -82,7 +82,7 @@ namespace Surge
         mGraph.Compile();
     }
 
-    void Renderer::BeginFrame(const EditorCamera& camera, Uint submitCount3D)
+    void Renderer::BeginFrame(const EditorCamera& camera)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();
@@ -105,7 +105,7 @@ namespace Surge
         mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
     }
 
-    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
+    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();

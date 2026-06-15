@@ -5,14 +5,14 @@
 
 namespace Surge
 {
-    static void OnVmaAllocate(VmaAllocator allocator, Uint memoryType,VkDeviceMemory memory,VkDeviceSize size,void* userData)
+    static void OnVmaAllocate([[maybe_unused]] VmaAllocator allocator, [[maybe_unused]] Uint memoryType, [[maybe_unused]] VkDeviceMemory memory,VkDeviceSize size,void* userData)
     {
         GPUMemoryStats* stats = static_cast<GPUMemoryStats*>(userData);
         stats->AllocatedBytes.fetch_add(size, std::memory_order_relaxed);
         stats->AllocationCount.fetch_add(1, std::memory_order_relaxed);
     }
 
-    static void OnVmaFree(VmaAllocator allocator, Uint memoryType, VkDeviceMemory memory, VkDeviceSize size,void* userData)
+    static void OnVmaFree([[maybe_unused]] VmaAllocator allocator, [[maybe_unused]] Uint memoryType, [[maybe_unused]] VkDeviceMemory memory, VkDeviceSize size,void* userData)
     {
         GPUMemoryStats* stats = static_cast<GPUMemoryStats*>(userData);
         stats->AllocatedBytes.fetch_sub(size, std::memory_order_relaxed);
@@ -75,15 +75,17 @@ namespace Surge
             
         Vector<const char*> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-        VkDeviceCreateInfo deviceInfo{ .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+        VkDeviceCreateInfo deviceInfo{};
+        deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
         // Uses a single graphics queue for now, but a more robust implementation would use separate queues for graphics, compute, and transfer operations if available
         const float queuePriority = 0.5f;
-        VkDeviceQueueCreateInfo queueInfo{
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = static_cast<uint32_t>(mGraphicsQueueIndex),
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority };
+        VkDeviceQueueCreateInfo queueInfo {};
+        queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueInfo.pNext = nullptr;
+        queueInfo.queueFamilyIndex = static_cast<uint32_t>(mGraphicsQueueIndex);
+        queueInfo.queueCount = 1;
+        queueInfo.pQueuePriorities = &queuePriority;
 
         // Features
         VkPhysicalDeviceFeatures enabledFeatures {};

@@ -130,7 +130,7 @@ namespace Surge
         }
     }
 
-    void ShadowPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard) {}
+    void ShadowPass::Resize(Uint /*width*/, Uint /*height*/, FrameBlackboard& /*blackBoard*/) {}
     void ShadowPass::OnImGuiRender(FrameBlackboard& blackBoard)
     {
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
@@ -163,7 +163,7 @@ namespace Surge
         SURGE_PROFILE_FUNC("ShadowPass::CalculateCascades");
 
         constexpr Uint NUM_FRUSTUM_CORNERS = 8;
-        const int totalCascades = bb.ShadowSettings_.CascadeCount;
+        const Uint totalCascades = bb.ShadowSettings_.CascadeCount;
         const float cascadeSplitLambda = bb.ShadowSettings_.CascadeSplitLambda;
 
         const float minZ = bb.CameraNearFarPlane.x;

@@ -57,7 +57,7 @@ namespace Surge
         mSerializerType = AssetType::MESH;
     }
 
-    bool MeshSerializer::Serialize(Ref<Asset> asset) const
+    bool MeshSerializer::Serialize([[maybe_unused]] Ref<Asset> asset) const
     {
 #ifdef SURGE_PLATFORM_ANDROID
         Log<Severity::Error>("[MeshSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");

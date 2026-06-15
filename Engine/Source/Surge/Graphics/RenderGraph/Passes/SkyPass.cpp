@@ -69,16 +69,16 @@ namespace Surge
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
 
-    void SkyPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
+    void SkyPass::Resize([[maybe_unused]] Uint width, [[maybe_unused]] Uint height, [[maybe_unused]] FrameBlackboard& blackBoard)
     {
         // Resize handled by GeometryPass
     }
 
-    void SkyPass::OnImGuiRender(FrameBlackboard& blackBoard)
+    void SkyPass::OnImGuiRender([[maybe_unused]] FrameBlackboard& blackBoard)
     {
     }
 
-    void SkyPass::Shutdown(FrameBlackboard& blackBoard)
+    void SkyPass::Shutdown([[maybe_unused]] FrameBlackboard& blackBoard)
     {
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
         mRHI->DestroyPipeline(mSkyPipeline);

@@ -104,7 +104,7 @@ namespace Surge
         ImGui::PopID();
     }
 
-    void MaterialEditorPanel::Init(void* panelInitArgs)
+    void MaterialEditorPanel::Init([[maybe_unused]] void* panelInitArgs)
     {
         mCode = GetStaticCode();
         mSelectedMaterial = nullptr;
@@ -167,7 +167,7 @@ namespace Surge
             bool clearSelectedMaterial = false;
 
             // glTF Read-Only Warning Banner
-            if(mSelectedMaterial->GetID() == AssetID::INVALID)
+            if(mSelectedMaterial->GetID())
             {
                 ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.25f, 0.18f, 0.05f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.4f, 0.1f, 1.0f));
@@ -196,7 +196,7 @@ namespace Surge
             // Header & Toolbar
             float buttonSizeX = 70.0f;
             float spacing = ImGui::GetStyle().ItemSpacing.x;
-            float totalButtonsWidth = (mSelectedMaterial->GetID() != AssetID::INVALID) ? (buttonSizeX * 2.0f + spacing) : buttonSizeX;
+            float totalButtonsWidth = mSelectedMaterial->GetID() ? (buttonSizeX * 2.0f + spacing) : buttonSizeX;
 
             if(ImGui::BeginTable("##MaterialHeaderTable", 2))
             {
@@ -217,7 +217,7 @@ namespace Surge
                     ImGuiAux::ScopedBoldFont font;
                     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
-                    if(mSelectedMaterial->GetID() != AssetID::INVALID)
+                    if(mSelectedMaterial->GetID())
                     {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.50f, 0.20f, 1.0f));
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.60f, 0.25f, 1.0f));

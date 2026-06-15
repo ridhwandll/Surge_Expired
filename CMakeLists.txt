@@ -8,18 +8,18 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 #check the compiler
+#check the compiler
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    # using Clang-CL
-    # Flags are ClangCL only, remove it in real Clang builds
-    # string(APPEND CMAKE_CXX_FLAGS " -g3 -m64 -mfma -ffast-math -fno-rtti /MP")
-    set(CMAKE_CXX_FLAGS "/w /fp:fast /GR- /MP /EHsc")
+    # using Clang-CL (MSVC syntax)
+    # /W4 (High warning level), /WX (Treat warnings as errors), /w44062 (Warn on unhandled switch enum)
+    set(CMAKE_CXX_FLAGS "/W4 /fp:fast /GR- /MP /EHsc")
     add_compile_options("/showFilenames")
     MESSAGE(STATUS "[Surge] Compiler: ClangCL")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     # using Visual Studio C++
-    set(CMAKE_CXX_FLAGS "/W2 /fp:fast /GR- /MP /EHsc")
+    set(CMAKE_CXX_FLAGS "/W4 /WX /fp:fast /GR- /MP /EHsc")
     MESSAGE(STATUS "[Surge] Compiler: MSVC")
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")    
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     message(FATAL_ERROR "Use Clang/MSVC")
 endif()
 

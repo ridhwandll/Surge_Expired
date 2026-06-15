@@ -16,7 +16,7 @@ namespace Surge
         EditorCamera(float fov, float aspectRatio, float nearClip, float farClip);
 
         void Focus(const glm::vec3& focusPoint);
-        void OnUpdate(bool viewportHovered);
+        void OnUpdate();
         void OnEvent(Event& e);
 
         bool IsActive() const { return mIsActive; }

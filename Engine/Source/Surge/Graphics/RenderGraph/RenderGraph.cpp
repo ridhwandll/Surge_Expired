@@ -19,10 +19,10 @@ namespace Surge
         SCOPED_TIMER("RenderGraph::Compile");
         mCompiledGraph = {};
 
-        ExecutionGroup outlineGroup = { .Name = "OutlineMask", .Type = PassGroup::OUTLINE_MASK, };
-        ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW, .ManagesOwnExecution = true };
-        ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE};
-        ExecutionGroup postProcessGroup = { .Name = "PostProcess", .Type = PassGroup::POST_PROCESS };
+        ExecutionGroup outlineGroup = { .Name = "OutlineMask", .Type = PassGroup::OUTLINE_MASK, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
+        ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = true, .IsSwapchain = false };
+        ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
+        ExecutionGroup postProcessGroup = { .Name = "PostProcess", .Type = PassGroup::POST_PROCESS, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
         ExecutionGroup swapchainGroup = { .Name = "Swapchain", .Type = PassGroup::SWAPCHAIN, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .IsSwapchain = true };
 
         for(auto& pass : mPasses)
@@ -184,7 +184,7 @@ namespace Surge
                     {
                         if(write == read && !barrierAdded.count(write))
                         {
-                            const ImageDesc& writeDesc = mRHI->GetDesc(write);
+                            //const ImageDesc& writeDesc = mRHI->GetDesc(write);
                             //Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
                             //Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
                             //Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);

@@ -169,7 +169,7 @@ namespace Surge
                 writes[i].Type = DescriptorType::TEXTURE;
                 writes[i].Sampler = mShadowSampler;
 
-                if(i < blackBoard.ShadowSettings_.CascadeCount)
+                if(i < (Uint)blackBoard.ShadowSettings_.CascadeCount)
                     writes[i].Texture = blackBoard.ShadowMap[i]; // Valid cascade
                 else
                 {
@@ -215,7 +215,7 @@ namespace Surge
         Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.MainPassFramebuffer, width, height); });
     }
 
-    void GeometryPass::OnImGuiRender(FrameBlackboard& blackBoard) {}
+    void GeometryPass::OnImGuiRender(FrameBlackboard&) {}
 
     void GeometryPass::Shutdown(FrameBlackboard& blackBoard)
     {

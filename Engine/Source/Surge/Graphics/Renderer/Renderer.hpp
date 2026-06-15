@@ -19,8 +19,8 @@ namespace Surge
         void Initialize();
         void Shutdown();
 
-        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D = 0);
-        void BeginFrame(const EditorCamera& camera, Uint submitCount3D = 0);
+        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
+        void BeginFrame(const EditorCamera& camera);
         void EndFrame();
 
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())

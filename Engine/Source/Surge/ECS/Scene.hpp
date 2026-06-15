@@ -55,7 +55,7 @@ namespace Surge
         void SyncPhysics();
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
-        void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
+        void OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity);
 
     private:
         bool mIsRunning = false;

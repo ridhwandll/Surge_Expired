@@ -74,7 +74,7 @@ namespace Surge
     {
         TCHAR path[MAX_PATH];
 
-        BROWSEINFO bi = {0};
+        BROWSEINFO bi = {};
         bi.lpszTitle = ("Choose Folder");
         bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_USENEWUI;
         bi.lpfn = NULL;

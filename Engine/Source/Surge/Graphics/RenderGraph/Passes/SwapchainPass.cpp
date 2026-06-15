@@ -49,7 +49,7 @@ namespace Surge
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
 
-    void SwapchainPass::Shutdown(FrameBlackboard& blackBoard)
+    void SwapchainPass::Shutdown(FrameBlackboard&)
     {
         if(!RHISettings::RENDER_TO_SWAPCHAIN)
             return;

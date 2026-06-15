@@ -22,6 +22,7 @@ namespace Surge
             default:
                 SG_ASSERT_INTERNAL("IsSingleChannelColor: Unhandled Image Format!(Are you passing a depth format in IsSingleChannelColor function?)");
         }
+        return false;
     }
 
     VkDescriptorType ShaderImageUsageToVulkan(ShaderResource::Usage type)
@@ -341,7 +342,8 @@ namespace Surge
                 layoutBinding.stageFlags = VulkanUtils::ShaderTypeToVulkanShaderStage(texture.ShaderStages);
             }
 
-            VkDescriptorSetLayoutCreateInfo layoutInfo { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+            VkDescriptorSetLayoutCreateInfo layoutInfo {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
             layoutInfo.flags = 0;
             layoutInfo.bindingCount = static_cast<Uint>(layoutBindings.size());
             layoutInfo.pBindings = layoutBindings.data();
@@ -353,7 +355,8 @@ namespace Surge
             // Create an empty layout
             if(!sEmptyLayout)
             {
-                VkDescriptorSetLayoutCreateInfo layoutInfo { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+                VkDescriptorSetLayoutCreateInfo layoutInfo {};
+                layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
                 VK_CALL(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &sEmptyLayout));
             }
             // Array index of a layout inside pSetLayouts directly establishes its set = N number in GLSL/HLSL

@@ -138,7 +138,8 @@ namespace Surge
         SG_ASSERT(data && size > 0, "UploadTextureData: data is null or size is 0");
         VmaAllocator allocator = rhi.GetAllocator();
 
-        VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        VkBufferCreateInfo stagingInfo{};
+        stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         stagingInfo.size = size;
 
         stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -174,8 +175,7 @@ namespace Surge
 
         if(entry->Desc.MipLevel > 1)
         {
-            const ImageFormat fmt = entry->Desc.Format;
-            SG_ASSERT(fmt != ImageFormat::ASTC4x4_SRGB && fmt != ImageFormat::ASTC4x4_UNORM && fmt != ImageFormat::BC7_SRGB && fmt != ImageFormat::BC7_UNORM, "[VulkanImage] UploadData: cannot generate mips for compressed format {}! Use ImageDesc::MipUploads with pre-baked levels!", SurgeReflect::EnumToString(fmt).data());
+            SG_ASSERT(entry->Desc.Format != ImageFormat::ASTC4x4_SRGB && entry->Desc.Format != ImageFormat::ASTC4x4_UNORM && entry->Desc.Format != ImageFormat::BC7_SRGB && entry->Desc.Format != ImageFormat::BC7_UNORM, "[VulkanImage] UploadData: cannot generate mips for compressed format {}! Use ImageDesc::MipUploads with pre-baked levels!", SurgeReflect::EnumToString(entry->Desc.Format).data());
             GenerateMipmaps(rhi, cb, *entry); // Leaves all levels at SHADER_READ_ONLY_OPTIMAL
         }
         else
@@ -326,7 +326,8 @@ namespace Surge
         for(Uint i = 0; i < mipCount; i++)
             totalSize += mips[i].Size;
 
-        VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        VkBufferCreateInfo stagingInfo{};
+        stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         stagingInfo.size = totalSize;
         stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 

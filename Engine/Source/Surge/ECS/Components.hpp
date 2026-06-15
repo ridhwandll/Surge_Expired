@@ -106,7 +106,7 @@ namespace Surge
     {
         LightComponent() = default;
         LightComponent(LightType type, const glm::vec3& color, float intensity, float radius, float falloff)
-            : Type(type), Color(color), Intensity(intensity), Radius(radius) {}
+            : Color(color), Intensity(intensity), Radius(radius), Falloff(falloff), Type(type) {}
 
         glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
         float Intensity = 1.0f;
@@ -118,9 +118,6 @@ namespace Surge
 
     struct EnvironmentComponent
     {
-        EnvironmentComponent() = default;
-        EnvironmentComponent(const EnvironmentComponent&) = default;
-
         float Elevation = 30.0f; // In degrees
         float Azimuth = 0.0f;   // In degrees
         float Turbidity = 2.0f;

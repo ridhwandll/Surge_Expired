@@ -46,7 +46,7 @@ namespace Surge
         ImGui::PopID();
     }
 
-    void InspectorPanel::Init(void* panelInitArgs)
+    void InspectorPanel::Init([[maybe_unused]] void* panelInitArgs)
     {
         mCode = GetStaticCode();
         mHierarchy = nullptr;
@@ -120,7 +120,7 @@ namespace Surge
             TransformComponent& component = entity.GetComponent<TransformComponent>();
             DrawComponent<TransformComponent>(
                 entity, "Transform", [&component]() {
-                    if (ImGuiAux::TProperty<glm::vec3>("Position", &component.Position));
+                    if (ImGuiAux::TProperty<glm::vec3>("Position", &component.Position))
                         component.MarkDirty();
                     if (ImGuiAux::TProperty<glm::vec3>("Rotation", &component.Rotation))
                         component.MarkDirty();

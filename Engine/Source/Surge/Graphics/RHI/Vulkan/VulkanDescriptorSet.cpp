@@ -113,7 +113,7 @@ namespace Surge
         VkDevice device = rhi.GetDevice();
         const Vector<VkDescriptorPool>& pools = rhi.GetNonResetableDescriptorPools();
 
-        for(int index = 0; index < entry.Count; index++)
+        for(Uint index = 0; index < entry.Count; index++)
         {
             VkDescriptorPool pool = pools[index];
             vkFreeDescriptorSets(device, pool, 1, &entry.Sets[index]);

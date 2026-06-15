@@ -105,12 +105,12 @@ namespace Surge
         mRenderPassCache.Shutdown(*this);
         mImGuiContext.Shutdown(*this);
 
-        mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry& entry) { DestroyDescriptorSet(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
-        mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry& entry){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
-        mFramebufferPool.ForEachAlive([&](const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
-        mTexturePool.ForEachAlive([&](const ImageHandle& h, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
-        mBufferPool.ForEachAlive([&](const BufferHandle& h, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!"); });
-        mPipelinePool.ForEachAlive([&](const PipelineHandle& h, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!"); });
+        mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry&) { DestroyDescriptorSet(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
+        mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry&){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
+        mFramebufferPool.ForEachAlive([&](const FramebufferHandle&, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
+        mTexturePool.ForEachAlive([&](const ImageHandle&, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
+        mBufferPool.ForEachAlive([&](const BufferHandle&, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!"); });
+        mPipelinePool.ForEachAlive([&](const PipelineHandle&, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!"); });
 
         DestroySwapchainFramebuffers();
         DestroySwapchainRenderpass();
@@ -643,24 +643,27 @@ namespace Surge
         // Set clear color values
         VkClearValue clearValue{ .color = {{0.1f, 0.1f, 0.1f, 1.0f}} };
 
-        VkRenderPassBeginInfo rpbegin{
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .renderPass = mRenderPass,
-            .framebuffer = mSwapchainFramebuffers[ctx.SwapchainIndex],
-            .renderArea = {.extent = {.width = ctx.Width, .height = ctx.Height}},
-            .clearValueCount = 1,
-            .pClearValues = &clearValue };
+        VkRenderPassBeginInfo rpbegin {};
+        rpbegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        rpbegin.renderPass = mRenderPass;
+        rpbegin.framebuffer = mSwapchainFramebuffers[ctx.SwapchainIndex];
+        rpbegin.renderArea = {};
+        rpbegin.renderArea.extent = {.width = ctx.Width, .height = ctx.Height};
+        rpbegin.clearValueCount = 1;
+        rpbegin.pClearValues = &clearValue;
 
         VkCommandBuffer cmd = mFrame.GetCurrentVkFrame().CmdBuffer;
         vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
 
-        VkViewport vp{
-            .width = static_cast<float>(ctx.Width),
-            .height = static_cast<float>(ctx.Height),
-            .minDepth = 0.0f,
-            .maxDepth = 1.0f };
+        VkViewport vp {};
+        vp.width = static_cast<float>(ctx.Width);
+        vp.height = static_cast<float>(ctx.Height);
+        vp.minDepth = 0.0f;
+        vp.maxDepth = 1.0f;
+
         vkCmdSetViewport(cmd, 0, 1, &vp); // Set viewport dynamically
-        VkRect2D scissor{ .extent = {.width = ctx.Width, .height = ctx.Height} };
+        VkRect2D scissor {};
+        scissor.extent = {.width = ctx.Width, .height = ctx.Height};
         vkCmdSetScissor(cmd, 0, 1, &scissor); // Set scissor dynamically
     }
 
@@ -943,7 +946,7 @@ namespace Surge
         if (ImGui::TreeNode("TexturePool"))
         {
             ImGui::Text("Alive objects: %d", mTexturePool.AliveObjCount());
-            mTexturePool.ForEachAlive([this](const ImageHandle& h, ImageEntry& entry)
+            mTexturePool.ForEachAlive([](const ImageHandle& h, ImageEntry& entry)
                 {
                     ImageDesc desc = entry.Desc;
                     String texText = std::format("{} ({}, {})", desc.DebugName, h.Index, h.Generation);
@@ -982,19 +985,19 @@ namespace Surge
         Vector<const char*> requiredInstanceExtensions = GetRequiredInstanceExtensions();
         Vector<const char*> requestedInstanceLayers = GetRequiredInstanceLayers();
 
-        VkApplicationInfo app{
-            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-            .pApplicationName = "SurgePlayer",
-            .pEngineName = "SurgeEngine",
-            .apiVersion = VK_API_VERSION_1_1 };
+        VkApplicationInfo app {};
+        app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        app.pApplicationName = "SurgePlayer";
+        app.pEngineName = "SurgeEngine";
+        app.apiVersion = VK_API_VERSION_1_1;
 
-        VkInstanceCreateInfo instanceinfo{
-            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            .pApplicationInfo = &app,
-            .enabledLayerCount = static_cast<Uint>(requestedInstanceLayers.size()),
-            .ppEnabledLayerNames = requestedInstanceLayers.data(),
-            .enabledExtensionCount = static_cast<Uint>(requiredInstanceExtensions.size()),
-            .ppEnabledExtensionNames = requiredInstanceExtensions.data() };
+        VkInstanceCreateInfo instanceinfo{};
+        instanceinfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        instanceinfo.pApplicationInfo = &app;
+        instanceinfo.enabledLayerCount = static_cast<Uint>(requestedInstanceLayers.size());
+        instanceinfo.ppEnabledLayerNames = requestedInstanceLayers.data();
+        instanceinfo.enabledExtensionCount = static_cast<Uint>(requiredInstanceExtensions.size()),
+        instanceinfo.ppEnabledExtensionNames = requiredInstanceExtensions.data();
 
         ENABLE_IF_VK_VALIDATION(mDebugger.Create(instanceinfo));
 
@@ -1119,22 +1122,20 @@ namespace Surge
         // UNDEFINED is transitioned into COLOR_ATTACHMENT_OPTIMAL.
         // The final layout in the render pass attachment states PRESENT_SRC_KHR, so we
         // will get a final transition from COLOR_ATTACHMENT_OPTIMAL to PRESENT_SRC_KHR.
-        VkSubpassDescription subpass
-        {
-            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-            .colorAttachmentCount = 1,
-            .pColorAttachments = &colorRef,
-        };
+        VkSubpassDescription subpass {};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorRef;
 
         // Create a dependency to external events.
         // We need to wait for the WSI semaphore to signal.
         // Only pipeline stages which depend on COLOR_ATTACHMENT_OUTPUT_BIT will
         // actually wait for the semaphore, so we must also wait for that pipeline stage.
-        VkSubpassDependency dependency{
-            .srcSubpass = VK_SUBPASS_EXTERNAL,
-            .dstSubpass = 0,
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        VkSubpassDependency dependency {};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
         // Since we changed the image layout, we need to make the memory visible to
         // color attachment to modify.
@@ -1142,14 +1143,14 @@ namespace Surge
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
         // Finally, create the renderpass.
-        VkRenderPassCreateInfo rp_info{
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-            .attachmentCount = 1,
-            .pAttachments = &attachment,
-            .subpassCount = 1,
-            .pSubpasses = &subpass,
-            .dependencyCount = 1,
-            .pDependencies = &dependency };
+        VkRenderPassCreateInfo rp_info{};
+        rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        rp_info.attachmentCount = 1;
+        rp_info.pAttachments = &attachment;
+        rp_info.subpassCount = 1;
+        rp_info.pSubpasses = &subpass;
+        rp_info.dependencyCount = 1;
+        rp_info.pDependencies = &dependency;
 
         VK_CALL(vkCreateRenderPass(device, &rp_info, nullptr, &mRenderPass));
         SET_VK_DEBUG_NAME(*this, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)mRenderPass, "Swapchain Renderpass");
@@ -1184,7 +1185,8 @@ namespace Surge
          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10000},
          {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 10000} };
 
-        VkDescriptorPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         poolInfo.maxSets = 100 * (sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
         poolInfo.poolSizeCount = (Uint)(sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));

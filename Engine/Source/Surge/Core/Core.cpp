@@ -38,7 +38,7 @@ namespace Surge::Core
     {
         GCoreData.SurgeClient->OnEvent(e);
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
+        dispatcher.Dispatch<Surge::WindowClosedEvent>([]([[maybe_unused]] Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
         dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e) { GCoreData.SurgeRenderer->OnWindowResize(e.GetWidth(), e.GetHeight()); });
     }
 
@@ -83,7 +83,7 @@ namespace Surge::Core
         GCoreData.SurgeClient->OnInitialize();
     }
 
-    void Core::Run()
+    void Run()
     {
         while (GCoreData.Running)
         {
@@ -107,7 +107,7 @@ namespace Surge::Core
         }
     }
 
-    void Core::Shutdown()
+    void Shutdown()
     {
         SCOPED_TIMER("Core::Shutdown");
 
@@ -132,7 +132,7 @@ namespace Surge::Core
         SurgeReflect::Registry::Shutdown();
     }
 
-    void Core::AddFrameEndCallback(const std::function<void()>& func)
+    void AddFrameEndCallback(const std::function<void()>& func)
 {
         GCoreData.FrameEndCallbacks.push_back(func);
     }

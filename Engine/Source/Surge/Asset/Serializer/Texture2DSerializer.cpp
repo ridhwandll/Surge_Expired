@@ -13,7 +13,7 @@ namespace Surge
         basist::basisu_transcoder_init();
     }
 
-    bool Texture2DSerializer::Serialize(Ref<Asset> asset) const
+    bool Texture2DSerializer::Serialize([[maybe_unused]] Ref<Asset> asset) const
     {
         bool result = false;
         SG_ASSERT_INTERNAL("[Texture2DSerializer] Serialize: You can not serialize Texture2Ds yet");

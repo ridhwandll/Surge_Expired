@@ -33,7 +33,7 @@ namespace Surge
         mProjection[1][1] *= -1;
     }
 
-    void EditorCamera::OnUpdate(bool viewportHovered)
+    void EditorCamera::OnUpdate()
     {
         if (Core::GetWindow()->IsWindowMinimized())
             return;

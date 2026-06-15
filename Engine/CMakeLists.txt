@@ -8,6 +8,8 @@ file(GLOB_RECURSE SOURCE_FILES
 set(INCLUDE_DIRS
     Source
     Source/SurgeReflect/Include
+)
+set(VENDOR_INCLUDES
     Vendor
     Vendor/glm
     Vendor/Vulkan-Headers/Include
@@ -36,6 +38,7 @@ set(LIB_LINKS
 
 add_library(Surge STATIC ${SOURCE_FILES})
 target_include_directories(Surge PUBLIC ${INCLUDE_DIRS})
+target_include_directories(Surge SYSTEM PUBLIC ${VENDOR_INCLUDES})
 target_link_libraries(Surge PUBLIC ${LIB_LINKS})
 
 # Add Precompiled Header

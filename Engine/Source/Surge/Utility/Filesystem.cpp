@@ -107,13 +107,13 @@ namespace Surge::Filesystem
         return true;
     }
 
-    bool WriteBinaryFile(const Path& path, const void* data, size_t size)
+    bool WriteBinaryFile(const Path& path, const void*, size_t)
     {
         Log<Severity::Error>("[Filesystem] Cannot write to {}. APK assets are readonly!", path.string());
         return false;
     }
 
-    bool WriteTextFile(const Path& path, const String& data)
+    bool WriteTextFile(const Path& path, const String&)
     {
         Log<Severity::Error>("[Filesystem] Cannot write to {}. APK assets are readonly!", path.string());
         return false;

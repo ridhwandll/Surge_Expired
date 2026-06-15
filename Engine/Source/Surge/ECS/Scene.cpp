@@ -22,8 +22,6 @@ namespace Surge
 
     Scene::~Scene()
     {
-        OnRuntimeEnd();
-
         mRegistry.clear();
         sSelectedEntity = Entity(entt::null, nullptr);
     }
@@ -51,24 +49,14 @@ namespace Surge
     void Scene::OnRuntimeEnd()
     {
         mIsRunning = false;
-        mRegistry.on_construct<RigidbodyComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<BoxColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<SphereColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<CapsuleColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<CylinderColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<ConvexColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<MeshColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_destroy<RigidbodyComponent>().disconnect<&Scene::OnRigidbodyDestroyed>(this);
     }
 
     void Scene::Update(EditorCamera& camera)
     {
         SyncPhysics();
         Renderer* renderer = Core::GetRenderer();
-        auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-        Uint submitCount3D = meshGroup.size();
 
-        renderer->BeginFrame(camera, submitCount3D);
+        renderer->BeginFrame(camera);
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
@@ -98,6 +86,7 @@ namespace Surge
         }
         {
             // 3D Meshes
+            auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
             for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
             {
                 if(meshComponent.MeshID)
@@ -187,13 +176,10 @@ namespace Surge
 
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
-        auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-        Uint submitCount3D = (Uint)meshGroup.size();
-
         if (camera.Data1)
         {
             Renderer* renderer = Core::GetRenderer();
-            renderer->BeginFrame(*camera.Data1, camera.Data2, submitCount3D);
+            renderer->BeginFrame(*camera.Data1, camera.Data2);
             {
                 auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
                 for (const auto& [entity, sprite, transform] : view.each())
@@ -214,6 +200,7 @@ namespace Surge
             }
             {
                 // 3D Meshes
+                auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
                 for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
                 {
                     if(meshComponent.MeshID)
@@ -487,7 +474,7 @@ namespace Surge
         Core::GetPhysics()->CreateRigidbody(Entity(entity, this));
     }
 
-    void Scene::OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity)
+    void Scene::OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity)
     {
         Core::GetPhysics()->DestroyRigidbody(Entity(entity, this));
     }
