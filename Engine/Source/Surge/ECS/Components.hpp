@@ -4,12 +4,9 @@
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
-#include "SurgeReflect/SurgeReflect.hpp"
+#include "Surge/Physics/RigidbodyID.hpp"
 #include "Surge/Asset/Asset.hpp"
-
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Body/BodyID.h>
-#include <Jolt/Physics/Collision/Shape/Shape.h>
+#include "SurgeReflect/SurgeReflect.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -143,7 +140,7 @@ namespace Surge
 
     struct RigidbodyComponent
     {
-        JPH::BodyID RuntimeBodyID; // Jolt's internal handle
+        RigidBodyID RuntimeBodyID; // Jolt's internal handle under the hood
         RigidbodyType Type = RigidbodyType::DYNAMIC;
         float Mass = 1.0f;
 
@@ -202,7 +199,6 @@ namespace Surge
         // Internal usage, not serialized
         bool ShowCollider = false;
         bool IsDirty = true;
-        JPH::ShapeRefC TempShape = nullptr;
 
         SURGE_REFLECTION_ENABLE;
     };

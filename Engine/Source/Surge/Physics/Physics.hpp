@@ -1,13 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Core/Defines.hpp"
+#include "Surge/Physics/RigidbodyID.hpp"
 
 #include <Jolt/Jolt.h>
-#include <Jolt/Physics/Collision/ObjectLayer.h>
-#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <Jolt/Physics/Collision/Shape/Shape.h>
-#include "Jolt/Renderer/DebugRenderer.h"
-
 
 namespace JPH
 {
@@ -19,21 +15,8 @@ namespace JPH
 
 namespace Surge
 {
-    namespace PhysicsLayers
-    {
-        static constexpr JPH::ObjectLayer STATIC = 0;
-        static constexpr JPH::ObjectLayer DYNAMIC = 1;
-        static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
-    }
-
-    namespace BroadPhaseLayers
-    {
-        static constexpr JPH::BroadPhaseLayer STATIC(0);
-        static constexpr JPH::BroadPhaseLayer DYNAMIC(1);
-        static constexpr Uint NUM_LAYERS(2);
-    }
-
     class Entity;
+    struct RigidbodyComponent;
     class Physics
     {
     public:
@@ -43,25 +26,31 @@ namespace Surge
 
         void OptimizeBroadPhase();
 
-        JPH::ShapeRefC CreateShape(Entity entity);
+        void CreateRigidbody(Entity entity);
+        void DestroyRigidbody(Entity entity);
+        JPH::ShapeRefC CreateShape(Entity entity); //TODO: Remove, exposes Jolt
 
-        // Getters for the ECS to use
-        JPH::PhysicsSystem* Get() { return mPhysicsSystem; }
-        JPH::DebugRenderer* GetDebugRenderer() { return mDebugRenderer; }
+        bool IsInValid(RigidBodyID rbID) const;
+        bool IsActive(RigidBodyID rbID) const;
+
+        glm::vec3 GetPosition(RigidBodyID rbID) const;
+        glm::vec3 GetRotation(RigidBodyID rbID) const;
 
         void GetDebugStats(int& outActiveBodies, int& outTotalBodies);
-    private:
-        // Core Jolt Systems
-        JPH::PhysicsSystem* mPhysicsSystem;
 
-        // Memory and Threading
+        JPH::PhysicsSystem* Get() { return mPhysicsSystem; }
+        JPH::DebugRenderer* GetDebugRenderer() { return mDebugRenderer; }
+    private:
+        JPH::PhysicsSystem* mPhysicsSystem;
         JPH::JobSystemThreadPool* mJobSystem;
         JPH::TempAllocatorImpl* mTempAllocator;
+        JPH::DebugRenderer* mDebugRenderer;
+
+        float mAccumulatedTime = 0.0f;
 
         void* mBPLayerInterface;
         void* mObjVsBPLayerFilter;
         void* mObjVsObjLayerFilter;
-        JPH::DebugRenderer* mDebugRenderer;
     };
 
 } // namespace Surge

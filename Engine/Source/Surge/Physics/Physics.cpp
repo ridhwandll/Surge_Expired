@@ -2,6 +2,7 @@
 #include "Physics.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Scene.hpp"
+#include "Surge/ECS/Components.hpp"
 
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
@@ -9,13 +10,19 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/Body/BodyInterface.h>
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
-#include <Jolt/Renderer/DebugRenderer.h>
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+
+
+#include <Jolt/Renderer/DebugRenderer.h>
 #include <cstdarg>
 
 namespace Surge
@@ -120,6 +127,20 @@ namespace Surge
         }
     };
 
+    namespace PhysicsLayers
+    {
+        static constexpr JPH::ObjectLayer STATIC = 0;
+        static constexpr JPH::ObjectLayer DYNAMIC = 1;
+        static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
+    }
+
+    namespace BroadPhaseLayers
+    {
+        static constexpr JPH::BroadPhaseLayer STATIC(0);
+        static constexpr JPH::BroadPhaseLayer DYNAMIC(1);
+        static constexpr Uint NUM_LAYERS = 2;
+    }
+
     class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
     {
     public:
@@ -181,13 +202,12 @@ namespace Surge
 
         mTempAllocator = new JPH::TempAllocatorImpl(20 * 1024 * 1024); //20MB buffer just in case
         mJobSystem = new JPH::JobSystemThreadPool(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, std::thread::hardware_concurrency() - 1);
+        mDebugRenderer = new PhysicsDebugRenderer();
+        mPhysicsSystem = new JPH::PhysicsSystem();
 
         mBPLayerInterface = new BPLayerInterfaceImpl();
         mObjVsBPLayerFilter = new ObjectVsBroadPhaseLayerFilterImpl();
         mObjVsObjLayerFilter = new ObjectLayerPairFilterImpl();
-        mDebugRenderer = new PhysicsDebugRenderer();
-
-        mPhysicsSystem = new JPH::PhysicsSystem();
 
         const Uint cMaxBodyPairs = 65536;          // Default: 1024
         const Uint cMaxContactConstraints = 10240; // Default: 1024
@@ -209,34 +229,32 @@ namespace Surge
             return;
 
         const int collisionSteps = 1;
-
         const float cFixedTimeStep = 1.0f / 60.0f;
-        static float sAccumulatedTime = 0.0f;
 
         float frameDeltaTime = deltaTime;
         if(frameDeltaTime > 0.25f)
             frameDeltaTime = 0.25f;
 
-        sAccumulatedTime += frameDeltaTime;
-        while(sAccumulatedTime >= cFixedTimeStep)
+        mAccumulatedTime += frameDeltaTime;
+        while(mAccumulatedTime >= cFixedTimeStep)
         {
             mPhysicsSystem->Update(cFixedTimeStep, collisionSteps, mTempAllocator, mJobSystem);
-            sAccumulatedTime -= cFixedTimeStep;
+            mAccumulatedTime -= cFixedTimeStep;
         }
     }
 
     void Physics::Shutdown()
     {
-        delete mDebugRenderer;
         delete mPhysicsSystem;
+        delete mDebugRenderer;
+        delete mJobSystem;
+        delete mTempAllocator;
 
         delete static_cast<ObjectLayerPairFilterImpl*>(mObjVsObjLayerFilter);
         delete static_cast<ObjectVsBroadPhaseLayerFilterImpl*>(mObjVsBPLayerFilter);
         delete static_cast<BPLayerInterfaceImpl*>(mBPLayerInterface);
 
-        delete mJobSystem;
-        delete mTempAllocator;
-
+        JPH::UnregisterTypes();
         delete JPH::Factory::sInstance;
         JPH::Factory::sInstance = nullptr;
     }
@@ -244,6 +262,103 @@ namespace Surge
     void Physics::OptimizeBroadPhase()
     {
         mPhysicsSystem->OptimizeBroadPhase();
+    }
+
+    static JPH::Quat GlmToJolt(const glm::vec3& v)
+    {
+        glm::quat q = glm::quat(glm::radians(v));
+        return JPH::Quat(q.x, q.y, q.z, q.w);
+    }
+
+    void Physics::CreateRigidbody(Entity entity)
+    {
+        JPH::ShapeRefC shape = CreateShape(entity);
+        JPH::Vec3 comOffset = shape->GetCenterOfMass();
+
+        auto& transform = entity.GetComponent<TransformComponent>();
+        auto& rb = entity.GetComponent<RigidbodyComponent>();
+
+        JPH::EMotionType motionType = JPH::EMotionType::Dynamic;
+        JPH::ObjectLayer objectLayer = PhysicsLayers::DYNAMIC;
+
+        if(rb.Type == RigidbodyType::STATIC)
+        {
+            motionType = JPH::EMotionType::Static;
+            objectLayer = PhysicsLayers::STATIC;
+        }
+        else if(rb.Type == RigidbodyType::KINEMATIC)
+        {
+            motionType = JPH::EMotionType::Kinematic;
+            objectLayer = PhysicsLayers::DYNAMIC;
+        }
+
+        JPH::Vec3 joltPosition = JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z);
+        JPH::Quat joltRotation = GlmToJolt(transform.Rotation);
+        joltPosition = joltPosition + joltRotation * comOffset;
+        JPH::BodyCreationSettings settings(shape, joltPosition, GlmToJolt(transform.Rotation), motionType, objectLayer);
+
+        settings.mGravityFactor = rb.UseGravity ? 1.0f : 0.0f;
+        settings.mIsSensor = rb.IsSensor;
+        settings.mMotionQuality = rb.ContinuousCollision ? JPH::EMotionQuality::LinearCast : JPH::EMotionQuality::Discrete;
+        settings.mLinearDamping = rb.LinearDamping;
+        settings.mAngularDamping = rb.AngularDamping;
+        settings.mFriction = rb.Friction;
+        settings.mRestitution = rb.Bounciness;
+
+        if(motionType == JPH::EMotionType::Dynamic)
+        {
+            settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+            settings.mMassPropertiesOverride.mMass = rb.Mass;
+        }
+        if(rb.FreezeRotationX || rb.FreezeRotationY || rb.FreezeRotationZ)
+        {
+            JPH::EAllowedDOFs allowedDOFs = JPH::EAllowedDOFs::All;
+            if(rb.FreezeRotationX) allowedDOFs &= ~JPH::EAllowedDOFs::RotationX;
+            if(rb.FreezeRotationY) allowedDOFs &= ~JPH::EAllowedDOFs::RotationY;
+            if(rb.FreezeRotationZ) allowedDOFs &= ~JPH::EAllowedDOFs::RotationZ;
+
+            settings.mAllowedDOFs = allowedDOFs;
+        }
+
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Body* body = bodyInterface.CreateBody(settings);
+
+        rb.RuntimeBodyID = body->GetID().GetIndexAndSequenceNumber();
+        bodyInterface.AddBody(JPH::BodyID(rb.RuntimeBodyID), JPH::EActivation::Activate);
+    }
+
+    void Physics::DestroyRigidbody(Entity entity)
+    {
+        auto& rb = entity.GetScene()->GetRegistry().get<RigidbodyComponent>(entity);
+
+        if(JPH::BodyID(rb.RuntimeBodyID).IsInvalid())
+            return;
+
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.RemoveBody(JPH::BodyID(rb.RuntimeBodyID));
+        bodyInterface.DestroyBody(JPH::BodyID(rb.RuntimeBodyID));
+
+        rb.RuntimeBodyID = JPH::BodyID().GetIndexAndSequenceNumber();
+    }
+
+    bool Physics::IsActive(RigidBodyID rbID) const
+    {
+        const JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        return bodyInterface.IsActive((JPH::BodyID)rbID);
+    }
+
+    glm::vec3 Physics::GetPosition(RigidBodyID rbID) const
+    {
+        const JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Vec3 joltPosition = bodyInterface.GetPosition(JPH::BodyID(rbID));
+        return { joltPosition.GetX(), joltPosition.GetY(), joltPosition.GetZ() };
+    }
+
+    glm::vec3 Physics::GetRotation(RigidBodyID rbID) const
+    {
+        const JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Quat joltRotation = bodyInterface.GetRotation(JPH::BodyID(rbID));
+        return glm::degrees(glm::eulerAngles(glm::quat(joltRotation.GetW(), joltRotation.GetX(), joltRotation.GetY(), joltRotation.GetZ())));
     }
 
     JPH::ShapeRefC Physics::CreateShape(Entity entity)
@@ -447,12 +562,15 @@ namespace Surge
         return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
     }
 
+    bool Physics::IsInValid(RigidBodyID rbID) const
+    {
+        return JPH::BodyID(rbID).IsInvalid();
+    }
+
     void Physics::GetDebugStats(int& outActiveBodies, int& outTotalBodies)
     {
-        JPH::PhysicsSystem* system = Get();
-        outTotalBodies = system->GetNumBodies();
-        outActiveBodies = system->GetNumActiveBodies(JPH::EBodyType::RigidBody);
+        outTotalBodies = mPhysicsSystem->GetNumBodies();
+        outActiveBodies = mPhysicsSystem->GetNumActiveBodies(JPH::EBodyType::RigidBody);
     }
 
 }  // namespace Surge
-

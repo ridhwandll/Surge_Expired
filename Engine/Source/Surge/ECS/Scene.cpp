@@ -6,21 +6,14 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
-#include "Surge/Asset/AssetManager.hpp"
-
 #include "Surge/Physics/Physics.hpp"
-#include "Jolt/Physics/Body/BodyInterface.h"
+#include "Surge/Asset/AssetManager.hpp"
+#include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
-#include "Jolt/Physics/Body/BodyCreationSettings.h"
 
 namespace Surge
 {
     static Entity sSelectedEntity;
-    static JPH::Quat GlmToJolt(const glm::vec3& v)
-    {
-        glm::quat q = glm::quat(glm::radians(v));
-        return JPH::Quat(q.x, q.y, q.z, q.w);
-    }
 
     Scene::Scene()
     {
@@ -49,7 +42,6 @@ namespace Surge
         mRegistry.on_construct<CylinderColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<ConvexColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
         Physics* physics = Core::GetPhysics();
@@ -59,11 +51,19 @@ namespace Surge
     void Scene::OnRuntimeEnd()
     {
         mIsRunning = false;
+        mRegistry.on_construct<RigidbodyComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<BoxColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<SphereColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<CapsuleColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<CylinderColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<ConvexColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<MeshColliderComponent>().disconnect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_destroy<RigidbodyComponent>().disconnect<&Scene::OnRigidbodyDestroyed>(this);
     }
 
     void Scene::Update(EditorCamera& camera)
     {
-        UpdatePhysics();
+        SyncPhysics();
         Renderer* renderer = Core::GetRenderer();
         auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
         Uint submitCount3D = meshGroup.size();
@@ -141,17 +141,18 @@ namespace Surge
                     if(showCollider)
                     {
                         auto& transformComp = sSelectedEntity.GetComponent<TransformComponent>();
+                        static JPH::ShapeRefC sTempShape = nullptr;
 
                         JPH::ShapeRefC shape;
                         if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
                         {
                             ConvexColliderComponent& convexComp = sSelectedEntity.GetComponent<ConvexColliderComponent>();
-                            if(!convexComp.TempShape || convexComp.IsDirty)
+                            if(!sTempShape || convexComp.IsDirty)
                             {
-                                convexComp.TempShape = Core::GetPhysics()->CreateShape(sSelectedEntity);
+                                sTempShape = Core::GetPhysics()->CreateShape(sSelectedEntity);
                                 convexComp.IsDirty = false;
                             }
-                            shape = convexComp.TempShape;
+                            shape = sTempShape;
                         }
                         else
                             shape = Core::GetPhysics()->CreateShape(sSelectedEntity);
@@ -160,7 +161,10 @@ namespace Surge
                         {
                             JPH::Vec3 comOffset = shape->GetCenterOfMass();
                             JPH::Vec3 joltPosition = JPH::Vec3(transformComp.Position.x, transformComp.Position.y, transformComp.Position.z);
-                            JPH::Quat joltRotation = GlmToJolt(transformComp.Rotation);
+
+                            glm::quat q = glm::quat(glm::radians(transformComp.Rotation));
+                            JPH::Quat joltRotation = JPH::Quat(q.x, q.y, q.z, q.w);
+
                             joltPosition = joltPosition + joltRotation * comOffset;
                             JPH::RMat44 joltTransform = JPH::RMat44::sRotationTranslation(joltRotation, joltPosition);
 
@@ -179,7 +183,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::Update()");
         //Timer timer("Scene::Update()", true);
-        UpdatePhysics();
+        SyncPhysics();
 
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
@@ -397,29 +401,20 @@ namespace Surge
         return result;
     }
 
-    void Scene::UpdatePhysics()
+    void Scene::SyncPhysics()
     {
         if(mIsRunning)
         {
             Physics* physics = Core::GetPhysics();
-            JPH::PhysicsSystem* physicsSystem = physics->Get();
-            JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
-
             auto view = mRegistry.view<TransformComponent, RigidbodyComponent>();
             for(auto [entity, transformComp, rb] : view.each())
             {
-                if(rb.RuntimeBodyID.IsInvalid())
+                if(physics->IsInValid(rb.RuntimeBodyID) || !physics->IsActive(rb.RuntimeBodyID))
                     continue;
 
-                if(!bodyInterface.IsActive(rb.RuntimeBodyID))
-                    continue;
-
-                JPH::Vec3 joltPosition = bodyInterface.GetPosition(rb.RuntimeBodyID);
-                JPH::Quat joltRotation = bodyInterface.GetRotation(rb.RuntimeBodyID);
-
-                transformComp.Position = glm::vec3(joltPosition.GetX(), joltPosition.GetY(), joltPosition.GetZ());
-                transformComp.Rotation = glm::degrees(glm::eulerAngles(glm::quat(joltRotation.GetW(), joltRotation.GetX(), joltRotation.GetY(), joltRotation.GetZ())));
-                transformComp.MarkDirty();
+                transformComp.Position = physics->GetPosition(rb.RuntimeBodyID);
+                transformComp.Rotation = physics->GetRotation(rb.RuntimeBodyID);
+                transformComp.MarkDirty(); // Fucking fuck ass MarkDirty funciton, I forogt to add this and spent 30mins debugging why my Physics system is not updating
             }
         }
     }
@@ -489,79 +484,12 @@ namespace Surge
            !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent, MeshColliderComponent>(entity)))
             return;
 
-        Physics* physics = Core::GetPhysics();
-        JPH::PhysicsSystem* physicsSystem = physics->Get();
-
-        JPH::ShapeRefC shape = physics->CreateShape(Entity(entity, this));
-        JPH::Vec3 comOffset = shape->GetCenterOfMass();
-
-        auto& transform = registry.get<TransformComponent>(entity);
-        auto& rb = registry.get<RigidbodyComponent>(entity);
-
-        JPH::EMotionType motionType = JPH::EMotionType::Dynamic;
-        JPH::ObjectLayer objectLayer = PhysicsLayers::DYNAMIC;
-
-        if(rb.Type == RigidbodyType::STATIC)
-        {
-            motionType = JPH::EMotionType::Static;
-            objectLayer = PhysicsLayers::STATIC;
-        }
-        else if(rb.Type == RigidbodyType::KINEMATIC)
-        {
-            motionType = JPH::EMotionType::Kinematic;
-            objectLayer = PhysicsLayers::DYNAMIC;
-        }
-
-        JPH::Vec3 joltPosition = JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z);
-        JPH::Quat joltRotation = GlmToJolt(transform.Rotation);
-        joltPosition = joltPosition + joltRotation * comOffset;
-        JPH::BodyCreationSettings settings(shape, joltPosition, GlmToJolt(transform.Rotation), motionType, objectLayer);
-
-        settings.mGravityFactor = rb.UseGravity ? 1.0f : 0.0f;
-        settings.mIsSensor = rb.IsSensor;
-        settings.mMotionQuality = rb.ContinuousCollision ? JPH::EMotionQuality::LinearCast : JPH::EMotionQuality::Discrete;
-        settings.mLinearDamping = rb.LinearDamping;
-        settings.mAngularDamping = rb.AngularDamping;
-        settings.mFriction = rb.Friction;
-        settings.mRestitution = rb.Bounciness;
-
-        if(motionType == JPH::EMotionType::Dynamic)
-        {
-            settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-            settings.mMassPropertiesOverride.mMass = rb.Mass;
-        }
-        if(rb.FreezeRotationX || rb.FreezeRotationY || rb.FreezeRotationZ)
-        {
-            JPH::EAllowedDOFs allowedDOFs = JPH::EAllowedDOFs::All;
-            if(rb.FreezeRotationX) allowedDOFs &= ~JPH::EAllowedDOFs::RotationX;
-            if(rb.FreezeRotationY) allowedDOFs &= ~JPH::EAllowedDOFs::RotationY;
-            if(rb.FreezeRotationZ) allowedDOFs &= ~JPH::EAllowedDOFs::RotationZ;
-
-            settings.mAllowedDOFs = allowedDOFs;
-        }
-
-        JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
-        JPH::Body* body = bodyInterface.CreateBody(settings);
-
-        rb.RuntimeBodyID = body->GetID();
-        bodyInterface.AddBody(rb.RuntimeBodyID, JPH::EActivation::Activate);
+        Core::GetPhysics()->CreateRigidbody(Entity(entity, this));
     }
 
     void Scene::OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity)
     {
-        auto& rb = registry.get<RigidbodyComponent>(entity);
-
-        if(rb.RuntimeBodyID.IsInvalid())
-            return;
-
-        Physics* physics = Core::GetPhysics();
-        JPH::PhysicsSystem* physicsSystem = physics->Get();
-
-        JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
-        bodyInterface.RemoveBody(rb.RuntimeBodyID);
-        bodyInterface.DestroyBody(rb.RuntimeBodyID);
-
-        rb.RuntimeBodyID = JPH::BodyID();
+        Core::GetPhysics()->DestroyRigidbody(Entity(entity, this));
     }
 
 } // namespace Surge

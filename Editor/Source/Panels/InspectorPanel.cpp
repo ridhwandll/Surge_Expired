@@ -391,13 +391,13 @@ namespace Surge
                 if(component.Type != RigidbodyType::STATIC)
                 {
                     ImGuiAux::TSperator("Damping");
-                    ImGuiAux::TProperty<float>("Linear Damping", &component.LinearDamping);
-                    ImGuiAux::TProperty<float>("Angular Damping", &component.AngularDamping);
+                    ImGuiAux::TProperty<float>("Linear", &component.LinearDamping);
+                    ImGuiAux::TProperty<float>("Angular", &component.AngularDamping);
 
                     ImGuiAux::TSperator("Freeze Rotation Axes");
-                    ImGuiAux::TProperty<bool>("Freeze X", &component.FreezeRotationX);
-                    ImGuiAux::TProperty<bool>("Freeze Y", &component.FreezeRotationY);
-                    ImGuiAux::TProperty<bool>("Freeze Z", &component.FreezeRotationZ);
+                    ImGuiAux::TProperty<bool>("X", &component.FreezeRotationX);
+                    ImGuiAux::TProperty<bool>("Y", &component.FreezeRotationY);
+                    ImGuiAux::TProperty<bool>("Z", &component.FreezeRotationZ);
                 }
             });
         }
@@ -471,8 +471,9 @@ namespace Surge
                 }
                 else
                 {
-                    ImGuiAux::ScopedColor({ ImGuiCol_Text }, ImGuiAux::Colors::Red);
-                    ImGuiAux::TString("ERROR", "Mesh Collider Components cannot be used with DYNAMIC Rigidbodies! REMOVE this component or set the Rigidbody Type to STATIC or KINEMATIC!");
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Red);
+                    ImGuiAux::TString("ERROR", "Mesh Collider Components can/should NOT be used with DYNAMIC Rigidbodies! REMOVE this component or set the Rigidbody Type to STATIC or KINEMATIC!");
+                    ImGui::PopStyleColor();
                 }
             });
         }
