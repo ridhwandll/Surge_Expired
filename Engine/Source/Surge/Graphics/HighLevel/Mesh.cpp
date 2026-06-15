@@ -44,6 +44,10 @@ namespace Surge
                     Log<Severity::Warn>("[Mesh] Failed to load material override for mesh at index {}! The material is missing probably, falling back to transient material!", i);
             }
         }
+
+        //TODO: Remove
+        mVertices = std::move(spec.Vertices);
+        mIndices = std::move(spec.Indices);
     }
 
     Mesh::~Mesh()

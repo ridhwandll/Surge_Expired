@@ -164,7 +164,7 @@ namespace Surge::ImGuiAux
 
         va_list args;
         va_start(args, fmt);
-        ImGui::TextV(fmt, args);
+        ImGui::TextWrappedV(fmt, args);
         va_end(args);
 
         ImGui::PopID();

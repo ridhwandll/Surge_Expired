@@ -81,3 +81,18 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CapsuleColliderComponent)
     .AddVariable<&Surge::CapsuleColliderComponent::Height>("Height")
     .AddVariable<&Surge::CapsuleColliderComponent::Radius>("Radius")
 SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CylinderColliderComponent)
+    .AddVariable<&Surge::CylinderColliderComponent::Height>("Height")
+    .AddVariable<&Surge::CylinderColliderComponent::Radius>("Radius")
+SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::ConvexColliderComponent)
+    .AddVariable<&Surge::ConvexColliderComponent::LocalOffset>("LocalOffset")
+    .AddVariable<&Surge::ConvexColliderComponent::LocalRotation>("LocalRotation")
+SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::MeshColliderComponent)
+    .AddVariable<&Surge::MeshColliderComponent::LocalOffset>("LocalOffset")
+    .AddVariable<&Surge::MeshColliderComponent::LocalRotation>("LocalRotation")
+SURGE_REFLECT_CLASS_REGISTER_END()

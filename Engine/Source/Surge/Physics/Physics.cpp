@@ -3,23 +3,42 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Scene.hpp"
 
-#include <glm/glm.hpp>
-
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
-#include "Jolt/Physics/Collision/Shape/BoxShape.h"
-#include "Jolt/Physics/Body/BodyCreationSettings.h"
-#include "Jolt/Physics/Collision/Shape/SphereShape.h"
-#include "Jolt/Physics/Collision/Shape/CapsuleShape.h"
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Renderer/DebugRenderer.h>
+#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
+#include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
+#include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <cstdarg>
 
 namespace Surge
 {
+    static void JoltTraceCallback(const char* inFMT, ...)
+    {
+        va_list list;
+        va_start(list, inFMT);
+        char buffer[1024];
+        vsnprintf(buffer, sizeof(buffer), inFMT, list);
+        va_end(list);
+        Log<Severity::Trace>("[Jolt] {}", buffer);
+    }
+
+#ifdef JPH_ENABLE_ASSERTS
+    // Asset Callback
+    static bool JoltAssertFailedCallback(const char* inExpression, const char* inMessage, const char* inFile, JPH::uint inLine)
+    {
+        Log<Severity::Error>("[Jolt] Assert Failed: {}:{} ({}) {}", inFile, inLine, inExpression, (inMessage ? inMessage : ""));
+        return true;
+    }
+#endif
+
     // Debug renderer
     class PhysicsDebugBatch : public JPH::RefTargetVirtual
     {
@@ -148,25 +167,19 @@ namespace Surge
         }
     };
 
-    static void JoltTraceImpl(const char* inFMT, ...)
-    {
-        va_list list;
-        va_start(list, inFMT);
-        char buffer[1024];
-        vsnprintf(buffer, sizeof(buffer), inFMT, list);
-        va_end(list);
-        Log<Severity::Info>("[Jolt] {}", buffer);
-    }
-
     void Physics::Initialize()
     {
-        JPH::Trace = JoltTraceImpl;
         JPH::RegisterDefaultAllocator();
+
+        JPH::Trace = JoltTraceCallback;
+#ifdef JPH_ENABLE_ASSERTS
+        JPH::AssertFailed = JoltAssertFailedCallback;
+#endif
 
         JPH::Factory::sInstance = new JPH::Factory();
         JPH::RegisterTypes();
 
-        mTempAllocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
+        mTempAllocator = new JPH::TempAllocatorImpl(20 * 1024 * 1024); //20MB buffer just in case
         mJobSystem = new JPH::JobSystemThreadPool(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, std::thread::hardware_concurrency() - 1);
 
         mBPLayerInterface = new BPLayerInterfaceImpl();
@@ -176,8 +189,11 @@ namespace Surge
 
         mPhysicsSystem = new JPH::PhysicsSystem();
 
+        const Uint cMaxBodyPairs = 65536;          // Default: 1024
+        const Uint cMaxContactConstraints = 10240; // Default: 1024
+
         mPhysicsSystem->Init(
-            1024, 0, 1024, 1024,
+            1024, 0, cMaxBodyPairs, cMaxContactConstraints,
             *static_cast<BPLayerInterfaceImpl*>(mBPLayerInterface),
             *static_cast<ObjectVsBroadPhaseLayerFilterImpl*>(mObjVsBPLayerFilter),
             *static_cast<ObjectLayerPairFilterImpl*>(mObjVsObjLayerFilter)
@@ -256,13 +272,178 @@ namespace Surge
 
             float halfHeightOfCylinder = (scaledTotalHeight * 0.5f) - scaledRadius;
             if(halfHeightOfCylinder < 0.0f)
-                halfHeightOfCylinder = 0.0f;
+                halfHeightOfCylinder = 1.0f;
 
             return new JPH::CapsuleShape(halfHeightOfCylinder, scaledRadius);
         }
+        if(auto* cylinder = registry.try_get<CylinderColliderComponent>(entity.Raw()))
+        {
+            // Radius scales along X/Z plane, Height scales along Y
+            float maxRadiusScale = std::max(absScale.x, absScale.z);
+            float scaledRadius = cylinder->Radius * maxRadiusScale;
+            float scaledHalfHeight = cylinder->Height * 0.5f * absScale.y;
 
+            if(scaledHalfHeight < 0.0f)
+                scaledHalfHeight = 0.0f;
+            if(scaledRadius < 0.0f)
+                scaledRadius = 0.0f;
+
+            return new JPH::CylinderShape(scaledHalfHeight, scaledRadius);
+        }
+        if(auto* convex = registry.try_get<ConvexColliderComponent>(entity.Raw()))
+        {
+            if(!registry.any_of<MeshComponent>(entity.Raw()))
+            {
+                Log<Severity::Warn>("[Physics] Entity {} has ConvexCollider but no MeshComponent!", (Uint)entity);
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            }
+            auto& meshComp = registry.get<MeshComponent>(entity.Raw());
+            if(!meshComp.MeshID)
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+
+            Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+            if(!mesh)
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+
+            const Vector<Vertex>& meshVertices = mesh->GetVertices();
+            if(meshVertices.empty())
+            {
+                Log<Severity::Warn>("[Physics] Entity {} mesh has 0 CPU vertices!", (Uint)entity);
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            }
+
+            // Rotate + Scale
+            glm::quat localRot = glm::quat(glm::radians(convex->LocalRotation));
+            Vector<JPH::Vec3> joltVertices;
+            joltVertices.reserve(meshVertices.size());
+            for(const auto& v : meshVertices)
+            {
+                glm::vec3 r = localRot * v.Position;
+                joltVertices.emplace_back(JPH::Vec3(r.x * absScale.x, r.y * absScale.y, r.z * absScale.z));
+            }
+
+            // Subtract vertex centroid so Jolt's COM lands near origin
+            JPH::Vec3 centroid = JPH::Vec3::sZero();
+            for(const auto& v : joltVertices)
+                centroid += v;
+            centroid /= (float)joltVertices.size();
+            for(auto& v : joltVertices)
+                v -= centroid;
+
+            // LocalOffset in scaled space (AFTER scale, not before)
+            JPH::Vec3 scaledOffset(
+                convex->LocalOffset.x * absScale.x,
+                convex->LocalOffset.y * absScale.y,
+                convex->LocalOffset.z * absScale.z
+            );
+            for(auto& v : joltVertices)
+                v += scaledOffset;
+
+            // Compute hull bounds for adaptive convex radius
+            JPH::Vec3 bboxMin = joltVertices[0], bboxMax = joltVertices[0];
+            for(const auto& v : joltVertices)
+            {
+                bboxMin = JPH::Vec3::sMin(bboxMin, v);
+                bboxMax = JPH::Vec3::sMax(bboxMax, v);
+            }
+            float hullDiagonal = (bboxMax - bboxMin).Length();
+            if(hullDiagonal < 1e-4f)
+            {
+                Log<Severity::Warn>("[Physics] Entity {} hull too small ({:.5f}m), fallback!", (Uint)entity, hullDiagonal);
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            }
+            float convexRadius = std::clamp(hullDiagonal * 0.01f, 0.0001f, 0.05f);
+
+            JPH::ConvexHullShapeSettings settings(joltVertices.data(), (int)joltVertices.size(), convexRadius);
+            JPH::ShapeSettings::ShapeResult result = settings.Create();
+
+            if(result.HasError())
+            {
+                Log<Severity::Error>("[Physics] Convex Hull failed: {}", result.GetError().c_str());
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            }
+
+            convex->IsDirty = true;
+            return result.Get();
+        }
+        if(auto* meshCol = registry.try_get<MeshColliderComponent>(entity.Raw()))
+        {
+            if(!registry.any_of<MeshComponent>(entity.Raw()))
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            auto& meshComp = registry.get<MeshComponent>(entity.Raw());
+            if(!meshComp.MeshID)
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+
+            Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+            if(!mesh)
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+
+            const Vector<Vertex>& meshVertices = mesh->GetVertices();
+            const Vector<Index>& meshIndices = mesh->GetIndices();
+            const Vector<Submesh>& submeshes = mesh->GetSubmeshes();
+            if(meshVertices.empty() || meshIndices.empty())
+            {
+                Log<Severity::Warn>("[Physics] Entity {} mesh missing CPU data!", (Uint)entity);
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            }
+
+            // Rotate + Scale
+            glm::quat localRot = glm::quat(glm::radians(meshCol->LocalRotation));
+            JPH::VertexList joltVertices;
+            joltVertices.resize(meshVertices.size());
+            for(const Submesh& submesh : submeshes)
+            {
+                for(Uint i = 0; i < submesh.VertexCount; ++i)
+                {
+                    Uint vIndex = submesh.BaseVertex + i;
+                    const Vertex& v = meshVertices[vIndex];
+
+                    // Apply the Submesh Node Transform 
+                    glm::vec4 nodePos = submesh.Transform * glm::vec4(v.Position, 1.0f);
+
+                    // Apply Local Rotation
+                    glm::vec3 r = localRot * glm::vec3(nodePos);
+
+                    // Apply Entity Scale and Local Offset
+                    joltVertices[vIndex] = JPH::Float3(
+                        (r.x * absScale.x) + (meshCol->LocalOffset.x * absScale.x),
+                        (r.y * absScale.y) + (meshCol->LocalOffset.y * absScale.y),
+                        (r.z * absScale.z) + (meshCol->LocalOffset.z * absScale.z)
+                    );
+                }
+            }
+
+            JPH::IndexedTriangleList joltTriangles;
+            joltTriangles.reserve(meshIndices.size());
+            for(const auto& submesh : submeshes)
+            {
+                Uint startTriangle = submesh.BaseIndex / 3;
+                Uint triangleCount = submesh.IndexCount / 3;
+
+                for(Uint i = 0; i < triangleCount; ++i)
+                {
+                    const Index& idx = meshIndices[startTriangle + i];
+                    joltTriangles.emplace_back(JPH::IndexedTriangle(
+                        idx.V1 + submesh.BaseVertex,
+                        idx.V2 + submesh.BaseVertex,
+                        idx.V3 + submesh.BaseVertex,
+                        0 // Material Index
+                    ));
+                }
+            }
+
+            JPH::MeshShapeSettings settings(joltVertices, joltTriangles);
+            JPH::ShapeSettings::ShapeResult result = settings.Create();
+            if(result.HasError())
+            {
+                Log<Severity::Error>("[Physics] MeshShape failed: {}", result.GetError().c_str());
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            }
+
+            return result.Get();
+        }
         // Default fallback
-        Log<Severity::Fatal>("[Physics] CreateShape: THIS SHOULD NOT HAPPEN Entity {} has no recognized collider component, using default box shape!", (Uint)entity);
+        Log<Severity::Fatal>("[Physics] CreateShape: THIS SHOULD NOT HAPPEN; Entity {} has no recognized collider component, using default box shape!", (Uint)entity);
         return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
     }
 

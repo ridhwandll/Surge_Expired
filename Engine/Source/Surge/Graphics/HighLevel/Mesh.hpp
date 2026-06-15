@@ -42,6 +42,9 @@ namespace Surge
         SURGE_ASSET_TYPE(AssetType::MESH);
         static Ref<Mesh> Create(MeshSpecification&& spec);
 
+        const Vector<Vertex>& GetVertices() const { return mVertices; }
+        const Vector<Index>& GetIndices() const { return mIndices; }
+
         BufferHandle GetVertexBuffer() const { return mVertexBuffer; }
         BufferHandle GetIndexBuffer() const { return mIndexBuffer; }
 
@@ -73,6 +76,9 @@ namespace Surge
         const Vector<Ref<Material>>& GetMaterialOverrides() const { return mMaterialOverrides; }
 
     private:
+        Vector<Vertex> mVertices; //TODO: Remove, currently used for physics convex hull generation
+        Vector<Index> mIndices;
+
         Vector<Submesh> mSubmeshes;
         BufferHandle mVertexBuffer;
         BufferHandle mIndexBuffer;

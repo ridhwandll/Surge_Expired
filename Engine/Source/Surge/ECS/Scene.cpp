@@ -16,7 +16,7 @@
 namespace Surge
 {
     static Entity sSelectedEntity;
-    inline JPH::Quat GlmToJolt(const glm::vec3& v)
+    static JPH::Quat GlmToJolt(const glm::vec3& v)
     {
         glm::quat q = glm::quat(glm::radians(v));
         return JPH::Quat(q.x, q.y, q.z, q.w);
@@ -46,6 +46,10 @@ namespace Surge
         mRegistry.on_construct<BoxColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<SphereColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_construct<CapsuleColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<CylinderColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<ConvexColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
         Physics* physics = Core::GetPhysics();
@@ -118,7 +122,9 @@ namespace Surge
                         }
                     }
                 }
-                if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent>(sSelectedEntity))
+
+                // No Collider showing for MeshColliderComponent
+                if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent>(sSelectedEntity))
                 {
                     bool showCollider = false;
                     if(sSelectedEntity.HasComponent<BoxColliderComponent>())
@@ -127,17 +133,36 @@ namespace Surge
                         showCollider = sSelectedEntity.GetComponent<SphereColliderComponent>().ShowCollider;
                     else if(sSelectedEntity.HasComponent<CapsuleColliderComponent>())
                         showCollider = sSelectedEntity.GetComponent<CapsuleColliderComponent>().ShowCollider;
+                    else if(sSelectedEntity.HasComponent<CylinderColliderComponent>())
+                        showCollider = sSelectedEntity.GetComponent<CylinderColliderComponent>().ShowCollider;
+                    else if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
+                        showCollider = sSelectedEntity.GetComponent<ConvexColliderComponent>().ShowCollider;
 
                     if(showCollider)
                     {
                         auto& transformComp = sSelectedEntity.GetComponent<TransformComponent>();
-                        JPH::ShapeRefC shape = Core::GetPhysics()->CreateShape(sSelectedEntity);
+
+                        JPH::ShapeRefC shape;
+                        if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
+                        {
+                            ConvexColliderComponent& convexComp = sSelectedEntity.GetComponent<ConvexColliderComponent>();
+                            if(!convexComp.TempShape || convexComp.IsDirty)
+                            {
+                                convexComp.TempShape = Core::GetPhysics()->CreateShape(sSelectedEntity);
+                                convexComp.IsDirty = false;
+                            }
+                            shape = convexComp.TempShape;
+                        }
+                        else
+                            shape = Core::GetPhysics()->CreateShape(sSelectedEntity);
 
                         if(shape)
                         {
-                            JPH::Vec3 joltPos(transformComp.Position.x, transformComp.Position.y, transformComp.Position.z);
-                            JPH::Quat joltRot = GlmToJolt(transformComp.Rotation);
-                            JPH::RMat44 joltTransform = JPH::RMat44::sRotationTranslation(joltRot, joltPos);
+                            JPH::Vec3 comOffset = shape->GetCenterOfMass();
+                            JPH::Vec3 joltPosition = JPH::Vec3(transformComp.Position.x, transformComp.Position.y, transformComp.Position.z);
+                            JPH::Quat joltRotation = GlmToJolt(transformComp.Rotation);
+                            joltPosition = joltPosition + joltRotation * comOffset;
+                            JPH::RMat44 joltTransform = JPH::RMat44::sRotationTranslation(joltRotation, joltPosition);
 
                             JPH::DebugRenderer* debugRenderer = Core::GetPhysics()->GetDebugRenderer();
                             shape->Draw(debugRenderer, joltTransform, JPH::Vec3::sReplicate(1.0f), JPH::Color::sGreen, false, true);
@@ -213,7 +238,7 @@ namespace Surge
             //JPH::PhysicsSystem* system = Core::GetPhysics()->Get();
             //JPH::BodyManager::DrawSettings settings;
             //settings.mDrawBoundingBox = true;
-            //settings.mDrawShape = false;
+            //settings.mDrawShape = true;
             //settings.mDrawShapeWireframe = false;
             //settings.mDrawSleepStats = false;
             //settings.mDrawVelocity = true;
@@ -232,7 +257,7 @@ namespace Surge
             entt::entity destEntity = enttMap.at(srcRegistry.get<IDComponent>(srcEntity).ID);
 
             auto& srcComponent = srcRegistry.get<T>(srcEntity);
-            auto& destComponent = dstRegistry.emplace_or_replace<T>(destEntity, srcComponent);
+            dstRegistry.emplace_or_replace<T>(destEntity, srcComponent);
         }
     }
 
@@ -262,6 +287,9 @@ namespace Surge
         CopyComponent<BoxColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<SphereColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CapsuleColliderComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<CylinderColliderComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<ConvexColliderComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<MeshColliderComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -327,6 +355,9 @@ namespace Surge
         CopyIfHas(std::type_identity<BoxColliderComponent>{});
         CopyIfHas(std::type_identity<SphereColliderComponent>{});
         CopyIfHas(std::type_identity<CapsuleColliderComponent>{});
+        CopyIfHas(std::type_identity<CylinderColliderComponent>{});
+        CopyIfHas(std::type_identity<ConvexColliderComponent>{});
+        CopyIfHas(std::type_identity<MeshColliderComponent>{});
         CopyIfHas(std::type_identity<LightComponent>{});
         CopyIfHas(std::type_identity<SpriteRendererComponent>{});
 
@@ -432,11 +463,6 @@ namespace Surge
             t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
             t.Scale = glm::vec3(15.0f, 1.0f, 15.0f);
             t.MarkDirty();
-
-            Ref<Material> material = assetManager->Load<Mesh>(meshComp.MeshID)->GetMaterialAtIndex(0);
-            material->Set<glm::vec3>("Albedo", glm::vec3(0.1f, 0.1f, 0.1f));
-            material->Set<float>("Metallic", 0.1f);
-            material->Set<float>("Roughness", 0.9f);
         }
         {
             Entity directionalLight;
@@ -459,13 +485,15 @@ namespace Surge
 
     void Scene::OnColliderAdded(entt::registry& registry, entt::entity entity)
     {
-        if(!registry.all_of<RigidbodyComponent, TransformComponent>(entity) || !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent>(entity)))
+        if(!registry.all_of<RigidbodyComponent, TransformComponent>(entity) ||
+           !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent, MeshColliderComponent>(entity)))
             return;
 
         Physics* physics = Core::GetPhysics();
         JPH::PhysicsSystem* physicsSystem = physics->Get();
 
         JPH::ShapeRefC shape = physics->CreateShape(Entity(entity, this));
+        JPH::Vec3 comOffset = shape->GetCenterOfMass();
 
         auto& transform = registry.get<TransformComponent>(entity);
         auto& rb = registry.get<RigidbodyComponent>(entity);
@@ -481,12 +509,13 @@ namespace Surge
         else if(rb.Type == RigidbodyType::KINEMATIC)
         {
             motionType = JPH::EMotionType::Kinematic;
-            objectLayer = PhysicsLayers::DYNAMIC; // Kinematic objects move, so they belong in dynamic layers
+            objectLayer = PhysicsLayers::DYNAMIC;
         }
 
-        JPH::BodyCreationSettings settings( shape,
-            JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z),
-            GlmToJolt(transform.Rotation), motionType, objectLayer);
+        JPH::Vec3 joltPosition = JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z);
+        JPH::Quat joltRotation = GlmToJolt(transform.Rotation);
+        joltPosition = joltPosition + joltRotation * comOffset;
+        JPH::BodyCreationSettings settings(shape, joltPosition, GlmToJolt(transform.Rotation), motionType, objectLayer);
 
         settings.mGravityFactor = rb.UseGravity ? 1.0f : 0.0f;
         settings.mIsSensor = rb.IsSensor;

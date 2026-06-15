@@ -23,7 +23,7 @@ namespace Surge
 
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
-            if(keyEvent.GetKeyCode() == Key::Delete)
+            if(keyEvent.GetKeyCode() == Key::Delete && mHierarchyHovered)
             {
                 mSceneContext->DestroyEntity(mSelectedEntity);
                 mSelectedEntity = {};
@@ -46,6 +46,7 @@ namespace Surge
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
         if (ImGui::Begin(PanelCodeToString(mCode), show))
         {
+            mHierarchyHovered = ImGui::IsWindowHovered();
             if (ImGuiAux::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
                 ImGui::OpenPopup("Add Entity");
 

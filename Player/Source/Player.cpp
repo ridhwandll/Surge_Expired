@@ -30,11 +30,6 @@ namespace Surge
 
         Project openedProject;
         Serializer::DeserializeProject(projectPath, &openedProject);
-
-        //const Path assetManagerPath = Filesystem::GetParentPath(projectPath) / "Assets";
-        //mAssetManager->Shutdown();
-        //mAssetManager->Initialize(assetManagerPath);
-
         mActiveScene = mAssetManager->Load<Scene>(openedProject.StartScene);
         mCurrentProject = std::move(openedProject);
     }

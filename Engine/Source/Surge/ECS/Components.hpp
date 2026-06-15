@@ -3,16 +3,17 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Surge/Graphics/HighLevel/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 #include "Surge/Asset/Asset.hpp"
 
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
+#include <Jolt/Physics/Collision/Shape/Shape.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+
 
 namespace Surge
 {
@@ -50,7 +51,7 @@ namespace Surge
 
         // Call transform changed (e.g. after physics)
         void MarkDirty() { mDirty = true; }
-
+        bool IsDirty() const { return mDirty; }
         const glm::mat4& GetTransform() const
         {
             if (mDirty)
@@ -184,11 +185,41 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct CylinderColliderComponent
+    {
+        bool ShowCollider = true;
+        float Height = 1.0f;
+        float Radius = 0.5f;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct ConvexColliderComponent
+    {
+        glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
+        glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f }; // In degrees
+        // Uses the entity's MeshComponent to generate the hull
+
+        // Internal usage, not serialized
+        bool ShowCollider = false;
+        bool IsDirty = true;
+        JPH::ShapeRefC TempShape = nullptr;
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct MeshColliderComponent
+    {
+        glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
+        glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f };
+        SURGE_REFLECTION_ENABLE;
+    };
+
+
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
                                 ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent,     \
                                 ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
-                                ::Surge::CapsuleColliderComponent \
+                                ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent \
 
 } // namespace Surge
