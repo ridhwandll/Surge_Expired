@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "OutlinePass.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {
@@ -81,9 +82,7 @@ namespace Surge
         Core::AddFrameEndCallback([this, width, height, blackBoard]() { mRHI->ResizeFramebuffer(blackBoard.OutlineFramebuffer, width, height); }); // (Player)
     }
 
-    void OutlinePass::OnImGuiRender(FrameBlackboard& blackBoard)
-    {
-    }
+    void OutlinePass::OnImGuiRender(FrameBlackboard&) {}
 
     void OutlinePass::Shutdown(FrameBlackboard& blackBoard)
     {

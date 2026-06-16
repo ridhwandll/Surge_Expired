@@ -4,16 +4,18 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
-#include "Profiler.hpp"
-#include <filesystem>
+#include "Surge/Core/Profiler.hpp"
 
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Physics/Physics.hpp"
+#include "Surge/ScriptEngine/ScriptEngine.hpp"
 
 #ifdef SURGE_PLATFORM_WINDOWS
 #include "Surge/Platform/Windows/WindowsWindow.hpp"
 #elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #endif
-#include "../Asset/AssetManager.hpp"
 
 
 #define ENV_VAR_KEY "SURGE_DIR"
@@ -27,6 +29,8 @@ namespace Surge::Core
         Window* SurgeWindow = nullptr;
         Renderer* SurgeRenderer = nullptr;
         AssetManager* SurgeAssetManager = nullptr;
+        Physics* SurgePhysics = nullptr;
+        ScriptEngine* SurgeScriptEngine = nullptr;
 
         bool Running = false;
         Vector<std::function<void()>> FrameEndCallbacks;
@@ -37,7 +41,7 @@ namespace Surge::Core
     {
         GCoreData.SurgeClient->OnEvent(e);
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
+        dispatcher.Dispatch<Surge::WindowClosedEvent>([]([[maybe_unused]] Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
         dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e) { GCoreData.SurgeRenderer->OnWindowResize(e.GetWidth(), e.GetHeight()); });
     }
 
@@ -74,12 +78,19 @@ namespace Surge::Core
         GCoreData.SurgeAssetManager = new AssetManager();
         GCoreData.SurgeAssetManager->Initialize("Engine/Assets");
 
+        // Physics
+        GCoreData.SurgePhysics = new Physics();
+        GCoreData.SurgePhysics->Initialize();
+
+        // Script Engine
+        GCoreData.SurgeScriptEngine = new ScriptEngine();
+        GCoreData.SurgeScriptEngine->Initialize();
 
         GCoreData.Running = true;
         GCoreData.SurgeClient->OnInitialize();
     }
 
-    void Core::Run()
+    void Run()
     {
         while (GCoreData.Running)
         {
@@ -90,6 +101,7 @@ namespace Surge::Core
             if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
                 continue;
 
+            GCoreData.SurgePhysics->Update(GCoreData.SurgeClock.GetSeconds());
             GCoreData.SurgeClient->OnUpdate();
 
             if (!GCoreData.FrameEndCallbacks.empty())
@@ -102,7 +114,7 @@ namespace Surge::Core
         }
     }
 
-    void Core::Shutdown()
+    void Shutdown()
     {
         SCOPED_TIMER("Core::Shutdown");
 
@@ -112,9 +124,15 @@ namespace Surge::Core
         // NOTE(Rid): Order Matters here
         GCoreData.SurgeClient->OnShutdown();
         delete GCoreData.SurgeClient;
+        
+        GCoreData.SurgeScriptEngine->Shutdown();
+        delete GCoreData.SurgeScriptEngine;
 
         GCoreData.SurgeAssetManager->Shutdown();
         delete GCoreData.SurgeAssetManager;
+
+        GCoreData.SurgePhysics->Shutdown();
+        delete GCoreData.SurgePhysics;
 
         GCoreData.SurgeRenderer->Shutdown();
         delete GCoreData.SurgeRenderer;
@@ -124,14 +142,16 @@ namespace Surge::Core
         SurgeReflect::Registry::Shutdown();
     }
 
-    void Core::AddFrameEndCallback(const std::function<void()>& func)
+    void AddFrameEndCallback(const std::function<void()>& func)
 {
         GCoreData.FrameEndCallbacks.push_back(func);
     }
 
     Window* GetWindow() { return GCoreData.SurgeWindow; }
+    Physics* GetPhysics() { return GCoreData.SurgePhysics; }
     Renderer* GetRenderer() { return GCoreData.SurgeRenderer; }
     AssetManager* GetAssetManager() { return GCoreData.SurgeAssetManager; }
+    ScriptEngine* GetScriptEngine() { return GCoreData.SurgeScriptEngine; }
     Client* GetClient() { return GCoreData.SurgeClient; }
     Clock& GetClock() { return GCoreData.SurgeClock; }
 

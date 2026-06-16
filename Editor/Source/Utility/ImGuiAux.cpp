@@ -62,7 +62,7 @@ namespace Surge
         String uppercaseName = name;
         for (char& n : uppercaseName)
             n = toupper(n);
-        open = ImGui::TreeNodeEx("##dummyId", treeNodeFlags, uppercaseName.c_str());
+        open = ImGui::TreeNodeEx("##dummyId", treeNodeFlags, "%s", uppercaseName.c_str());
         ImGui::PopFont();
         ImGui::PopID();
 

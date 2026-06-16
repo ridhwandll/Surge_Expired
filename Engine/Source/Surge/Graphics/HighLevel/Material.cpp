@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Material.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Graphics/RHI/RHI.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Texture2D.hpp"
 
 #undef FindResource // FUCK ASS WIN32

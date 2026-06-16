@@ -40,9 +40,11 @@ namespace Surge
     }
 #endif
 
-    static void ImGuiCheckVkResult(VkResult err)
+    [[maybe_unused]] static void ImGuiCheckVkResult([[maybe_unused]] VkResult err)
     {
+#ifdef SURGE_DEBUG
         VK_CALL(err);
+#endif
     }
 
     void VulkanImGuiContext::Init(const VulkanRHI& rhi)

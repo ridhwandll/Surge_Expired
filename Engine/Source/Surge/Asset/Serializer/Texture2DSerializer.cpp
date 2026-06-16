@@ -2,8 +2,12 @@
 #include "Texture2DSerializer.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include <basisu/transcoder/basisu_transcoder.h>
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
+#include "Surge/Graphics/HighLevel/Texture2D.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "AssetStamp.hpp"
+
+#include <basisu/transcoder/basisu_transcoder.h>
 
 namespace Surge
 {
@@ -13,7 +17,7 @@ namespace Surge
         basist::basisu_transcoder_init();
     }
 
-    bool Texture2DSerializer::Serialize(Ref<Asset> asset) const
+    bool Texture2DSerializer::Serialize([[maybe_unused]] Ref<Asset> asset) const
     {
         bool result = false;
         SG_ASSERT_INTERNAL("[Texture2DSerializer] Serialize: You can not serialize Texture2Ds yet");

@@ -11,10 +11,10 @@ namespace Surge
         InspectorPanel() = default;
         ~InspectorPanel() = default;
 
-        virtual void Init(void* panelInitArgs);
-        virtual void OnEvent(Event& e) override {};
-        virtual void Render(bool* show);
-        virtual void Shutdown() {};
+        virtual void Init([[maybe_unused]] void* panelInitArgs) override;
+        virtual void OnEvent([[maybe_unused]] Event& e) override {};
+        virtual void Render(bool* show) override;
+        virtual void Shutdown()  override {};
 
         static PanelCode GetStaticCode() { return PanelCode::Inspector; }
         void SetHierarchy(SceneHierarchyPanel* hierarchy) { mHierarchy = hierarchy; }

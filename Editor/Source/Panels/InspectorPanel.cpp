@@ -1,8 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Panels/InspectorPanel.hpp"
+#include "InspectorPanel.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Surge/Core/Core.hpp"
+
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "ContentBrowserPanel.hpp"
@@ -46,7 +49,7 @@ namespace Surge
         ImGui::PopID();
     }
 
-    void InspectorPanel::Init(void* panelInitArgs)
+    void InspectorPanel::Init([[maybe_unused]] void* panelInitArgs)
     {
         mCode = GetStaticCode();
         mHierarchy = nullptr;
@@ -79,7 +82,25 @@ namespace Surge
                         entity.AddComponent<LightComponent>();
                     if (ImGui::MenuItem("Environment") && !entity.HasComponent<EnvironmentComponent>())
                         entity.AddComponent<EnvironmentComponent>();
+                    if(ImGui::BeginMenu("Physics"))
+                    {
+                        if(ImGui::MenuItem("Rigidbody") && !entity.HasComponent<RigidbodyComponent>())
+                            entity.AddComponent<RigidbodyComponent>();
+                        if(ImGui::MenuItem("Box Collider") && !entity.HasComponent<BoxColliderComponent>())
+                            entity.AddComponent<BoxColliderComponent>();
+                        if(ImGui::MenuItem("Sphere Collider") && !entity.HasComponent<SphereColliderComponent>())
+                            entity.AddComponent<SphereColliderComponent>();
+                        if(ImGui::MenuItem("Capsule Collider") && !entity.HasComponent<CapsuleColliderComponent>())
+                            entity.AddComponent<CapsuleColliderComponent>();
+                        if(ImGui::MenuItem("Cylinder Collider") && !entity.HasComponent<CylinderColliderComponent>())
+                            entity.AddComponent<CylinderColliderComponent>();
+                        if(ImGui::MenuItem("Convex Collider") && !entity.HasComponent<ConvexColliderComponent>() && entity.HasComponent<MeshComponent>())
+                            entity.AddComponent<ConvexColliderComponent>();
+                        if(ImGui::MenuItem("Mesh Collider") && !entity.HasComponent<MeshColliderComponent>())
+                            entity.AddComponent<MeshColliderComponent>();
 
+                        ImGui::EndPopup();
+                    }
                     ImGui::EndPopup();
                 }
             }
@@ -102,7 +123,7 @@ namespace Surge
             TransformComponent& component = entity.GetComponent<TransformComponent>();
             DrawComponent<TransformComponent>(
                 entity, "Transform", [&component]() {
-                    if (ImGuiAux::TProperty<glm::vec3>("Position", &component.Position));
+                    if (ImGuiAux::TProperty<glm::vec3>("Position", &component.Position))
                         component.MarkDirty();
                     if (ImGuiAux::TProperty<glm::vec3>("Rotation", &component.Rotation))
                         component.MarkDirty();
@@ -315,22 +336,151 @@ namespace Surge
             EnvironmentComponent& component = entity.GetComponent<EnvironmentComponent>();
             DrawComponent<EnvironmentComponent>(entity, "Environment", [&component]()
             {
-                ImGuiAux::TProperty<bool>("Sun Disk", &component.EnableSunDisk);
+                ImGuiAux::TSperator("Position");
                 ImGuiAux::TProperty<float>("Azimuth (X)", &component.Azimuth);
                 ImGuiAux::TProperty<float>("Elevation (Y)", &component.Elevation);
+                ImGuiAux::TSperator("Visuals");
+                ImGuiAux::TProperty<bool>("Sun Disk", &component.EnableSunDisk);
                 ImGuiAux::TSlider<float>("Turbidity", &component.Turbidity, 1.5f, 10.0f, "%.2f");
                 ImGuiAux::TSlider<float>("Exposure", &component.Exposure, 0.001, 0.1f, "%.4f");
                 ImGuiAux::TSlider<float>("Sun Intensity", &component.SunIntensity, 0.01, 1.0f, "%.2f");
-                {
-                    ImGuiAux::ScopedBoldFont font;
-                    ImGuiAux::TString("Global Illumination", "");
-                }
+                ImGuiAux::TSperator("Global Illumination");
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("SkyAmbient", &component.SkyAmbient);
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("HorizonAmbient", &component.HorizonAmbient);
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("GroundAmbient", &component.GroundAmbient);
 
             });
         }
+        if(entity.HasComponent<RigidbodyComponent>())
+        {
+            RigidbodyComponent& component = entity.GetComponent<RigidbodyComponent>();
+            DrawComponent<RigidbodyComponent>(entity, "Rigidbody", [&component]()
+            {
+                const char* rbTypeStrings[] = { "STATIC", "DYNAMIC", "KINEMATIC" };
+                const char* currentRbTypeString = rbTypeStrings[static_cast<int>(component.Type)];
+
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("TYPE");
+                ImGui::TableNextColumn();
+                ImGui::PushItemWidth(-1);
+                if(ImGui::BeginCombo("##RBTYPE", currentRbTypeString))
+                {
+                    for(int i = 0; i < 3; i++)
+                    {
+                        const bool isSelected = (component.Type == static_cast<RigidbodyType>(i));
+                        if(ImGui::Selectable(rbTypeStrings[i], isSelected))
+                        {
+                            component.Type = static_cast<RigidbodyType>(i);
+                        }
+                        if(isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopItemWidth();
+
+                if(component.Type != RigidbodyType::STATIC)
+                    ImGuiAux::TProperty<float>("Mass", &component.Mass);
+
+                ImGuiAux::TSperator("Collision Settings");
+                ImGuiAux::TProperty<bool>("Use Gravity", &component.UseGravity);
+                ImGuiAux::TProperty<bool>("Is Sensor", &component.IsSensor);
+                ImGuiAux::TProperty<bool>("Continuous Collision (CCD)", &component.ContinuousCollision);
+
+                ImGuiAux::TSperator("Material Properties");
+                ImGuiAux::TProperty<float>("Friction", &component.Friction);
+                ImGuiAux::TProperty<float>("Bounciness", &component.Bounciness);
+
+                if(component.Type != RigidbodyType::STATIC)
+                {
+                    ImGuiAux::TSperator("Damping");
+                    ImGuiAux::TProperty<float>("Linear", &component.LinearDamping);
+                    ImGuiAux::TProperty<float>("Angular", &component.AngularDamping);
+
+                    ImGuiAux::TSperator("Freeze Rotation Axes");
+                    ImGuiAux::TProperty<bool>("X", &component.FreezeRotationX);
+                    ImGuiAux::TProperty<bool>("Y", &component.FreezeRotationY);
+                    ImGuiAux::TProperty<bool>("Z", &component.FreezeRotationZ);
+                }
+            });
+        }
+        if(entity.HasComponent<BoxColliderComponent>())
+        {
+            BoxColliderComponent& component = entity.GetComponent<BoxColliderComponent>();
+            DrawComponent<BoxColliderComponent>(entity, "Box Collider", [&component]()
+            {
+                ImGuiAux::TProperty<glm::vec3>("Half Extents", &component.HalfExtents);
+                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+            });
+        }
+        if(entity.HasComponent<SphereColliderComponent>())
+        {
+            SphereColliderComponent& component = entity.GetComponent<SphereColliderComponent>();
+            DrawComponent<SphereColliderComponent>(entity, "Sphere Collider", [&component]()
+            {
+                ImGuiAux::TProperty<float>("Radius", &component.Radius);
+                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+            });
+        }
+        if(entity.HasComponent<CapsuleColliderComponent>())
+        {
+            CapsuleColliderComponent& component = entity.GetComponent<CapsuleColliderComponent>();
+            DrawComponent<CapsuleColliderComponent>(entity, "Capsule Collider", [&component]()
+            {
+                ImGuiAux::TProperty<float>("Radius", &component.Radius);
+                ImGuiAux::TProperty<float>("Height", &component.Height);
+                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+            });
+        }
+        if(entity.HasComponent<CylinderColliderComponent>())
+        {
+            CylinderColliderComponent& component = entity.GetComponent<CylinderColliderComponent>();
+            DrawComponent<CylinderColliderComponent>(entity, "Cylinder Collider", [&component]()
+            {
+                ImGuiAux::TProperty<float>("Radius", &component.Radius);
+                ImGuiAux::TProperty<float>("Height", &component.Height);
+                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+            });
+        }
+        if(entity.HasComponent<ConvexColliderComponent>())
+        {
+            ConvexColliderComponent& component = entity.GetComponent<ConvexColliderComponent>();
+            DrawComponent<ConvexColliderComponent>(entity, "Convex Collider", [&component, &entity]()
+            {
+                if(entity.HasComponent<MeshComponent>())
+                {
+                    if (ImGuiAux::TProperty<glm::vec3>("Local Offset", &component.LocalOffset))
+                        component.IsDirty = true;
+                    if (ImGuiAux::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation))
+                        component.IsDirty = true;
+                }
+                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+            });
+        }
+        if(entity.HasComponent<MeshColliderComponent>())
+        {
+            MeshColliderComponent& component = entity.GetComponent<MeshColliderComponent>();
+            DrawComponent<MeshColliderComponent>(entity, "Mesh Collider", [&component, &entity]()
+            {
+                if(entity.HasComponent<RigidbodyComponent>() && entity.GetComponent<RigidbodyComponent>().Type != RigidbodyType::DYNAMIC)
+                {
+                    if(entity.HasComponent<MeshComponent>())
+                    {
+                        ImGuiAux::TProperty<glm::vec3>("Local Offset", &component.LocalOffset);
+                        ImGuiAux::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation);
+                    }
+                    ImGuiAux::TSperator("Note");
+                    ImGuiAux::TString("Show Collider", "Mesh Colliders are generated properly from the associated mesh, trust the Engine and pray it works, no visualization!");
+                }
+                else
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Red);
+                    ImGuiAux::TString("ERROR", "Mesh Collider Components can/should NOT be used with DYNAMIC Rigidbodies! REMOVE this component or set the Rigidbody Type to STATIC or KINEMATIC!");
+                    ImGui::PopStyleColor();
+                }
+            });
+        }
+
     }
 
 } // namespace Surge

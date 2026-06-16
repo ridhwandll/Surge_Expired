@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Input/Input.hpp"
+#include "Surge/Core/Time/Clock.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
@@ -33,7 +34,7 @@ namespace Surge
         mProjection[1][1] *= -1;
     }
 
-    void EditorCamera::OnUpdate(bool viewportHovered)
+    void EditorCamera::OnUpdate()
     {
         if (Core::GetWindow()->IsWindowMinimized())
             return;

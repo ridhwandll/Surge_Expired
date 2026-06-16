@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "SwapchainPass.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {
@@ -49,7 +50,7 @@ namespace Surge
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
 
-    void SwapchainPass::Shutdown(FrameBlackboard& blackBoard)
+    void SwapchainPass::Shutdown(FrameBlackboard&)
     {
         if(!RHISettings::RENDER_TO_SWAPCHAIN)
             return;

@@ -1,10 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Memory.hpp"
-#include "Surge/Graphics/RenderGraph/RenderGraph.hpp"
-#include "Surge/ECS/Components.hpp"
-#include "Surge/Graphics/Shader/ShaderManager.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
+#include "Surge/Graphics/RenderGraph/RenderGraph.hpp"
+#include "Surge/Graphics/Shader/ShaderManager.hpp"
+#include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 
 namespace Surge
 {
@@ -19,8 +19,8 @@ namespace Surge
         void Initialize();
         void Shutdown();
 
-        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D = 0);
-        void BeginFrame(const EditorCamera& camera, Uint submitCount3D = 0);
+        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
+        void BeginFrame(const EditorCamera& camera);
         void EndFrame();
 
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())
@@ -37,8 +37,8 @@ namespace Surge
             bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow });
             //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
         }
-        void SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position);
-        void SubmitEnvironment(const EnvironmentComponent& env);
+        void SubmitLight(const Light& light);
+        void SubmitEnvironment(Environnment&& env);
 
         void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
 

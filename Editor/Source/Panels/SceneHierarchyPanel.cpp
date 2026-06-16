@@ -2,19 +2,40 @@
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "Surge/Core/Input/Input.hpp"
-#include <imgui.h>
-#include <imgui_internal.h>
+#include "Utility/ImGuiAux.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 
+#include <imgui.h>
+#include <imgui_internal.h>
+
 namespace Surge
 {
-    void SceneHierarchyPanel::Init(void* panelInitArgs)
+    void SceneHierarchyPanel::Init([[maybe_unused]] void* panelInitArgs)
     {
         mCode = GetStaticCode();
         mSceneContext = nullptr;
         mSelectedEntity = {};
+    }
+
+    void SceneHierarchyPanel::OnEvent([[maybe_unused]] Event& e)
+    {
+        if(!mSelectedEntity || !mSceneContext)
+            return;
+
+        EventDispatcher dispatcher(e);
+        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
+            if(keyEvent.GetKeyCode() == Key::Delete && mHierarchyHovered)
+            {
+                mSceneContext->DestroyEntity(mSelectedEntity);
+                mSelectedEntity = {};
+            }
+            if(keyEvent.GetKeyCode() == Key::ScrollLock)
+            {
+                Entity e = mSceneContext->DuplicateEntity(mSelectedEntity);
+                mSelectedEntity = e;
+            }
+                                             });
     }
 
     void SceneHierarchyPanel::Render(bool* show)
@@ -27,6 +48,7 @@ namespace Surge
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
         if (ImGui::Begin(PanelCodeToString(mCode), show))
         {
+            mHierarchyHovered = ImGui::IsWindowHovered();
             if (ImGuiAux::Button("Add Entity", {ImGui::GetWindowWidth() - 15, 0.0f}))
                 ImGui::OpenPopup("Add Entity");
 
@@ -135,11 +157,11 @@ namespace Surge
             {
                 ImGuiAux::ScopedBoldFont font;
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.123f, 0.123f, 0.123f, 1.0f));
-                ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
+                ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, "%s", name.c_str());
                 ImGui::PopStyleColor();
             }
             else
-                ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, name.c_str());
+                ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, "%s", name.c_str());
         }
 
         if(ImGui::IsItemClicked())

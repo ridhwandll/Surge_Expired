@@ -225,7 +225,7 @@ namespace Surge
         return UUID::INVALID;
     }
 
-    void AssetManager::UpdateAssetPath(AssetID id, const String& newRelativePath)
+    void AssetManager::UpdateAssetPath([[maybe_unused]] AssetID id, [[maybe_unused]] const String& newRelativePath)
     {
 #ifdef SURGE_PLATFORM_ANDROID
         Log<Severity::Error>("[AssetManager] UpdateAssetPath is an Editor function. APK assets are readonly!");

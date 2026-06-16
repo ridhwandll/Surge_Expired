@@ -23,8 +23,6 @@ namespace Surge
         SURGE_ASSET_TYPE(AssetType::SCENE);
         static Ref<Scene> Create() { return Ref<Scene>::Create(); }
 
-        SURGE_DISABLE_COPY_AND_MOVE(Scene);
-
         void OnRuntimeStart();
         void Update(); // Runtime Update
         void Update(EditorCamera& camera); // EditorCam Update
@@ -34,23 +32,31 @@ namespace Surge
 
         // Entity manipulation
         void CreateEntity(Entity& outEntity, const String& name = "New Entity");
+        void CreateEntityEmpty(Entity& outEntity, const String& name);
         void CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name = "New Entity");
         void DestroyEntity(Entity entity);
+        Entity DuplicateEntity(Entity entity);
 
         void SetSlectedEntity(Entity entity);
         Entity GetSlectedEntity() const;
 
         void OnResize(float width, float height);
 
+        void SetRunning(bool isRunning) { mIsRunning = isRunning; }
+        bool IsRunning() const { return mIsRunning; }
+
         entt::registry& GetRegistry() { return mRegistry; }
         const entt::registry& GetRegistry() const { return mRegistry; }
 
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
     private:
+        void SyncPhysics();
         void AddStartupEntities();
-
+        void OnColliderAdded(entt::registry& registry, entt::entity entity);
+        void OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity);
 
     private:
+        bool mIsRunning = false;
         entt::registry mRegistry;
     };
 

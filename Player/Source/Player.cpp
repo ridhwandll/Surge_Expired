@@ -30,11 +30,6 @@ namespace Surge
 
         Project openedProject;
         Serializer::DeserializeProject(projectPath, &openedProject);
-
-        //const Path assetManagerPath = Filesystem::GetParentPath(projectPath) / "Assets";
-        //mAssetManager->Shutdown();
-        //mAssetManager->Initialize(assetManagerPath);
-
         mActiveScene = mAssetManager->Load<Scene>(openedProject.StartScene);
         mCurrentProject = std::move(openedProject);
     }
@@ -50,6 +45,7 @@ namespace Surge
         const glm::vec2 size = Core::GetWindow()->GetSize();
         mActiveScene->OnResize(static_cast<float>(size.x), static_cast<float>(size.y));
         //mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
+        mActiveScene->OnRuntimeStart();
     }
 
     void Player::OnUpdate()
@@ -78,6 +74,7 @@ namespace Surge
 
     void Player::OnShutdown()
     {
+        mActiveScene->OnRuntimeEnd();
     }
 
 } // namespace Surge

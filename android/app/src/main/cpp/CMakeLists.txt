@@ -125,6 +125,7 @@ set(BASISU_SOURCES
     "${VENDOR_ROOT}/basisu/zstd/zstd.c"
     "${VENDOR_ROOT}/basisu/zstd/zstddeclib.c"
 )
+
 add_library(basisu_android STATIC ${BASISU_SOURCES})
 target_include_directories(basisu_android PUBLIC "${VENDOR_ROOT}/basisu/transcoder")
 target_compile_definitions(basisu_android PRIVATE 
@@ -135,6 +136,13 @@ target_compile_definitions(basisu_android PRIVATE
     BASISD_SUPPORT_FXT1=0
 )
 
+
+file(GLOB_RECURSE JOLT_SOURCES "${VENDOR_ROOT}/JoltPhysics/Jolt/*.cpp" "${VENDOR_ROOT}/JoltPhysics/Jolt/*.h" "${VENDOR_ROOT}/JoltPhysics/Jolt/*.hpp")
+add_library(Jolt_android STATIC ${JOLT_SOURCES})
+target_include_directories(Jolt_android PUBLIC "${VENDOR_ROOT}/JoltPhysics")
+target_compile_definitions(Jolt_android PUBLIC JPH_DEBUG_RENDERER)
+target_compile_options(Jolt_android PUBLIC -ffast-math)
+
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE
     game-activity::game-activity_static
@@ -142,6 +150,7 @@ target_link_libraries(SurgePlayer PRIVATE
     spirvcross_android
     imgui_android
     basisu_android
+    Jolt_android
     ${log-lib}
     ${android-lib}
     ${vulkan-lib}

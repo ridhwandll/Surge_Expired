@@ -259,13 +259,13 @@ namespace Surge
         mCurrentLineBatch.Reset();
     }
 
-    void Renderer2DPass::Resize(Uint width, Uint height, FrameBlackboard& blackBoard)
+    void Renderer2DPass::Resize(Uint, Uint, FrameBlackboard&)
     {
         // We do nothing here, as Renderer2DPass writes to framebuffer of GeometryPass...
         // GeometryPass resizes the framebuffer
     }
 
-    void Renderer2DPass::Shutdown(FrameBlackboard& blackBoard)
+    void Renderer2DPass::Shutdown(FrameBlackboard&)
     {
         SURGE_PROFILE_FUNC("Renderer2DPass::Shutdown");
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
@@ -281,7 +281,7 @@ namespace Surge
         mRHI->DestroyBuffer(mQuadIB);
     }
 
-    void Renderer2DPass::OnImGuiRender(FrameBlackboard& blackBoard)
+    void Renderer2DPass::OnImGuiRender(FrameBlackboard&)
     {
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
         ImGui::PushFont(boldFont, 25.0f);

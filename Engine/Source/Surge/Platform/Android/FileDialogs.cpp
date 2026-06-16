@@ -5,14 +5,14 @@
 
 namespace Surge
 {
-    String FileDialog::OpenFile(const char* filter)
+    String FileDialog::OpenFile(const char*)
     {
-        return String();
+        return {};
     }
 
-    String FileDialog::SaveFile(const char* filter, const char* defaultName)
+    String FileDialog::SaveFile(const char*, const char*)
     {
-        return String();
+        return {};
     }
 
     Surge::String FileDialog::ChooseFolder()

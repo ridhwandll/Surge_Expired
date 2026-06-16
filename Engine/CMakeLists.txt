@@ -8,6 +8,8 @@ file(GLOB_RECURSE SOURCE_FILES
 set(INCLUDE_DIRS
     Source
     Source/SurgeReflect/Include
+)
+set(VENDOR_INCLUDES
     Vendor
     Vendor/glm
     Vendor/Vulkan-Headers/Include
@@ -21,6 +23,8 @@ set(INCLUDE_DIRS
     Vendor/json/Include
     Vendor/FontAwesome
     Vendor/basisu
+    Vendor/JoltPhysics
+    Vendor/lua/src
 )
 
 set(LIB_LINKS
@@ -29,11 +33,14 @@ set(LIB_LINKS
     ImGui
     Optick
     basisu
+    Jolt
+    lua
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 
 add_library(Surge STATIC ${SOURCE_FILES})
 target_include_directories(Surge PUBLIC ${INCLUDE_DIRS})
+target_include_directories(Surge SYSTEM PUBLIC ${VENDOR_INCLUDES})
 target_link_libraries(Surge PUBLIC ${LIB_LINKS})
 
 # Add Precompiled Header

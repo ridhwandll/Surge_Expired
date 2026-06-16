@@ -2,7 +2,6 @@
 #pragma once
 #include "Panels/IPanel.hpp"
 #include "Surge/ECS/Scene.hpp"
-#include "Utility/ImGUIAux.hpp"
 
 namespace Surge
 {
@@ -12,10 +11,10 @@ namespace Surge
         SceneHierarchyPanel() = default;
         ~SceneHierarchyPanel() = default;
 
-        virtual void Init(void* panelInitArgs);
-        virtual void OnEvent(Event& e) override {};
-        virtual void Render(bool* show);
-        virtual void Shutdown();
+        virtual void Init(void* panelInitArgs) override;
+        virtual void OnEvent(Event& e) override;
+        virtual void Render(bool* show) override;
+        virtual void Shutdown() override;
 
         static PanelCode GetStaticCode() { return PanelCode::SceneHierarchy; }
 
@@ -34,6 +33,7 @@ namespace Surge
         void DrawEntityNode(Entity& e);
 
     private:
+        bool mHierarchyHovered = false;
         PanelCode mCode;
         Scene* mSceneContext;
         Entity mSelectedEntity; // TODO: Make It a vector when we allow multiple selection

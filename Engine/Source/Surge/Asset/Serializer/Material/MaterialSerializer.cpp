@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MaterialSerializer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Asset/Serializer/Material/MaterialBinaryFormat.hpp"
 
 namespace Surge
@@ -10,7 +11,7 @@ namespace Surge
         mSerializerType = AssetType::MATERIAL;
     }
 
-    bool MaterialSerializer::Serialize(Ref<Asset> asset) const
+    bool MaterialSerializer::Serialize([[maybe_unused]] Ref<Asset> asset) const
     {
 #ifdef SURGE_PLATFORM_ANDROID
         Log<Severity::Error>("[MaterialSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");

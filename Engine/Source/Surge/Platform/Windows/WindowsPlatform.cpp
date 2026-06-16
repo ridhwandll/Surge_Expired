@@ -11,7 +11,7 @@ namespace Surge
     {
         String resultantPath;
         PWSTR roamingFilePath;
-        HRESULT result = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, NULL, &roamingFilePath);
+        [[maybe_unused]] HRESULT result = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, NULL, &roamingFilePath);
         SG_ASSERT_NOMSG(result == S_OK);
         std::wstring filepath = roamingFilePath;
         std::replace(filepath.begin(), filepath.end(), L'\\', L'/');
@@ -106,7 +106,7 @@ namespace Surge
 
     void* Platform::GetFunction(void* library, const String& procAddress)
     {
-        void* functionAdress = GetProcAddress((HMODULE)library, procAddress.c_str());
+        void* functionAdress = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(GetProcAddress((HMODULE)library, procAddress.c_str())));
         return functionAdress;
     }
 

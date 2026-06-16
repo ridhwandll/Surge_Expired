@@ -3,6 +3,7 @@
 #include "Panels/IPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
 #include <glm/glm.hpp>
+#include <Imgui/imgui.h>
 
 namespace Surge
 {

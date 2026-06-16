@@ -3,13 +3,14 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Surge/Graphics/HighLevel/Material.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
-#include "SurgeReflect/SurgeReflect.hpp"
+#include "Surge/Physics/RigidbodyID.hpp"
 #include "Surge/Asset/Asset.hpp"
+#include "SurgeReflect/SurgeReflect.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+
 
 namespace Surge
 {
@@ -35,7 +36,7 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API TransformComponent
+    struct TransformComponent
     {
         TransformComponent() = default;
         TransformComponent(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
@@ -47,7 +48,7 @@ namespace Surge
 
         // Call transform changed (e.g. after physics)
         void MarkDirty() { mDirty = true; }
-
+        bool IsDirty() const { return mDirty; }
         const glm::mat4& GetTransform() const
         {
             if (mDirty)
@@ -67,7 +68,6 @@ namespace Surge
         mutable glm::mat4 mCachedTransform{ 1.0f };
         mutable bool mDirty = true;
     };
-
 
     struct SpriteRendererComponent
     {
@@ -106,7 +106,7 @@ namespace Surge
     {
         LightComponent() = default;
         LightComponent(LightType type, const glm::vec3& color, float intensity, float radius, float falloff)
-            : Type(type), Color(color), Intensity(intensity), Radius(radius) {}
+            : Color(color), Intensity(intensity), Radius(radius), Falloff(falloff), Type(type) {}
 
         glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
         float Intensity = 1.0f;
@@ -118,8 +118,6 @@ namespace Surge
 
     struct EnvironmentComponent
     {
-        EnvironmentComponent() = default;
-
         float Elevation = 30.0f; // In degrees
         float Azimuth = 0.0f;   // In degrees
         float Turbidity = 2.0f;
@@ -134,9 +132,87 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    //Physics
+    enum class RigidbodyType { STATIC, DYNAMIC, KINEMATIC };
+
+    struct RigidbodyComponent
+    {
+        RigidBodyID RuntimeBodyID; // Jolt's internal handle under the hood
+        RigidbodyType Type = RigidbodyType::DYNAMIC;
+        float Mass = 1.0f;
+
+        bool UseGravity = true;
+        bool IsSensor = false;
+        bool ContinuousCollision = false;
+
+        bool FreezeRotationX = false;
+        bool FreezeRotationY = false;
+        bool FreezeRotationZ = false;
+
+        float LinearDamping = 0.05f;
+        float AngularDamping = 0.05f;
+        float Friction = 0.2f;
+        float Bounciness = 0.0f;
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct BoxColliderComponent
+    {
+        bool ShowCollider = true;
+        glm::vec3 HalfExtents = { 0.5f, 0.5f, 0.5f }; // A 1x1x1 meter cube
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct SphereColliderComponent
+    {
+        bool ShowCollider = true;
+        float Radius = 0.5f;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct CapsuleColliderComponent
+    {
+        bool ShowCollider = true;
+        float Height = 1.0f;
+        float Radius = 0.25f;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct CylinderColliderComponent
+    {
+        bool ShowCollider = true;
+        float Height = 1.0f;
+        float Radius = 0.5f;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct ConvexColliderComponent
+    {
+        glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
+        glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f }; // In degrees
+        // Uses the entity's MeshComponent to generate the hull
+
+        // Internal usage, not serialized
+        bool ShowCollider = false;
+        bool IsDirty = true;
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct MeshColliderComponent
+    {
+        glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
+        glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f };
+        SURGE_REFLECTION_ENABLE;
+    };
+
+
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
-#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent, ::Surge::NameComponent, ::Surge::TransformComponent,      \
-                             ::Surge::CameraComponent, ::Surge::SpriteRendererComponent,\
-                             ::Surge::MeshComponent, ::Surge::LightComponent, ::Surge::EnvironmentComponent \
+#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
+                                ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent,     \
+                                ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
+                                ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
+                                ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent \
 
 } // namespace Surge

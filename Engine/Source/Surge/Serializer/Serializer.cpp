@@ -62,6 +62,7 @@ namespace Surge
     // Enum Mappings
     NLOHMANN_JSON_SERIALIZE_ENUM(RuntimeCamera::ProjectionType, { {RuntimeCamera::ProjectionType::Perspective, "Perspective"}, {RuntimeCamera::ProjectionType::Orthographic, "Orthographic"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(LightType, { {LightType::POINT, "POINT"}, {LightType::DIRECTIONAL, "DIRECTIONAL"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(RigidbodyType, { {RigidbodyType::STATIC, "STATIC"}, {RigidbodyType::DYNAMIC, "DYNAMIC"}, {RigidbodyType::KINEMATIC, "KINEMATIC"} });
 
     template <typename XComponent>
     FORCEINLINE static void SerializeComponent(nlohmann::json& j, Entity& e)
@@ -75,7 +76,6 @@ namespace Surge
 
             for (const auto& [name, var] : clazz->GetVariables())
             {
-                uint64_t size = var.GetSize();
                 const Byte* source = reinterpret_cast<const Byte*>(&comp) + var.GetOffset();
 
                 const SurgeReflect::Type& type = var.GetType();
@@ -115,6 +115,10 @@ namespace Surge
                 {
                     out[name] = *reinterpret_cast<const LightType*>(source);
                 }
+                else if(type.EqualTo<RigidbodyType>())
+                {
+                    out[name] = *reinterpret_cast<const RigidbodyType*>(source);
+                }
                 else
                     Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
             }
@@ -128,7 +132,7 @@ namespace Surge
     }
 
     // nlohmann::json& j is in "Scene" scope
-    static void SerializeEntity(nlohmann::json& j, Entity& e, uint64_t index)
+    [[maybe_unused]] static void SerializeEntity(nlohmann::json& j, Entity& e, uint64_t index)
     {
         SG_ASSERT_NOMSG(e);
 
@@ -136,7 +140,7 @@ namespace Surge
         SerializeComponents<SERIALIZABLE_COMPONENTS>(out, e);
     }
 
-    void Serializer::SerializeScene(const Path& path, Scene* in)
+    void Serializer::SerializeScene([[maybe_unused]] const Path& path, [[maybe_unused]] Scene* in)
     {
 #ifdef SURGE_PLATFORM_ANDROID
         Log<Severity::Error>("[Serializer] SerializeScene is unsupported on Android runtime. APK assets are readonly!");
@@ -218,6 +222,8 @@ namespace Surge
             }
             else if(type.EqualTo<LightType>())
                 *reinterpret_cast<LightType*>(dest) = inJson.value(name, LightType::DIRECTIONAL);
+            else if(type.EqualTo<RigidbodyType>())
+                *reinterpret_cast<RigidbodyType*>(dest) = inJson.value(name, RigidbodyType::STATIC);
             else
                 Log<Severity::Warn>("DeserializeComponent: Unhandled type '{}' for field '{}'", type.GetFullName(), name);
         }
@@ -267,11 +273,10 @@ namespace Surge
     }
 #pragma endregion
 
-    void Serializer::SerializeProject(const Path& path, Project* in)
+    void Serializer::SerializeProject([[maybe_unused]] const Path& path, [[maybe_unused]] Project* in)
     {
 #ifdef SURGE_PLATFORM_ANDROID
         Log<Severity::Error>("[Serializer] SerializeProject is unsupported on Android runtime. APK assets are readonly!");
-        return;
 #else
         SG_ASSERT_NOMSG(in);
 

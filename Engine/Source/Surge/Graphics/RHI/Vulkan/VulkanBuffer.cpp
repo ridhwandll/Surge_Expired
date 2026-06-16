@@ -63,7 +63,8 @@ namespace Surge
         }
         else if (desc.InitialData != nullptr && !desc.HostVisible)
         {
-            VkBufferCreateInfo stagingInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+            VkBufferCreateInfo stagingInfo{};
+            stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
             stagingInfo.size = desc.Size;
             stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 

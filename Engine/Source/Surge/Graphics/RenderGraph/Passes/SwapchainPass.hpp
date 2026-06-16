@@ -23,8 +23,8 @@ namespace Surge
 
         void Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard) override;
         void Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard) override;
-        void Resize(Uint width, Uint height, FrameBlackboard& blackBoard) override {};
-        void OnImGuiRender(FrameBlackboard& blackBoard) override {};
+        void Resize([[maybe_unused]] Uint width, [[maybe_unused]] Uint height, [[maybe_unused]] FrameBlackboard& blackBoard) override {};
+        void OnImGuiRender([[maybe_unused]] FrameBlackboard& blackBoard) override {};
         void Shutdown(FrameBlackboard& blackBoard) override;
     private:
         GraphicsRHI* mRHI;

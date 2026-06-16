@@ -53,7 +53,7 @@ namespace Surge
         data.Channels = 0;
     }
 
-    void ContentBrowserPanel::Init(void* panelInitArgs)
+    void ContentBrowserPanel::Init(void*)
     {
         mCode = GetStaticCode();
         OnAssetManagerInit();
@@ -269,7 +269,7 @@ namespace Surge
                                 for(int col = 0; col < columnCount; ++col)
                                 {
                                     int itemIndex = row * columnCount + col;
-                                    if(itemIndex >= mItemsToDisplay.size())
+                                    if(itemIndex >= (int)mItemsToDisplay.size())
                                         break;
 
                                     auto& item = *mItemsToDisplay[itemIndex];

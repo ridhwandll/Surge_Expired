@@ -12,8 +12,8 @@ namespace Surge
         MaterialEditorPanel() = default;
         virtual ~MaterialEditorPanel() override = default;
 
-        virtual void Init(void* panelInitArgs) override;
-        virtual void OnEvent(Event& e) override {};
+        virtual void Init([[maybe_unused]] void* panelInitArgs) override;
+        virtual void OnEvent([[maybe_unused]] Event& e) override {};
         virtual void Render(bool* show) override;
         virtual void Shutdown() override;
 

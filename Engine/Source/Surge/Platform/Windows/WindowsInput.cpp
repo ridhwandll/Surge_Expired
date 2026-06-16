@@ -1,6 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Input/Input.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Window/Window.hpp"
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 namespace Surge
 {

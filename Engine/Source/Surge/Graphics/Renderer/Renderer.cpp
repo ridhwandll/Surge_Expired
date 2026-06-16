@@ -82,7 +82,7 @@ namespace Surge
         mGraph.Compile();
     }
 
-    void Renderer::BeginFrame(const EditorCamera& camera, Uint submitCount3D)
+    void Renderer::BeginFrame(const EditorCamera& camera)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();
@@ -105,7 +105,7 @@ namespace Surge
         mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
     }
 
-    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform, Uint submitCount3D)
+    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();
@@ -137,42 +137,22 @@ namespace Surge
         mGraph.ClearLists();
     }
 
-    void Renderer::SubmitLight(const LightComponent& light, const glm::mat4& transform, const glm::vec3& position)
+    void Renderer::SubmitLight(const Light& light)
     {
         FrameBlackboard& bb = mGraph.GetBlackboard();
-
-        Light gpuLight {};
-        gpuLight.Color = light.Color;
-        gpuLight.Intensity = light.Intensity;
-        gpuLight.Radius = light.Radius;
-        gpuLight.Falloff = light.Falloff;
-
-        if(light.Type == LightType::DIRECTIONAL)
+        if(light.PositionType.w == (float)LightType::DIRECTIONAL)
         {
             bb.HasDirectionalLight = true;
-            bb.DirectionalLightDir = transform[2];
-            gpuLight.PositionType = glm::vec4(bb.DirectionalLightDir, 0.0f); // w = 0.0f for dir light
+            bb.DirectionalLightDir = glm::vec3(light.PositionType);
         }
-        else if(light.Type == LightType::POINT)
-            gpuLight.PositionType = glm::vec4(position, 1.0f); // w = 1.0f for point lights
-
-        bb.LightList.emplace_back(gpuLight);
+        bb.LightList.emplace_back(light);
     }
 
-    void Renderer::SubmitEnvironment(const EnvironmentComponent& env)
+    void Renderer::SubmitEnvironment(Environnment&& env)
     {
         FrameBlackboard& bb = mGraph.GetBlackboard();
-        Environnment& e = bb.Env;
-        e.Elevation = env.Elevation;
-        e.Azimuth = env.Azimuth;
-        e.Turbidity = env.Turbidity;
-        e.Exposure = env.Exposure;
-        e.SunIntensity = env.SunIntensity;
-        e.EnableSunDisk = env.EnableSunDisk;
-        e.SkyAmbient = env.SkyAmbient;
-        e.HorizonAmbient = env.HorizonAmbient;
-        e.GroundAmbient = env.GroundAmbient;
-        e.HasEnvironment = true;
+        env.HasEnvironment = true;
+        bb.Env = std::move(env);
     }
 
     void Renderer::OnWindowResize(Uint width, Uint height)

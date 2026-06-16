@@ -21,15 +21,15 @@ namespace Surge
     static String sAndroidOutputPath;
     static AssetID sSelectedStartSceneID = AssetID::INVALID;
 
-    void ExportPanel::Init(void* panelInitArgs)
+    void ExportPanel::Init(void*)
     {
         mCode = GetStaticCode();
     }
 
-    void ExportPanel::OnEvent(Event& e)
+    void ExportPanel::OnEvent(Event&)
     {
-        EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {});
+        //EventDispatcher dispatcher(e);
+        //dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {});
     }
 
     void ExportPanel::Render(bool* show)
@@ -132,7 +132,7 @@ namespace Surge
 
                 ImGui::SetNextItemWidth(cardAvailWidth);
                 ImGui::PushFont(regularFont);
-                String currentScenePreview = sSelectedStartSceneID != AssetID::INVALID ? am->GetMetadata(sSelectedStartSceneID).RelativePath : "No Scene Selected...";
+                String currentScenePreview = sSelectedStartSceneID.IsValid() ? am->GetMetadata(sSelectedStartSceneID).RelativePath : "No Scene Selected...";
 
                 if(ImGui::BeginCombo("##StartScene", currentScenePreview.c_str()))
                 {
@@ -206,7 +206,7 @@ namespace Surge
 
                     // Absolute Bottom Pinned Button
                     ImGui::Dummy(ImVec2(0.0f, 30.0f));
-                    bool canExport = !sWindowsOutputPath.empty() && sSelectedStartSceneID != AssetID::INVALID;
+                    bool canExport = !sWindowsOutputPath.empty() && sSelectedStartSceneID.IsValid();
 
                     if(!canExport) ImGui::BeginDisabled();
 
@@ -309,7 +309,7 @@ namespace Surge
 
                     // Absolute Bottom Pinned Button
                     ImGui::Dummy(ImVec2(0.0f, 30.0f));
-                    bool canExport = !sAndroidOutputPath.empty() && !sAndroidKeystorePath.empty() && sSelectedStartSceneID != AssetID::INVALID;
+                    bool canExport = !sAndroidOutputPath.empty() && !sAndroidKeystorePath.empty() && sSelectedStartSceneID.IsValid();
 
                     if(!canExport) ImGui::BeginDisabled();
 

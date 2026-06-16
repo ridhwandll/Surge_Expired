@@ -1,6 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Mesh.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+#include "Material.hpp"
 
 namespace Surge
 {
@@ -44,6 +47,10 @@ namespace Surge
                     Log<Severity::Warn>("[Mesh] Failed to load material override for mesh at index {}! The material is missing probably, falling back to transient material!", i);
             }
         }
+
+        //TODO: Remove
+        mVertices = std::move(spec.Vertices);
+        mIndices = std::move(spec.Indices);
     }
 
     Mesh::~Mesh()
