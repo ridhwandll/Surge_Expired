@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MaterialSerializer.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Asset/Serializer/Material/MaterialBinaryFormat.hpp"
 
 namespace Surge

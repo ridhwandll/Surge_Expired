@@ -66,21 +66,42 @@ namespace Surge
             auto view = mRegistry.view<LightComponent, TransformComponent>();
             for(const auto& [entity, light, transform] : view.each())
             {
-                renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
-                if (light.Type == LightType::DIRECTIONAL)
+                Light gpuLight {};
+                gpuLight.Color = light.Color;
+                gpuLight.Intensity = light.Intensity;
+                gpuLight.Radius = light.Radius;
+                gpuLight.Falloff = light.Falloff;
+
+                if(light.Type == LightType::DIRECTIONAL)
                 {
-                    // Note: Assuming a Right-Handed system where forward is -Z. 
+                    glm::vec3 dirLightDir = transform.GetTransform()[2];
+                    gpuLight.PositionType = glm::vec4(dirLightDir, 0.0f); // w = 0.0f for dir light
+
                     glm::vec3 forwardDir = glm::normalize(glm::vec3(transform.GetTransform()[2]));
                     glm::vec4 debugColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
                     renderer->SubmitDirLightDebug(transform.Position, forwardDir, debugColor);
                 }
+                else if(light.Type == LightType::POINT)
+                    gpuLight.PositionType = glm::vec4(transform.Position, 1.0f); // w = 1.0f for point lights
+
+                renderer->SubmitLight(gpuLight);
             }
         }
         {
             auto view = mRegistry.view<EnvironmentComponent>();
             for(const auto& [entity, env] : view.each())
             {
-                renderer->SubmitEnvironment(env);
+                Environnment e {};
+                e.Elevation = env.Elevation;
+                e.Azimuth = env.Azimuth;
+                e.Turbidity = env.Turbidity;
+                e.Exposure = env.Exposure;
+                e.SunIntensity = env.SunIntensity;
+                e.EnableSunDisk = env.EnableSunDisk;
+                e.SkyAmbient = env.SkyAmbient;
+                e.HorizonAmbient = env.HorizonAmbient;
+                e.GroundAmbient = env.GroundAmbient;
+                renderer->SubmitEnvironment(std::move(e));
                 break; // Only submit the first environment component we find
             }
         }
@@ -187,14 +208,40 @@ namespace Surge
             }
             {
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
-                for (const auto& [entity, light, transform] : view.each())
-                    renderer->SubmitLight(light, transform.GetTransform(), transform.Position);
+                for(const auto& [entity, light, transform] : view.each())
+                {
+                    Light gpuLight {};
+                    gpuLight.Color = light.Color;
+                    gpuLight.Intensity = light.Intensity;
+                    gpuLight.Radius = light.Radius;
+                    gpuLight.Falloff = light.Falloff;
+
+                    if(light.Type == LightType::DIRECTIONAL)
+                    {
+                        glm::vec3 dirLightDir = transform.GetTransform()[2];
+                        gpuLight.PositionType = glm::vec4(dirLightDir, 0.0f); // w = 0.0f for dir light
+                    }
+                    else if(light.Type == LightType::POINT)
+                        gpuLight.PositionType = glm::vec4(transform.Position, 1.0f); // w = 1.0f for point lights
+
+                    renderer->SubmitLight(gpuLight);
+                }
             }
             {
                 auto view = mRegistry.view<EnvironmentComponent>();
                 for(const auto& [entity, env] : view.each())
                 {
-                    renderer->SubmitEnvironment(env);
+                    Environnment e {};
+                    e.Elevation = env.Elevation;
+                    e.Azimuth = env.Azimuth;
+                    e.Turbidity = env.Turbidity;
+                    e.Exposure = env.Exposure;
+                    e.SunIntensity = env.SunIntensity;
+                    e.EnableSunDisk = env.EnableSunDisk;
+                    e.SkyAmbient = env.SkyAmbient;
+                    e.HorizonAmbient = env.HorizonAmbient;
+                    e.GroundAmbient = env.GroundAmbient;
+                    renderer->SubmitEnvironment(std::move(e));
                     break; // Only submit the first environment component we find
                 }
             }

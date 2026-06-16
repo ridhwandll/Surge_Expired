@@ -14,7 +14,7 @@ add_subdirectory(ImGui)
 add_subdirectory(Optick)
 add_subdirectory(basisu)
 add_subdirectory(JoltPhysics)
-
+add_subdirectory(lua)
 
 DisableTargetWarnings(volk)
 DisableTargetWarnings(SPIRV-Cross)

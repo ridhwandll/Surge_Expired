@@ -2,8 +2,12 @@
 #include "Texture2DSerializer.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include <basisu/transcoder/basisu_transcoder.h>
+#include "Surge/Graphics/RHI/RHIDescs.hpp"
+#include "Surge/Graphics/HighLevel/Texture2D.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "AssetStamp.hpp"
+
+#include <basisu/transcoder/basisu_transcoder.h>
 
 namespace Surge
 {

@@ -3,6 +3,9 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
@@ -120,9 +123,10 @@ namespace Surge
                 glm::vec3 glmV1(v1.GetX(), v1.GetY(), v1.GetZ());
                 glm::vec3 glmV2(v2.GetX(), v2.GetY(), v2.GetZ());
 
-                Core::GetRenderer()->SubmitLine(glmV0, glmV1, color);
-                Core::GetRenderer()->SubmitLine(glmV1, glmV2, color);
-                Core::GetRenderer()->SubmitLine(glmV2, glmV0, color);
+                Renderer* renderer = Core::GetRenderer();
+                renderer->SubmitLine(glmV0, glmV1, color);
+                renderer->SubmitLine(glmV1, glmV2, color);
+                renderer->SubmitLine(glmV2, glmV0, color);
             }
         }
     };

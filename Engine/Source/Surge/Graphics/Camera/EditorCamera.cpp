@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Input/Input.hpp"
+#include "Surge/Core/Time/Clock.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>

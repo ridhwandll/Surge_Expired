@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/MaterialEditorPanel.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
 #include "ContentBrowserPanel.hpp"

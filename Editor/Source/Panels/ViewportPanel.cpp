@@ -2,6 +2,7 @@
 #include "Panels/ViewportPanel.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Input/Input.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Surge/Utility/Filesystem.hpp"

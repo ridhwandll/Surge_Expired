@@ -2,6 +2,7 @@
 #include "MeshSerializer.hpp"
 #include "Surge/Core/Core.hpp"
 #include "MeshBinaryFormat.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 
 namespace Surge
 {

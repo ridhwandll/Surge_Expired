@@ -3,6 +3,7 @@
 #include "Surge/Asset/Serializer/BinaryHelpers.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 
 namespace Surge::MaterialBinary
 {

@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Core/Profiler.hpp"
+#include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
@@ -794,7 +795,7 @@ namespace Surge
         float currentFrameTime = Core::GetClock().GetMilliseconds();
         String frameTimeText = std::format("Frame Time: {:.2f} ms", currentFrameTime);
         ImGui::PushFont(regularFont, 20.0f);
-        ImGui::TextUnformatted(frameTimeText.c_str());
+        ImGui::Text("%s", frameTimeText.c_str());
         ImGui::PopFont();
 
         constexpr float boldFontSize = 18.0f;

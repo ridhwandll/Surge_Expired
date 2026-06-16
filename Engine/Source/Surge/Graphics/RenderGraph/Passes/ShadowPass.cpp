@@ -1,7 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
+#include "ShadowPass.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
-#include "Surge/Graphics/RenderGraph/Passes/ShadowPass.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {

@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "SwapchainPass.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {

@@ -1,8 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Panels/InspectorPanel.hpp"
+#include "InspectorPanel.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Surge/Core/Core.hpp"
+
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "ContentBrowserPanel.hpp"

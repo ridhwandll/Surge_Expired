@@ -1,16 +1,17 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
-#include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Core/Client.hpp"
-#include "Surge/Core/Window/Window.hpp"
-#include "Surge/Core/Time/Clock.hpp"
 #include <functional>
-
 
 namespace Surge
 {
+    class Clock;
+    class Window;
     class Physics;
+    class Renderer;
+    class AssetManager;
+    class ScriptEngine;
+
     namespace Core
     {
         void Initialize(Client* application);
@@ -19,13 +20,14 @@ namespace Surge
 
         void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
 
-        // Window should be a part of core
         Window* GetWindow();
         Clock& GetClock();
 
         Physics* GetPhysics();
         Renderer* GetRenderer();
         AssetManager* GetAssetManager();
+        ScriptEngine* GetScriptEngine();
+
         Client* GetClient();
     }
 

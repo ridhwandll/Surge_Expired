@@ -24,6 +24,7 @@ set(VENDOR_INCLUDES
     Vendor/FontAwesome
     Vendor/basisu
     Vendor/JoltPhysics
+    Vendor/lua/src
 )
 
 set(LIB_LINKS
@@ -33,6 +34,7 @@ set(LIB_LINKS
     Optick
     basisu
     Jolt
+    lua
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 

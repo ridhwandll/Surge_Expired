@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "SkyPass.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include <glm/gtc/type_ptr.hpp>
 
 namespace Surge
@@ -69,16 +70,11 @@ namespace Surge
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
 
-    void SkyPass::Resize([[maybe_unused]] Uint width, [[maybe_unused]] Uint height, [[maybe_unused]] FrameBlackboard& blackBoard)
-    {
-        // Resize handled by GeometryPass
-    }
+    void SkyPass::Resize(Uint, Uint, FrameBlackboard&) { /*Resize handled by GeometryPass*/ }
 
-    void SkyPass::OnImGuiRender([[maybe_unused]] FrameBlackboard& blackBoard)
-    {
-    }
+    void SkyPass::OnImGuiRender(FrameBlackboard&) {}
 
-    void SkyPass::Shutdown([[maybe_unused]] FrameBlackboard& blackBoard)
+    void SkyPass::Shutdown(FrameBlackboard&)
     {
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
         mRHI->DestroyPipeline(mSkyPipeline);

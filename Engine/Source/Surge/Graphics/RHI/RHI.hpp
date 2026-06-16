@@ -7,17 +7,10 @@
 
 #if defined(SURGE_PLATFORM_WINDOWS) || defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
-namespace Surge
-{
-    using BackendRHI = VulkanRHI;
-}
+namespace Surge { using BackendRHI = VulkanRHI; }
 #elif defined(SURGE_PLATFORM_APPLE)
-// ERROR: This file doesn't exist yet, but will be implemented in the future when we add support for Apple platforms
-#include "Surge/Graphics/RHI/Metal/MetalRHI.hpp"
-namespace Surge
-{
-    using BackendRHI = MetalRHI;
-}
+#include "Surge/Graphics/RHI/Metal/MetalRHI.hpp" // ERROR: This file doesn't exist yet, but will be implemented in the future when we add support for Apple platforms
+namespace Surge { using BackendRHI = MetalRHI; }
 #endif
 
 namespace Surge

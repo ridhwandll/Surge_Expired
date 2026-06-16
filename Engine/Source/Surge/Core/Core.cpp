@@ -4,10 +4,12 @@
 #include "Surge/Core/Window/Window.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
-#include "Profiler.hpp"
+#include "Surge/Core/Profiler.hpp"
+
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Physics/Physics.hpp"
-
+#include "Surge/ScriptEngine/ScriptEngine.hpp"
 
 #ifdef SURGE_PLATFORM_WINDOWS
 #include "Surge/Platform/Windows/WindowsWindow.hpp"
@@ -28,6 +30,7 @@ namespace Surge::Core
         Renderer* SurgeRenderer = nullptr;
         AssetManager* SurgeAssetManager = nullptr;
         Physics* SurgePhysics = nullptr;
+        ScriptEngine* SurgeScriptEngine = nullptr;
 
         bool Running = false;
         Vector<std::function<void()>> FrameEndCallbacks;
@@ -79,6 +82,10 @@ namespace Surge::Core
         GCoreData.SurgePhysics = new Physics();
         GCoreData.SurgePhysics->Initialize();
 
+        // Script Engine
+        GCoreData.SurgeScriptEngine = new ScriptEngine();
+        GCoreData.SurgeScriptEngine->Initialize();
+
         GCoreData.Running = true;
         GCoreData.SurgeClient->OnInitialize();
     }
@@ -117,6 +124,9 @@ namespace Surge::Core
         // NOTE(Rid): Order Matters here
         GCoreData.SurgeClient->OnShutdown();
         delete GCoreData.SurgeClient;
+        
+        GCoreData.SurgeScriptEngine->Shutdown();
+        delete GCoreData.SurgeScriptEngine;
 
         GCoreData.SurgeAssetManager->Shutdown();
         delete GCoreData.SurgeAssetManager;
@@ -141,6 +151,7 @@ namespace Surge::Core
     Physics* GetPhysics() { return GCoreData.SurgePhysics; }
     Renderer* GetRenderer() { return GCoreData.SurgeRenderer; }
     AssetManager* GetAssetManager() { return GCoreData.SurgeAssetManager; }
+    ScriptEngine* GetScriptEngine() { return GCoreData.SurgeScriptEngine; }
     Client* GetClient() { return GCoreData.SurgeClient; }
     Clock& GetClock() { return GCoreData.SurgeClock; }
 

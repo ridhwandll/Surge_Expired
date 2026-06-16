@@ -2,6 +2,7 @@
 #include "SceneSerializer.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Serializer/Serializer.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 
 namespace Surge
 {
