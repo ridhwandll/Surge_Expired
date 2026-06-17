@@ -11,7 +11,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-
 namespace Surge
 {
     struct IDComponent
@@ -207,12 +206,19 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct ScriptComponent
+    {
+        AssetID ScriptAsset = AssetID::INVALID;
+        bool IsInstantiated = false;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+} // namespace Surge
 
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
                                 ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent,     \
                                 ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
-                                ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent \
-
-} // namespace Surge
+                                ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
+                                ::Surge::ScriptComponent

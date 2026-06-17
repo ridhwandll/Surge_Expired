@@ -32,6 +32,7 @@ namespace Surge
         const Project& GetCurrentProject() const { return mCurrentProject; }
 
         const AssetImporter& GetAssetImporter() const { return mAssetImporter; }
+        AssetImporter& GetAssetImporter() { return mAssetImporter; }
         Ref<Scene> GetCurrentScene() { return mActiveScene; }
         PanelManager& GetPanelManager() { return mPanelManager; }
         EditorCamera& GetCamera() { return mCamera; }

@@ -50,10 +50,13 @@ namespace Surge
 
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
     private:
+        void UpdateScripts();
         void SyncPhysics();
+
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
-        void OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity);
+        void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
+        void OnScriptDestroyed(entt::registry& registry, entt::entity entity);
 
     private:
         bool mIsRunning = false;

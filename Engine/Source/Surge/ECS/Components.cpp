@@ -96,3 +96,7 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::MeshColliderComponent)
     .AddVariable<&Surge::MeshColliderComponent::LocalOffset>("LocalOffset")
     .AddVariable<&Surge::MeshColliderComponent::LocalRotation>("LocalRotation")
 SURGE_REFLECT_CLASS_REGISTER_END()
+
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::ScriptComponent)
+    .AddVariable<&Surge::ScriptComponent::ScriptAsset>("ScriptAsset")
+SURGE_REFLECT_CLASS_REGISTER_END()

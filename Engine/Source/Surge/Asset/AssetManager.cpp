@@ -1,10 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetManager.hpp"
 
-#include "Serializer/Texture2DSerializer.hpp"
+#include "Serializer/Script/ScriptSerializer.hpp"
 #include "Serializer/Material/MaterialSerializer.hpp"
 #include "Serializer/Mesh/MeshSerializer.hpp"
 #include "Serializer/SceneSerializer.hpp"
+#include "Serializer/Texture2DSerializer.hpp"
 
 #include "Surge/Utility/Filesystem.hpp"
 
@@ -21,6 +22,7 @@ namespace Surge
         mSerializers[AssetType::TEXTURE2D] = CreateScope<Texture2DSerializer>();
         mSerializers[AssetType::MESH] = CreateScope<MeshSerializer>();
         mSerializers[AssetType::MATERIAL] = CreateScope<MaterialSerializer>();
+        mSerializers[AssetType::SCRIPT] = CreateScope<ScriptSerializer>();
 
         for(auto& [type, serializer] : mSerializers)
             serializer->Initialize();

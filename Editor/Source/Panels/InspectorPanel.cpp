@@ -101,6 +101,9 @@ namespace Surge
 
                         ImGui::EndPopup();
                     }
+                    if(ImGui::MenuItem("Script") && !entity.HasComponent<ScriptComponent>())
+                        entity.AddComponent<ScriptComponent>();
+
                     ImGui::EndPopup();
                 }
             }
@@ -477,6 +480,37 @@ namespace Surge
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Red);
                     ImGuiAux::TString("ERROR", "Mesh Collider Components can/should NOT be used with DYNAMIC Rigidbodies! REMOVE this component or set the Rigidbody Type to STATIC or KINEMATIC!");
                     ImGui::PopStyleColor();
+                }
+            });
+        }
+        if(entity.HasComponent<ScriptComponent>())
+        {
+            ScriptComponent& component = entity.GetComponent<ScriptComponent>();
+            DrawComponent<ScriptComponent>(entity, "Script Component", [&component]()
+            {
+                AssetManager* am = Core::GetAssetManager();
+
+                if(component.ScriptAsset.IsValid())
+                    ImGuiAux::TString("Asset Handle: ", "%llu", component.ScriptAsset.Get());
+                else
+                    ImGui::TextUnformatted("Drop SCRIPT from Content browser");
+
+                if(ImGui::BeginDragDropTarget())
+                {
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                    {
+                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
+                        if(meta.Type == AssetType::SCRIPT)
+                            component.ScriptAsset = droppedAssetID;
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+                if (ImGuiAux::TButton("Script", "RELOAD"))
+                {
+                    Editor* editor = static_cast<Editor*>(Core::GetClient());
+                    editor->GetAssetImporter().RecookAsset(component.ScriptAsset);
                 }
             });
         }

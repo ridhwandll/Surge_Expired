@@ -13,6 +13,9 @@
 #include "Utility/ImGuiAux.hpp"
 #include "Asset/SourceWriters/MaterialSourceWriter.hpp"
 #include <stb_image.h>
+#include <Surge/ScriptEngine/ScriptAsset.hpp>
+#include "Asset/SourceWriters/ScriptSourceWriter.hpp"
+#include "Surge/ScriptEngine/ScriptEngine.hpp"
 
 namespace Surge
 {
@@ -416,7 +419,11 @@ namespace Surge
                                                         Ref<Material> newMaterial = mAssetManager->Load<Material>(item.Id);
                                                         newMaterial->SetName(Filesystem::GetFilenameWithoutExt(mRenameBuffer));
                                                         MaterialSourceWriter::Write(newMaterial, newPath.generic_string());
-
+                                                        mAssetManager->Save(item.Id);
+                                                        mAssetManager->Unload(item.Id);
+                                                    }
+                                                    else if (item.AssetTypeStr == "SCRIPT")
+                                                    {
                                                         mAssetManager->Save(item.Id);
                                                         mAssetManager->Unload(item.Id);
                                                     }
@@ -505,6 +512,27 @@ namespace Surge
                                     mSelectedPath = newFilePath;
                                     StartRename(newFilePath);
                                 }
+                                mNeedsCacheRefresh = true;
+                            }
+                            if(ImGui::MenuItem("Script"))
+                            {
+                                const char* extension = GetExtensionFromAssetType(AssetType::SCRIPT);
+                                std::filesystem::path newFilePath = mCurrentDirectory / ("NewScript" + String(extension));
+                                int count = 1;
+                                while(std::filesystem::exists(newFilePath))
+                                {
+                                    newFilePath = mCurrentDirectory / ("NewScript (" + std::to_string(count) + ")" + extension);
+                                    count++;
+                                }
+                                String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
+                                ScriptSourceWriter::WriteNew(newFilePath.generic_string());
+                                ScriptEngine* scriptEngine = Core::GetScriptEngine();
+                                Vector<Byte> bytecode = scriptEngine->Compile(ScriptSourceWriter::GetDefaultScriptContent());
+                                Ref<Script> newScript = mAssetManager->Create<Script>(relativeToAssets, std::move(bytecode));
+
+                                mSelectedPath = newFilePath;
+                                StartRename(newFilePath);
+                                
                                 mNeedsCacheRefresh = true;
                             }
                             if(ImGui::MenuItem("Physics Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new physics material asset"); }
