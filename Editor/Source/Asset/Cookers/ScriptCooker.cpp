@@ -20,10 +20,10 @@ namespace Surge
         String sourceCodeStr;
         if(Filesystem::ReadTextFile(sourceAbsPath, sourceCodeStr))
         {
-            Vector<Byte> sourceCode = Core::GetScriptEngine()->Compile(sourceCodeStr);
-            if (!sourceCode.empty())
+            Vector<Byte> sourceBytecode = Core::GetScriptEngine()->Compile(sourceCodeStr);
+            if (!sourceBytecode.empty())
             {
-                Ref<Script> scriptAsset = Script::Create(std::move(sourceCode));
+                Ref<Script> scriptAsset = Script::Create(std::move(sourceBytecode));
                 ScriptBinary::Write(outputPath, AssetStampWriter::Build(sourceAbsPath, GetCookerVersion()), scriptAsset);
             }
             else

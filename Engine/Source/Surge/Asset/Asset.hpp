@@ -8,6 +8,11 @@
 
 #define SURGE_MEMORY_ASSET_PREFIX "Engine://"
 
+#define SURGE_ASSET_TYPE(AssetEnum)                                                \
+public:                                                                            \
+    static  ::Surge::AssetType GetStaticType() { return AssetEnum; }               \
+    virtual ::Surge::AssetType GetAssetType() const override { return AssetEnum; } 
+
 namespace Surge
 {
     using AssetID = UUID;
@@ -88,10 +93,5 @@ namespace Surge
         AssetID mID;
         friend class AssetManager;
     };
-
-#define SURGE_ASSET_TYPE(AssetEnum)                                      \
-public:                                                                  \
-    static AssetType GetStaticType() { return AssetEnum; }               \
-    virtual AssetType GetAssetType() const override { return AssetEnum; }
 
 } // namespace Surge

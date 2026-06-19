@@ -43,14 +43,18 @@ namespace Surge
         mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
-        mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptDestroyed>(this);
-
         Physics* physics = Core::GetPhysics();
         physics->OptimizeBroadPhase();
     }
 
     void Scene::OnRuntimeEnd()
     {
+        AssetManager* am = Core::GetAssetManager();
+        auto view = mRegistry.view<ScriptComponent>();
+
+        for(auto entityID : view)
+            OnScriptDestroyed(Entity(entityID, this), view.get<ScriptComponent>(entityID));
+
         mIsRunning = false;
     }
 
@@ -380,6 +384,9 @@ namespace Surge
 
     void Scene::DestroyEntity(Entity entity)
     {
+        if(entity.HasComponent<ScriptComponent>())
+            OnScriptDestroyed(entity, entity.GetComponent<ScriptComponent>());
+
         mRegistry.destroy(entity.Raw());
     }
 
@@ -456,15 +463,15 @@ namespace Surge
             {
                 auto& scriptComp = view.get<ScriptComponent>(entityID);
                 Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
-
+                Entity entityObj = { entityID, this };
                 if(!scriptComp.IsInstantiated)
                 {
                     script->CreateEnvironment();
-                    script->ExecuteOnCreate();
+                    script->ExecuteOnCreate(entityObj);
                     scriptComp.IsInstantiated = true;
                 }
                 else
-                    script->ExecuteOnUpdate();
+                    script->ExecuteOnUpdate(entityObj);
             }
         }
     }
@@ -560,11 +567,13 @@ namespace Surge
         Core::GetPhysics()->DestroyRigidbody(Entity(entity, this));
     }
 
-    void Scene::OnScriptDestroyed(entt::registry& registry, entt::entity entity)
+    void Scene::OnScriptDestroyed(Entity e, ScriptComponent& comp)
     {
-        Entity e = Entity(entity, this);
-        AssetID id =  e.GetComponent<ScriptComponent>().ScriptAsset;
-        Core::GetAssetManager()->Load<Script>(id)->ExecuteOnDestroy();
+        if(comp.IsInstantiated)
+        {
+            Core::GetAssetManager()->Load<Script>(comp.ScriptAsset)->ExecuteOnDestroy(e);
+            comp.IsInstantiated = false;
+        }
     }
 
 } // namespace Surge

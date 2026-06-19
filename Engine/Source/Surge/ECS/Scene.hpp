@@ -56,7 +56,7 @@ namespace Surge
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
         void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
-        void OnScriptDestroyed(entt::registry& registry, entt::entity entity);
+        void OnScriptDestroyed(Entity e, ScriptComponent& comp);
 
     private:
         bool mIsRunning = false;

@@ -36,11 +36,11 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnCreate()
+    void Script::ExecuteOnCreate(Entity e)
     {
         if(mOnCreate.valid())
         {
-            auto createResult = mOnCreate();
+            auto createResult = mOnCreate(e);
             if(!createResult.valid())
             {
                 sol::error err = createResult;
@@ -49,12 +49,12 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnUpdate()
+    void Script::ExecuteOnUpdate(Entity e)
     {
         if(mOnUpdate.valid())
         {
             float dt = Core::GetClock().GetSeconds();
-            auto updateResult = mOnUpdate(dt);
+            auto updateResult = mOnUpdate(e, dt);
             if(!updateResult.valid())
             {
                 sol::error err = updateResult;
@@ -63,11 +63,11 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnDestroy()
+    void Script::ExecuteOnDestroy(Entity e)
     {
         if(mOnDestroy.valid())
         {
-            auto destroyResult = mOnDestroy();
+            auto destroyResult = mOnDestroy(e);
             if(!destroyResult.valid())
             {
                 sol::error err = destroyResult;

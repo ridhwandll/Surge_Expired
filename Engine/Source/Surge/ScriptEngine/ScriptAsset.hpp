@@ -5,6 +5,7 @@
 
 namespace Surge
 {
+    class Entity;
     class Script : public Asset
     {
     public:
@@ -16,9 +17,9 @@ namespace Surge
         const Vector<Byte>& GetBytecode() const { return mBytecode; }
 
         void CreateEnvironment();
-        void ExecuteOnCreate();
-        void ExecuteOnUpdate();
-        void ExecuteOnDestroy();
+        void ExecuteOnCreate(Entity e);
+        void ExecuteOnUpdate(Entity e);
+        void ExecuteOnDestroy(Entity e);
 
         static Ref<Script> Create(Vector<Byte>&& bytecode);
     private:

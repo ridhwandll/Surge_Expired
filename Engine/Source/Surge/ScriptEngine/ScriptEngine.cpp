@@ -4,6 +4,7 @@
 #include "Surge/ScriptEngine/Lua.hpp"
 #include "Bindings/MathBinding.hpp"
 #include "Bindings/LogBinding.hpp"
+#include "Bindings/ECSBindings.hpp"
 
 namespace Surge
 {
@@ -57,6 +58,8 @@ namespace Surge
 
         ScriptBinding::BindLog(sLua);
         ScriptBinding::BindMath(sLua);
+        ScriptBinding::BindEntity(sLua);
+        ScriptBinding::BindComponents(sLua);
 
         Log<Severity::Info>("ScriptEngine Initialized: {}", LUA_VERSION);
 
@@ -91,6 +94,7 @@ namespace Surge
         bytecode->insert(bytecode->end(), data, data + sz);
         return 0;
     }
+
     Vector<Byte> ScriptEngine::Compile(const String& source)
     {
         lua_State* L = luaL_newstate();
