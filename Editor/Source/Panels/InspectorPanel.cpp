@@ -13,6 +13,7 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
+#include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
 {
@@ -490,10 +491,24 @@ namespace Surge
             {
                 AssetManager* am = Core::GetAssetManager();
 
-                if(component.ScriptAsset.IsValid())
-                    ImGuiAux::TString("Asset Handle: ", "%llu", component.ScriptAsset.Get());
+                String buttonText;
+                bool hasScript = component.ScriptAsset.IsValid();
+                if(hasScript)
+                {
+                    const String& scriptPath = am->GetMetadata(component.ScriptAsset).RelativePath;
+                    buttonText = Filesystem::GetFilenameWithExt(scriptPath).c_str();
+                }
                 else
-                    ImGui::TextUnformatted("Drop SCRIPT from Content browser");
+                    buttonText = "Drop SCRIPT from Content browser";
+
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Script");
+                ImGui::TableNextColumn();
+                if(ImGuiAux::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)) && hasScript)
+                {
+                    Editor* editor = static_cast<Editor*>(Core::GetClient());
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset);
+                }
 
                 if(ImGui::BeginDragDropTarget())
                 {
@@ -507,14 +522,8 @@ namespace Surge
                     }
                     ImGui::EndDragDropTarget();
                 }
-                if (ImGuiAux::TButton("Script", "RELOAD"))
-                {
-                    Editor* editor = static_cast<Editor*>(Core::GetClient());
-                    editor->GetAssetImporter().RecookAsset(component.ScriptAsset);
-                }
             });
         }
-
     }
 
 } // namespace Surge

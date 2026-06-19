@@ -31,6 +31,16 @@ namespace Surge
         void DestroyRigidbody(Entity entity);
         JPH::ShapeRefC CreateShape(Entity entity); //TODO: Remove, exposes Jolt
 
+        void AddForce(RigidBodyID rbID, const glm::vec3& force);
+        void AddImpulse(RigidBodyID rbID, const glm::vec3& impulse);
+        void SetLinearVelocity(RigidBodyID rbID, const glm::vec3& velocity);
+        glm::vec3 GetLinearVelocity(RigidBodyID rbID);
+
+        void AddTorque(RigidBodyID rbID, const glm::vec3& torque);
+        void AddAngularImpulse(RigidBodyID rbID, const glm::vec3& impulse);
+        void SetAngularVelocity(RigidBodyID rbID, const glm::vec3& velocity);
+        glm::vec3 GetAngularVelocity(RigidBodyID rbID);
+
         bool IsInValid(RigidBodyID rbID) const;
         bool IsActive(RigidBodyID rbID) const;
 

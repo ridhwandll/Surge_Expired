@@ -20,7 +20,7 @@ namespace Surge
         String sourceCodeStr;
         if(Filesystem::ReadTextFile(sourceAbsPath, sourceCodeStr))
         {
-            Vector<Byte> sourceBytecode = Core::GetScriptEngine()->Compile(sourceCodeStr);
+            Vector<Byte> sourceBytecode = Core::GetScriptEngine()->Compile(sourceCodeStr, Filesystem::GetFilenameWithExt(sourceAbsPath));
             if (!sourceBytecode.empty())
             {
                 Ref<Script> scriptAsset = Script::Create(std::move(sourceBytecode));

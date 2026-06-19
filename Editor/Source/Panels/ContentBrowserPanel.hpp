@@ -24,6 +24,7 @@ namespace Surge
         virtual void Render(bool* show) override;
         virtual void Shutdown() override;
 
+        void SetSelectedAsset(AssetID asset);
         void OnAssetManagerInit();
         void RefreshDirectoryCache();
     private:

@@ -527,7 +527,7 @@ namespace Surge
                                 String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
                                 ScriptSourceWriter::WriteNew(newFilePath.generic_string());
                                 ScriptEngine* scriptEngine = Core::GetScriptEngine();
-                                Vector<Byte> bytecode = scriptEngine->Compile(ScriptSourceWriter::GetDefaultScriptContent());
+                                Vector<Byte> bytecode = scriptEngine->Compile(ScriptSourceWriter::GetDefaultScriptContent(), Filesystem::GetFilenameWithExt(newFilePath));
                                 Ref<Script> newScript = mAssetManager->Create<Script>(relativeToAssets, std::move(bytecode));
 
                                 mSelectedPath = newFilePath;
@@ -826,6 +826,14 @@ namespace Surge
         rhi->DestroyImage(mDirectoryIconHandle);
         rhi->DestroyImage(mEmptyDirectoryIconHandle);
         rhi->DestroyImage(mFileIconHandle);
+    }
+
+    void ContentBrowserPanel::SetSelectedAsset(AssetID asset)
+    {
+        const AssetMetadata& meta = mAssetManager->GetMetadata(asset);
+        mSelectedPath = mAssetManager->GetAbsolutePath(meta.RelativePath);
+        mCurrentDirectory = mSelectedPath.parent_path();
+        RefreshDirectoryCache();
     }
 
 } // namespace Surge

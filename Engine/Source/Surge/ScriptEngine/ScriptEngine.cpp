@@ -87,7 +87,7 @@ namespace Surge
         sLua = nullptr;
     }
 
-    static int BytecodeWriter(lua_State* L, const void* p, size_t sz, void* ud)
+    static int BytecodeWriter(lua_State*, const void* p, size_t sz, void* ud)
     {
         auto* bytecode = static_cast<Vector<Byte>*>(ud);
         const auto* data = static_cast<const Byte*>(p);
@@ -95,19 +95,19 @@ namespace Surge
         return 0;
     }
 
-    Vector<Byte> ScriptEngine::Compile(const String& source)
+    Vector<Byte> ScriptEngine::Compile(const String& source, const String& chunkName)
     {
         lua_State* L = luaL_newstate();
-        if(luaL_loadbuffer(L, source.c_str(), source.length(), "ScriptEngine") != LUA_OK)
+        if(luaL_loadbuffer(L, source.c_str(), source.length(), chunkName.c_str()) != LUA_OK)
         {
             String errorMsg = lua_tostring(L, -1);
-            Log<Severity::Error>("[ScriptEngine] Compile Error in {}", errorMsg);
+            Log<Severity::Error>("[ScriptEngine] Compile Error: {}", errorMsg);
             lua_close(L);
             return {};
         }
 
         Vector<Byte> bytecode;
-        int stripDebugInfo = 1; // Strips out variable names and line numbers to save memory
+        int stripDebugInfo = 0; // 1 = Strips out variable names and line numbers to save memory
         lua_dump(L, BytecodeWriter, &bytecode, stripDebugInfo);
 
         lua_close(L);

@@ -1,8 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ECSBindings.hpp"
+#include "Surge/Core/Core.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Surge/ECS/Scene.hpp"
+#include "Surge/Physics/Physics.hpp"
 
 namespace Surge::ScriptBinding
 {
@@ -27,7 +29,10 @@ namespace Surge::ScriptBinding
 
         auto entityType = lua.new_usertype<Entity>("Entity", sol::no_constructor);
         entityType["IsValid"] = [](const Entity& e) { return static_cast<bool>(e); };
-        entityType["GetUUID"] = &Entity::GetUUID;
+        entityType["Destroy"] = [](Entity& e) {
+            if(e)
+                e.GetScene()->DestroyEntity(e);
+            };
 
         BindComponentToEntity<NameComponent>(entityType, "NameC");
         BindComponentToEntity<TransformComponent>(entityType, "TransformC");
@@ -136,7 +141,46 @@ namespace Surge::ScriptBinding
                                              "LinearDamping", &RigidbodyComponent::LinearDamping,
                                              "AngularDamping", &RigidbodyComponent::AngularDamping,
                                              "Friction", &RigidbodyComponent::Friction,
-                                             "Bounciness", &RigidbodyComponent::Bounciness
+                                             "Bounciness", &RigidbodyComponent::Bounciness,
+                                             
+                                             "AddForce", [](RigidbodyComponent& rb, const glm::vec3& force) {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID))
+                                                     physics->AddForce(rb.RuntimeBodyID, force);
+                                             },
+                                             "AddImpulse", [](RigidbodyComponent& rb, const glm::vec3& impulse) {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID))
+                                                     physics->AddImpulse(rb.RuntimeBodyID, impulse);
+                                             },
+                                             "SetLinearVelocity", [](RigidbodyComponent& rb, const glm::vec3& vel) {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID))
+                                                     physics->SetLinearVelocity(rb.RuntimeBodyID, vel);
+                                             },
+                                             "GetLinearVelocity", [](RigidbodyComponent& rb) -> glm::vec3 {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID)) return physics->GetLinearVelocity(rb.RuntimeBodyID);
+                                                 return glm::vec3(0.0f);
+                                             },
+                                             "AddTorque", [](RigidbodyComponent& rb, const glm::vec3& torque) {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID)) physics->AddTorque(rb.RuntimeBodyID, torque);
+                                             },
+                                             "AddAngularImpulse", [](RigidbodyComponent& rb, const glm::vec3& impulse) {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID)) physics->AddAngularImpulse(rb.RuntimeBodyID, impulse);
+                                             },
+                                             "SetAngularVelocity", [](RigidbodyComponent& rb, const glm::vec3& vel) {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID))
+                                                     physics->SetAngularVelocity(rb.RuntimeBodyID, vel);
+                                             },
+                                             "GetAngularVelocity", [](RigidbodyComponent& rb) -> glm::vec3 {
+                                                 Physics* physics = Core::GetPhysics();
+                                                 if(!physics->IsInValid(rb.RuntimeBodyID)) return physics->GetAngularVelocity(rb.RuntimeBodyID);
+                                                 return glm::vec3(0.0f);
+                                             }
         );
 
         lua.new_usertype<BoxColliderComponent>("BoxColliderComponent", sol::no_constructor,
