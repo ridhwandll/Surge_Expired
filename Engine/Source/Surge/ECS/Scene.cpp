@@ -49,7 +49,6 @@ namespace Surge
 
     void Scene::OnRuntimeEnd()
     {
-        AssetManager* am = Core::GetAssetManager();
         auto view = mRegistry.view<ScriptComponent>();
 
         for(auto entityID : view)
@@ -419,12 +418,12 @@ namespace Surge
         return newEntity;
     }
 
-    void Scene::SetSlectedEntity(Entity entity)
+    void Scene::SetSelectedEntity(Entity entity)
     {
         sSelectedEntity = entity;
     }
 
-    Surge::Entity Scene::GetSlectedEntity() const
+    Entity Scene::GetSelectedEntity() const
     {
         return sSelectedEntity;
     }
@@ -434,6 +433,18 @@ namespace Surge
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
         if (camera.Data1)
             camera.Data1->SetViewportSize(width, height);
+    }
+
+    Entity Scene::GetEntityByName(const String& name)
+    {
+        auto view = mRegistry.view<NameComponent>();
+        for(auto entityID : view)
+        {
+            if(view.get<NameComponent>(entityID).Name == name)
+                return Entity { entityID, this };
+        }
+
+        return Entity { entt::null, nullptr };
     }
 
     Pair<RuntimeCamera*, glm::mat4> Scene::GetMainCameraEntity()

@@ -34,6 +34,8 @@ namespace Surge::ScriptBinding
                 e.GetScene()->DestroyEntity(e);
             };
 
+        entityType["FindEntityByName"] = [](Entity& e, const String& targetName) -> Entity { return e.GetScene()->GetEntityByName(targetName); };
+
         BindComponentToEntity<NameComponent>(entityType, "NameC");
         BindComponentToEntity<TransformComponent>(entityType, "TransformC");
         BindComponentToEntity<SpriteRendererComponent>(entityType, "SpriteRendererC");
@@ -50,6 +52,12 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<MeshColliderComponent>(entityType, "MeshColliderC");
         BindComponentToEntity<ScriptComponent>(entityType, "ScriptC");
     }
+
+#define BIND_PROP(COMP, PROP) \
+        sol::property( \
+            [](COMP& c) -> decltype(COMP::PROP) { return c.PROP; }, \
+            [](COMP& c, const decltype(COMP::PROP)& val) { c.PROP = val; } \
+        )
 
     void BindComponents(void* luaState)
     {
@@ -69,80 +77,73 @@ namespace Surge::ScriptBinding
 
         // COMPONENTS
         lua.new_usertype<NameComponent>("NameComponent", sol::no_constructor,
-                                        "Name", &NameComponent::Name
+                                        "Name", BIND_PROP(NameComponent, Name)
         );
 
         lua.new_usertype<TransformComponent>("TransformComponent", sol::no_constructor,
-            "Position", sol::property(
-                [](TransformComponent& t) -> glm::vec3 { return t.Position; },
-                [](TransformComponent& t, const glm::vec3& val) { t.Position = val; t.MarkDirty(); }
-            ),
-            "Rotation", sol::property(
-                [](TransformComponent& t) -> glm::vec3 { return t.Rotation; },
-                [](TransformComponent& t, const glm::vec3& val) { t.Rotation = val; t.MarkDirty(); }
-            ),
-            "Scale", sol::property(
-                [](TransformComponent& t) -> glm::vec3 { return t.Scale; },
-                [](TransformComponent& t, const glm::vec3& val) { t.Scale = val; t.MarkDirty(); }
-            ),
-            // AAA Convenience Methods: Instantly applies offsets AND marks dirty!
-            "Translate", [](TransformComponent& t, const glm::vec3& offset) { t.Position += offset; t.MarkDirty(); },
-            "Rotate", [](TransformComponent& t, const glm::vec3& offset) { t.Rotation += offset; t.MarkDirty(); },
-            "ScaleBy", [](TransformComponent& t, const glm::vec3& multi) { t.Scale *= multi; t.MarkDirty(); },
-            "MarkDirty", &TransformComponent::MarkDirty,
-            "IsDirty", &TransformComponent::IsDirty
+                                             "Position", sol::property(
+                                                 [](TransformComponent& t) -> glm::vec3 { return t.Position; },
+                                                 [](TransformComponent& t, const glm::vec3& val) { t.Position = val; t.MarkDirty(); }
+                                             ),
+                                             "Rotation", sol::property(
+                                                 [](TransformComponent& t) -> glm::vec3 { return t.Rotation; },
+                                                 [](TransformComponent& t, const glm::vec3& val) { t.Rotation = val; t.MarkDirty(); }
+                                             ),
+                                             "Scale", sol::property(
+                                                 [](TransformComponent& t) -> glm::vec3 { return t.Scale; },
+                                                 [](TransformComponent& t, const glm::vec3& val) { t.Scale = val; t.MarkDirty(); }
+                                             ),
+
+                                             "Translate", [](TransformComponent& t, const glm::vec3& offset) { t.Position += offset; t.MarkDirty(); },
+                                             "Rotate", [](TransformComponent& t, const glm::vec3& offset) { t.Rotation += offset; t.MarkDirty(); },
+                                             "ScaleBy", [](TransformComponent& t, const glm::vec3& multi) { t.Scale *= multi; t.MarkDirty(); },
+                                             "MarkDirty", &TransformComponent::MarkDirty,
+                                             "IsDirty", &TransformComponent::IsDirty
         );
 
         // RENDERER
-        lua.new_usertype<SpriteRendererComponent>("SpriteRendererComponent", sol::no_constructor,
-                                                  "Color", &SpriteRendererComponent::Color
-        );
+        lua.new_usertype<SpriteRendererComponent>("SpriteRendererComponent", sol::no_constructor, "Color", BIND_PROP(SpriteRendererComponent, Color));
 
         lua.new_usertype<CameraComponent>("CameraComponent", sol::no_constructor,
-                                          "Primary", &CameraComponent::Primary,
-                                          "FixedAspectRatio", &CameraComponent::FixedAspectRatio
-        );
+                                          "Primary", BIND_PROP(CameraComponent, Primary),
+                                          "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio));
 
         lua.new_usertype<MeshComponent>("MeshComponent", sol::no_constructor,
-                                        "MeshID", &MeshComponent::MeshID,
-                                        "DropShadow", &MeshComponent::DropShadow
-        );
+                                        "MeshID", BIND_PROP(MeshComponent, MeshID),
+                                        "DropShadow", BIND_PROP(MeshComponent, DropShadow));
 
         lua.new_usertype<LightComponent>("LightComponent", sol::no_constructor,
-                                         "Color", &LightComponent::Color,
-                                         "Intensity", &LightComponent::Intensity,
-                                         "Radius", &LightComponent::Radius,
-                                         "Falloff", &LightComponent::Falloff,
-                                         "Type", &LightComponent::Type
-        );
+                                         "Color", BIND_PROP(LightComponent, Color),
+                                         "Intensity", BIND_PROP(LightComponent, Intensity),
+                                         "Radius", BIND_PROP(LightComponent, Radius),
+                                         "Falloff", BIND_PROP(LightComponent, Falloff),
+                                         "Type", BIND_PROP(LightComponent, Type));
 
         lua.new_usertype<EnvironmentComponent>("EnvironmentComponent", sol::no_constructor,
-                                               "Elevation", &EnvironmentComponent::Elevation,
-                                               "Azimuth", &EnvironmentComponent::Azimuth,
-                                               "Turbidity", &EnvironmentComponent::Turbidity,
-                                               "Exposure", &EnvironmentComponent::Exposure,
-                                               "SunIntensity", &EnvironmentComponent::SunIntensity,
-                                               "EnableSunDisk", &EnvironmentComponent::EnableSunDisk,
-                                               "SkyAmbient", &EnvironmentComponent::SkyAmbient,
-                                               "HorizonAmbient", &EnvironmentComponent::HorizonAmbient,
-                                               "GroundAmbient", &EnvironmentComponent::GroundAmbient
-        );
+                                               "Elevation", BIND_PROP(EnvironmentComponent, Elevation),
+                                               "Azimuth", BIND_PROP(EnvironmentComponent, Azimuth),
+                                               "Turbidity", BIND_PROP(EnvironmentComponent, Turbidity),
+                                               "Exposure", BIND_PROP(EnvironmentComponent, Exposure),
+                                               "SunIntensity", BIND_PROP(EnvironmentComponent, SunIntensity),
+                                               "EnableSunDisk", BIND_PROP(EnvironmentComponent, EnableSunDisk),
+                                               "SkyAmbient", BIND_PROP(EnvironmentComponent, SkyAmbient),
+                                               "HorizonAmbient", BIND_PROP(EnvironmentComponent, HorizonAmbient),
+                                               "GroundAmbient", BIND_PROP(EnvironmentComponent, GroundAmbient));
 
         // PHYSICS
         lua.new_usertype<RigidbodyComponent>("RigidbodyComponent", sol::no_constructor,
-                                             "Type", &RigidbodyComponent::Type,
-                                             "Mass", &RigidbodyComponent::Mass,
-                                             "UseGravity", &RigidbodyComponent::UseGravity,
-                                             "IsSensor", &RigidbodyComponent::IsSensor,
-                                             "ContinuousCollision", &RigidbodyComponent::ContinuousCollision,
-                                             "FreezeRotationX", &RigidbodyComponent::FreezeRotationX,
-                                             "FreezeRotationY", &RigidbodyComponent::FreezeRotationY,
-                                             "FreezeRotationZ", &RigidbodyComponent::FreezeRotationZ,
-                                             "LinearDamping", &RigidbodyComponent::LinearDamping,
-                                             "AngularDamping", &RigidbodyComponent::AngularDamping,
-                                             "Friction", &RigidbodyComponent::Friction,
-                                             "Bounciness", &RigidbodyComponent::Bounciness,
-                                             
+                                             "Type", BIND_PROP(RigidbodyComponent, Type),
+                                             "Mass", BIND_PROP(RigidbodyComponent, Mass),
+                                             "IsSensor", BIND_PROP(RigidbodyComponent, IsSensor),
+                                             "ContinuousCollision", BIND_PROP(RigidbodyComponent, ContinuousCollision),
+                                             "FreezeRotationX", BIND_PROP(RigidbodyComponent, FreezeRotationX),
+                                             "FreezeRotationY", BIND_PROP(RigidbodyComponent, FreezeRotationY),
+                                             "FreezeRotationZ", BIND_PROP(RigidbodyComponent, FreezeRotationZ),
+                                             "LinearDamping", BIND_PROP(RigidbodyComponent, LinearDamping),
+                                             "AngularDamping", BIND_PROP(RigidbodyComponent, AngularDamping),
+                                             "Friction", BIND_PROP(RigidbodyComponent, Friction),
+                                             "Bounciness", BIND_PROP(RigidbodyComponent, Bounciness),
+
                                              "AddForce", [](RigidbodyComponent& rb, const glm::vec3& force) {
                                                  Physics* physics = Core::GetPhysics();
                                                  if(!physics->IsInValid(rb.RuntimeBodyID))
@@ -180,44 +181,41 @@ namespace Surge::ScriptBinding
                                                  Physics* physics = Core::GetPhysics();
                                                  if(!physics->IsInValid(rb.RuntimeBodyID)) return physics->GetAngularVelocity(rb.RuntimeBodyID);
                                                  return glm::vec3(0.0f);
-                                             }
-        );
+                                             });
 
         lua.new_usertype<BoxColliderComponent>("BoxColliderComponent", sol::no_constructor,
-                                               "ShowCollider", &BoxColliderComponent::ShowCollider,
-                                               "HalfExtents", &BoxColliderComponent::HalfExtents
-        );
+                                               "ShowCollider", BIND_PROP(BoxColliderComponent, ShowCollider),
+                                               "HalfExtents", BIND_PROP(BoxColliderComponent, HalfExtents));
 
         lua.new_usertype<SphereColliderComponent>("SphereColliderComponent", sol::no_constructor,
-                                                  "ShowCollider", &SphereColliderComponent::ShowCollider,
-                                                  "Radius", &SphereColliderComponent::Radius
-        );
+                                                  "ShowCollider", BIND_PROP(SphereColliderComponent, ShowCollider),
+                                                  "Radius", BIND_PROP(SphereColliderComponent, Radius));
 
         lua.new_usertype<CapsuleColliderComponent>("CapsuleColliderComponent", sol::no_constructor,
-                                                   "ShowCollider", &CapsuleColliderComponent::ShowCollider,
-                                                   "Height", &CapsuleColliderComponent::Height,
-                                                   "Radius", &CapsuleColliderComponent::Radius
-        );
+                                                   "ShowCollider", BIND_PROP(CapsuleColliderComponent, ShowCollider),
+                                                   "Height", BIND_PROP(CapsuleColliderComponent, Height),
+                                                   "Radius", BIND_PROP(CapsuleColliderComponent, Radius));
 
         lua.new_usertype<CylinderColliderComponent>("CylinderColliderComponent", sol::no_constructor,
-                                                    "ShowCollider", &CylinderColliderComponent::ShowCollider,
-                                                    "Height", &CylinderColliderComponent::Height,
-                                                    "Radius", &CylinderColliderComponent::Radius
-        );
+                                                    "ShowCollider", BIND_PROP(CylinderColliderComponent, ShowCollider),
+                                                    "Height", BIND_PROP(CylinderColliderComponent, Height),
+                                                    "Radius", BIND_PROP(CylinderColliderComponent, Radius));
 
         lua.new_usertype<ConvexColliderComponent>("ConvexColliderComponent", sol::no_constructor,
-                                                  "LocalOffset", &ConvexColliderComponent::LocalOffset,
-                                                  "LocalRotation", &ConvexColliderComponent::LocalRotation,
-                                                  "ShowCollider", &ConvexColliderComponent::ShowCollider
-        );
+                                                  "ShowCollider", BIND_PROP(ConvexColliderComponent, ShowCollider),
+                                                  "LocalOffset", sol::property(
+                                                      [](ConvexColliderComponent& c) -> glm::vec3 { return c.LocalOffset; },
+                                                      [](ConvexColliderComponent& c, const glm::vec3& v) { c.LocalOffset = v; c.IsDirty = true; }
+                                                  ),
+                                                  "LocalRotation", sol::property(
+                                                      [](ConvexColliderComponent& c) -> glm::vec3 { return c.LocalRotation; },
+                                                      [](ConvexColliderComponent& c, const glm::vec3& v) { c.LocalRotation = v; c.IsDirty = true; }));
 
         lua.new_usertype<MeshColliderComponent>("MeshColliderComponent", sol::no_constructor,
-                                                "LocalOffset", &MeshColliderComponent::LocalOffset,
-                                                "LocalRotation", &MeshColliderComponent::LocalRotation
-        );
+                                                "LocalOffset", BIND_PROP(MeshColliderComponent, LocalOffset),
+                                                "LocalRotation", BIND_PROP(MeshColliderComponent, LocalRotation));
 
         lua.new_usertype<ScriptComponent>("ScriptComponent", sol::no_constructor,
-                                          "ScriptAsset", &ScriptComponent::ScriptAsset
-        );
+                                          "ScriptAsset", BIND_PROP(ScriptComponent, ScriptAsset));
     }
 }

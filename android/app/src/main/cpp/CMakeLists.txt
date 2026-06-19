@@ -13,9 +13,8 @@ set(ENGINE_SRC_ROOT "${REPO_ROOT}/Engine/Source")
 set(VENDOR_ROOT "${REPO_ROOT}/Engine/Vendor")
 set(PLAYER_SRC_ROOT "${REPO_ROOT}/Player/Source")
 
-# -----------------------------------------------------------------------
+
 # GameActivity (provided via Prefab)
-# -----------------------------------------------------------------------
 find_package(game-activity REQUIRED CONFIG)
 
 # -----------------------------------------------------------------------
@@ -54,12 +53,11 @@ target_include_directories(SurgePlayer PUBLIC
     "${VENDOR_ROOT}/volk"
     "${VENDOR_ROOT}/SPIRV-Cross/Include"
     "${VENDOR_ROOT}/stb"
-    "${VENDOR_ROOT}/cgltf" n
+    "${VENDOR_ROOT}/cgltf"
     "${VENDOR_ROOT}/ImGui"
     "${VENDOR_ROOT}/Optick/Include"
     "${VENDOR_ROOT}/entt/Include"
     "${VENDOR_ROOT}/json/Include"
-    "${VENDOR_ROOT}/FontAwesome"
     "${PLAYER_SRC_ROOT}"
     "${game-activity_NATIVE_SRCS}"
 )
@@ -90,13 +88,11 @@ add_library(volk_android STATIC "${VENDOR_ROOT}/volk/volk.c")
 target_include_directories(volk_android PUBLIC "${VENDOR_ROOT}/volk" "${VENDOR_ROOT}/Vulkan-Headers/Include")
 target_compile_definitions(volk_android PUBLIC VK_USE_PLATFORM_ANDROID_KHR)
 
-# SPIRV-Cross (minimal set needed by the shader compiler)
+# SPIRV-Cross
 file(GLOB SPIRVCROSS_SOURCES "${VENDOR_ROOT}/SPIRV-Cross/Source/*.cpp")
 add_library(spirvcross_android STATIC ${SPIRVCROSS_SOURCES})
 target_include_directories(spirvcross_android PUBLIC "${VENDOR_ROOT}/SPIRV-Cross/Include/SPIRV-Cross")
-target_compile_options(spirvcross_android PRIVATE
-    -w
-)
+target_compile_options(spirvcross_android PRIVATE -w)
 
 # ImGui
 set(IMGUI_SOURCES
@@ -143,6 +139,12 @@ target_include_directories(Jolt_android PUBLIC "${VENDOR_ROOT}/JoltPhysics")
 target_compile_definitions(Jolt_android PUBLIC JPH_DEBUG_RENDERER)
 target_compile_options(Jolt_android PUBLIC -ffast-math)
 
+# lua
+file(GLOB LUA_SOURCES "${VENDOR_ROOT}/lua/src/*.c" "${VENDOR_ROOT}/lua/src/*.h")
+add_library(lua_android STATIC ${LUA_SOURCES})
+target_include_directories(lua_android PUBLIC "${VENDOR_ROOT}/lua/src")
+target_compile_options(lua_android PRIVATE -w)
+
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE
     game-activity::game-activity_static
@@ -151,6 +153,7 @@ target_link_libraries(SurgePlayer PRIVATE
     imgui_android
     basisu_android
     Jolt_android
+    lua_android
     ${log-lib}
     ${android-lib}
     ${vulkan-lib}

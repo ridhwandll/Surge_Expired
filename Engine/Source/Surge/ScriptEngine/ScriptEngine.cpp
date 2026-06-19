@@ -3,6 +3,7 @@
 #include "Surge/Core/Defines.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
 #include "Bindings/MathBinding.hpp"
+#include "Bindings/InputBinding.hpp"
 #include "Bindings/LogBinding.hpp"
 #include "Bindings/ECSBindings.hpp"
 
@@ -57,27 +58,12 @@ namespace Surge
         lua_gc(L, LUA_GCGEN, 100, 200);
 
         ScriptBinding::BindLog(sLua);
+        ScriptBinding::BindInput(sLua);
         ScriptBinding::BindMath(sLua);
         ScriptBinding::BindEntity(sLua);
         ScriptBinding::BindComponents(sLua);
 
         Log<Severity::Info>("ScriptEngine Initialized: {}", LUA_VERSION);
-
-        // Test
-        auto result = sLua->safe_script(R"(
-        Log.Trace("Hello from LUA!")
-        local rgb = Math.HexToRGB("#FF0000")
-        Log.Trace("Red in RGB: " ..tostring(rgb))
-        local hsv = Math.RGBToHSV(rgb)
-        Log.Trace("Red in HSV: " ..tostring(hsv))
-        )", sol::script_pass_on_error);
-
-        if(!result.valid())
-        {
-            sol::error err = result;
-            Log<Severity::Fatal>("[ScriptEngine] Math Test Suite Failed: {}", err.what());
-            SG_ASSERT_INTERNAL("Lua Math Bindings are broken!");
-        }
     }
 
     void ScriptEngine::Shutdown()

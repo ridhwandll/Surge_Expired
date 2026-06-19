@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MathBinding.hpp"
+#include "Surge/Core/String.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
 
 #include <glm/glm.hpp>
@@ -24,8 +25,14 @@ namespace Surge::ScriptBinding
 
         // Vector 2
         math.new_usertype<glm::vec2>("Vec2",
-            sol::constructors<glm::vec2(), glm::vec2(float), glm::vec2(float, float)>(), "x", &glm::vec2::x, "y", &glm::vec2::y,
-            
+            sol::constructors<glm::vec2(), glm::vec2(float), glm::vec2(float, float)>(),
+            "x", sol::property(
+                [](glm::vec2& v) -> float { return v.x; },
+                [](glm::vec2& v, float val) { v.x = val; }),
+            "y", sol::property(
+                [](glm::vec2& v) -> float { return v.y; },
+                [](glm::vec2& v, float val) { v.y = val; }),
+
             // Operators
             sol::meta_function::addition,       [](const glm::vec2& a, const glm::vec2& b) { return a + b; },
             sol::meta_function::subtraction,    [](const glm::vec2& a, const glm::vec2& b) { return a - b; },
@@ -52,8 +59,10 @@ namespace Surge::ScriptBinding
         // Vector 3
         math.new_usertype<glm::vec3>("Vec3",
             sol::constructors<glm::vec3(), glm::vec3(float), glm::vec3(float, float, float)>(),
-            "x", &glm::vec3::x, "y", &glm::vec3::y, "z", &glm::vec3::z,
-            
+            "x", sol::property([](glm::vec3& v) -> float { return v.x; }, [](glm::vec3& v, float val) { v.x = val; }),
+            "y", sol::property([](glm::vec3& v) -> float { return v.y; }, [](glm::vec3& v, float val) { v.y = val; }),
+            "z", sol::property([](glm::vec3& v) -> float { return v.z; }, [](glm::vec3& v, float val) { v.z = val; }),
+
             // Operators
             sol::meta_function::addition,       [](const glm::vec3& a, const glm::vec3& b) { return a + b; },
             sol::meta_function::subtraction,    [](const glm::vec3& a, const glm::vec3& b) { return a - b; },
@@ -83,8 +92,11 @@ namespace Surge::ScriptBinding
         // Vector 4
         math.new_usertype<glm::vec4>("Vec4",
             sol::constructors<glm::vec4(), glm::vec4(float), glm::vec4(float, float, float, float)>(),
-            "x", &glm::vec4::x, "y", &glm::vec4::y, "z", &glm::vec4::z, "w", &glm::vec4::w,
-            
+            "x", sol::property([](glm::vec4& v) -> float { return v.x; }, [](glm::vec4& v, float val) { v.x = val; }),
+            "y", sol::property([](glm::vec4& v) -> float { return v.y; }, [](glm::vec4& v, float val) { v.y = val; }),
+            "z", sol::property([](glm::vec4& v) -> float { return v.z; }, [](glm::vec4& v, float val) { v.z = val; }),
+            "w", sol::property([](glm::vec4& v) -> float { return v.w; }, [](glm::vec4& v, float val) { v.w = val; }),
+
             // Operators
             sol::meta_function::addition,       [](const glm::vec4& a, const glm::vec4& b) { return a + b; },
             sol::meta_function::subtraction,    [](const glm::vec4& a, const glm::vec4& b) { return a - b; },
@@ -98,7 +110,10 @@ namespace Surge::ScriptBinding
         // Quaternions (Rotations)
         math.new_usertype<glm::quat>("Quat",
             sol::constructors<glm::quat(), glm::quat(float, float, float, float), glm::quat(glm::vec3)>(),
-            "x", &glm::quat::x, "y", &glm::quat::y, "z", &glm::quat::z, "w", &glm::quat::w,
+            "x", sol::property([](glm::quat& q) -> float { return q.x; }, [](glm::quat& q, float val) { q.x = val; }),
+            "y", sol::property([](glm::quat& q) -> float { return q.y; }, [](glm::quat& q, float val) { q.y = val; }),
+            "z", sol::property([](glm::quat& q) -> float { return q.z; }, [](glm::quat& q, float val) { q.z = val; }),
+            "w", sol::property([](glm::quat& q) -> float { return q.w; }, [](glm::quat& q, float val) { q.w = val; }),
             
             // Operators
             sol::meta_function::multiplication, sol::overload(

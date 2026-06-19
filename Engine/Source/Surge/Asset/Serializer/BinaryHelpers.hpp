@@ -21,7 +21,7 @@ namespace Surge
         buffer.insert(buffer.end(), ptr, ptr + (sizeof(T) * count));
     }
 
-    static void WriteStr(Vector<Byte>& buffer, const String& s)
+    [[maybe_unused]] static void WriteStr(Vector<Byte>& buffer, const String& s)
     {
         Uint len = static_cast<Uint>(s.size());
         WriteData(buffer, len);
@@ -45,7 +45,7 @@ namespace Surge
         ptr += sizeof(T) * count;
     }
 
-    static String ReadStr(const Byte*& ptr)
+    [[maybe_unused]] static String ReadStr(const Byte*& ptr)
     {
         Uint len = 0;
         ReadData(ptr, len);

@@ -31,6 +31,39 @@ namespace Surge::ScriptBinary
 
     bool Read(const String& path, AssetStamp& outStamp, Ref<Script>& outScript)
     {
-        return true;
+        Vector<Byte> scriptCodeBuffer;
+        if(Filesystem::ReadBinaryFile(path, scriptCodeBuffer))
+        {
+            if(scriptCodeBuffer.size() < sizeof(AssetStamp) + sizeof(uint64_t))
+            {
+                Log<Severity::Error>("[ScriptSerializer] Corrupted script sidecar (Too small): {}", path);
+                return false;
+            }
+
+            const Byte* ptr = scriptCodeBuffer.data();
+            const Byte* endPtr = scriptCodeBuffer.data() + scriptCodeBuffer.size();
+
+            ReadData(ptr, outStamp);
+
+            uint64_t bytecodeSize = 0;
+            ReadData(ptr, bytecodeSize);
+
+            // ptr is now at the start of the bytecode
+
+            if(ptr + bytecodeSize > endPtr)
+            {
+                Log<Severity::Error>("[ScriptSerializer] Corrupted script sidecar (Bytecode size mismatch): {}", path);
+                return false;
+            }
+
+            Vector<Byte> bytecode(ptr, ptr + bytecodeSize);
+            outScript = Script::Create(std::move(bytecode));
+            return true;
+        }
+        else
+        {
+            Log<Severity::Error>("[ScriptBinary] Failed to read sidecar at path: {}", path);
+            return false;
+        }
     }
 }

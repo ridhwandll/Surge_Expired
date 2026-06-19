@@ -37,13 +37,15 @@ namespace Surge
         void DestroyEntity(Entity entity);
         Entity DuplicateEntity(Entity entity);
 
-        void SetSlectedEntity(Entity entity);
-        Entity GetSlectedEntity() const;
+        void SetSelectedEntity(Entity entity);
+        Entity GetSelectedEntity() const;
 
         void OnResize(float width, float height);
 
         void SetRunning(bool isRunning) { mIsRunning = isRunning; }
         bool IsRunning() const { return mIsRunning; }
+
+        Entity GetEntityByName(const String& name);
 
         entt::registry& GetRegistry() { return mRegistry; }
         const entt::registry& GetRegistry() const { return mRegistry; }

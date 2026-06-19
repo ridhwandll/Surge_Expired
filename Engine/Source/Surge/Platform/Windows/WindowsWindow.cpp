@@ -243,7 +243,7 @@ namespace Surge
                 }
 
                 int repeatCount = (lParam & 0xffff);
-                KeyPressedEvent event(static_cast<KeyCode>(virtualKeyCode), repeatCount);
+                KeyPressedEvent event(static_cast<Key>(virtualKeyCode), repeatCount);
                 data->mEventCallback(event);
                 break;
             }

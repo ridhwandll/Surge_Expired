@@ -6,14 +6,14 @@
 namespace Surge
 {
     // Android has no keyboard; key queries always return false
-    bool Input::IsKeyPressed(KeyCode)
+    bool Input::IsKeyPressed(Key)
     {
-        SG_ASSERT_INTERNAL("Android has no keyboard so bool Input::IsKeyPressed(KeyCode) is always return false!");
+        SG_ASSERT_INTERNAL("Android has no keyboard so bool Input::IsKeyPressed(Key) is always return false!");
         return false;
     }
 
     // Primary touch maps to left mouse button
-    bool Input::IsMouseButtonPressed(MouseCode button)
+    bool Input::IsMouseButtonPressed(Mouse button)
     {
         if (button == Mouse::ButtonLeft)
             return Android::IsTouchDown();

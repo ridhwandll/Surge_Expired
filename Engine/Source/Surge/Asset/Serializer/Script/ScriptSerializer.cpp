@@ -39,39 +39,12 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
-        Vector<Byte> scriptCodeBuffer;
-        if(Filesystem::ReadBinaryFile(sidecarPath, scriptCodeBuffer))
-        {
-            if(scriptCodeBuffer.size() < sizeof(AssetStamp) + sizeof(uint64_t))
-            {
-                Log<Severity::Error>("[ScriptSerializer] Corrupted script sidecar (Too small): {}", sidecarPath);
-                return nullptr;
-            }
+        AssetStamp stamp;
+        Ref<Script> script = nullptr;
+        if (!ScriptBinary::Read(sidecarPath, stamp, script))
+            Log<Severity::Error>("[ScriptSerializer] Failed to read script bytecode for asset ID: {}. Path: {}", metadata.ID.Get(), sidecarPath);
 
-            const Byte* ptr = scriptCodeBuffer.data();
-            const Byte* endPtr = scriptCodeBuffer.data() + scriptCodeBuffer.size();
-
-            AssetStamp stamp;
-            ReadData(ptr, stamp);
-
-            uint64_t bytecodeSize = 0;
-            ReadData(ptr, bytecodeSize);
-
-            if(ptr + bytecodeSize > endPtr)
-            {
-                Log<Severity::Error>("[ScriptSerializer] Corrupted script sidecar (Bytecode size mismatch): {}", sidecarPath);
-                return nullptr;
-            }
-
-            Vector<Byte> bytecode(ptr, ptr + bytecodeSize);
-
-            // Create the Script Asset and MUST assign its metadata ID
-            Ref<Script> script = Script::Create(std::move(bytecode));
-            return script;
-        }
-
-        Log<Severity::Error>("[ScriptSerializer] Failed to read script sidecar at path: {}", sidecarPath);
-        return nullptr;
+        return script;
     }
 
     void ScriptSerializer::Shutdown()

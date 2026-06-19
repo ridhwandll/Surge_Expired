@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Core/Memory.hpp"
 #include "Surge/Asset/Serializer/AssetStamp.hpp"
 
 namespace Surge

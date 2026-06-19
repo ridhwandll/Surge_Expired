@@ -121,6 +121,8 @@ namespace Surge
                             mGizmoType = ImGuizmo::OPERATION::UNIVERSAL;
                         break;
                     }
+                    default:
+                        break;
                 }
             }
                                              });
