@@ -44,25 +44,25 @@ namespace Surge
     class KeyEvent : public Event
     {
     public:
-        KeyCode GetKeyCode() const { return mKeyCode; }
+        Key GetKeyCode() const { return mKeyCode; }
 
     protected:
-        KeyEvent(const KeyCode keycode) : mKeyCode(keycode) {}
+        KeyEvent(const Key keycode) : mKeyCode(keycode) {}
 
-        KeyCode mKeyCode;
+        Key mKeyCode;
     };
 
     class SURGE_API KeyPressedEvent : public KeyEvent
     {
     public:
-        KeyPressedEvent(const KeyCode keycode, const uint16_t repeatCount) : KeyEvent(keycode), mRepeatCount(repeatCount) {}
+        KeyPressedEvent(const Key keycode, const uint16_t repeatCount) : KeyEvent(keycode), mRepeatCount(repeatCount) {}
 
         uint16_t GetRepeatCount() const { return mRepeatCount; }
 
         virtual String ToString() const override
         {
             std::stringstream ss;
-            ss << "KeyPressedEvent: " << mKeyCode << " (" << mRepeatCount << " repeats)";
+            ss << "KeyPressedEvent: " << (KeyCode)mKeyCode << " (" << mRepeatCount << " repeats)";
             return ss.str();
         }
         EVENT_CLASS_TYPE(KeyPressed);
@@ -74,12 +74,12 @@ namespace Surge
     class SURGE_API KeyReleasedEvent : public KeyEvent
     {
     public:
-        KeyReleasedEvent(const KeyCode keycode) : KeyEvent(keycode) {}
+        KeyReleasedEvent(const KeyCode keycode) : KeyEvent((Key)keycode) {}
 
         virtual String ToString() const override
         {
             std::stringstream ss;
-            ss << "KeyReleasedEvent: " << mKeyCode;
+            ss << "KeyReleasedEvent: " << (KeyCode)mKeyCode;
             return ss.str();
         }
         EVENT_CLASS_TYPE(KeyReleased);
@@ -88,12 +88,12 @@ namespace Surge
     class SURGE_API KeyTypedEvent : public KeyEvent
     {
     public:
-        KeyTypedEvent(const KeyCode keycode) : KeyEvent(keycode) {}
+        KeyTypedEvent(const KeyCode keycode) : KeyEvent((Key)keycode) {}
 
         virtual String ToString() const override
         {
             std::stringstream ss;
-            ss << "KeyTypedEvent: " << mKeyCode;
+            ss << "KeyTypedEvent: " << (KeyCode)mKeyCode;
             return ss.str();
         }
         EVENT_CLASS_TYPE(KeyTyped);

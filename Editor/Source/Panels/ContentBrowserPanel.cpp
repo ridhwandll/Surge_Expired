@@ -6,12 +6,16 @@
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Utility/Filesystem.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/ScriptEngine/ScriptEngine.hpp"
 #include "SurgeReflect/Enum.hpp"
 
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Asset/SourceWriters/MaterialSourceWriter.hpp"
+#include "Asset/SourceWriters/ScriptSourceWriter.hpp"
+
 #include <stb_image.h>
 
 namespace Surge
@@ -416,7 +420,11 @@ namespace Surge
                                                         Ref<Material> newMaterial = mAssetManager->Load<Material>(item.Id);
                                                         newMaterial->SetName(Filesystem::GetFilenameWithoutExt(mRenameBuffer));
                                                         MaterialSourceWriter::Write(newMaterial, newPath.generic_string());
-
+                                                        mAssetManager->Save(item.Id);
+                                                        mAssetManager->Unload(item.Id);
+                                                    }
+                                                    else if (item.AssetTypeStr == "SCRIPT")
+                                                    {
                                                         mAssetManager->Save(item.Id);
                                                         mAssetManager->Unload(item.Id);
                                                     }
@@ -505,6 +513,27 @@ namespace Surge
                                     mSelectedPath = newFilePath;
                                     StartRename(newFilePath);
                                 }
+                                mNeedsCacheRefresh = true;
+                            }
+                            if(ImGui::MenuItem("Script"))
+                            {
+                                const char* extension = GetExtensionFromAssetType(AssetType::SCRIPT);
+                                std::filesystem::path newFilePath = mCurrentDirectory / ("NewScript" + String(extension));
+                                int count = 1;
+                                while(std::filesystem::exists(newFilePath))
+                                {
+                                    newFilePath = mCurrentDirectory / ("NewScript (" + std::to_string(count) + ")" + extension);
+                                    count++;
+                                }
+                                String relativeToAssets = std::filesystem::relative(newFilePath, mBaseDirectory).generic_string();
+                                ScriptSourceWriter::WriteNew(newFilePath.generic_string());
+                                ScriptEngine* scriptEngine = Core::GetScriptEngine();
+                                Vector<Byte> bytecode = scriptEngine->Compile(ScriptSourceWriter::GetDefaultScriptContent(), Filesystem::GetFilenameWithExt(newFilePath));
+                                Ref<Script> newScript = mAssetManager->Create<Script>(relativeToAssets, std::move(bytecode));
+
+                                mSelectedPath = newFilePath;
+                                StartRename(newFilePath);
+                                
                                 mNeedsCacheRefresh = true;
                             }
                             if(ImGui::MenuItem("Physics Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new physics material asset"); }
@@ -781,8 +810,7 @@ namespace Surge
 
     void ContentBrowserPanel::StartRename(const Path& path)
     {
-        // We don't allow renaming of directories in this implementation, 
-        // but this can be added in the future if needed. It just requires updating all child paths in the registry when a directory is renamed
+        // We don't allow renaming of directories
         if (std::filesystem::is_directory(path))
             return;
 
@@ -798,6 +826,14 @@ namespace Surge
         rhi->DestroyImage(mDirectoryIconHandle);
         rhi->DestroyImage(mEmptyDirectoryIconHandle);
         rhi->DestroyImage(mFileIconHandle);
+    }
+
+    void ContentBrowserPanel::SetSelectedAsset(AssetID asset)
+    {
+        const AssetMetadata& meta = mAssetManager->GetMetadata(asset);
+        mSelectedPath = mAssetManager->GetAbsolutePath(meta.RelativePath);
+        mCurrentDirectory = mSelectedPath.parent_path();
+        RefreshDirectoryCache();
     }
 
 } // namespace Surge

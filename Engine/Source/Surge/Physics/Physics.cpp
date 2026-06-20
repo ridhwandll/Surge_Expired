@@ -566,6 +566,56 @@ namespace Surge
         return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
     }
 
+    void Physics::AddForce(RigidBodyID rbID, const glm::vec3& force)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.AddForce(JPH::BodyID(rbID), JPH::Vec3(force.x, force.y, force.z), JPH::EActivation::Activate);
+    }
+
+    void Physics::AddImpulse(RigidBodyID rbID, const glm::vec3& impulse)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.AddImpulse(JPH::BodyID(rbID), JPH::Vec3(impulse.x, impulse.y, impulse.z));
+    }
+
+    void Physics::SetLinearVelocity(RigidBodyID rbID, const glm::vec3& velocity)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.SetLinearVelocity(JPH::BodyID(rbID), JPH::Vec3(velocity.x, velocity.y, velocity.z));
+    }
+
+    glm::vec3 Physics::GetLinearVelocity(RigidBodyID rbID)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Vec3 velocity = bodyInterface.GetLinearVelocity(JPH::BodyID(rbID));
+        return glm::vec3(velocity.GetX(), velocity.GetY(), velocity.GetZ());
+    }
+
+    void Physics::AddTorque(RigidBodyID rbID, const glm::vec3& torque)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.AddTorque(JPH::BodyID(rbID), JPH::Vec3(torque.x, torque.y, torque.z), JPH::EActivation::Activate);
+    }
+
+    void Physics::AddAngularImpulse(RigidBodyID rbID, const glm::vec3& impulse)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.AddAngularImpulse(JPH::BodyID(rbID), JPH::Vec3(impulse.x, impulse.y, impulse.z));
+    }
+
+    void Physics::SetAngularVelocity(RigidBodyID rbID, const glm::vec3& velocity)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        bodyInterface.SetAngularVelocity(JPH::BodyID(rbID), JPH::Vec3(velocity.x, velocity.y, velocity.z));
+    }
+
+    glm::vec3 Physics::GetAngularVelocity(RigidBodyID rbID)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Vec3 velocity = bodyInterface.GetAngularVelocity(JPH::BodyID(rbID));
+        return glm::vec3(velocity.GetX(), velocity.GetY(), velocity.GetZ());
+    }
+
     bool Physics::IsInValid(RigidBodyID rbID) const
     {
         return JPH::BodyID(rbID).IsInvalid();

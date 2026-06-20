@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MathBinding.hpp"
+#include "Surge/Core/String.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
 
 #include <glm/glm.hpp>
@@ -24,8 +25,14 @@ namespace Surge::ScriptBinding
 
         // Vector 2
         math.new_usertype<glm::vec2>("Vec2",
-            sol::constructors<glm::vec2(), glm::vec2(float), glm::vec2(float, float)>(), "x", &glm::vec2::x, "y", &glm::vec2::y,
-            
+            sol::constructors<glm::vec2(), glm::vec2(float), glm::vec2(float, float)>(),
+            "x", sol::property(
+                [](glm::vec2& v) -> float { return v.x; },
+                [](glm::vec2& v, float val) { v.x = val; }),
+            "y", sol::property(
+                [](glm::vec2& v) -> float { return v.y; },
+                [](glm::vec2& v, float val) { v.y = val; }),
+
             // Operators
             sol::meta_function::addition,       [](const glm::vec2& a, const glm::vec2& b) { return a + b; },
             sol::meta_function::subtraction,    [](const glm::vec2& a, const glm::vec2& b) { return a - b; },
@@ -52,8 +59,10 @@ namespace Surge::ScriptBinding
         // Vector 3
         math.new_usertype<glm::vec3>("Vec3",
             sol::constructors<glm::vec3(), glm::vec3(float), glm::vec3(float, float, float)>(),
-            "x", &glm::vec3::x, "y", &glm::vec3::y, "z", &glm::vec3::z,
-            
+            "x", sol::property([](glm::vec3& v) -> float { return v.x; }, [](glm::vec3& v, float val) { v.x = val; }),
+            "y", sol::property([](glm::vec3& v) -> float { return v.y; }, [](glm::vec3& v, float val) { v.y = val; }),
+            "z", sol::property([](glm::vec3& v) -> float { return v.z; }, [](glm::vec3& v, float val) { v.z = val; }),
+
             // Operators
             sol::meta_function::addition,       [](const glm::vec3& a, const glm::vec3& b) { return a + b; },
             sol::meta_function::subtraction,    [](const glm::vec3& a, const glm::vec3& b) { return a - b; },
@@ -83,22 +92,40 @@ namespace Surge::ScriptBinding
         // Vector 4
         math.new_usertype<glm::vec4>("Vec4",
             sol::constructors<glm::vec4(), glm::vec4(float), glm::vec4(float, float, float, float)>(),
-            "x", &glm::vec4::x, "y", &glm::vec4::y, "z", &glm::vec4::z, "w", &glm::vec4::w,
-            
+            "x", sol::property([](glm::vec4& v) -> float { return v.x; }, [](glm::vec4& v, float val) { v.x = val; }),
+            "y", sol::property([](glm::vec4& v) -> float { return v.y; }, [](glm::vec4& v, float val) { v.y = val; }),
+            "z", sol::property([](glm::vec4& v) -> float { return v.z; }, [](glm::vec4& v, float val) { v.z = val; }),
+            "w", sol::property([](glm::vec4& v) -> float { return v.w; }, [](glm::vec4& v, float val) { v.w = val; }),
+
             // Operators
             sol::meta_function::addition,       [](const glm::vec4& a, const glm::vec4& b) { return a + b; },
             sol::meta_function::subtraction,    [](const glm::vec4& a, const glm::vec4& b) { return a - b; },
             sol::meta_function::multiplication, sol::overload(
                 [](const glm::vec4& a, float s) { return a * s; },
-                [](float s, const glm::vec4& a) { return a * s; }
-            ),
-            sol::meta_function::to_string,      [](const glm::vec4& v) { return std::format("Vec4({:.3f}, {:.3f}, {:.3f}, {:.3f})", v.x, v.y, v.z, v.w); }
+                [](float s, const glm::vec4& a) { return a * s; }),
+            sol::meta_function::division, sol::overload(
+                [](const glm::vec4& a, const glm::vec4& b) { return a / b; },
+                [](const glm::vec4& a, float s) { return a / s; }),
+
+            sol::meta_function::unary_minus, [](const glm::vec4& v) { return -v; },
+            sol::meta_function::equal_to, [](const glm::vec4& a, const glm::vec4& b) { return a == b; },
+            sol::meta_function::to_string,      [](const glm::vec4& v) { return std::format("Vec4({:.3f}, {:.3f}, {:.3f}, {:.3f})", v.x, v.y, v.z, v.w); },
+
+            "Length", [](const glm::vec4& v) { return glm::length(v); },
+            "Normalize", [](const glm::vec4& v) { return glm::length(v) > 0 ? glm::normalize(v) : glm::vec4(0.0f); },
+            "Dot", [](const glm::vec4& a, const glm::vec4& b) { return glm::dot(a, b); },
+            "Distance", [](const glm::vec4& a, const glm::vec4& b) { return glm::distance(a, b); },
+            "Reflect", [](const glm::vec4& i, const glm::vec4& n) { return glm::reflect(i, n); },
+            "Refract", [](const glm::vec4& i, const glm::vec4& n, float eta) { return glm::refract(i, n, eta); }
         );
 
         // Quaternions (Rotations)
         math.new_usertype<glm::quat>("Quat",
             sol::constructors<glm::quat(), glm::quat(float, float, float, float), glm::quat(glm::vec3)>(),
-            "x", &glm::quat::x, "y", &glm::quat::y, "z", &glm::quat::z, "w", &glm::quat::w,
+            "x", sol::property([](glm::quat& q) -> float { return q.x; }, [](glm::quat& q, float val) { q.x = val; }),
+            "y", sol::property([](glm::quat& q) -> float { return q.y; }, [](glm::quat& q, float val) { q.y = val; }),
+            "z", sol::property([](glm::quat& q) -> float { return q.z; }, [](glm::quat& q, float val) { q.z = val; }),
+            "w", sol::property([](glm::quat& q) -> float { return q.w; }, [](glm::quat& q, float val) { q.w = val; }),
             
             // Operators
             sol::meta_function::multiplication, sol::overload(
@@ -154,8 +181,8 @@ namespace Surge::ScriptBinding
         math["Atan2"] = [](float y, float x) { return glm::atan(y, x); };
 
         // Conversions
-        math["Radians"] = [](float degrees) { return glm::radians(degrees); };
-        math["Degrees"] = [](float radians) { return glm::degrees(radians); };
+        math["ToRadians"] = [](float degrees) { return glm::radians(degrees); };
+        math["ToDegrees"] = [](float radians) { return glm::degrees(radians); };
 
         // General Math
         math["Abs"]   = [](float x) { return glm::abs(x); };

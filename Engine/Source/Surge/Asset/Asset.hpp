@@ -8,6 +8,11 @@
 
 #define SURGE_MEMORY_ASSET_PREFIX "Engine://"
 
+#define SURGE_ASSET_TYPE(AssetEnum)                                                \
+public:                                                                            \
+    static  ::Surge::AssetType GetStaticType() { return AssetEnum; }               \
+    virtual ::Surge::AssetType GetAssetType() const override { return AssetEnum; } 
+
 namespace Surge
 {
     using AssetID = UUID;
@@ -21,6 +26,7 @@ namespace Surge
         MESH,
         MATERIAL,
         SCENE,
+        SCRIPT,
     };
 
     inline constexpr auto sAssetTypeArray = std::array {
@@ -28,7 +34,8 @@ namespace Surge
         AssetType::SPRITE,
         AssetType::MESH,
         AssetType::MATERIAL,
-        AssetType::SCENE
+        AssetType::SCENE,
+        AssetType::SCRIPT
     };
 
     inline AssetType AssetTypeFromString(const char* str)
@@ -38,6 +45,7 @@ namespace Surge
         if(strcmp(str, "MESH") == 0) return AssetType::MESH;
         if(strcmp(str, "MATERIAL") == 0) return AssetType::MATERIAL;
         if(strcmp(str, "SCENE") == 0) return AssetType::SCENE;
+        if(strcmp(str, "SCRIPT") == 0) return AssetType::SCRIPT;
         return AssetType::NONE;
     }
 
@@ -47,6 +55,7 @@ namespace Surge
         if(strcmp(str, ".glb") == 0 || strcmp(str, ".gltf") == 0) return AssetType::MESH;
         if(strcmp(str, ".smat") == 0) return AssetType::MATERIAL;
         if(strcmp(str, ".srg") == 0) return AssetType::SCENE;
+        if(strcmp(str, ".lua") == 0) return AssetType::SCRIPT;
         return AssetType::NONE;
     }
 
@@ -56,6 +65,7 @@ namespace Surge
         {
             case AssetType::MATERIAL: return ".smat";
             case AssetType::SCENE: return ".srg";
+            case AssetType::SCRIPT: return ".lua";
             default:
                 SG_ASSERT_INTERNAL("GetExtensionFromAssetType: Invalid asset type");
                 return "";
@@ -83,10 +93,5 @@ namespace Surge
         AssetID mID;
         friend class AssetManager;
     };
-
-#define SURGE_ASSET_TYPE(AssetEnum)                                      \
-public:                                                                  \
-    static AssetType GetStaticType() { return AssetEnum; }               \
-    virtual AssetType GetAssetType() const override { return AssetEnum; }
 
 } // namespace Surge

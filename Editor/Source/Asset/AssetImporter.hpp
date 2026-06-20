@@ -15,6 +15,7 @@ namespace Surge
         void RegisterCooker(Scope<AssetCooker> cooker);
         void Shutdown();
 
+        void ScanAndRecookScripts();
         void ScanAndCookAll() const;
         CookResult RecookAsset(AssetID id);
 

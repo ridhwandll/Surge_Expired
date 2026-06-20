@@ -8,7 +8,7 @@
 
 namespace Surge
 {
-    bool Input::IsKeyPressed(KeyCode key)
+    bool Input::IsKeyPressed(Key key)
     {
         if (GetActiveWindow() == Surge::Core::GetWindow()->GetNativeWindowHandle())
         {
@@ -18,7 +18,7 @@ namespace Surge
         return false;
     }
 
-    bool Input::IsMouseButtonPressed(const MouseCode button)
+    bool Input::IsMouseButtonPressed(Mouse button)
     {
         if (GetActiveWindow() == Surge::Core::GetWindow()->GetNativeWindowHandle())
         {

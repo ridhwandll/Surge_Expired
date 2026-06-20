@@ -37,23 +37,28 @@ namespace Surge
         void DestroyEntity(Entity entity);
         Entity DuplicateEntity(Entity entity);
 
-        void SetSlectedEntity(Entity entity);
-        Entity GetSlectedEntity() const;
+        void SetSelectedEntity(Entity entity);
+        Entity GetSelectedEntity() const;
 
         void OnResize(float width, float height);
 
         void SetRunning(bool isRunning) { mIsRunning = isRunning; }
         bool IsRunning() const { return mIsRunning; }
 
+        Entity GetEntityByName(const String& name);
+
         entt::registry& GetRegistry() { return mRegistry; }
         const entt::registry& GetRegistry() const { return mRegistry; }
 
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
     private:
+        void UpdateScripts();
         void SyncPhysics();
+
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
-        void OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity);
+        void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
+        void OnScriptDestroyed(Entity e, ScriptComponent& comp);
 
     private:
         bool mIsRunning = false;

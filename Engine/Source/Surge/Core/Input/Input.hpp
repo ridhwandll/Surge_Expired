@@ -15,8 +15,8 @@ namespace Surge
     class Input
     {
     public:
-        static bool IsKeyPressed(KeyCode key);
-        static bool IsMouseButtonPressed(MouseCode button);
+        static bool IsKeyPressed(Key key);
+        static bool IsMouseButtonPressed(Mouse button);
 
         static Pair<float, float> GetMousePosition();
         static float GetMouseX();

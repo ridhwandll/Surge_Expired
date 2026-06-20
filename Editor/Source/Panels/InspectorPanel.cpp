@@ -13,6 +13,7 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
+#include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
 {
@@ -101,6 +102,9 @@ namespace Surge
 
                         ImGui::EndPopup();
                     }
+                    if(ImGui::MenuItem("Script") && !entity.HasComponent<ScriptComponent>())
+                        entity.AddComponent<ScriptComponent>();
+
                     ImGui::EndPopup();
                 }
             }
@@ -480,7 +484,46 @@ namespace Surge
                 }
             });
         }
+        if(entity.HasComponent<ScriptComponent>())
+        {
+            ScriptComponent& component = entity.GetComponent<ScriptComponent>();
+            DrawComponent<ScriptComponent>(entity, "Script Component", [&component]()
+            {
+                AssetManager* am = Core::GetAssetManager();
 
+                String buttonText;
+                bool hasScript = component.ScriptAsset.IsValid();
+                if(hasScript)
+                {
+                    const String& scriptPath = am->GetMetadata(component.ScriptAsset).RelativePath;
+                    buttonText = Filesystem::GetFilenameWithExt(scriptPath).c_str();
+                }
+                else
+                    buttonText = "Drop SCRIPT from Content browser";
+
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Script");
+                ImGui::TableNextColumn();
+                if(ImGuiAux::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)) && hasScript)
+                {
+                    Editor* editor = static_cast<Editor*>(Core::GetClient());
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset);
+                }
+
+                if(ImGui::BeginDragDropTarget())
+                {
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                    {
+                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
+                        if(meta.Type == AssetType::SCRIPT)
+                            component.ScriptAsset = droppedAssetID;
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+            });
+        }
     }
 
 } // namespace Surge

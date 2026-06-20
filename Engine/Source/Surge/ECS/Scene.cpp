@@ -8,6 +8,8 @@
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
+
 #include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
 
@@ -48,12 +50,19 @@ namespace Surge
 
     void Scene::OnRuntimeEnd()
     {
+        auto view = mRegistry.view<ScriptComponent>();
+
+        for(auto entityID : view)
+            OnScriptDestroyed(Entity(entityID, this), view.get<ScriptComponent>(entityID));
+
         mIsRunning = false;
     }
 
     void Scene::Update(EditorCamera& camera)
     {
         SyncPhysics();
+        UpdateScripts();
+
         Renderer* renderer = Core::GetRenderer();
 
         renderer->BeginFrame(camera);
@@ -193,7 +202,9 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::Update()");
         //Timer timer("Scene::Update()", true);
+
         SyncPhysics();
+        UpdateScripts();
 
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
@@ -320,14 +331,16 @@ namespace Surge
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<LightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<EnvironmentComponent>(other->mRegistry, mRegistry, enttMap);
-        CopyComponent<RigidbodyComponent>(other->mRegistry, mRegistry, enttMap);
 
+        CopyComponent<RigidbodyComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<BoxColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<SphereColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CapsuleColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<CylinderColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<ConvexColliderComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<MeshColliderComponent>(other->mRegistry, mRegistry, enttMap);
+
+        CopyComponent<ScriptComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -371,6 +384,9 @@ namespace Surge
 
     void Scene::DestroyEntity(Entity entity)
     {
+        if(entity.HasComponent<ScriptComponent>())
+            OnScriptDestroyed(entity, entity.GetComponent<ScriptComponent>());
+
         mRegistry.destroy(entity.Raw());
     }
 
@@ -398,16 +414,17 @@ namespace Surge
         CopyIfHas(std::type_identity<MeshColliderComponent>{});
         CopyIfHas(std::type_identity<LightComponent>{});
         CopyIfHas(std::type_identity<SpriteRendererComponent>{});
+        CopyIfHas(std::type_identity<ScriptComponent>{});
 
         return newEntity;
     }
 
-    void Scene::SetSlectedEntity(Entity entity)
+    void Scene::SetSelectedEntity(Entity entity)
     {
         sSelectedEntity = entity;
     }
 
-    Surge::Entity Scene::GetSlectedEntity() const
+    Entity Scene::GetSelectedEntity() const
     {
         return sSelectedEntity;
     }
@@ -417,6 +434,18 @@ namespace Surge
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
         if (camera.Data1)
             camera.Data1->SetViewportSize(width, height);
+    }
+
+    Entity Scene::GetEntityByName(const String& name)
+    {
+        auto view = mRegistry.view<NameComponent>();
+        for(auto entityID : view)
+        {
+            if(view.get<NameComponent>(entityID).Name == name)
+                return Entity { entityID, this };
+        }
+
+        return Entity { entt::null, nullptr };
     }
 
     Pair<RuntimeCamera*, glm::mat4> Scene::GetMainCameraEntity()
@@ -433,6 +462,30 @@ namespace Surge
             }
         }
         return result;
+    }
+
+    void Scene::UpdateScripts()
+    {
+        if(mIsRunning)
+        {
+            auto view = mRegistry.view<ScriptComponent>();
+            AssetManager* assetManager = Core::GetAssetManager();
+
+            for(auto entityID : view)
+            {
+                auto& scriptComp = view.get<ScriptComponent>(entityID);
+                Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
+                Entity entityObj = { entityID, this };
+                if(!scriptComp.IsInstantiated)
+                {
+                    script->CreateEnvironment();
+                    script->ExecuteOnCreate(entityObj);
+                    scriptComp.IsInstantiated = true;
+                }
+                else
+                    script->ExecuteOnUpdate(entityObj);
+            }
+        }
     }
 
     void Scene::SyncPhysics()
@@ -524,6 +577,15 @@ namespace Surge
     void Scene::OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity)
     {
         Core::GetPhysics()->DestroyRigidbody(Entity(entity, this));
+    }
+
+    void Scene::OnScriptDestroyed(Entity e, ScriptComponent& comp)
+    {
+        if(comp.IsInstantiated)
+        {
+            Core::GetAssetManager()->Load<Script>(comp.ScriptAsset)->ExecuteOnDestroy(e);
+            comp.IsInstantiated = false;
+        }
     }
 
 } // namespace Surge

@@ -4,14 +4,12 @@
 namespace Surge
 {
     using MouseCode = uint16_t;
-
-    namespace Mouse
+    enum class Mouse : MouseCode
     {
-        enum : MouseCode
-        {
-            ButtonLeft = 1,
-            ButtonRight = 2,
-            ButtonMiddle = 4
-        };
-    } // namespace Mouse
+        ButtonLeft = 1,
+        ButtonRight = 2,
+        ButtonMiddle = 4
+    };
+
 } // namespace Surge
+

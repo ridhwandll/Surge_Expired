@@ -17,6 +17,29 @@ namespace Surge
 
     void AssetImporter::Shutdown() {}
 
+    void AssetImporter::ScanAndRecookScripts()
+    {
+        Uint cooked = 0, skipped = 0;
+        for(const auto& [id, meta] : mAssetManager->GetRegistryMap())
+        {
+            if(meta.Type != AssetType::SCRIPT)
+                continue;
+
+            if(!NeedsCook(id, meta.Type))
+            {
+                skipped++;
+                continue;
+            }
+
+            const CookResult r = RecookAsset(id);
+            if(r.Success)
+                cooked++;
+            else
+                Log<Severity::Error>("[AssetImporter::ScanAndRecookScripts] Recook script failed: {}", meta.RelativePath);
+        }
+        Log<Severity::Info>("[AssetImporter::ScanAndRecookScripts]  Cooked: {} | Already up to date: {}", cooked, skipped);
+    }
+
     void AssetImporter::ScanAndCookAll() const
     {
         Uint cooked = 0, skipped = 0;
@@ -38,7 +61,7 @@ namespace Surge
                 Log<Severity::Error>("[AssetImporter] Cook failed: '{}'", meta.RelativePath);
         }
 
-        Log<Severity::Info>("[AssetImporter] Startup cook complete cooked: {} | already up to date: {}", cooked, skipped);
+        Log<Severity::Info>("[AssetImporter] Cooked: {} | Already up to date: {}", cooked, skipped);
     }
 
     CookResult AssetImporter::RecookAsset(AssetID id)

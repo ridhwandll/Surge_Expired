@@ -11,14 +11,14 @@
 
 namespace Surge
 {
-    void SceneHierarchyPanel::Init([[maybe_unused]] void* panelInitArgs)
+    void SceneHierarchyPanel::Init(void*)
     {
         mCode = GetStaticCode();
         mSceneContext = nullptr;
         mSelectedEntity = {};
     }
 
-    void SceneHierarchyPanel::OnEvent([[maybe_unused]] Event& e)
+    void SceneHierarchyPanel::OnEvent(Event& e)
     {
         if(!mSelectedEntity || !mSceneContext)
             return;
@@ -167,7 +167,8 @@ namespace Surge
         if(ImGui::IsItemClicked())
         {
             mSelectedEntity = e;
-            mSceneContext->SetSlectedEntity(mSelectedEntity);
+            mSceneContext->SetSelectedEntity(mSelectedEntity);
+            ImGui::SetWindowFocus("Inspector");
         }
 
         if (isSelectedEntity)
@@ -185,7 +186,7 @@ namespace Surge
                 if(mSelectedEntity == e)
                 {
                     mSelectedEntity = {};
-                    mSceneContext->SetSlectedEntity(mSelectedEntity);
+                    mSceneContext->SetSelectedEntity(mSelectedEntity);
                 }
 
                 // Only execute when the frame ends, else it will give crash on "Entity not found"

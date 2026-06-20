@@ -121,6 +121,8 @@ namespace Surge
                             mGizmoType = ImGuizmo::OPERATION::UNIVERSAL;
                         break;
                     }
+                    default:
+                        break;
                 }
             }
                                              });
@@ -280,7 +282,7 @@ namespace Surge
 
                 if(ImGuizmo::IsUsing())
                 {
-                    mGizmoInUse = true;
+                     mGizmoInUse = true;
 
                     glm::vec3 translation, rotation, scale;
                     Math::DecomposeTransform(transform, translation, rotation, scale);
@@ -289,6 +291,7 @@ namespace Surge
                     transformComponent.Position = translation;
                     transformComponent.Rotation += deltaRotation;
                     transformComponent.Scale = scale;
+                    transformComponent.MarkDirty();
                 }
                 else
                     mGizmoInUse = false;

@@ -1,5 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "LogBinding.hpp"
+#include "Surge/Core/String.hpp"
+#include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
 
 namespace Surge::ScriptBinding

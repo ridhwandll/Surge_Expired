@@ -146,11 +146,11 @@ namespace Surge
                 ImGui::SetCursorPosY((windowSize.y - ImGui::GetTextLineHeight() * 2.5f) * 0.5f);
 
                 ImGuiAux::ScopedBoldFont font;
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.4f, 0.4f, 1.0f)); // Faded text
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
                 ImGuiAux::TextCentered("No Material Selected");
                 ImGui::PopStyleColor();
 
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // Even more faded
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
                 ImGuiAux::TextCentered("Select one in the Inspector or drop a Material Asset here.");
                 ImGui::PopStyleColor();
             }
@@ -168,7 +168,7 @@ namespace Surge
             bool clearSelectedMaterial = false;
 
             // glTF Read-Only Warning Banner
-            if(mSelectedMaterial->GetID())
+            if(!mSelectedMaterial->GetID())
             {
                 ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.25f, 0.18f, 0.05f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.4f, 0.1f, 1.0f));
