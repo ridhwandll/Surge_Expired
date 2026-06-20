@@ -6,8 +6,9 @@
 
 namespace Surge
 {
-    class Script; // ScriptAsset.hpp contains the fat ass sol
+    class Script; // ScriptAsset.hpp contains the fat ass sol.hpp
 }
+
 namespace Surge::ScriptBinary
 {
     // ScriptBinary

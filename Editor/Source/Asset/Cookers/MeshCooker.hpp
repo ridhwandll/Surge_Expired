@@ -4,7 +4,7 @@
 
 namespace Surge
 {
-    class MeshCooker : public AssetCooker
+    class MeshCooker final : public AssetCooker
     {
     public:
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;

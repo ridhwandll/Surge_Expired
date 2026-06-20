@@ -6,7 +6,7 @@
 namespace Surge
 {
     class Entity;
-    class Script : public Asset
+    class Script final : public Asset
     {
     public:
         Script(Vector<Byte>&& bytecode);

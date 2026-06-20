@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ScriptCooker.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Core/Process.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Asset/Serializer/AssetStamp.hpp"
 #include "Surge/Core/Core.hpp"

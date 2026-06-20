@@ -102,9 +102,21 @@ namespace Surge::ScriptBinding
             sol::meta_function::subtraction,    [](const glm::vec4& a, const glm::vec4& b) { return a - b; },
             sol::meta_function::multiplication, sol::overload(
                 [](const glm::vec4& a, float s) { return a * s; },
-                [](float s, const glm::vec4& a) { return a * s; }
-            ),
-            sol::meta_function::to_string,      [](const glm::vec4& v) { return std::format("Vec4({:.3f}, {:.3f}, {:.3f}, {:.3f})", v.x, v.y, v.z, v.w); }
+                [](float s, const glm::vec4& a) { return a * s; }),
+            sol::meta_function::division, sol::overload(
+                [](const glm::vec4& a, const glm::vec4& b) { return a / b; },
+                [](const glm::vec4& a, float s) { return a / s; }),
+
+            sol::meta_function::unary_minus, [](const glm::vec4& v) { return -v; },
+            sol::meta_function::equal_to, [](const glm::vec4& a, const glm::vec4& b) { return a == b; },
+            sol::meta_function::to_string,      [](const glm::vec4& v) { return std::format("Vec4({:.3f}, {:.3f}, {:.3f}, {:.3f})", v.x, v.y, v.z, v.w); },
+
+            "Length", [](const glm::vec4& v) { return glm::length(v); },
+            "Normalize", [](const glm::vec4& v) { return glm::length(v) > 0 ? glm::normalize(v) : glm::vec4(0.0f); },
+            "Dot", [](const glm::vec4& a, const glm::vec4& b) { return glm::dot(a, b); },
+            "Distance", [](const glm::vec4& a, const glm::vec4& b) { return glm::distance(a, b); },
+            "Reflect", [](const glm::vec4& i, const glm::vec4& n) { return glm::reflect(i, n); },
+            "Refract", [](const glm::vec4& i, const glm::vec4& n, float eta) { return glm::refract(i, n, eta); }
         );
 
         // Quaternions (Rotations)
@@ -169,8 +181,8 @@ namespace Surge::ScriptBinding
         math["Atan2"] = [](float y, float x) { return glm::atan(y, x); };
 
         // Conversions
-        math["Radians"] = [](float degrees) { return glm::radians(degrees); };
-        math["Degrees"] = [](float radians) { return glm::degrees(radians); };
+        math["ToRadians"] = [](float degrees) { return glm::radians(degrees); };
+        math["ToDegrees"] = [](float radians) { return glm::degrees(radians); };
 
         // General Math
         math["Abs"]   = [](float x) { return glm::abs(x); };

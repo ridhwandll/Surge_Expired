@@ -27,7 +27,13 @@ namespace Surge::ScriptBinding
     {
         sol::state_view& lua = *static_cast<sol::state_view*>(luaState);
 
-        auto entityType = lua.new_usertype<Entity>("Entity", sol::no_constructor);
+        auto entityType = lua.new_usertype<Entity>("Entity", sol::no_constructor,
+                                                   sol::meta_function::to_string, [](Entity& e) {
+                                                       if(!static_cast<bool>(e)) return String("Entity (Invalid/Null)");
+                                                       if(e.HasComponent<NameComponent>()) return String("Entity (") + e.GetComponent<NameComponent>().Name + ")";
+                                                       return String("Entity (Unnamed)"); },
+                                                   sol::meta_function::equal_to, [](Entity& a, Entity& b) { return a == b; });
+
         entityType["IsValid"] = [](const Entity& e) { return static_cast<bool>(e); };
         entityType["Destroy"] = [](Entity& e) {
             if(e)
@@ -58,6 +64,12 @@ namespace Surge::ScriptBinding
             [](COMP& c) -> decltype(COMP::PROP) { return c.PROP; }, \
             [](COMP& c, const decltype(COMP::PROP)& val) { c.PROP = val; } \
         )
+#define STRICT_READ(COMP) \
+        sol::meta_function::index, [](COMP&, sol::stack_object key, sol::this_state s) -> sol::object { \
+            String keyStr = key.is<String>() ? key.as<String>() : "<non-string-key>"; \
+            Log<Severity::Warn>("Script accessed invalid field {} on {}. Returning nil.", keyStr, #COMP); \
+            return sol::make_object(s, sol::lua_nil); \
+        }
 
     void BindComponents(void* luaState)
     {
@@ -77,7 +89,8 @@ namespace Surge::ScriptBinding
 
         // COMPONENTS
         lua.new_usertype<NameComponent>("NameComponent", sol::no_constructor,
-                                        "Name", BIND_PROP(NameComponent, Name)
+                                        "Name", BIND_PROP(NameComponent, Name),
+                                        STRICT_READ(NameComponent)
         );
 
         lua.new_usertype<TransformComponent>("TransformComponent", sol::no_constructor,
@@ -98,26 +111,30 @@ namespace Surge::ScriptBinding
                                              "Rotate", [](TransformComponent& t, const glm::vec3& offset) { t.Rotation += offset; t.MarkDirty(); },
                                              "ScaleBy", [](TransformComponent& t, const glm::vec3& multi) { t.Scale *= multi; t.MarkDirty(); },
                                              "MarkDirty", &TransformComponent::MarkDirty,
-                                             "IsDirty", &TransformComponent::IsDirty
+                                             "IsDirty", &TransformComponent::IsDirty,
+                                             STRICT_READ(TransformComponent)
         );
 
         // RENDERER
-        lua.new_usertype<SpriteRendererComponent>("SpriteRendererComponent", sol::no_constructor, "Color", BIND_PROP(SpriteRendererComponent, Color));
+        lua.new_usertype<SpriteRendererComponent>("SpriteRendererComponent", sol::no_constructor, "Color", BIND_PROP(SpriteRendererComponent, Color), STRICT_READ(SpriteRendererComponent));
 
         lua.new_usertype<CameraComponent>("CameraComponent", sol::no_constructor,
                                           "Primary", BIND_PROP(CameraComponent, Primary),
-                                          "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio));
+                                          "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio),
+                                          STRICT_READ(CameraComponent));
 
         lua.new_usertype<MeshComponent>("MeshComponent", sol::no_constructor,
                                         "MeshID", BIND_PROP(MeshComponent, MeshID),
-                                        "DropShadow", BIND_PROP(MeshComponent, DropShadow));
+                                        "DropShadow", BIND_PROP(MeshComponent, DropShadow),
+                                        STRICT_READ(MeshComponent));
 
         lua.new_usertype<LightComponent>("LightComponent", sol::no_constructor,
                                          "Color", BIND_PROP(LightComponent, Color),
                                          "Intensity", BIND_PROP(LightComponent, Intensity),
                                          "Radius", BIND_PROP(LightComponent, Radius),
                                          "Falloff", BIND_PROP(LightComponent, Falloff),
-                                         "Type", BIND_PROP(LightComponent, Type));
+                                         "Type", BIND_PROP(LightComponent, Type),
+                                         STRICT_READ(LightComponent));
 
         lua.new_usertype<EnvironmentComponent>("EnvironmentComponent", sol::no_constructor,
                                                "Elevation", BIND_PROP(EnvironmentComponent, Elevation),
@@ -128,7 +145,8 @@ namespace Surge::ScriptBinding
                                                "EnableSunDisk", BIND_PROP(EnvironmentComponent, EnableSunDisk),
                                                "SkyAmbient", BIND_PROP(EnvironmentComponent, SkyAmbient),
                                                "HorizonAmbient", BIND_PROP(EnvironmentComponent, HorizonAmbient),
-                                               "GroundAmbient", BIND_PROP(EnvironmentComponent, GroundAmbient));
+                                               "GroundAmbient", BIND_PROP(EnvironmentComponent, GroundAmbient),
+                                               STRICT_READ(EnvironmentComponent));
 
         // PHYSICS
         lua.new_usertype<RigidbodyComponent>("RigidbodyComponent", sol::no_constructor,
@@ -181,25 +199,30 @@ namespace Surge::ScriptBinding
                                                  Physics* physics = Core::GetPhysics();
                                                  if(!physics->IsInValid(rb.RuntimeBodyID)) return physics->GetAngularVelocity(rb.RuntimeBodyID);
                                                  return glm::vec3(0.0f);
-                                             });
+                                             },
+                                             STRICT_READ(RigidbodyComponent));
 
         lua.new_usertype<BoxColliderComponent>("BoxColliderComponent", sol::no_constructor,
                                                "ShowCollider", BIND_PROP(BoxColliderComponent, ShowCollider),
-                                               "HalfExtents", BIND_PROP(BoxColliderComponent, HalfExtents));
+                                               "HalfExtents", BIND_PROP(BoxColliderComponent, HalfExtents),
+                                               STRICT_READ(BoxColliderComponent));
 
         lua.new_usertype<SphereColliderComponent>("SphereColliderComponent", sol::no_constructor,
                                                   "ShowCollider", BIND_PROP(SphereColliderComponent, ShowCollider),
-                                                  "Radius", BIND_PROP(SphereColliderComponent, Radius));
+                                                  "Radius", BIND_PROP(SphereColliderComponent, Radius),
+                                                  STRICT_READ(SphereColliderComponent));
 
         lua.new_usertype<CapsuleColliderComponent>("CapsuleColliderComponent", sol::no_constructor,
                                                    "ShowCollider", BIND_PROP(CapsuleColliderComponent, ShowCollider),
                                                    "Height", BIND_PROP(CapsuleColliderComponent, Height),
-                                                   "Radius", BIND_PROP(CapsuleColliderComponent, Radius));
+                                                   "Radius", BIND_PROP(CapsuleColliderComponent, Radius),
+                                                   STRICT_READ(CapsuleColliderComponent));
 
         lua.new_usertype<CylinderColliderComponent>("CylinderColliderComponent", sol::no_constructor,
                                                     "ShowCollider", BIND_PROP(CylinderColliderComponent, ShowCollider),
                                                     "Height", BIND_PROP(CylinderColliderComponent, Height),
-                                                    "Radius", BIND_PROP(CylinderColliderComponent, Radius));
+                                                    "Radius", BIND_PROP(CylinderColliderComponent, Radius),
+                                                    STRICT_READ(CylinderColliderComponent));
 
         lua.new_usertype<ConvexColliderComponent>("ConvexColliderComponent", sol::no_constructor,
                                                   "ShowCollider", BIND_PROP(ConvexColliderComponent, ShowCollider),
@@ -209,13 +232,17 @@ namespace Surge::ScriptBinding
                                                   ),
                                                   "LocalRotation", sol::property(
                                                       [](ConvexColliderComponent& c) -> glm::vec3 { return c.LocalRotation; },
-                                                      [](ConvexColliderComponent& c, const glm::vec3& v) { c.LocalRotation = v; c.IsDirty = true; }));
+                                                      [](ConvexColliderComponent& c, const glm::vec3& v) { c.LocalRotation = v; c.IsDirty = true; }),
+
+                                                  STRICT_READ(ConvexColliderComponent));
 
         lua.new_usertype<MeshColliderComponent>("MeshColliderComponent", sol::no_constructor,
                                                 "LocalOffset", BIND_PROP(MeshColliderComponent, LocalOffset),
-                                                "LocalRotation", BIND_PROP(MeshColliderComponent, LocalRotation));
+                                                "LocalRotation", BIND_PROP(MeshColliderComponent, LocalRotation),
+                                                STRICT_READ(MeshColliderComponent));
 
         lua.new_usertype<ScriptComponent>("ScriptComponent", sol::no_constructor,
-                                          "ScriptAsset", BIND_PROP(ScriptComponent, ScriptAsset));
+                                          "ScriptAsset", BIND_PROP(ScriptComponent, ScriptAsset),
+                                          STRICT_READ(ScriptComponent));
     }
 }

@@ -6,16 +6,17 @@
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Utility/Filesystem.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/ScriptEngine/ScriptEngine.hpp"
 #include "SurgeReflect/Enum.hpp"
 
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Asset/SourceWriters/MaterialSourceWriter.hpp"
-#include <stb_image.h>
-#include <Surge/ScriptEngine/ScriptAsset.hpp>
 #include "Asset/SourceWriters/ScriptSourceWriter.hpp"
-#include "Surge/ScriptEngine/ScriptEngine.hpp"
+
+#include <stb_image.h>
 
 namespace Surge
 {
@@ -809,8 +810,7 @@ namespace Surge
 
     void ContentBrowserPanel::StartRename(const Path& path)
     {
-        // We don't allow renaming of directories in this implementation, 
-        // but this can be added in the future if needed. It just requires updating all child paths in the registry when a directory is renamed
+        // We don't allow renaming of directories
         if (std::filesystem::is_directory(path))
             return;
 

@@ -8,9 +8,10 @@
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
+
 #include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
-#include <Surge/ScriptEngine/ScriptAsset.hpp>
 
 namespace Surge
 {

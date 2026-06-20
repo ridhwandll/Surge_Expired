@@ -51,7 +51,7 @@ namespace Surge
 
             Save(meta.ID);
 
-            Log<Severity::Info>("[AssetManager] Created & Saved new asset: '{}'", relativePath);
+            Log<Severity::Info>("[AssetManager] Created & Saved new asset: {}", relativePath);
             return newAsset;
         }
 

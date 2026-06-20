@@ -4,7 +4,7 @@
 
 namespace Surge
 {
-    class Texture2DCooker : public AssetCooker
+    class Texture2DCooker final : public AssetCooker
     {
     public:
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;

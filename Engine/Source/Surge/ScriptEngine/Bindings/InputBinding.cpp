@@ -1,9 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "InputBinding.hpp"
-#include "Surge/Core/String.hpp"
-#include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Input/Input.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
+#include <glm/vec2.hpp>
 
 namespace Surge::ScriptBinding
 {

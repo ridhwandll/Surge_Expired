@@ -6,11 +6,10 @@
 
 namespace Surge
 {
+
     Script::Script(Vector<Byte>&& bytecode)
         : mBytecode(std::move(bytecode))
-    {
-
-    }
+    {}
 
     void Script::CreateEnvironment()
     {

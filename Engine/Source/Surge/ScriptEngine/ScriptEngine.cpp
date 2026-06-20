@@ -2,15 +2,16 @@
 #include "ScriptEngine.hpp"
 #include "Surge/Core/Defines.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
+
 #include "Bindings/MathBinding.hpp"
 #include "Bindings/InputBinding.hpp"
 #include "Bindings/LogBinding.hpp"
 #include "Bindings/ECSBindings.hpp"
 
+
 namespace Surge
 {
     static sol::state_view* sLua = nullptr;
-
     static void* LuaAllocator(void* /*ud*/, void* ptr, size_t /*osize*/, size_t nsize)
     {
         if(nsize == 0)
