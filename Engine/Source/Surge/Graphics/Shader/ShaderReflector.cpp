@@ -3,10 +3,6 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
 #include <SurgeReflect/Enum.hpp>
 #include <SPIRV-Cross/spirv_glsl.hpp>
-#include "SPIRV-Cross/spirv_hlsl.hpp"
-#include "SPIRV-Cross/spirv_msl.hpp"
-
-
 
 namespace Surge
 {

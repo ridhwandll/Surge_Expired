@@ -12,6 +12,7 @@
 
 #include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
+#include <regex>
 
 namespace Surge
 {
@@ -69,7 +70,10 @@ namespace Surge
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
-                renderer->SubmitQuad(transform.GetTransform(), sprite.Color);
+            {
+                ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? Core::GetAssetManager()->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
+                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, textureHandle);
+            }
         }
         {
             auto view = mRegistry.view<LightComponent, TransformComponent>();
@@ -215,7 +219,10 @@ namespace Surge
             {
                 auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
                 for (const auto& [entity, sprite, transform] : view.each())
-                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color);
+                {
+                    ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? Core::GetAssetManager()->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
+                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color, textureHandle);
+                }
             }
             {
                 auto view = mRegistry.view<LightComponent, TransformComponent>();
@@ -393,7 +400,24 @@ namespace Surge
     Entity Scene::DuplicateEntity(Entity entity)
     {
         Entity newEntity;
-        CreateEntityEmpty(newEntity, entity.GetComponent<NameComponent>().Name + " (Clone)");
+
+        String originalName = entity.GetComponent<NameComponent>().Name;
+        String newName = originalName;
+
+        std::regex re("(.*) \\(([0-9]+)\\)$"); // Regex to check if the name already ends with " (Number)"
+        std::smatch match;
+        if(std::regex_match(originalName, match, re))
+        {
+            // match[1] -> Base name ("Cube")
+            // match[2] -> Number ("1")
+            String baseName = match[1].str();
+            int currentNum = std::stoi(match[2].str());
+            newName = std::format("{} ({})", baseName, currentNum + 1);
+        }
+        else
+            newName = std::format("{} (1)", originalName);
+
+        CreateEntityEmpty(newEntity, newName);
 
         auto CopyIfHas = [&](auto componentType) {
             using T = typename decltype(componentType)::type;

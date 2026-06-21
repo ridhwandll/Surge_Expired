@@ -62,15 +62,11 @@ namespace Surge
             desc.DebugName = "Renderer2D";
             desc.TargetFramebuffer = blackBoard.MainPassFramebuffer;
             desc.TargetSwapchain = false;
-            desc.Blend.Enable = false;
+            desc.Blend.Enable = true;
             desc.Depth.TestEnable = true;
             desc.Depth.WriteEnable = true;
             desc.Depth.Op = CompareOp::LESS_OR_EQUAL;
             m2DPipeline = mRHI->CreatePipeline(desc);
-
-            // Textures TODO
-            //for (Uint i = 0; i < MAX_BATCHES_PER_FRAME; i++)
-            //    mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(m2DPipeline, 1, DescriptorUpdateFrequency::DYNAMIC, "Renderer2D_TexDescriptorSet");
 
             // Frame UBO
             mFrameDescriptorSet = mRHI->CreateDescriptorSet(m2DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "2D_FrameData [Set0]");
@@ -85,7 +81,26 @@ namespace Surge
                 write.BufferRange = sizeof(FrameUBO);
                 mRHI->UpdateDescriptorSet(mFrameDescriptorSet, &write, 1, i);
             }
-            mImageWrites.push_back(blackBoard.MainPassColorImage);
+
+            // (Rid) Textures descriptor sets for each batch, with MAX_TEX_SLOTS_PER_BATCH slots each. We update the texture slots dynamically per batch as needed
+            mTexDescriptorSets.resize(MAX_QUAD_BATCHES_PER_FRAME);
+            for(Uint i = 0; i < MAX_QUAD_BATCHES_PER_FRAME; i++)
+            {
+                mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(m2DPipeline, DescriptorSetSlot::ONE, DescriptorUpdateFrequency::DYNAMIC, std::format("Renderer2D_TexDescriptorSet_{}", i).c_str());
+                for(Uint frame = 0; frame < RHISettings::FRAMES_IN_FLIGHT; frame++)
+                {
+                    for(Uint slot = 0; slot < MAX_TEX_SLOTS_PER_BATCH; slot++)
+                    {
+                        DescriptorWrite write = {};
+                        write.Binding = 0;
+                        write.Type = DescriptorType::TEXTURE;
+                        write.ArrayIndex = slot;
+                        write.Texture = blackBoard.WhiteImage;
+                        write.Sampler = blackBoard.DefaultSampler;
+                        mRHI->UpdateDescriptorSet(mTexDescriptorSets[i], &write, 1, frame);
+                    }
+                }
+            }
         }
         {
             ////////////////////////////////////// Lines //////////////////////////////////////
@@ -114,6 +129,8 @@ namespace Surge
             }
             mCurrentLineBatch.VertexData.resize(MAX_LINES_PER_BATCH * 2);
         }
+
+        mImageWrites.push_back(blackBoard.MainPassColorImage);
     }
 
     void Renderer2DPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackboard)
@@ -122,7 +139,7 @@ namespace Surge
         mCurrentFrameCtx = ctx;
 
         // QuadReset
-        mQuadDrawCommandCount = 0;
+        mQuadBatchCount = 0;
         mTotalQuadlVertexCount = 0;
         mTotalQuadCount = 0;
         mCurrentFrameVertexOffset = 0;
@@ -130,7 +147,14 @@ namespace Surge
         for(const QuadSubmitCmd& quad : blackboard.QuadList)
         {
             if(mCurrentQuadBatch.QuadCount >= MAX_QUADS_PER_BATCH)
-                RegisterQuadDrawcall();
+                FlushQuadBatch();
+
+            // Protect against array overflow if we hit the batch limit!
+            if(mQuadBatchCount >= MAX_QUAD_BATCHES_PER_FRAME)
+            {
+                Log<Severity::Warn>("Max Quad Batches per frame reached!");
+                break;
+            }
 
             if(mTotalQuadCount == MAX_QUADS_TOTAL)
             {
@@ -139,7 +163,17 @@ namespace Surge
                 break;
             }
             mMaxQuadCountReached = false;
-            Uint texIndex = 0;
+
+            int slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
+            if(slot == QuadBatchData::MAX_TEX_IN_BATCH_REACHED)
+            {
+                FlushQuadBatch();
+                if(mQuadBatchCount >= MAX_QUAD_BATCHES_PER_FRAME)
+                    break;
+
+                slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture); // (Rid) Returns valid slot, as we just flushed and reset the batch
+            }
+            Uint texIndex = (Uint)slot;
 
             static constexpr glm::vec4 sLocalPositions[4] = {
                 { 0.5f, -0.5f, 0.0f, 1.0f},
@@ -148,9 +182,11 @@ namespace Surge
                 {-0.5f, -0.5f, 0.0f, 1.0f},
             };
             static constexpr glm::vec2 sUVs[4] = {
-                {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}
+                { 1.0f, 1.0f },  // Bottom-right
+                { 1.0f, 0.0f },  // Top-right
+                { 0.0f, 0.0f },  // Top-left
+                { 0.0f, 1.0f },  // Bottom-left
             };
-
             const Uint packedColor = glm::packUnorm4x8(quad.Color);
             for(Uint i = 0; i < 4; i++)
             {
@@ -160,24 +196,24 @@ namespace Surge
                 v.UV = sUVs[i];
                 v.TextureIndex = texIndex;
             }
-
             mCurrentQuadBatch.QuadCount++;
             mTotalQuadCount++;
         }
 
         if(mCurrentQuadBatch.QuadCount > 0)
-            RegisterQuadDrawcall();
+            FlushQuadBatch();
 
-        if(!mQuadDrawCommands.empty())
+        if(mQuadBatchCount > 0)
         {
             mRHI->CmdBindPipeline(mCurrentFrameCtx, m2DPipeline);
             mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
             mRHI->CmdBindVertexBuffer(mCurrentFrameCtx, mQuadVB[mCurrentFrameCtx.FrameIndex], 0);
             mRHI->CmdBindIndexBuffer(mCurrentFrameCtx, mQuadIB, 0);
 
-            for(Uint i = 0; i < mQuadDrawCommandCount; i++)
+            for(Uint i = 0; i < mQuadBatchCount; i++)
             {
                 const QuadDrawCmd& cmd = mQuadDrawCommands[i];
+                mRHI->CmdBindDescriptorSet(mCurrentFrameCtx, m2DPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
                 mRHI->CmdDrawIndexed(mCurrentFrameCtx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
             }
         }
@@ -187,7 +223,7 @@ namespace Surge
         //
 
         // Reset
-        mLineDrawCommandCount = 0;
+        mLineBatchCount = 0;
         mTotalLineVertexCount = 0;
         mTotalLineCount = 0;
         mCurrentLineVertexOffset = 0;
@@ -195,7 +231,7 @@ namespace Surge
         for(const LineSubmitCmd& line : blackboard.LineList)
         {
             if(mCurrentLineBatch.LineCount >= MAX_LINES_PER_BATCH)
-                RegisterLineDrawcall();
+                FlushLineBatch();
 
             if(mTotalLineCount == MAX_LINES_TOTAL)
             {
@@ -211,15 +247,15 @@ namespace Surge
         }
 
         if(mCurrentLineBatch.LineCount > 0)
-            RegisterLineDrawcall();
+            FlushLineBatch();
 
-        if(!mLineDrawCommands.empty())
+        if(mLineBatchCount > 0)
         {
             mRHI->CmdBindPipeline(ctx, m2DLinePipeline);
             mRHI->CmdBindDescriptorSet(ctx, m2DLinePipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
             mRHI->CmdBindVertexBuffer(ctx, mLineVB[ctx.FrameIndex], 0);
 
-            for(Uint i = 0; i < mLineDrawCommandCount; i++)
+            for(Uint i = 0; i < mLineBatchCount; i++)
             {
                 const LineDrawCmd& cmd = mLineDrawCommands[i];
                 mRHI->CmdDraw(ctx, cmd.VertexCount, 1, cmd.VertexOffset, 0);
@@ -227,32 +263,53 @@ namespace Surge
         }
     }
 
-    void Renderer2DPass::RegisterQuadDrawcall()
+    void Renderer2DPass::FlushQuadBatch()
     {
         if(mCurrentQuadBatch.QuadCount == 0)
             return;
 
-        const FrameContext& ctx = mCurrentFrameCtx;
+        if(mQuadBatchCount >= MAX_QUAD_BATCHES_PER_FRAME)
+        {
+            Log<Severity::Error>("Renderer2DPass: Exceeded max Quad batches!");
+            return;
+        }
 
-        // Upload current batch vertex data to GPU (only the portion needed for this batch, not the entire VB)
-        Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
-        Uint uploadSizeInBytes = mCurrentQuadBatch.VertexCount * sizeof(QuadVertex);
+        const FrameContext& ctx = mCurrentFrameCtx;
+        const Uint batchIndex = mQuadBatchCount;
+
+        for(Uint slot = 0; slot < mCurrentQuadBatch.TextureCount; slot++)
+        {
+            if (mCurrentQuadBatch.Textures[slot].IsNull())
+                continue;
+
+            DescriptorWrite write = {};
+            write.Binding = 0;
+            write.Type = DescriptorType::TEXTURE;
+            write.ArrayIndex = slot;
+            write.Texture = mCurrentQuadBatch.Textures[slot];
+            write.Sampler = Core::GetRenderer()->GetDefaultSampler();
+            mRHI->UpdateDescriptorSet(mTexDescriptorSets[batchIndex], &write, 1, ctx.FrameIndex);
+        }
+
+        const Uint uploadOffsetInBytes = mCurrentFrameVertexOffset * sizeof(QuadVertex);
+        const Uint uploadSizeInBytes = mCurrentQuadBatch.VertexCount * sizeof(QuadVertex);
         mRHI->UploadBuffer(mQuadVB[ctx.FrameIndex], mCurrentQuadBatch.VertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
 
-        mQuadDrawCommands[mQuadDrawCommandCount++] = { mCurrentFrameVertexOffset, mCurrentQuadBatch.QuadCount };
+        mQuadDrawCommands[mQuadBatchCount++] = { mCurrentFrameVertexOffset, mCurrentQuadBatch.QuadCount };
 
         mTotalQuadlVertexCount += mCurrentQuadBatch.VertexCount;
         mCurrentFrameVertexOffset += mCurrentQuadBatch.VertexCount;
         mCurrentQuadBatch.Reset();
+
     }
 
-    void Renderer2DPass::RegisterLineDrawcall()
+    void Renderer2DPass::FlushLineBatch()
     {
-        Uint uploadOffsetInBytes = mCurrentLineVertexOffset * sizeof(LineVertex);
-        Uint uploadSizeInBytes = mCurrentLineBatch.VertexCount * sizeof(LineVertex);
+        const Uint uploadOffsetInBytes = mCurrentLineVertexOffset * sizeof(LineVertex);
+        const Uint uploadSizeInBytes = mCurrentLineBatch.VertexCount * sizeof(LineVertex);
         mRHI->UploadBuffer(mLineVB[mCurrentFrameCtx.FrameIndex], mCurrentLineBatch.VertexData.data(), uploadSizeInBytes, uploadOffsetInBytes);
 
-        mLineDrawCommands[mLineDrawCommandCount++] = { mCurrentLineVertexOffset, mCurrentLineBatch.VertexCount };
+        mLineDrawCommands[mLineBatchCount++] = { mCurrentLineVertexOffset, mCurrentLineBatch.VertexCount };
 
         mTotalLineVertexCount += mCurrentLineBatch.VertexCount;
         mCurrentLineVertexOffset += mCurrentLineBatch.VertexCount;
@@ -271,6 +328,9 @@ namespace Surge
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
         mRHI->DestroyPipeline(m2DLinePipeline);
         mRHI->DestroyPipeline(m2DPipeline);
+
+        for(Uint i = 0; i < MAX_QUAD_BATCHES_PER_FRAME; i++)
+            mRHI->DestroyDescriptorSet(mTexDescriptorSets[i]);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mRHI->DestroyBuffer(mQuadVB[i]);
@@ -295,7 +355,7 @@ namespace Surge
         ImGui::PopFont();
 
         {
-            ImGui::Text("Batches: %u / %u", (mTotalQuadCount + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH, (MAX_QUADS_TOTAL + MAX_QUADS_PER_BATCH - 1) / MAX_QUADS_PER_BATCH);
+            ImGui::Text("Batches: %u / %u", mQuadBatchCount, MAX_QUAD_BATCHES_PER_FRAME);
 
             if(mMaxQuadCountReached)
             {
@@ -316,6 +376,7 @@ namespace Surge
 
             ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
             ImGui::ProgressBar(usageRatio, ImVec2(-1.0f, 0.0f));
+            ImGui::Text("%u Quads (Total)", mTotalQuadlVertexCount / 4);
             ImGui::Text("%u / %u Vertices", mTotalQuadlVertexCount, MAX_QUAD_VERTICES);
             ImGui::PopStyleColor();
         }

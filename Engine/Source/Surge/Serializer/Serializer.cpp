@@ -53,6 +53,7 @@ namespace glm
         j.at("Z").get_to(p.z);
         j.at("W").get_to(p.w);
     }
+
 } // namespace glm
 
 namespace Surge
@@ -80,25 +81,19 @@ namespace Surge
 
                 const SurgeReflect::Type& type = var.GetType();
                 if (type.EqualTo<bool>())
-                {
                     out[name] = *reinterpret_cast<const bool*>(source);
-                }
                 else if (type.EqualTo<float>())
-                {
                     out[name] = *reinterpret_cast<const float*>(source);
-                }
                 else if (type.EqualTo<UUID>() || type.EqualTo<AssetID>())
-                {
                     out[name] = *reinterpret_cast<const uint64_t*>(source);
-                }
                 else if (type.EqualTo<String>())
-                {
                     out[name] = *reinterpret_cast<const String*>(source);
-                }
+                else if (type.EqualTo<glm::vec2>())
+                    out[name] = *reinterpret_cast<const glm::vec2*>(source);
                 else if (type.EqualTo<glm::vec3>())
-                {
                     out[name] = *reinterpret_cast<const glm::vec3*>(source);
-                }
+                else if (type.EqualTo<glm::vec4>())
+                    out[name] = *reinterpret_cast<const glm::vec4*>(source);
                 else if (type.EqualTo<RuntimeCamera>())
                 {
                     nlohmann::json& camOut = out[name];
@@ -112,13 +107,9 @@ namespace Surge
                     camOut["Projection"] = cam->GetProjectionType();
                 }
                 else if(type.EqualTo<LightType>())
-                {
                     out[name] = *reinterpret_cast<const LightType*>(source);
-                }
                 else if(type.EqualTo<RigidbodyType>())
-                {
                     out[name] = *reinterpret_cast<const RigidbodyType*>(source);
-                }
                 else
                     Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
             }
@@ -206,8 +197,12 @@ namespace Surge
                 *reinterpret_cast<uint64_t*>(dest) = inJson.value(name, 0ULL);
             else if(type.EqualTo<String>())
                 *reinterpret_cast<String*>(dest) = inJson.value(name, String());
+            else if(type.EqualTo<glm::vec2>())
+                *reinterpret_cast<glm::vec2*>(dest) = inJson.value(name, glm::vec2(0.0f));
             else if(type.EqualTo<glm::vec3>())
                 *reinterpret_cast<glm::vec3*>(dest) = inJson.value(name, glm::vec3(0.0f));
+            else if(type.EqualTo<glm::vec4>())
+                *reinterpret_cast<glm::vec4*>(dest) = inJson.value(name, glm::vec4(0.0f));
             else if(type.EqualTo<RuntimeCamera>())
             {
                 RuntimeCamera* cam = reinterpret_cast<RuntimeCamera*>(dest);

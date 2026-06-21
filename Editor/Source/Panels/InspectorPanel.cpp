@@ -207,7 +207,35 @@ namespace Surge
             SpriteRendererComponent& component = entity.GetComponent<SpriteRendererComponent>();
             DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
                 ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
-                });
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Texture");
+                ImGui::TableNextColumn();
+
+                const char* buttonText = component.Texture.IsValid() ? Core::GetAssetManager()->GetMetadata(component.Texture).RelativePath.c_str() : "Drop TEXTURE2D";
+                ImGui::PushID(buttonText);
+                if(ImGuiAux::Button(buttonText, ImVec2(ImGui::GetContentRegionAvail().x / 1.5, 0)))
+                {
+                    Editor* editor = static_cast<Editor*>(Core::GetClient());
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.Texture);
+                }
+                if(ImGui::BeginDragDropTarget())
+                {
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                    {
+                        AssetManager* am = Core::GetAssetManager();
+                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
+                        if(meta.Type == AssetType::TEXTURE2D)
+                            component.Texture = droppedAssetID;
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+                ImGui::SameLine();
+                if(ImGuiAux::Button("REMOVE", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+                    component.Texture = AssetID::INVALID;
+                ImGui::PopID();
+            });
         }
 
         if (entity.HasComponent<MeshComponent>())
@@ -509,7 +537,6 @@ namespace Surge
                     Editor* editor = static_cast<Editor*>(Core::GetClient());
                     editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset);
                 }
-
                 if(ImGui::BeginDragDropTarget())
                 {
                     if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))

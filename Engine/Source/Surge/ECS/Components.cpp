@@ -22,6 +22,7 @@ SURGE_REFLECT_CLASS_REGISTER_END()
 
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::SpriteRendererComponent)
     .AddVariable<&Surge::SpriteRendererComponent::Color>("Color")
+    .AddVariable<&Surge::SpriteRendererComponent::Texture>("Texture")
 SURGE_REFLECT_CLASS_REGISTER_END()
 
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::CameraComponent)

@@ -77,6 +77,7 @@ namespace Surge
             : Color(glm::vec4(color, alpha)){}
 
         glm::vec4 Color;
+        AssetID Texture = AssetID::INVALID;
 
         SURGE_REFLECTION_ENABLE;
     };

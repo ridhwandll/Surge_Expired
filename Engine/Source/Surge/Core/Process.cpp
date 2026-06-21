@@ -23,7 +23,7 @@ using ProcessID = pid_t;
 
 namespace Surge
 {
-    static ProcessID StartProcess(const String& commandLine, FILE* outputStream)
+    static ProcessID StartProcess([[maybe_unused]] const String& commandLine, [[maybe_unused]] FILE* outputStream)
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
         STARTUPINFOW startupInfo = {};
@@ -59,7 +59,7 @@ namespace Surge
 #endif
     }
 
-    static int WaitProcess(ProcessID pid)
+    static int WaitProcess([[maybe_unused]] ProcessID pid)
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
         BOOL result;
@@ -91,7 +91,7 @@ namespace Surge
         return WaitProcess(pid);
     }
 
-    String Process::OutputOf(const String& commandLine, int& result)
+    String Process::OutputOf([[maybe_unused]] const String& commandLine, [[maybe_unused]] int& result)
     {
 #if defined(SURGE_PLATFORM_WINDOWS)
         HANDLE read;

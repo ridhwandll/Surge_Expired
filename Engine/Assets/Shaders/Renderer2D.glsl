@@ -30,8 +30,7 @@ void main()
 //SURGE:[Shader: Fragment]
 #version 450
 
-// TODO Textures
-//layout(set = 1, binding = 0) uniform sampler2D uTextures[16];
+layout(set = 1, binding = 0) uniform sampler2D uTextures[16];
 
 layout(location = 0) flat in uint inColor;
 layout(location = 1) in vec2 inUV;
@@ -42,11 +41,7 @@ layout(location = 0) out vec4 outColor;
 void main()
 {
     vec4 color = unpackUnorm4x8(inColor);
-    //outColor = texture(uTextures[inTextureIndex], inUV) * color;
+    color.rgb = pow(color.rgb, vec3(2.2)); // Convert incoming sRGB vertex data to Linear Space, then gamma corrected later in PostProcess pass (Else there will be double gamma correction)
 
-    // Convert incoming sRGB vertex data to Linear Space, then gamma corrected later in PostProcess pass
-    // Else there will be double gamma correction
-    color.rgb = pow(color.rgb, vec3(2.2)); 
-
-    outColor = color;
+    outColor = texture(uTextures[inTextureIndex], inUV) * color;
 }
