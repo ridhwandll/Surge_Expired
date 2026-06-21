@@ -63,6 +63,7 @@ namespace Surge
     {
         SyncPhysics();
         UpdateScripts();
+        UpdateTransforms();
 
         Renderer* renderer = Core::GetRenderer();
 
@@ -207,8 +208,10 @@ namespace Surge
         SURGE_PROFILE_FUNC("Scene::Update()");
         //Timer timer("Scene::Update()", true);
 
+        // Order matters here
         SyncPhysics();
         UpdateScripts();
+        UpdateTransforms();
 
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
 
@@ -308,12 +311,38 @@ namespace Surge
     static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const std::unordered_map<UUID, entt::entity>& enttMap)
     {
         auto components = srcRegistry.view<T>();
-        for (entt::entity srcEntity : components)
+        for(entt::entity srcEntity : components)
         {
             entt::entity destEntity = enttMap.at(srcRegistry.get<IDComponent>(srcEntity).ID);
-
             auto& srcComponent = srcRegistry.get<T>(srcEntity);
-            dstRegistry.emplace_or_replace<T>(destEntity, srcComponent);
+
+            // We need to preserve the entt::entity while copying
+            if constexpr(std::is_same_v<T, RelationshipComponent>)
+            {
+                RelationshipComponent destComponent;
+
+                auto MapEntity = [&](Uint oldEntUint) -> Uint {
+                    if(oldEntUint == 0xFFFFFFFF)
+                        return 0xFFFFFFFF;
+
+                    entt::entity oldEnt = static_cast<entt::entity>(oldEntUint);
+                    UUID oldUUID = srcRegistry.get<IDComponent>(oldEnt).ID;
+                    entt::entity newEnt = enttMap.at(oldUUID);
+                    return static_cast<Uint>(newEnt);
+                    };
+
+                destComponent.Parent = MapEntity(srcComponent.Parent);
+                destComponent.FirstChild = MapEntity(srcComponent.FirstChild);
+                destComponent.PreviousSibling = MapEntity(srcComponent.PreviousSibling);
+                destComponent.NextSibling = MapEntity(srcComponent.NextSibling);
+                destComponent.ChildrenCount = srcComponent.ChildrenCount;
+
+                dstRegistry.emplace_or_replace<T>(destEntity, destComponent);
+            }
+            else
+            {
+                dstRegistry.emplace_or_replace<T>(destEntity, srcComponent);
+            }
         }
     }
 
@@ -332,6 +361,7 @@ namespace Surge
         }
 
         CopyComponent<NameComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<RelationshipComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<TransformComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<SpriteRendererComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<MeshComponent>(other->mRegistry, mRegistry, enttMap);
@@ -370,6 +400,7 @@ namespace Surge
         outEntity.AddComponent<IDComponent>();
         outEntity.AddComponent<NameComponent>(name);
         outEntity.AddComponent<TransformComponent>();
+        outEntity.AddComponent<RelationshipComponent>();
     }
 
     void Scene::CreateEntityEmpty(Entity& outEntity, const String& name)
@@ -378,6 +409,7 @@ namespace Surge
         outEntity = Entity(e, this);
         outEntity.AddComponent<IDComponent>();
         outEntity.AddComponent<NameComponent>(name);
+        outEntity.AddComponent<RelationshipComponent>();
     }
 
     void Scene::CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name)
@@ -387,18 +419,42 @@ namespace Surge
         outEntity.AddComponent<IDComponent>(id);
         outEntity.AddComponent<NameComponent>(name);
         outEntity.AddComponent<TransformComponent>();
+        outEntity.AddComponent<RelationshipComponent>();
     }
 
     void Scene::DestroyEntity(Entity entity)
     {
+        if(!entity)
+            return;
+
         if(entity.HasComponent<ScriptComponent>())
             OnScriptDestroyed(entity, entity.GetComponent<ScriptComponent>());
 
+        auto& rel = entity.GetComponent<RelationshipComponent>();
+
+        entt::entity currentChild = (entt::entity)rel.FirstChild;
+        while(currentChild != entt::null)
+        {
+            Entity child(currentChild, this);
+            entt::entity nextChild = (entt::entity)child.GetComponent<RelationshipComponent>().NextSibling;
+
+            // (Every child will loop back to the top of this function and fire its own script callback)
+            DestroyEntity(child);
+            currentChild = nextChild;
+        }
+
+        SetParent(entity, Entity {});
         mRegistry.destroy(entity.Raw());
     }
 
     Entity Scene::DuplicateEntity(Entity entity)
     {
+        if(entity.GetComponent<RelationshipComponent>().Parent != entt::null)
+        {
+            Log<Severity::Warn>("Scene::DuplicateEntity: Entity with a parent cannot be duplicated yet!");
+            return Entity(entt::null, nullptr);
+        }
+
         Entity newEntity;
 
         String originalName = entity.GetComponent<NameComponent>().Name;
@@ -441,6 +497,63 @@ namespace Surge
         CopyIfHas(std::type_identity<ScriptComponent>{});
 
         return newEntity;
+    }
+
+    void Scene::SetParent(Entity entity, Entity newParent)
+    {
+        if(entity == newParent)
+            return;
+
+        auto& rel = entity.GetComponent<RelationshipComponent>();
+
+        // Unlink from current parent
+        if(rel.Parent != entt::null)
+        {
+            Entity oldParent((entt::entity)rel.Parent, this);
+            auto& oldParentRel = oldParent.GetComponent<RelationshipComponent>();
+
+            // If we are the first child, point the parent to our next sibling
+            if((entt::entity)oldParentRel.FirstChild == entity.Raw())
+                oldParentRel.FirstChild = rel.NextSibling;
+
+            // Bridge the gap between our previous and next siblings
+            if(rel.PreviousSibling != entt::null)
+                Entity((entt::entity)rel.PreviousSibling, this).GetComponent<RelationshipComponent>().NextSibling = rel.NextSibling;
+
+            if(rel.NextSibling != entt::null)
+                Entity((entt::entity)rel.NextSibling, this).GetComponent<RelationshipComponent>().PreviousSibling = rel.PreviousSibling;
+
+            oldParentRel.ChildrenCount--;
+        }
+
+        // Link to new parent
+        rel.Parent = newParent ? (Uint)newParent.Raw() : entt::null;
+        rel.PreviousSibling = entt::null;
+        rel.NextSibling = entt::null;
+        if(newParent)
+        {
+            auto& newParentRel = newParent.GetComponent<RelationshipComponent>();
+
+            if(newParentRel.FirstChild == entt::null)
+                newParentRel.FirstChild = (Uint)entity.Raw(); // We are the first and only child
+            else
+            {
+                // Walk the sibling chain to find the end, and attach ourselves
+                entt::entity currentSibling = (entt::entity)newParentRel.FirstChild;
+                while(true)
+                {
+                    auto& siblingRel = mRegistry.get<RelationshipComponent>(currentSibling);
+                    if(siblingRel.NextSibling == entt::null)
+                    {
+                        siblingRel.NextSibling = (Uint)entity.Raw();
+                        rel.PreviousSibling = (Uint)currentSibling;
+                        break;
+                    }
+                    currentSibling = (entt::entity)siblingRel.NextSibling;
+                }
+            }
+            newParentRel.ChildrenCount++;
+        }
     }
 
     void Scene::SetSelectedEntity(Entity entity)
@@ -488,8 +601,45 @@ namespace Surge
         return result;
     }
 
+    void Scene::UpdateTransforms()
+    {
+        SURGE_PROFILE_FUNC("Scene::UpdateTransforms");
+
+        auto view = mRegistry.view<TransformComponent, RelationshipComponent>();
+
+        for(auto entity : view)
+        {
+            const auto& rel = view.get<RelationshipComponent>(entity);
+            if(rel.Parent == entt::null)
+                UpdateTransformHierarchy(entity, glm::mat4(1.0f), false);
+        }
+    }
+
+    void Scene::UpdateTransformHierarchy(entt::entity entity, const glm::mat4& parentWorldTransform, bool parentDirty)
+    {
+        auto& transform = mRegistry.get<TransformComponent>(entity);
+        auto& rel = mRegistry.get<RelationshipComponent>(entity);
+        bool isDirty = transform.IsDirty() || parentDirty;
+
+        if(isDirty)
+        {
+            const glm::mat4& local = transform.GetLocalTransform();
+            transform.SetWorldTransform(parentWorldTransform * local);
+        }
+
+        // Recursively propagate down to all children
+        entt::entity currentChild = (entt::entity)rel.FirstChild;
+        while(currentChild != entt::null)
+        {
+            UpdateTransformHierarchy(currentChild, transform.GetTransform(), isDirty);
+            currentChild = (entt::entity)mRegistry.get<RelationshipComponent>(currentChild).NextSibling;
+        }
+    }
+
     void Scene::UpdateScripts()
     {
+        SURGE_PROFILE_FUNC("Scene::UpdateScripts");
+
         if(mIsRunning)
         {
             auto view = mRegistry.view<ScriptComponent>();
@@ -514,6 +664,8 @@ namespace Surge
 
     void Scene::SyncPhysics()
     {
+        SURGE_PROFILE_FUNC("Scene::SyncPhysics");
+
         if(mIsRunning)
         {
             Physics* physics = Core::GetPhysics();

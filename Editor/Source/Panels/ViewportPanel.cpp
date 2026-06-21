@@ -27,8 +27,8 @@ namespace Surge
         style.CenterCircleSize = 4.0f;
         style.TranslationLineThickness = 5.0f;
         style.TranslationLineArrowSize = 9.0f;
-        //style.RotationLineThickness = 3.0f;
-        //style.RotationOuterLineThickness = 5.0f;
+        style.RotationLineThickness = 4.0f;
+        style.RotationOuterLineThickness = 5.0f;
         style.ScaleLineThickness = 5.0f;
         style.ScaleLineCircleSize = 9.0f;
         style.HatchedAxisLineThickness = 0.0f;
@@ -253,19 +253,18 @@ namespace Surge
 
             // GIZMOS
             Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
+            Editor* app = static_cast<Editor*>(Core::GetClient());
+
+            const EditorCamera& camera = app->GetCamera();
+            glm::mat4 cameraView = camera.GetViewMatrix();
+            glm::mat4 cameraProjection = camera.GetProjectionMatrix();
+            cameraProjection[1][1] *= -1;
+            ImGuizmo::SetRect(cursorScreenPos.x, cursorScreenPos.y, mViewportSize.x, mViewportSize.y);
+            //ImGuizmo::DrawGrid(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), glm::value_ptr(glm::mat4(1.0f)), 16);
+
             if(selectedEntity && mGizmoType > 0)
             {
-                ImGuizmo::SetOrthographic(false);
                 ImGuizmo::SetDrawlist();
-
-                ImGuizmo::SetRect(cursorScreenPos.x, cursorScreenPos.y, mViewportSize.x, mViewportSize.y);
-
-                glm::mat4 cameraView, cameraProjection;
-                Editor* app = static_cast<Editor*>(Core::GetClient());
-                EditorCamera& camera = app->GetCamera();
-                cameraProjection = camera.GetProjectionMatrix();
-                cameraProjection[1][1] *= -1; // Vulkan flip
-                cameraView = camera.GetViewMatrix();
 
                 TransformComponent& transformComponent = selectedEntity.GetComponent<TransformComponent>();
                 glm::mat4 transform = transformComponent.GetTransform();
@@ -282,7 +281,18 @@ namespace Surge
 
                 if(ImGuizmo::IsUsing())
                 {
-                     mGizmoInUse = true;
+                    mGizmoInUse = true;
+
+                     RelationshipComponent& rel = selectedEntity.GetComponent<RelationshipComponent>();
+
+                     if(rel.Parent != entt::null)
+                     {
+                         Entity parentEntity((entt::entity)rel.Parent, app->GetCurrentScene().Raw());
+                         glm::mat4 parentWorld = parentEntity.GetComponent<TransformComponent>().GetTransform();
+
+                         // Local = Inverse(ParentWorld) * World
+                         transform = glm::inverse(parentWorld) * transform;
+                     }
 
                     glm::vec3 translation, rotation, scale;
                     Math::DecomposeTransform(transform, translation, rotation, scale);

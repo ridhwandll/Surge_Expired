@@ -36,6 +36,7 @@ namespace Surge
         void CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name = "New Entity");
         void DestroyEntity(Entity entity);
         Entity DuplicateEntity(Entity entity);
+        void SetParent(Entity entity, Entity newParent);
 
         void SetSelectedEntity(Entity entity);
         Entity GetSelectedEntity() const;
@@ -52,6 +53,8 @@ namespace Surge
 
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
     private:
+        void UpdateTransforms();
+        void UpdateTransformHierarchy(entt::entity entity, const glm::mat4& parentWorldTransform, bool parentDirty);
         void UpdateScripts();
         void SyncPhysics();
 

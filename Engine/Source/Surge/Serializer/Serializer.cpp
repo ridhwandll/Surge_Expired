@@ -66,7 +66,7 @@ namespace Surge
     NLOHMANN_JSON_SERIALIZE_ENUM(RigidbodyType, { {RigidbodyType::STATIC, "STATIC"}, {RigidbodyType::DYNAMIC, "DYNAMIC"}, {RigidbodyType::KINEMATIC, "KINEMATIC"} });
 
     template <typename XComponent>
-    FORCEINLINE static void SerializeComponent(nlohmann::json& j, Entity& e)
+    static void SerializeComponent(nlohmann::json& j, Entity& e)
     {
         if (e.HasComponent<XComponent>())
         {
@@ -74,6 +74,23 @@ namespace Surge
             const SurgeReflect::Class* clazz = SurgeReflect::GetReflection<XComponent>();
 
             nlohmann::json& out = j[clazz->GetName()];
+
+            // Handle RelationshipComponent separately
+            if constexpr (std::is_same_v<XComponent, RelationshipComponent>)
+            {
+                auto GetUUID = [&](entt::entity ent) -> uint64_t {
+                    if(ent == entt::null)
+                        return 0;
+                    return Entity(ent, e.GetScene()).GetComponent<IDComponent>().ID;
+                };
+
+                out["Parent"] = GetUUID((entt::entity)comp.Parent);
+                out["FirstChild"] = GetUUID((entt::entity)comp.FirstChild);
+                out["PreviousSibling"] = GetUUID((entt::entity)comp.PreviousSibling);
+                out["NextSibling"] = GetUUID((entt::entity)comp.NextSibling);
+                out["ChildrenCount"] = comp.ChildrenCount;
+                return;
+            }
 
             for (const auto& [name, var] : clazz->GetVariables())
             {
@@ -178,6 +195,13 @@ namespace Surge
         nlohmann::json& inJson = j[clazz->GetName()];
         XComponent& comp = e.GetComponent<XComponent>();
 
+        if constexpr(std::is_same_v<XComponent, RelationshipComponent>)
+        {
+            // (Rid) IMPORTANT: Do absolutely nothing here! 
+            // We MUST wait for all entities to exist before linking them
+            return;
+        }
+
         for(const auto& [name, var] : clazz->GetVariables())
         {
             const SurgeReflect::Type& type = var.GetType();
@@ -258,12 +282,42 @@ namespace Surge
             return;
         }
 
+        // (Rid) 1st pass: Create flat hierarchy of entities, skip RelationshipComponent
         uint64_t sceneSize = parsedJson["Scene"]["Size"];
         for(uint64_t i = 0; i < sceneSize; i++)
         {
             Entity newEntity;
             out->CreateEntity(newEntity, "");
             DeserializeEntity(parsedJson["Scene"], newEntity, i);
+        }
+
+        // (Rid) 2nd pass: parse the RelationshipComponent in a second pass, once all entities exist
+        for(uint64_t i = 0; i < sceneSize; i++)
+        {
+            nlohmann::json& entityJson = parsedJson["Scene"][std::format("Entity{0}", i)];
+            if(entityJson.contains("Surge::RelationshipComponent"))
+            {
+                uint64_t uuid = entityJson["Surge::IDComponent"]["ID"].get<uint64_t>();
+                Entity entity = out->FindEntityByUUID(uuid);
+                SG_ASSERT_NOMSG(entity);
+                if(entity)
+                {
+                    auto& relJson = entityJson["Surge::RelationshipComponent"];
+                    auto& rel = entity.GetComponent<RelationshipComponent>();
+                    auto GetHandle = [&](uint64_t savedUUID) -> entt::entity {
+                        if(savedUUID == 0)
+                            return entt::null;
+                        Entity found = out->FindEntityByUUID(savedUUID);
+                        return found ? found.Raw() : entt::null;
+                    };
+
+                    rel.Parent = (Uint)GetHandle(relJson.value("Parent", 0ULL));
+                    rel.FirstChild = (Uint)GetHandle(relJson.value("FirstChild", 0ULL));
+                    rel.PreviousSibling = (Uint)GetHandle(relJson.value("PreviousSibling", 0ULL));
+                    rel.NextSibling = (Uint)GetHandle(relJson.value("NextSibling", 0ULL));
+                    rel.ChildrenCount = relJson.value("ChildrenCount", 0);
+                }
+            }
         }
     }
 #pragma endregion

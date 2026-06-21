@@ -24,7 +24,20 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct SURGE_API NameComponent
+    struct RelationshipComponent
+    {
+        // Uint is the underlying type of entt::entity, we use this to avoid including entt in the header
+        // 0xFFFFFFFF acts as our "entt::null" entity
+        Uint Parent = 0xFFFFFFFF;
+        Uint FirstChild = 0xFFFFFFFF;
+        Uint PreviousSibling = 0xFFFFFFFF;
+        Uint NextSibling = 0xFFFFFFFF;
+
+        Uint ChildrenCount = 0;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct NameComponent
     {
         NameComponent() = default;
         NameComponent(const String& name)
@@ -45,26 +58,35 @@ namespace Surge
         glm::vec3 Rotation = glm::vec3(0.0f); // Degrees
         glm::vec3 Scale = glm::vec3(1.0f);
 
-        // Call transform changed (e.g. after physics)
         void MarkDirty() { mDirty = true; }
         bool IsDirty() const { return mDirty; }
+
         const glm::mat4& GetTransform() const
         {
-            if (mDirty)
-            {
-                mCachedTransform = glm::translate(glm::mat4(1.0f), Position)
-                    * glm::mat4_cast(glm::quat(glm::radians(Rotation)))
-                    * glm::scale(glm::mat4(1.0f), Scale);
+            // For an entity with no parent, World = Local
+            if(mDirty)
+                WorldTransform = GetLocalTransform();
 
-                mDirty = false;
-            }
-            return mCachedTransform;
+            return WorldTransform;
         }
 
-        SURGE_REFLECTION_ENABLE;
+        const glm::mat4& GetLocalTransform() const
+        {
+            if(mDirty)
+            {
+                LocalTransform = glm::translate(glm::mat4(1.0f), Position) * glm::mat4_cast(glm::quat(glm::radians(Rotation))) * glm::scale(glm::mat4(1.0f), Scale);
+                mDirty = false;
+            }
+            return LocalTransform;
+        }
 
+        // Set by Scene.cpp when propagating parent transforms down the hierarchy
+        void SetWorldTransform(const glm::mat4& transform) { WorldTransform = transform; }
+
+        SURGE_REFLECTION_ENABLE;
     private:
-        mutable glm::mat4 mCachedTransform{ 1.0f };
+        mutable glm::mat4 LocalTransform { 1.0f };
+        mutable glm::mat4 WorldTransform { 1.0f };
         mutable bool mDirty = true;
     };
 
@@ -218,7 +240,7 @@ namespace Surge
 
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
 #define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
-                                ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent,     \
+                                ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent, ::Surge::RelationshipComponent, \
                                 ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
                                 ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \

@@ -14,6 +14,10 @@ SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::NameComponent)
     .AddVariable<&Surge::NameComponent::Name>("Name")
 SURGE_REFLECT_CLASS_REGISTER_END()
 
+SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::RelationshipComponent)
+// (Rid) We manually serialize/deserialize this component, members are not reflected, but we still need to register the class
+SURGE_REFLECT_CLASS_REGISTER_END()
+
 SURGE_REFLECT_CLASS_REGISTER_BEGIN(Surge::TransformComponent)
     .AddVariable<&Surge::TransformComponent::Position>("Position")
     .AddVariable<&Surge::TransformComponent::Rotation>("Rotation")
