@@ -10,6 +10,7 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/ScriptEngine/ScriptEngine.hpp"
+#include "SurgeReflect/SurgeReflectRegistry.hpp"
 
 #ifdef SURGE_PLATFORM_WINDOWS
 #include "Surge/Platform/Windows/WindowsWindow.hpp"

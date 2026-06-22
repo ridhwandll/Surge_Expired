@@ -59,15 +59,11 @@ namespace Surge
         mIsRunning = false;
     }
 
-    void Scene::Update(EditorCamera& camera)
+    void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
     {
-        SyncPhysics();
-        UpdateScripts();
-        UpdateTransforms();
-
         Renderer* renderer = Core::GetRenderer();
 
-        renderer->BeginFrame(camera);
+        renderer->BeginFrame(viewMatrix, projectionMatrix, cameraNearFar);
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
@@ -91,9 +87,12 @@ namespace Surge
                     glm::vec3 dirLightDir = transform.GetTransform()[2];
                     gpuLight.PositionType = glm::vec4(dirLightDir, 0.0f); // w = 0.0f for dir light
 
-                    glm::vec3 forwardDir = glm::normalize(glm::vec3(transform.GetTransform()[2]));
-                    glm::vec4 debugColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
-                    renderer->SubmitDirLightDebug(transform.Position, forwardDir, debugColor);
+                    if(!mIsRunning)
+                    {
+                        glm::vec3 forwardDir = glm::normalize(glm::vec3(transform.GetTransform()[2]));
+                        glm::vec4 debugColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+                        renderer->SubmitDirLightDebug(transform.Position, forwardDir, debugColor);
+                    }
                 }
                 else if(light.Type == LightType::POINT)
                     gpuLight.PositionType = glm::vec4(transform.Position, 1.0f); // w = 1.0f for point lights
@@ -131,82 +130,92 @@ namespace Surge
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
                 }
             }
-            if(sSelectedEntity)
+
+        }
+
+        // DEBUG
+        if(sSelectedEntity && !mIsRunning)
+        {
+            if(const MeshComponent* meshComp = sSelectedEntity.TryGetComponent<MeshComponent>())
             {
-                if(sSelectedEntity.HasComponent<MeshComponent>())
+                if(meshComp->MeshID)
                 {
-                    const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
-                    if(meshComp.MeshID)
+                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp->MeshID);
+                    if(mesh) //Asset might be missing/corrupted, so check before submitting
                     {
-                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
-                        if(mesh) //Asset might be missing/corrupted, so check before submitting
-                        {
-                            const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                            renderer->SubmitMeshOutline(transform, mesh);
-                        }
+                        const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
+                        renderer->SubmitMeshOutline(transform, mesh);
                     }
                 }
+            }
 
-                // No Collider showing for MeshColliderComponent
-                if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent>(sSelectedEntity))
+            // No Collider showing for MeshColliderComponent
+            if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent>(sSelectedEntity))
+            {
+                bool showCollider = false;
+                if(sSelectedEntity.HasComponent<BoxColliderComponent>())
+                    showCollider = sSelectedEntity.GetComponent<BoxColliderComponent>().ShowCollider;
+                else if(sSelectedEntity.HasComponent<SphereColliderComponent>())
+                    showCollider = sSelectedEntity.GetComponent<SphereColliderComponent>().ShowCollider;
+                else if(sSelectedEntity.HasComponent<CapsuleColliderComponent>())
+                    showCollider = sSelectedEntity.GetComponent<CapsuleColliderComponent>().ShowCollider;
+                else if(sSelectedEntity.HasComponent<CylinderColliderComponent>())
+                    showCollider = sSelectedEntity.GetComponent<CylinderColliderComponent>().ShowCollider;
+                else if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
+                    showCollider = sSelectedEntity.GetComponent<ConvexColliderComponent>().ShowCollider;
+
+                if(showCollider)
                 {
-                    bool showCollider = false;
-                    if(sSelectedEntity.HasComponent<BoxColliderComponent>())
-                        showCollider = sSelectedEntity.GetComponent<BoxColliderComponent>().ShowCollider;
-                    else if(sSelectedEntity.HasComponent<SphereColliderComponent>())
-                        showCollider = sSelectedEntity.GetComponent<SphereColliderComponent>().ShowCollider;
-                    else if(sSelectedEntity.HasComponent<CapsuleColliderComponent>())
-                        showCollider = sSelectedEntity.GetComponent<CapsuleColliderComponent>().ShowCollider;
-                    else if(sSelectedEntity.HasComponent<CylinderColliderComponent>())
-                        showCollider = sSelectedEntity.GetComponent<CylinderColliderComponent>().ShowCollider;
-                    else if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
-                        showCollider = sSelectedEntity.GetComponent<ConvexColliderComponent>().ShowCollider;
+                    auto& transformComp = sSelectedEntity.GetComponent<TransformComponent>();
+                    static JPH::ShapeRefC sTempShape = nullptr;
 
-                    if(showCollider)
+                    JPH::ShapeRefC shape;
+                    if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
                     {
-                        auto& transformComp = sSelectedEntity.GetComponent<TransformComponent>();
-                        static JPH::ShapeRefC sTempShape = nullptr;
-
-                        JPH::ShapeRefC shape;
-                        if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
+                        ConvexColliderComponent& convexComp = sSelectedEntity.GetComponent<ConvexColliderComponent>();
+                        if(!sTempShape || convexComp.IsDirty)
                         {
-                            ConvexColliderComponent& convexComp = sSelectedEntity.GetComponent<ConvexColliderComponent>();
-                            if(!sTempShape || convexComp.IsDirty)
-                            {
-                                sTempShape = Core::GetPhysics()->CreateShape(sSelectedEntity);
-                                convexComp.IsDirty = false;
-                            }
-                            shape = sTempShape;
+                            sTempShape = Core::GetPhysics()->CreateShape(sSelectedEntity);
+                            convexComp.IsDirty = false;
                         }
-                        else
-                            shape = Core::GetPhysics()->CreateShape(sSelectedEntity);
+                        shape = sTempShape;
+                    }
+                    else
+                        shape = Core::GetPhysics()->CreateShape(sSelectedEntity);
 
-                        if(shape)
-                        {
-                            JPH::Vec3 comOffset = shape->GetCenterOfMass();
-                            JPH::Vec3 joltPosition = JPH::Vec3(transformComp.Position.x, transformComp.Position.y, transformComp.Position.z);
+                    if(shape)
+                    {
+                        JPH::Vec3 comOffset = shape->GetCenterOfMass();
+                        JPH::Vec3 joltPosition = JPH::Vec3(transformComp.Position.x, transformComp.Position.y, transformComp.Position.z);
 
-                            glm::quat q = glm::quat(glm::radians(transformComp.Rotation));
-                            JPH::Quat joltRotation = JPH::Quat(q.x, q.y, q.z, q.w);
+                        glm::quat q = glm::quat(glm::radians(transformComp.Rotation));
+                        JPH::Quat joltRotation = JPH::Quat(q.x, q.y, q.z, q.w);
 
-                            joltPosition = joltPosition + joltRotation * comOffset;
-                            JPH::RMat44 joltTransform = JPH::RMat44::sRotationTranslation(joltRotation, joltPosition);
+                        joltPosition = joltPosition + joltRotation * comOffset;
+                        JPH::RMat44 joltTransform = JPH::RMat44::sRotationTranslation(joltRotation, joltPosition);
 
-                            JPH::DebugRenderer* debugRenderer = Core::GetPhysics()->GetDebugRenderer();
-                            shape->Draw(debugRenderer, joltTransform, JPH::Vec3::sReplicate(1.0f), JPH::Color::sGreen, false, true);
-                        }
+                        JPH::DebugRenderer* debugRenderer = Core::GetPhysics()->GetDebugRenderer();
+                        shape->Draw(debugRenderer, joltTransform, JPH::Vec3::sReplicate(1.0f), JPH::Color::sGreen, false, true);
                     }
                 }
             }
         }
-
         renderer->EndFrame();
+    }
+
+    void Scene::Update(EditorCamera& camera)
+    {
+        SURGE_PROFILE_FUNC("Scene::Update(Editor)");
+
+        SyncPhysics();
+        UpdateScripts();
+        UpdateTransforms();
+        UpdateRendering(camera.GetViewMatrix(), camera.GetProjectionMatrix(), camera.GetNearAndFarPlane());
     }
 
     void Scene::Update()
     {
         SURGE_PROFILE_FUNC("Scene::Update()");
-        //Timer timer("Scene::Update()", true);
 
         // Order matters here
         SyncPhysics();
@@ -214,97 +223,8 @@ namespace Surge
         UpdateTransforms();
 
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
-
-        if (camera.Data1)
-        {
-            Renderer* renderer = Core::GetRenderer();
-            renderer->BeginFrame(*camera.Data1, camera.Data2);
-            {
-                auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
-                for (const auto& [entity, sprite, transform] : view.each())
-                {
-                    ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? Core::GetAssetManager()->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
-                    renderer->SubmitQuad(transform.GetTransform(), sprite.Color, textureHandle);
-                }
-            }
-            {
-                auto view = mRegistry.view<LightComponent, TransformComponent>();
-                for(const auto& [entity, light, transform] : view.each())
-                {
-                    Light gpuLight {};
-                    gpuLight.Color = light.Color;
-                    gpuLight.Intensity = light.Intensity;
-                    gpuLight.Radius = light.Radius;
-                    gpuLight.Falloff = light.Falloff;
-
-                    if(light.Type == LightType::DIRECTIONAL)
-                    {
-                        glm::vec3 dirLightDir = transform.GetTransform()[2];
-                        gpuLight.PositionType = glm::vec4(dirLightDir, 0.0f); // w = 0.0f for dir light
-                    }
-                    else if(light.Type == LightType::POINT)
-                        gpuLight.PositionType = glm::vec4(transform.Position, 1.0f); // w = 1.0f for point lights
-
-                    renderer->SubmitLight(gpuLight);
-                }
-            }
-            {
-                auto view = mRegistry.view<EnvironmentComponent>();
-                for(const auto& [entity, env] : view.each())
-                {
-                    Environnment e {};
-                    e.Elevation = env.Elevation;
-                    e.Azimuth = env.Azimuth;
-                    e.Turbidity = env.Turbidity;
-                    e.Exposure = env.Exposure;
-                    e.SunIntensity = env.SunIntensity;
-                    e.EnableSunDisk = env.EnableSunDisk;
-                    e.SkyAmbient = env.SkyAmbient;
-                    e.HorizonAmbient = env.HorizonAmbient;
-                    e.GroundAmbient = env.GroundAmbient;
-                    renderer->SubmitEnvironment(std::move(e));
-                    break; // Only submit the first environment component we find
-                }
-            }
-            {
-                // 3D Meshes
-                auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
-                for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
-                {
-                    if(meshComponent.MeshID)
-                    {
-                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComponent.MeshID);
-                        if(mesh) //Asset might be missing/corrupted, so check before submitting
-                            renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
-
-                    }
-                }
-                if(sSelectedEntity && sSelectedEntity.HasComponent<MeshComponent>())
-                {
-                    const MeshComponent& meshComp = sSelectedEntity.GetComponent<MeshComponent>();
-                    if(meshComp.MeshID)
-                    {
-                        Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
-                        if (mesh)  //Asset might be missing/corrupted, so check before submitting
-                        {
-                            const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                            renderer->SubmitMeshOutline(transform, mesh);
-                        }
-                    }
-                }
-            }
-
-            //JPH::PhysicsSystem* system = Core::GetPhysics()->Get();
-            //JPH::BodyManager::DrawSettings settings;
-            //settings.mDrawBoundingBox = true;
-            //settings.mDrawShape = true;
-            //settings.mDrawShapeWireframe = false;
-            //settings.mDrawSleepStats = false;
-            //settings.mDrawVelocity = true;
-            //system->DrawBodies(settings, Core::GetPhysics()->GetDebugRenderer());
-
-            renderer->EndFrame();
-        }
+        if(camera.Data1)
+            UpdateRendering(glm::inverse(camera.Data2), camera.Data1->GetProjectionMatrix(), { camera.Data1->GetPerspectiveNearClip(), camera.Data1->GetPerspectiveFarClip() });
     }
 
     template <typename T>
@@ -316,14 +236,14 @@ namespace Surge
             entt::entity destEntity = enttMap.at(srcRegistry.get<IDComponent>(srcEntity).ID);
             auto& srcComponent = srcRegistry.get<T>(srcEntity);
 
-            // We need to preserve the entt::entity while copying
+            // We need to preserve the entt::entity to point to correct entity while copying
             if constexpr(std::is_same_v<T, RelationshipComponent>)
             {
                 RelationshipComponent destComponent;
 
                 auto MapEntity = [&](Uint oldEntUint) -> Uint {
-                    if(oldEntUint == 0xFFFFFFFF)
-                        return 0xFFFFFFFF;
+                    if(oldEntUint == RELATIONSHIP_NULL)
+                        return RELATIONSHIP_NULL;
 
                     entt::entity oldEnt = static_cast<entt::entity>(oldEntUint);
                     UUID oldUUID = srcRegistry.get<IDComponent>(oldEnt).ID;
@@ -605,34 +525,32 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::UpdateTransforms");
 
-        auto view = mRegistry.view<TransformComponent, RelationshipComponent>();
+        auto UpdateTransformHierarchy = [&](auto&& self, entt::entity entity, const glm::mat4& parentWorldTransform, bool parentDirty) -> void {
+            auto& transform = mRegistry.get<TransformComponent>(entity);
+            auto& rel = mRegistry.get<RelationshipComponent>(entity);
+            bool isDirty = transform.IsDirty() || parentDirty;
 
+            if(isDirty)
+            {
+                const glm::mat4& local = transform.GetLocalTransform();
+                transform.SetWorldTransform(parentWorldTransform * local);
+            }
+
+            // Recursively propagate down to all children
+            entt::entity currentChild = (entt::entity)rel.FirstChild;
+            while(currentChild != entt::null)
+            {
+                self(self, currentChild, transform.GetTransform(), isDirty);
+                currentChild = (entt::entity)mRegistry.get<RelationshipComponent>(currentChild).NextSibling;
+            }
+        };
+
+        auto view = mRegistry.view<TransformComponent, RelationshipComponent>();
         for(auto entity : view)
         {
             const auto& rel = view.get<RelationshipComponent>(entity);
             if(rel.Parent == entt::null)
-                UpdateTransformHierarchy(entity, glm::mat4(1.0f), false);
-        }
-    }
-
-    void Scene::UpdateTransformHierarchy(entt::entity entity, const glm::mat4& parentWorldTransform, bool parentDirty)
-    {
-        auto& transform = mRegistry.get<TransformComponent>(entity);
-        auto& rel = mRegistry.get<RelationshipComponent>(entity);
-        bool isDirty = transform.IsDirty() || parentDirty;
-
-        if(isDirty)
-        {
-            const glm::mat4& local = transform.GetLocalTransform();
-            transform.SetWorldTransform(parentWorldTransform * local);
-        }
-
-        // Recursively propagate down to all children
-        entt::entity currentChild = (entt::entity)rel.FirstChild;
-        while(currentChild != entt::null)
-        {
-            UpdateTransformHierarchy(currentChild, transform.GetTransform(), isDirty);
-            currentChild = (entt::entity)mRegistry.get<RelationshipComponent>(currentChild).NextSibling;
+                UpdateTransformHierarchy(UpdateTransformHierarchy, entity, glm::mat4(1.0f), false);
         }
     }
 

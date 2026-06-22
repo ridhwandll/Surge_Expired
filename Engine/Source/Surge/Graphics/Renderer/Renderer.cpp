@@ -82,41 +82,19 @@ namespace Surge
         mGraph.Compile();
     }
 
-    void Renderer::BeginFrame(const EditorCamera& camera)
-    {
-        SURGE_PROFILE_FUNC("Renderer::BeginFrame(EditorCamera)");
-        FrameBlackboard& blackBoard = mGraph.GetBlackboard();
-
-        blackBoard.ViewMatrix = camera.GetViewMatrix();
-        blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
-        blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
-        blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
-        blackBoard.CameraPosition = camera.GetPosition();
-        blackBoard.CameraNearFarPlane = camera.GetNearAndFarPlane();
-        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
-
-        FrameUBO frameData = {};
-        frameData.View = blackBoard.ViewMatrix;
-        frameData.ViewProjection = blackBoard.ViewProjection;
-        frameData.InverseViewProjection = blackBoard.InverseViewProjection;
-        frameData.CameraPos = blackBoard.CameraPosition;
-
-        mCurrentFrameCtx = mRHI->BeginFrame();
-        mRHI->UploadBuffer(blackBoard.FrameUBOs[mCurrentFrameCtx.FrameIndex], &frameData, sizeof(FrameUBO));
-    }
-
-    void Renderer::BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform)
+    void Renderer::BeginFrame(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
     {
         SURGE_PROFILE_FUNC("Renderer::BeginFrame(Camera)");
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();
+        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
 
-        blackBoard.ViewMatrix = glm::inverse(transform);
-        blackBoard.ProjectionMatrix = camera.GetProjectionMatrix();
+        // Camera setup
+        blackBoard.ViewMatrix = viewMatrix;
+        blackBoard.ProjectionMatrix = projectionMatrix;
         blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
         blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
-        blackBoard.CameraPosition = transform[3];
-        blackBoard.CameraNearFarPlane = { camera.GetPerspectiveNearClip(), camera.GetPerspectiveFarClip() };
-        blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
+        blackBoard.CameraPosition = glm::inverse(viewMatrix)[3];
+        blackBoard.CameraNearFarPlane = cameraNearFar;
 
         FrameUBO frameData = {};
         frameData.View = blackBoard.ViewMatrix;

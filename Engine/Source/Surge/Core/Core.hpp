@@ -21,14 +21,12 @@ namespace Surge
         void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
 
         Window* GetWindow();
-        Clock& GetClock();
-
         Physics* GetPhysics();
         Renderer* GetRenderer();
         AssetManager* GetAssetManager();
         ScriptEngine* GetScriptEngine();
-
         Client* GetClient();
+        Clock& GetClock();
     }
 
 } // namespace Surge::Core

@@ -4,6 +4,8 @@
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 namespace Surge
 {
     void ShadowPass::Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard)

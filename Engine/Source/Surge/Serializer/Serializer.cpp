@@ -1,19 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Serializer/Serializer.hpp"
+#include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <json/json.hpp>
-
-#ifdef SURGE_PLATFORM_ANDROID
-#include "Surge/Platform/Android/AndroidApp.hpp"
-#include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <android/asset_manager.h>
-#else
-#include <fstream>
-#endif
-
 
 // https://github.com/nlohmann/json#arbitrary-types-conversions
 namespace glm
@@ -80,7 +72,7 @@ namespace Surge
             {
                 auto GetUUID = [&](entt::entity ent) -> uint64_t {
                     if(ent == entt::null)
-                        return 0;
+                        return UUID::INVALID;
                     return Entity(ent, e.GetScene()).GetComponent<IDComponent>().ID;
                 };
 
@@ -128,7 +120,7 @@ namespace Surge
                 else if(type.EqualTo<RigidbodyType>())
                     out[name] = *reinterpret_cast<const RigidbodyType*>(source);
                 else
-                    Log<Severity::Warn>("Unhandled Variable of type: '{0}' while serializing!", type.GetFullName());
+                    Log<Severity::Warn>("Unhandled Variable of type: {0} while serializing!", type.GetFullName());
             }
         }
     }
@@ -165,19 +157,13 @@ namespace Surge
             index++;
         });
 
+        // Size of all entities in the scene
         const size_t size = in->GetRegistry().view<IDComponent>().size();
         outJson["Scene"]["Size"] = size;
-
         String result = outJson.dump(4);
-        std::ofstream file(path.string(), std::ios::out | std::ios::trunc);
-        if(!file.is_open())
-        {
-            Log<Severity::Error>("SerializeScene: Failed to open '{}'.", path.string().c_str());
-            return;
-        }
 
-        file << result;
-        file.close();
+        if(!Filesystem::WriteTextFile(path, result))
+            Log<Severity::Error>("SerializeScene: Failed to Write Text File {}", path.string());
 #endif
     }
 
@@ -311,10 +297,10 @@ namespace Surge
                         return found ? found.Raw() : entt::null;
                     };
 
-                    rel.Parent = (Uint)GetHandle(relJson.value("Parent", 0ULL));
-                    rel.FirstChild = (Uint)GetHandle(relJson.value("FirstChild", 0ULL));
-                    rel.PreviousSibling = (Uint)GetHandle(relJson.value("PreviousSibling", 0ULL));
-                    rel.NextSibling = (Uint)GetHandle(relJson.value("NextSibling", 0ULL));
+                    rel.Parent = (Uint)GetHandle(relJson.value("Parent", UUID::INVALID));
+                    rel.FirstChild = (Uint)GetHandle(relJson.value("FirstChild", UUID::INVALID));
+                    rel.PreviousSibling = (Uint)GetHandle(relJson.value("PreviousSibling", UUID::INVALID));
+                    rel.NextSibling = (Uint)GetHandle(relJson.value("NextSibling", UUID::INVALID));
                     rel.ChildrenCount = relJson.value("ChildrenCount", 0);
                 }
             }
@@ -322,6 +308,7 @@ namespace Surge
     }
 #pragma endregion
 
+#pragma region ProjectSerializer
     void Serializer::SerializeProject([[maybe_unused]] const Path& path, [[maybe_unused]] Project* in)
     {
 #ifdef SURGE_PLATFORM_ANDROID
@@ -369,5 +356,7 @@ namespace Surge
         else
             Log<Severity::Error>("DeserializeProject: Corrupted file '{}'", path.string());
     }
+
+#pragma endregion
 
 } // namespace Surge

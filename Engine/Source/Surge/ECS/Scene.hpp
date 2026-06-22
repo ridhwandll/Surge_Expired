@@ -5,7 +5,6 @@
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
-#include "Components.hpp"
 #include "Surge/Asset/Asset.hpp"
 
 #include <entt.hpp>
@@ -14,8 +13,11 @@ namespace Surge
 {
     class Scene;
     class Entity;
+    struct IDComponent;
+    struct TransformComponent;
+    struct ScriptComponent;
 
-    class Scene : public Asset
+    class Scene final : public Asset
     {
     public:
         Scene();
@@ -25,8 +27,9 @@ namespace Surge
 
         void OnRuntimeStart();
         void Update(); // Runtime Update
-        void Update(EditorCamera& camera); // EditorCam Update
+        void Update(EditorCamera& camera); // EditorView Update
         void OnRuntimeEnd();
+
         void CopyTo(Scene* other);
         Entity FindEntityByUUID(UUID id);
 
@@ -35,8 +38,8 @@ namespace Surge
         void CreateEntityEmpty(Entity& outEntity, const String& name);
         void CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name = "New Entity");
         void DestroyEntity(Entity entity);
-        Entity DuplicateEntity(Entity entity);
         void SetParent(Entity entity, Entity newParent);
+        Entity DuplicateEntity(Entity entity);
 
         void SetSelectedEntity(Entity entity);
         Entity GetSelectedEntity() const;
@@ -54,9 +57,9 @@ namespace Surge
         Pair<RuntimeCamera*, glm::mat4> GetMainCameraEntity(); // Camera - CameraTransform(view = glm::inverse(CameraTransform))
     private:
         void UpdateTransforms();
-        void UpdateTransformHierarchy(entt::entity entity, const glm::mat4& parentWorldTransform, bool parentDirty);
         void UpdateScripts();
         void SyncPhysics();
+        void UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar);
 
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
@@ -78,6 +81,13 @@ namespace Surge
         Entity() = default;
         Entity(const entt::entity& handle, Scene* scene)
             : mEnttHandle(handle), mScene(scene) {}
+
+        template <typename T>
+        const T* TryGetComponent() const
+        {
+            const auto* component = mScene->GetRegistry().try_get<T>(mEnttHandle);
+            return component;
+        }
 
         template <typename T>
         const T& GetComponent() const
@@ -115,11 +125,6 @@ namespace Surge
         entt::entity Raw()
         {
             return mEnttHandle;
-        }
-
-        UUID GetUUID()
-        {
-            return GetComponent<IDComponent>().ID;
         }
 
         Scene* GetScene() const

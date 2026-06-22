@@ -7,7 +7,6 @@
 #include "Surge/Physics/RigidbodyID.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
-
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -26,12 +25,13 @@ namespace Surge
 
     struct RelationshipComponent
     {
-        // Uint is the underlying type of entt::entity, we use this to avoid including entt in the header
-        // 0xFFFFFFFF acts as our "entt::null" entity
-        Uint Parent = 0xFFFFFFFF;
-        Uint FirstChild = 0xFFFFFFFF;
-        Uint PreviousSibling = 0xFFFFFFFF;
-        Uint NextSibling = 0xFFFFFFFF;
+        #define RELATIONSHIP_NULL 0xFFFFFFFF
+
+        // Uint is the underlying type of entt::entity, we use this to avoid including entt in this header
+        Uint Parent = RELATIONSHIP_NULL;
+        Uint FirstChild = RELATIONSHIP_NULL;
+        Uint PreviousSibling = RELATIONSHIP_NULL;
+        Uint NextSibling = RELATIONSHIP_NULL;
 
         Uint ChildrenCount = 0;
         SURGE_REFLECTION_ENABLE;

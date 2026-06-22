@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Platform/Windows/WindowsWindow.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Core/Time/Clock.hpp"
 #include <imgui.h>
 #include <dwmapi.h>
 #include <windowsx.h>
@@ -13,7 +14,7 @@ namespace Surge
     WindowsWindow::WindowsWindow(const WindowDesc& windowData)
     {
         mWindowData = windowData;
-        HINSTANCE hInstance = GetModuleHandle(nullptr);
+        HINSTANCE hInstance = GetModuleHandle(nullptr); 
 
         WNDCLASSEX wc = {};
         wc.cbSize = sizeof(WNDCLASSEX);
@@ -36,13 +37,7 @@ namespace Surge
         RegisterClassEx(&wc);
         SURGE_GET_WIN32_LAST_ERROR;
 
-#ifdef SURGE_DEBUG
-        String config = "DEBUG";
-#elif defined(SURGE_RELEASE)
-        String config = "RELEASE";
-#endif
-
-        String windowTitle = std::format("{} <{}>", mWindowData.Title, config);
+        String windowTitle = GetWindowTitle();
         glm::ivec2 screenSize = Platform::GetScreenSize();
         mWin32Window = CreateWindow(wc.lpszClassName, windowTitle.c_str(),
                                     WS_OVERLAPPEDWINDOW, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
@@ -74,6 +69,16 @@ namespace Surge
     void WindowsWindow::Update()
     {
         SURGE_PROFILE_FUNC("WindowsWindow::Update()");
+
+        constexpr Uint updateTitleEveryNFrames = 60;
+        static Uint frameCount = updateTitleEveryNFrames;
+        frameCount++;
+        if(frameCount >= updateTitleEveryNFrames) // Update every 300 frames
+        {
+            SetWindowText(mWin32Window, GetWindowTitle().c_str());
+            frameCount = 0;
+        }
+
         MSG msg;
         while (PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE))
         {
@@ -171,6 +176,17 @@ namespace Surge
             if (flags & WindowFlags::CreateDefault)
                 ShowWindow(mWin32Window, SW_SHOWDEFAULT);
         }
+    }
+
+    String WindowsWindow::GetWindowTitle() const
+    {
+#ifdef SURGE_DEBUG
+        String config = "DEBUG";
+#elif defined(SURGE_RELEASE)
+        String config = "RELEASE";
+#endif
+        String windowTitle = std::format("{} <{}> {:.2f}ms", mWindowData.Title, config, Core::GetClock().GetMilliseconds());
+        return windowTitle;
     }
 
     LRESULT WindowsWindow::WindowProcWithoutImGui(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)

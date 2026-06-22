@@ -252,59 +252,62 @@ namespace Surge
             ImGui::PopStyleColor();
 
             // GIZMOS
-            Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
-            Editor* app = static_cast<Editor*>(Core::GetClient());
-
-            const EditorCamera& camera = app->GetCamera();
-            glm::mat4 cameraView = camera.GetViewMatrix();
-            glm::mat4 cameraProjection = camera.GetProjectionMatrix();
-            cameraProjection[1][1] *= -1;
-            ImGuizmo::SetRect(cursorScreenPos.x, cursorScreenPos.y, mViewportSize.x, mViewportSize.y);
-            //ImGuizmo::DrawGrid(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), glm::value_ptr(glm::mat4(1.0f)), 16);
-
-            if(selectedEntity && mGizmoType > 0)
+            if(!isPlaying)
             {
-                ImGuizmo::SetDrawlist();
+                Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
+                Editor* app = static_cast<Editor*>(Core::GetClient());
 
-                TransformComponent& transformComponent = selectedEntity.GetComponent<TransformComponent>();
-                glm::mat4 transform = transformComponent.GetTransform();
+                const EditorCamera& camera = app->GetCamera();
+                glm::mat4 cameraView = camera.GetViewMatrix();
+                glm::mat4 cameraProjection = camera.GetProjectionMatrix();
+                cameraProjection[1][1] *= -1;
+                ImGuizmo::SetRect(cursorScreenPos.x, cursorScreenPos.y, mViewportSize.x, mViewportSize.y);
+                //ImGuizmo::DrawGrid(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), glm::value_ptr(glm::mat4(1.0f)), 16);
 
-                // Snapping
-                const bool snap = Input::IsKeyPressed(Key::LeftControl);
-                float snapValue = 0.5f;
-                if(mGizmoType == ImGuizmo::OPERATION::ROTATE)
-                    snapValue = 45.0f;
-
-                float snapValues[3] = { snapValue, snapValue, snapValue };
-                ImGuizmo::SetGizmoSizeClipSpace(0.15f);
-                ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), static_cast<ImGuizmo::OPERATION>(mGizmoType), ImGuizmo::LOCAL, glm::value_ptr(transform), nullptr, snap ? snapValues : nullptr);
-
-                if(ImGuizmo::IsUsing())
+                if(selectedEntity && mGizmoType > 0)
                 {
-                    mGizmoInUse = true;
+                    ImGuizmo::SetDrawlist();
 
-                     RelationshipComponent& rel = selectedEntity.GetComponent<RelationshipComponent>();
+                    TransformComponent& transformComponent = selectedEntity.GetComponent<TransformComponent>();
+                    glm::mat4 transform = transformComponent.GetTransform();
 
-                     if(rel.Parent != entt::null)
-                     {
-                         Entity parentEntity((entt::entity)rel.Parent, app->GetCurrentScene().Raw());
-                         glm::mat4 parentWorld = parentEntity.GetComponent<TransformComponent>().GetTransform();
+                    // Snapping
+                    const bool snap = Input::IsKeyPressed(Key::LeftControl);
+                    float snapValue = 0.5f;
+                    if(mGizmoType == ImGuizmo::OPERATION::ROTATE)
+                        snapValue = 45.0f;
 
-                         // Local = Inverse(ParentWorld) * World
-                         transform = glm::inverse(parentWorld) * transform;
-                     }
+                    float snapValues[3] = { snapValue, snapValue, snapValue };
+                    ImGuizmo::SetGizmoSizeClipSpace(0.15f);
+                    ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), static_cast<ImGuizmo::OPERATION>(mGizmoType), ImGuizmo::LOCAL, glm::value_ptr(transform), nullptr, snap ? snapValues : nullptr);
 
-                    glm::vec3 translation, rotation, scale;
-                    Math::DecomposeTransform(transform, translation, rotation, scale);
+                    if(ImGuizmo::IsUsing())
+                    {
+                        mGizmoInUse = true;
 
-                    glm::vec3 deltaRotation = glm::degrees(rotation) - transformComponent.Rotation;
-                    transformComponent.Position = translation;
-                    transformComponent.Rotation += deltaRotation;
-                    transformComponent.Scale = scale;
-                    transformComponent.MarkDirty();
+                        RelationshipComponent& rel = selectedEntity.GetComponent<RelationshipComponent>();
+
+                        if(rel.Parent != entt::null)
+                        {
+                            Entity parentEntity((entt::entity)rel.Parent, app->GetCurrentScene().Raw());
+                            glm::mat4 parentWorld = parentEntity.GetComponent<TransformComponent>().GetTransform();
+
+                            // Local = Inverse(ParentWorld) * World
+                            transform = glm::inverse(parentWorld) * transform;
+                        }
+
+                        glm::vec3 translation, rotation, scale;
+                        Math::DecomposeTransform(transform, translation, rotation, scale);
+
+                        glm::vec3 deltaRotation = glm::degrees(rotation) - transformComponent.Rotation;
+                        transformComponent.Position = translation;
+                        transformComponent.Rotation += deltaRotation;
+                        transformComponent.Scale = scale;
+                        transformComponent.MarkDirty();
+                    }
+                    else
+                        mGizmoInUse = false;
                 }
-                else
-                    mGizmoInUse = false;
             }
         }
         else

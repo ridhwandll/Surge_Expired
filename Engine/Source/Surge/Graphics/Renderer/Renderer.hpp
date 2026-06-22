@@ -4,23 +4,16 @@
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/RenderGraph/RenderGraph.hpp"
 #include "Surge/Graphics/Shader/ShaderManager.hpp"
-#include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 
 namespace Surge
 {
-    class Scene;
-    class EditorCamera;
     class Renderer
     {
     public:
-        Renderer() = default;
-        ~Renderer() = default;
-
         void Initialize();
         void Shutdown();
 
-        void BeginFrame(const RuntimeCamera& camera, const glm::mat4& transform);
-        void BeginFrame(const EditorCamera& camera);
+        void BeginFrame(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar);
         void EndFrame();
 
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())
@@ -35,7 +28,6 @@ namespace Surge
         {
             FrameBlackboard& bb = mGraph.GetBlackboard();
             bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow });
-            //bb.OutlineList.emplace_back(OutlineSubmitCmd { transform, mesh }); // Uncomment for seeing outline in Runtime
         }
         void SubmitLight(const Light& light);
         void SubmitEnvironment(Environnment&& env);
