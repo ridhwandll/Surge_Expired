@@ -16,6 +16,7 @@
 #include "Asset/Cookers/MeshCooker.hpp"
 #include "Asset/Cookers/MaterialCooker.hpp"
 #include "Asset/Cookers/ScriptCooker.hpp"
+#include "Asset/Cookers/FontCooker.hpp"
 
 #include "Surge/Physics/Physics.hpp"
 
@@ -48,7 +49,7 @@ namespace Surge
         mAssetImporter.RegisterCooker(CreateScope<MaterialCooker>());
         mAssetImporter.RegisterCooker(CreateScope<MeshCooker>());
         mAssetImporter.RegisterCooker(CreateScope<ScriptCooker>());
-
+        mAssetImporter.RegisterCooker(CreateScope<FontCooker>());
 
         mAssetManager->AddAssetLoadHook([this](AssetID id, const AssetMetadata& meta)
                                         {
@@ -183,6 +184,8 @@ namespace Surge
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(scene.Raw());
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
         mActiveScene = std::move(scene);
+        mActiveScene->SetSelectedEntity({});
+
         //mAssetImporter.ScanAndCookAll();
     }
 

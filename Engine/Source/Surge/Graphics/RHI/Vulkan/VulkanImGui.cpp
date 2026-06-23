@@ -213,6 +213,7 @@ namespace Surge
 
     void VulkanImGuiContext::BeginFrame()
     {
+        SURGE_PROFILE_FUNC("VulkanImGuiContext::BeginFrame()");
         SG_ASSERT(mInitialized, "ImGuiLayer: BeginFrame called before Init");
         ImGui_ImplVulkan_NewFrame();
 

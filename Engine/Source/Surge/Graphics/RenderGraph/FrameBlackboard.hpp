@@ -5,6 +5,7 @@
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include <glm/glm.hpp>
+#include <Surge/Graphics/HighLevel/Font.hpp>
 
 #define MAX_SHADOW_CASCADE_COUNT 3
 
@@ -98,6 +99,15 @@ namespace Surge
         glm::vec4 Color;
     };
 
+    struct TextSubmitCmd // Pushed by Renderer::SubmitText()
+    {
+        glm::mat4 Transform;
+        String Text;
+        glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        Ref<Font> FontAsset;
+    };
+
     struct FrameBlackboard
     {
         // Written by Renderer::BeginFrame()
@@ -127,6 +137,7 @@ namespace Surge
         FramebufferHandle MainPassFramebuffer;
 
         SamplerHandle DefaultSampler;
+        SamplerHandle TextSampler;
 
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))
 
@@ -147,12 +158,14 @@ namespace Surge
         Vector<LightSubmitCmd> LightList;
         Vector<QuadSubmitCmd> QuadList;
         Vector<LineSubmitCmd> LineList;
+        Vector<TextSubmitCmd> TextList;
         Vector<OutlineSubmitCmd> OutlineList;
 
         void ClearLists()
         {
             MeshList.clear();
             LightList.clear();
+            TextList.clear();
             QuadList.clear();
             LineList.clear();
             OutlineList.clear();

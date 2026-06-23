@@ -6,6 +6,7 @@
 #include "Serializer/Mesh/MeshSerializer.hpp"
 #include "Serializer/SceneSerializer.hpp"
 #include "Serializer/Texture2DSerializer.hpp"
+#include "Serializer/Font/FontSerializer.hpp"
 
 #include "Surge/Utility/Filesystem.hpp"
 
@@ -23,6 +24,7 @@ namespace Surge
         mSerializers[AssetType::MESH] = CreateScope<MeshSerializer>();
         mSerializers[AssetType::MATERIAL] = CreateScope<MaterialSerializer>();
         mSerializers[AssetType::SCRIPT] = CreateScope<ScriptSerializer>();
+        mSerializers[AssetType::FONT] = CreateScope<FontSerializer>();
 
         for(auto& [type, serializer] : mSerializers)
             serializer->Initialize();

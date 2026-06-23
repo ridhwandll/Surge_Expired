@@ -15,8 +15,10 @@ namespace Surge
 
     struct TextureSpecification
     {
+        // TODO: Remove; Texture2D MUST be comporessed and use Mips always even if for a single level (Mips[0] is always guranteed)
         Uint Width = 0;
         Uint Height = 0;
+
         ImageFormat Format = ImageFormat::RGBA8_SRGB;
         void* Content = nullptr;
         bool GenerateMips = false;

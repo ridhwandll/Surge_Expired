@@ -17,6 +17,7 @@
 #include "Asset/SourceWriters/ScriptSourceWriter.hpp"
 
 #include <stb_image.h>
+#include <Surge/Graphics/HighLevel/Font.hpp>
 
 namespace Surge
 {
@@ -377,11 +378,18 @@ namespace Surge
                                             {
                                                 String extension = item.Path_.extension().string();
                                                 AssetType typeToImport = AssetTypeFromExtension(extension.c_str());
+                                                AssetID importedID = AssetID::INVALID;
                                                 if(typeToImport != AssetType::NONE)
                                                 {
                                                     String relativeToAssets =  Filesystem::GetRelativePath(item.Path_, mBaseDirectory).generic_string();
-                                                    mAssetManager->Import(relativeToAssets, typeToImport);
+                                                    importedID = mAssetManager->Import(relativeToAssets, typeToImport);
                                                     mNeedsCacheRefresh = true;
+                                                }
+
+                                                // Temp
+                                                if(typeToImport == AssetType::FONT)
+                                                {
+                                                    mAssetManager->Load<Font>(importedID);
                                                 }
                                             }
                                         }

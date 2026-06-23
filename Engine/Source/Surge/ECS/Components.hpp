@@ -236,6 +236,15 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct TextComponent
+    {
+        String Text;
+        glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        AssetID FontAssetID = AssetID::INVALID;
+        SURGE_REFLECTION_ENABLE;
+    };
+
 } // namespace Surge
 
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
@@ -244,4 +253,4 @@ namespace Surge
                                 ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
                                 ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
-                                ::Surge::ScriptComponent
+                                ::Surge::ScriptComponent, ::Surge::TextComponent

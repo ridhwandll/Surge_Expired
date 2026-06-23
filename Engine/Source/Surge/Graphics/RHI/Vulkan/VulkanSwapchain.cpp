@@ -22,6 +22,7 @@ namespace Surge
 
     VkResult VulkanSwapchain::AcquireNextImage(const VulkanRHI& rhi, VkSemaphore acquireSemaphore, Uint& outImageIndex)
     {
+        SURGE_PROFILE_FUNC("VulkanSwapchain::AcquireNextImage()");
         return vkAcquireNextImageKHR(rhi.GetDevice(), mSwapchain, UINT64_MAX, acquireSemaphore, VK_NULL_HANDLE, &outImageIndex);
     }
 

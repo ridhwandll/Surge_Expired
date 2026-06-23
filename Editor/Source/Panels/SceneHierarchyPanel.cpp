@@ -134,6 +134,12 @@ namespace Surge
                     mSceneContext->CreateEntity(mSelectedEntity, "Point Light");
                     mSelectedEntity.AddComponent<LightComponent>().Type = LightType::POINT;
                 }
+                ImGui::Separator();
+                if(ImGui::MenuItem("Text"))
+                {
+                    mSceneContext->CreateEntity(mSelectedEntity, "Text");
+                    mSelectedEntity.AddComponent<TextComponent>();
+                }
                 ImGui::EndPopup();
             }
 
@@ -217,11 +223,8 @@ namespace Surge
         bool isSearching = strlen(sSearchBuffer) > 0;
         bool hasChildren = (rel.FirstChild != entt::null) && !isSearching;
 
-        ImGuiTreeNodeFlags flags = (isSelectedEntity ? ImGuiTreeNodeFlags_Selected : 0)
-            | ImGuiTreeNodeFlags_SpanFullWidth
-            | ImGuiTreeNodeFlags_OpenOnArrow
-            | ImGuiTreeNodeFlags_OpenOnDoubleClick
-            | ImGuiTreeNodeFlags_FramePadding;
+        ImGuiTreeNodeFlags flags = (isSelectedEntity ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick
+                                                                                        | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DrawLinesFull;
 
         if(!hasChildren)
             flags |= ImGuiTreeNodeFlags_Leaf;

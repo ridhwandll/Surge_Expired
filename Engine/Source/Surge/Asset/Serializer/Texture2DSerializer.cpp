@@ -3,7 +3,6 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
-#include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "AssetStamp.hpp"
 
@@ -29,35 +28,44 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String ktx2Path = am->GetSidecarPath(metadata.ID);
 
-        Ref<Asset> ktx2Asset = LoadFromKTX2(ktx2Path);
-        SG_ASSERT(ktx2Asset, "[Texture2DSerializer] Failed to deserialize Texture2D: {}", metadata.RelativePath);
-        return ktx2Asset;
+        Ref<Texture2D> texture = LoadFromKTX2(ktx2Path);
+        SG_ASSERT(texture, "[Texture2DSerializer] Failed to deserialize Texture2D: {}", metadata.RelativePath);
+        return texture.As<Asset>();
     }
 
-    Ref<Asset> Texture2DSerializer::LoadFromKTX2(const String& ktx2Path) const
+    Ref<Texture2D> Texture2DSerializer::LoadFromKTX2(const String& ktx2Path)
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(ktx2Path, fileData))
         {
             Log<Severity::Error>("[Texture2DSerializer] Failed to read KTX2 file at path: {0} Maybe the file doesn't exist?", ktx2Path);
-            return nullptr;
+            return {};
         }
 
-        const Byte* ktx2Start = fileData.data() + sizeof(AssetStamp);
-        const Uint ktx2Size = static_cast<Uint>(fileData.size() - sizeof(AssetStamp));
+        TextureSpecification spec = LoadFromKTX2(fileData, ktx2Path, false);
+        return Texture2D::Create(spec);
+    }
+
+    TextureSpecification Texture2DSerializer::LoadFromKTX2(const Vector<Byte>& ktx2Data, const String& debugStr, bool raw)
+    {
+        const Byte* ktx2Start = raw ? ktx2Data.data() : ktx2Data.data() + sizeof(AssetStamp);
+        const Uint ktx2Size = raw ? static_cast<Uint>(ktx2Data.size()) : static_cast<Uint>(ktx2Data.size() - sizeof(AssetStamp));
         basist::ktx2_transcoder ktx2;
         if(!ktx2.init(ktx2Start, ktx2Size))
-            return nullptr;
+        {
+            Log<Severity::Error>("[Texture2DSerializer] Corrupted KTX2 file: {}", debugStr);
+            return {};
+        }
 
         const bool isSRGB = ktx2.get_dfd_transfer_func() == basist::KTX2_KHR_DF_TRANSFER_SRGB;
         if(!ktx2.start_transcoding())
         {
-            Log<Severity::Error>("[Texture2DSerializer] Failed to start transcoding(from KTX2) for {}", ktx2Path);
-            return nullptr;
+            Log<Severity::Error>("[Texture2DSerializer] Failed to start transcoding(from KTX2) {}!", debugStr);
+            return {};
         }
 
         TextureSpecification spec;
-        spec.DebugName = Filesystem::GetFilenameWithExt(ktx2Path);
+        spec.DebugName = Filesystem::GetFilenameWithExt(debugStr);
 
 #ifdef SURGE_PLATFORM_ANDROID
         // Transcode to hardware ASTC 4x4
@@ -84,14 +92,14 @@ namespace Surge
 
             if(!ktx2.transcode_image_level(level, 0, 0, levelData.data(), blockCount, transcoderFmt))
             {
-                Log<Severity::Error>("[Texture2DSerializer] Block transcode failed at level {} for {}", level, ktx2Path);
-                return nullptr;
+                Log<Severity::Error>("[Texture2DSerializer] Block transcode failed at level {} for {}", level, debugStr);
+                return {};
             }
 
             spec.Mips.push_back({ std::move(levelData), info.m_orig_width, info.m_orig_height });
         }
-        Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form KTX2 {}", Filesystem::GetFilenameWithExt(ktx2Path));
-        return Texture2D::Create(spec).As<Asset>();
+        Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form KTX2 {}", Filesystem::GetFilenameWithExt(debugStr));
+        return spec;
     }
 
     void Texture2DSerializer::Shutdown()

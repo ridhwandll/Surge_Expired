@@ -27,6 +27,7 @@ namespace Surge
         MATERIAL,
         SCENE,
         SCRIPT,
+        FONT
     };
 
     inline constexpr auto sAssetTypeArray = std::array {
@@ -35,7 +36,8 @@ namespace Surge
         AssetType::MESH,
         AssetType::MATERIAL,
         AssetType::SCENE,
-        AssetType::SCRIPT
+        AssetType::SCRIPT,
+        AssetType::FONT
     };
 
     inline AssetType AssetTypeFromString(const char* str)
@@ -46,6 +48,7 @@ namespace Surge
         if(strcmp(str, "MATERIAL") == 0) return AssetType::MATERIAL;
         if(strcmp(str, "SCENE") == 0) return AssetType::SCENE;
         if(strcmp(str, "SCRIPT") == 0) return AssetType::SCRIPT;
+        if(strcmp(str, "FONT") == 0) return AssetType::FONT;
         return AssetType::NONE;
     }
 
@@ -56,6 +59,7 @@ namespace Surge
         if(strcmp(str, ".smat") == 0) return AssetType::MATERIAL;
         if(strcmp(str, ".srg") == 0) return AssetType::SCENE;
         if(strcmp(str, ".lua") == 0) return AssetType::SCRIPT;
+        if(strcmp(str, ".ttf") == 0 || strcmp(str, ".otf") == 0) return AssetType::FONT;
         return AssetType::NONE;
     }
 
@@ -66,6 +70,7 @@ namespace Surge
             case AssetType::MATERIAL: return ".smat";
             case AssetType::SCENE: return ".srg";
             case AssetType::SCRIPT: return ".lua";
+            case AssetType::FONT: return ".ttf";
             default:
                 SG_ASSERT_INTERNAL("GetExtensionFromAssetType: Invalid asset type");
                 return "";

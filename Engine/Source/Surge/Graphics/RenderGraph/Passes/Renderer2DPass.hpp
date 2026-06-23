@@ -28,7 +28,6 @@ namespace Surge
         static constexpr Uint MAX_QUAD_BATCHES_PER_FRAME = 1000;
         static constexpr Uint MAX_TEX_SLOTS_PER_BATCH = 16; // TODO: Query from RHI caps
 
-
         // 1 draw call for ALL lines
         static constexpr Uint MAX_LINES_TOTAL = 300000;
         static constexpr Uint MAX_LINES_PER_BATCH = 300000;
@@ -130,7 +129,7 @@ namespace Surge
         Vector<DescriptorSetHandle> mTexDescriptorSets;
 
         QuadBatchData mCurrentQuadBatch;
-        PipelineHandle m2DPipeline;
+        PipelineHandle m2DQuadPipeline;
         BufferHandle mQuadVB[RHISettings::FRAMES_IN_FLIGHT];
         BufferHandle mQuadIB;
         DescriptorSetHandle mFrameDescriptorSet;
@@ -147,5 +146,8 @@ namespace Surge
         LineBatchData mCurrentLineBatch;
         PipelineHandle m2DLinePipeline;
         BufferHandle mLineVB[RHISettings::FRAMES_IN_FLIGHT];
+
+        // Text
+        PipelineHandle m2DTextPipeline;
     };
 }

@@ -26,6 +26,7 @@ namespace Surge
         mShaderManager.Initialize(ENGINE_SHADER_PATH);
         mShaderManager.Load("Renderer2D.glsl");
         mShaderManager.Load("Renderer2DLine.glsl");
+        mShaderManager.Load("Renderer2DText.glsl");
         mShaderManager.Load("Renderer3D.glsl");
         mShaderManager.Load("PostProcess.glsl");
         mShaderManager.Load("OutlineMask.glsl");
@@ -39,16 +40,28 @@ namespace Surge
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();
 
         //Sampler
-        SamplerDesc samplerDesc = {};
-        samplerDesc.DebugName = "DefaultSampler";
-        samplerDesc.Min = FilterMode::NEAREST; // We set to NEAREST as Rendergraph Passes uses this internally
-        samplerDesc.Mag = FilterMode::NEAREST;
-        samplerDesc.Mip = MipmapMode::LINEAR;
-        samplerDesc.WrapU = WrapMode::REPEAT;
-        samplerDesc.WrapV = WrapMode::REPEAT;
-        samplerDesc.Anisotropy = true;
-        samplerDesc.MaxAniso = 4;
-        blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
+        {
+            SamplerDesc samplerDesc = {};
+            samplerDesc.DebugName = "DefaultSampler";
+            samplerDesc.Min = FilterMode::NEAREST; // We set to NEAREST as Rendergraph Passes uses this internally
+            samplerDesc.Mag = FilterMode::NEAREST;
+            samplerDesc.Mip = MipmapMode::LINEAR;
+            samplerDesc.WrapU = WrapMode::REPEAT;
+            samplerDesc.WrapV = WrapMode::REPEAT;
+            samplerDesc.Anisotropy = true;
+            samplerDesc.MaxAniso = 4;
+            blackBoard.DefaultSampler = mRHI->CreateSampler(samplerDesc);
+        }
+        {
+            SamplerDesc samplerDesc = {};
+            samplerDesc.DebugName = "TextSampler";
+            samplerDesc.Min = FilterMode::LINEAR;
+            samplerDesc.Mag = FilterMode::LINEAR;
+            samplerDesc.Mip = MipmapMode::LINEAR;
+            samplerDesc.WrapU = WrapMode::CLAMP;
+            samplerDesc.WrapV = WrapMode::CLAMP;
+            blackBoard.TextSampler = mRHI->CreateSampler(samplerDesc);
+        }
 
         Byte whitePixel[] = { 255, 255, 255, 255 };
         ImageDesc texDesc = {};
@@ -192,6 +205,7 @@ namespace Surge
             mRHI->DestroyBuffer(blackBoard.FrameUBOs[i]);
 
         mRHI->DestroySampler(blackBoard.DefaultSampler);
+        mRHI->DestroySampler(blackBoard.TextSampler);
         mRHI->Shutdown();
     }
 

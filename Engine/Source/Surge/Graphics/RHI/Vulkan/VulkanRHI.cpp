@@ -139,7 +139,7 @@ namespace Surge
         // Wait for this SLOT's fence
         // This slot was used N frames ago, wait until the GPU is done with it
         {
-            //Timer fenceTimer("vkWaitForFences", true);
+            //SCOPED_TIMER("vkWaitForFences");
             vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
         }
 
@@ -1165,6 +1165,7 @@ namespace Surge
 
     void VulkanRHI::ResizeInternal()
     {
+        SURGE_PROFILE_FUNC("VulkanRHI::ResizeInternal()");
         WaitIdle();
         DestroySwapchainFramebuffers();
         mSwapchain.Resize(*this, 0, 0);
@@ -1253,6 +1254,7 @@ namespace Surge
 
     void VulkanRHI::FlushDeletionQueue(Uint frameIndex)
     {
+        SURGE_PROFILE_FUNC("VulkanRHI::FlushDeletionQueue(Uint frameIndex)");
         auto& q = mDeletionQueues[frameIndex];
         for(auto& e : q.Buffers) VulkanBuffer::Destroy(*this, e);
         for(auto& e : q.Images) VulkanImage::Destroy(*this, e);

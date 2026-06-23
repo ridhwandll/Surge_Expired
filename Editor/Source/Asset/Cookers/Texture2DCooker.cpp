@@ -69,7 +69,7 @@ namespace Surge
 
     String Texture2DCooker::FindBasisuExe()
     {
-        const String basisuPath = "Engine/Tools/basisu.exe";
+        const String basisuPath = "Editor/Tools/basisu.exe";
         if(Filesystem::Exists(basisuPath))
             return basisuPath;
 

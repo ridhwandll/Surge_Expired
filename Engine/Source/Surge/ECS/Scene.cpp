@@ -62,14 +62,24 @@ namespace Surge
     void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
     {
         Renderer* renderer = Core::GetRenderer();
-
+        AssetManager* am = Core::GetAssetManager();
         renderer->BeginFrame(viewMatrix, projectionMatrix, cameraNearFar);
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
             {
-                ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? Core::GetAssetManager()->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
+                ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? am->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
                 renderer->SubmitQuad(transform.GetTransform(), sprite.Color, textureHandle);
+            }
+
+            auto txtView = mRegistry.view<TextComponent, TransformComponent>();
+            for(const auto& [entity, txtCmp, transform] : txtView.each())
+            {
+                if (txtCmp.FontAssetID)
+                {
+                    Ref<Font> font = am->Load<Font>(txtCmp.FontAssetID);
+                    renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, font);
+                }
             }
         }
         {
@@ -125,7 +135,7 @@ namespace Surge
             {
                 if(meshComponent.MeshID)
                 {
-                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComponent.MeshID);
+                    Ref<Mesh> mesh = am->Load<Mesh>(meshComponent.MeshID);
                     if(mesh) //Asset might be missing/corrupted, so check before submitting
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
                 }
@@ -140,7 +150,7 @@ namespace Surge
             {
                 if(meshComp->MeshID)
                 {
-                    Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp->MeshID);
+                    Ref<Mesh> mesh = am->Load<Mesh>(meshComp->MeshID);
                     if(mesh) //Asset might be missing/corrupted, so check before submitting
                     {
                         const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
@@ -288,6 +298,7 @@ namespace Surge
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<LightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<EnvironmentComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<TextComponent>(other->mRegistry, mRegistry, enttMap);
 
         CopyComponent<RigidbodyComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<BoxColliderComponent>(other->mRegistry, mRegistry, enttMap);
@@ -414,6 +425,7 @@ namespace Surge
         CopyIfHas(std::type_identity<MeshColliderComponent>{});
         CopyIfHas(std::type_identity<LightComponent>{});
         CopyIfHas(std::type_identity<SpriteRendererComponent>{});
+        CopyIfHas(std::type_identity<TextComponent>{});
         CopyIfHas(std::type_identity<ScriptComponent>{});
 
         return newEntity;
@@ -566,6 +578,9 @@ namespace Surge
             for(auto entityID : view)
             {
                 auto& scriptComp = view.get<ScriptComponent>(entityID);
+                if (!scriptComp.ScriptAsset.IsValid())
+                    continue;
+
                 Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
                 Entity entityObj = { entityID, this };
                 if(!scriptComp.IsInstantiated)
