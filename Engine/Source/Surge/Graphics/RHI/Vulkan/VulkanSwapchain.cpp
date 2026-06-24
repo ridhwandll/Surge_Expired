@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/RHI/Vulkan/VulkanSwapchain.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
+#include "Surge/Core/Profiler.hpp"
 
 namespace Surge
 {

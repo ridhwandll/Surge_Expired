@@ -115,9 +115,6 @@ namespace Surge
         GraphicsRHI* mRHI = nullptr;
         FrameContext mCurrentFrameCtx;
 
-        // TODO: Textures in Renderer2D
-        //DescriptorSetHandle mTexDescriptorSets[MAX_BATCHES_PER_FRAME];
-
         // Quads
         Uint mTotalQuadlVertexCount = 0;
         Uint mTotalQuadCount = 0;
@@ -149,5 +146,6 @@ namespace Surge
 
         // Text
         PipelineHandle m2DTextPipeline;
+        Vector<float> mLineLayoutCache;
     };
 }

@@ -152,7 +152,7 @@ namespace Surge
         mCurrentFrameCtx = ctx;
 
         // ==========================================================================
-        // 1. QUADS (SPRITES)
+        // QUADS
         // ==========================================================================
         mQuadBatchCount = 0;
         mTotalQuadlVertexCount = 0;
@@ -179,15 +179,8 @@ namespace Surge
                 if(mQuadBatchCount >= MAX_QUAD_BATCHES_PER_FRAME) break;
                 slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
             }
-
-            static constexpr glm::vec4 sLocalPositions[4] = {
-                { 0.5f, -0.5f, 0.0f, 1.0f}, { 0.5f,  0.5f, 0.0f, 1.0f},
-                {-0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f, -0.5f, 0.0f, 1.0f}
-            };
-            static constexpr glm::vec2 sUVs[4] = {
-                { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f }
-            };
-
+            static constexpr glm::vec4 sLocalPositions[4] = { { 0.5f, -0.5f, 0.0f, 1.0f}, { 0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f, -0.5f, 0.0f, 1.0f} };
+            static constexpr glm::vec2 sUVs[4] = { { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f } };
             const Uint packedColor = glm::packUnorm4x8(quad.Color);
             for(Uint i = 0; i < 4; i++)
             {
@@ -220,7 +213,7 @@ namespace Surge
         }
 
         // ==========================================================================
-        // 2. LINES
+        // LINES
         // ==========================================================================
         mLineBatchCount = 0;
         mTotalLineVertexCount = 0;
@@ -263,17 +256,15 @@ namespace Surge
         }
 
         // ==========================================================================
-        // 3. TEXT (MSDF)
+        // TEXT
         // ==========================================================================
-        Uint textBatchStartIndex = mQuadBatchCount; // Record where the text batches begin
-
+        Uint textBatchStartIndex = mQuadBatchCount;
         struct TextPushConstants
         {
             float PxRange;
             float pad[2];
         };
 
-        // Cache the parameters associated with each batch index
         std::array<TextPushConstants, MAX_QUAD_BATCHES_PER_FRAME> textBatchParams;
         TextPushConstants currentTextParams = { 2.0f, {0.0f, 0.0f} };
 
@@ -282,25 +273,146 @@ namespace Surge
             if(!txt.FontAsset || txt.Text.empty() || mMaxQuadCountReached)
                 continue;
 
+            // TODO: Styling via PushConstants (Weight, Italic, etc.)
+            //if(mCurrentQuadBatch.QuadCount > 0 && currentTextParams.Weight != txt.Weight)
+            //{
+            //    textBatchParams[mQuadBatchCount] = currentTextParams;
+            //    FlushQuadBatch();
+            //    if(mQuadBatchCount >= MAX_QUAD_BATCHES_PER_FRAME)
+            //        break;
+            //}
+
             currentTextParams.PxRange = 2.0f;
             textBatchParams[mQuadBatchCount] = currentTextParams;
 
             ImageHandle fontAtlas = txt.FontAsset->GetAtlas();
-            float cursorX = 0.0f;
-            float cursorY = 0.0f;
             const Uint packedColor = glm::packUnorm4x8(txt.Color);
 
-            for(char c : txt.Text)
+            glm::vec4 localPositions[4];
+            glm::vec2 uvs[4];
+
+            // LINE MEASUREMENT
+            mLineLayoutCache.clear();
+            float currentLineWidth = 0.0f;
+            Uint measurePrevChar = 0;
+            for(size_t i = 0; i < txt.Text.size(); i++)
             {
+                char c = txt.Text[i];
+
+                // If we have a max width set, and we encounter a space, we need to measure the next word length to see
+                // if it fits in the current line. If it doesn't fit, we push the current line width to the cache and reset for the next line.
+                if(txt.MaxWidth > 0.0f && c == ' ')
+                {
+                    float nextWordLength = 0.0f;
+
+                    // If encountered a space, measure the next word length to see if it fits in the current line
+                    for(size_t j = i + 1; j < txt.Text.size() && txt.Text[j] != ' ' && txt.Text[j] != '\n'; j++)
+                    {
+                        const FontGlyph* nextGlyph = txt.FontAsset->GetGlyph(txt.Text[j]);
+                        if(nextGlyph)
+                            nextWordLength += nextGlyph->Advance;
+                    }
+
+                    if(currentLineWidth + nextWordLength > txt.MaxWidth)
+                    {
+                        mLineLayoutCache.push_back(currentLineWidth);
+                        currentLineWidth = 0.0f;
+                        measurePrevChar = 0;
+                        continue;
+                    }
+                }
                 if(c == '\n')
                 {
-                    cursorY -= txt.FontAsset->GetLineHeight();
-                    cursorX = 0.0f;
+                    mLineLayoutCache.push_back(currentLineWidth);
+                    currentLineWidth = 0.0f;
+                    measurePrevChar = 0;
                     continue;
                 }
 
                 const FontGlyph* glyph = txt.FontAsset->GetGlyph(c);
-                if(!glyph) continue;
+                if(!glyph)
+                    continue;
+
+                if(measurePrevChar != 0)
+                    currentLineWidth += txt.FontAsset->GetKerning(measurePrevChar, c);
+
+                currentLineWidth += (glyph->Advance + txt.LetterSpacing);
+                measurePrevChar = c;
+            }
+            mLineLayoutCache.push_back(currentLineWidth); // Push the final line width
+
+            // GEOMETRY GENERATION
+
+            // Calculate the starting cursorX
+            auto getCursorX = [&](Uint lineIdx) -> float {
+                if(lineIdx >= mLineLayoutCache.size()) [[unlikely]] // Should not happen
+                    return 0.0f;
+
+                float lineWidth = mLineLayoutCache[lineIdx];
+                if(txt.Alignment == TextAlignment::CENTER)
+                    return -lineWidth * 0.5f;
+                else if(txt.Alignment == TextAlignment::RIGHT)
+                    return -lineWidth;
+                return 0.0f; // Left alignment
+            };
+
+            Uint lineIndex = 0;
+            auto nextLine = [&]() {
+                cursorY -= (txt.FontAsset->GetLineHeight() + txt.LineSpacing);
+                lineIndex++;
+
+                // Reset cursorX alignment offset
+                cursorX = getCursorX(lineIndex);
+                drawPrevChar = 0;
+            };
+
+            float cursorY = 0.0f;
+            float cursorX = getCursorX(lineIndex);
+            Uint drawPrevChar = 0;
+
+            for(size_t i = 0; i < txt.Text.size(); i++)
+            {
+                if(mTotalQuadCount >= MAX_QUADS_TOTAL)
+                {
+                    Log<Severity::Warn>("Max Quads per frame reached during Text Pass!");
+                    mMaxQuadCountReached = true;
+                    break;
+                }
+
+                char c = txt.Text[i];
+
+                // Wrapping (Max Width)
+                if(txt.MaxWidth > 0.0f && c == ' ')
+                {
+                    float nextWordLength = 0.0f;
+                    for(size_t j = i + 1; j < txt.Text.size() && txt.Text[j] != ' ' && txt.Text[j] != '\n'; j++)
+                    {
+                        const FontGlyph* nextGlyph = txt.FontAsset->GetGlyph(txt.Text[j]);
+                        if(nextGlyph) nextWordLength += nextGlyph->Advance;
+                    }
+
+                    // We use the raw advance without offset here to check wrap limits
+                    float baseWidth = txt.Alignment == TextAlignment::LEFT ? cursorX : cursorX + (txt.Alignment == TextAlignment::CENTER ? mLineLayoutCache[lineIndex] * 0.5f : mLineLayoutCache[lineIndex]);
+
+                    if(baseWidth + nextWordLength > txt.MaxWidth)
+                    {
+                        nextLine();
+                        continue;
+                    }
+                }
+
+                if(c == '\n')
+                {
+                    nextLine();
+                    continue;
+                }
+
+                const FontGlyph* glyph = txt.FontAsset->GetGlyph(c);
+                if(!glyph)
+                    continue;
+
+                if(drawPrevChar != 0)
+                    cursorX += txt.FontAsset->GetKerning(drawPrevChar, c);
 
                 int slot = mCurrentQuadBatch.FindOrAssignTextureSlot(fontAtlas);
                 if(slot == QuadBatchData::MAX_TEX_IN_BATCH_REACHED || mCurrentQuadBatch.QuadCount >= MAX_QUADS_PER_BATCH)
@@ -312,47 +424,47 @@ namespace Surge
                         break;
                     }
                     slot = mCurrentQuadBatch.FindOrAssignTextureSlot(fontAtlas);
-
-                    // We just advanced the batch index via Flush, so we must assign the styling to the NEW batch!
                     textBatchParams[mQuadBatchCount] = currentTextParams;
                 }
 
+                // QuadMin = Bottom-Left; QuadMax = Top-Right
                 glm::vec2 quadMin = glm::vec2(cursorX + glyph->PlaneBounds[0].x, cursorY + glyph->PlaneBounds[0].y);
                 glm::vec2 quadMax = glm::vec2(cursorX + glyph->PlaneBounds[1].x, cursorY + glyph->PlaneBounds[1].y);
 
-                glm::vec4 localPositions[4] = {
-                    { quadMax.x, quadMin.y, 0.0f, 1.0f }, { quadMax.x, quadMax.y, 0.0f, 1.0f },
-                    { quadMin.x, quadMax.y, 0.0f, 1.0f }, { quadMin.x, quadMin.y, 0.0f, 1.0f }
-                };
+                localPositions[0] = { quadMax.x, quadMin.y, 0.0f, 1.0f };
+                localPositions[1] = { quadMax.x, quadMax.y, 0.0f, 1.0f };
+                localPositions[2] = { quadMin.x, quadMax.y, 0.0f, 1.0f };
+                localPositions[3] = { quadMin.x, quadMin.y, 0.0f, 1.0f };
 
-                glm::vec2 uvs[4] = {
-                    { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[0].y }, { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[1].y },
-                    { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[1].y }, { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[0].y }
-                };
+                // (Rid) MSDF JSON assumes Y goes Up, but Vulkan assumes Y goes Down. Invert Y here
+                uvs[0] = { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[0].y };
+                uvs[1] = { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[1].y };
+                uvs[2] = { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[1].y };
+                uvs[3] = { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[0].y };
 
-                for(Uint i = 0; i < 4; i++)
+                for(Uint vIdx = 0; vIdx < 4; vIdx++)
                 {
                     QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
-                    v.Position = txt.Transform * localPositions[i];
+                    v.Position = txt.Transform * localPositions[vIdx];
                     v.Color = packedColor;
-                    v.UV = uvs[i];
+                    v.UV = uvs[vIdx];
                     v.TextureIndex = (Uint)slot;
                 }
 
+                cursorX += (glyph->Advance + txt.LetterSpacing);
+                drawPrevChar = c;
+
                 mCurrentQuadBatch.QuadCount++;
                 mTotalQuadCount++;
-                cursorX += glyph->Advance;
             }
         }
 
-        // Flush any remaining text characters
         if(mCurrentQuadBatch.QuadCount > 0)
         {
             textBatchParams[mQuadBatchCount] = currentTextParams;
             FlushQuadBatch();
         }
 
-        // Finally, issue Vulkan Commands specifically mapping the tracked constants to their batches
         if(mQuadBatchCount > textBatchStartIndex)
         {
             mRHI->CmdBindPipeline(mCurrentFrameCtx, m2DTextPipeline);
@@ -362,9 +474,7 @@ namespace Surge
 
             for(Uint i = textBatchStartIndex; i < mQuadBatchCount; i++)
             {
-                // Grab the exact styling parameters mapped to this specific batch ID
                 const TextPushConstants& params = textBatchParams[i];
-
                 mRHI->CmdPushConstants(mCurrentFrameCtx, m2DTextPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(TextPushConstants), &params);
 
                 const QuadDrawCmd& cmd = mQuadDrawCommands[i];

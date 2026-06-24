@@ -81,8 +81,6 @@ find_library(log-lib log)
 find_library(android-lib android)
 find_library(vulkan-lib vulkan)
 
-# Build vendored static libraries from source
-
 # volk (single-header loader; compile it as a static lib)
 add_library(volk_android STATIC "${VENDOR_ROOT}/volk/volk.c")
 target_include_directories(volk_android PUBLIC "${VENDOR_ROOT}/volk" "${VENDOR_ROOT}/Vulkan-Headers/Include")

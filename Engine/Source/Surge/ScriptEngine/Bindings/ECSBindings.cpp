@@ -57,6 +57,7 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<ConvexColliderComponent>(entityType, "ConvexColliderC");
         BindComponentToEntity<MeshColliderComponent>(entityType, "MeshColliderC");
         BindComponentToEntity<ScriptComponent>(entityType, "ScriptC");
+        BindComponentToEntity<TextComponent>(entityType, "TextC");
     }
 
 #define BIND_PROP(COMP, PROP) \
@@ -85,6 +86,12 @@ namespace Surge::ScriptBinding
         lua.new_enum("LightType",
                      "DIRECTIONAL", LightType::DIRECTIONAL,
                      "POINT", LightType::POINT
+        );
+
+        lua.new_enum("TextAlignment",
+                     "LEFT", TextAlignment::LEFT,
+                     "CENTER", TextAlignment::CENTER,
+                     "RIGHT", TextAlignment::RIGHT
         );
 
         // COMPONENTS
@@ -244,5 +251,16 @@ namespace Surge::ScriptBinding
         lua.new_usertype<ScriptComponent>("ScriptComponent", sol::no_constructor,
                                           "ScriptAsset", BIND_PROP(ScriptComponent, ScriptAsset),
                                           STRICT_READ(ScriptComponent));
+
+        lua.new_usertype<TextComponent>("TextComponent", sol::no_constructor,
+                                        "Text", BIND_PROP(TextComponent, Text),
+                                        "Color", BIND_PROP(TextComponent, Color),
+                                        "MaxWidth", BIND_PROP(TextComponent, MaxWidth),
+                                        "LetterSpacing", BIND_PROP(TextComponent, LetterSpacing),
+                                        "Alignment", BIND_PROP(TextComponent, Alignment),
+                                        "LineSpacing", BIND_PROP(TextComponent, LineSpacing),
+                                        "FontAssetID", BIND_PROP(TextComponent, FontAssetID),
+
+                                          STRICT_READ(TextComponent));
     }
 }

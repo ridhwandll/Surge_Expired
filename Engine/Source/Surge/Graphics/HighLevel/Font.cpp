@@ -41,6 +41,8 @@ namespace Surge
         desc.MipUploadCount = 1;
 
         mAtlasImageHandle = renderer->GetRHI()->CreateImage(desc);
+
+        // mSpecification.KTX2Data.clear(); // TODO: Free the KTX2 data after creating the GPU image
     }
 
     Font::~Font()

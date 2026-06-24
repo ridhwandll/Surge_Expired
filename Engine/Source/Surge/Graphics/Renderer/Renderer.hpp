@@ -4,6 +4,7 @@
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/RenderGraph/RenderGraph.hpp"
 #include "Surge/Graphics/Shader/ShaderManager.hpp"
+#include "Surge/Graphics/Renderer/Text.hpp"
 
 namespace Surge
 {
@@ -24,9 +25,9 @@ namespace Surge
         {
             mGraph.GetBlackboard().LineList.emplace_back(LineSubmitCmd { .P0 = point0, .P1 = point1, .Color = color, });
         }
-        void SubmitText(const glm::mat4& transform, const String& txt, const glm::vec4& color, const Ref<Font>& font)
+        void SubmitText(const glm::mat4& transform, const String& txt, const glm::vec4& color, float maxWidth, float letterSpacing, float lineSpacing, TextAlignment alignment, const Ref<Font>& font)
         {
-            mGraph.GetBlackboard().TextList.emplace_back(TextSubmitCmd { .Transform = transform, .Text = txt, .Color = color, .FontAsset = font });
+            mGraph.GetBlackboard().TextList.emplace_back(TextSubmitCmd { .Transform = transform, .Text = txt, .Color = color, .MaxWidth = maxWidth, .LetterSpacing = letterSpacing, .LineSpacing = lineSpacing, .Alignment = alignment, .FontAsset = font });
         }
         void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow)
         {

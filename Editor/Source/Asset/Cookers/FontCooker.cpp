@@ -27,7 +27,7 @@ namespace Surge
         const String charsetArg = "[0x0020, 0x007E]";
 
         String msdfCmd = std::format(
-            "\"{}\" -font \"{}\" -type msdf -dimensions 1024 1024 -minsize 32 -pxrange 2.0 "
+            "\"{}\" -font \"{}\" -type msdf -dimensions 1024 1024 -minsize 32 -pxrange 2.0 -kerning "
             "-chars \"{}\" -json \"{}\" -imageout \"{}\"",
             msdfAtlasGenExe, sourceAbsPath, charsetArg,
             tempJson.string(), tempPng.string());
@@ -81,8 +81,20 @@ namespace Surge
                 bg.UVBounds[0] = { jGlyph["atlasBounds"]["left"].get<float>() / atlasWidth, jGlyph["atlasBounds"]["bottom"].get<float>() / atlasHeight };
                 bg.UVBounds[1] = { jGlyph["atlasBounds"]["right"].get<float>() / atlasWidth, jGlyph["atlasBounds"]["top"].get<float>() / atlasHeight };
             }
-
             spec.Glyphs[bg.UnicodeID] = bg;
+
+            if(fontJson.contains("kerning"))
+            {
+                for(const auto& jKerning : fontJson["kerning"])
+                {
+                    Uint u1 = jKerning["unicode1"].get<Uint>();
+                    Uint u2 = jKerning["unicode2"].get<Uint>();
+                    float advance = jKerning["advance"].get<float>();
+
+                    uint64_t key = ((uint64_t)u1 << 32) | u2;
+                    spec.Kerning[key] = advance;
+                }
+            }
         }
 
         // Slurp the compressed KTX2 data directly into the spec memory buffer

@@ -675,7 +675,7 @@ namespace Surge
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted("Font");
                 ImGui::TableNextColumn();
-                if(ImGui::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x / 1.3f, 0)) && hasFontAsset)
+                if(ImGui::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x / 1.5f, 0)) && hasFontAsset)
                 {
                     Editor* editor = static_cast<Editor*>(Core::GetClient());
                     editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.FontAssetID);
@@ -700,13 +700,40 @@ namespace Surge
                     ImGui::EndDragDropTarget();
                 }
 
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("Text");
-                ImGui::TableNextColumn();
-                ImGui::PushItemWidth(-1);
-                ImGui::InputTextMultiline("##Text", &component.Text);
-                ImGui::PopItemWidth();
-                ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
+                if(component.FontAssetID)
+                {
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted("Text");
+                    ImGui::TableNextColumn();
+                    ImGui::PushItemWidth(-1);
+                    ImGui::InputTextMultiline("##Text", &component.Text);
+                    ImGui::PopItemWidth();
+                    ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
+                    ImGuiAux::TProperty<float>("Max Width", &component.MaxWidth);
+                    ImGuiAux::TProperty<float>("Letter Spacing", &component.LetterSpacing);
+                    ImGuiAux::TProperty<float>("Line Spacing", &component.LineSpacing);
+
+                    const char* alignTypeStrings[] = { "LEFT", "CENTER", "RIGHT" };
+                    const char* currentAlignTypeString = alignTypeStrings[static_cast<uint8_t>(component.Alignment)];
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted("ALIGNMENT");
+                    ImGui::TableNextColumn();
+                    ImGui::PushItemWidth(-1);
+                    if(ImGui::BeginCombo("##ALIGNTYPE", currentAlignTypeString))
+                    {
+                        for(int i = 0; i < 3; i++)
+                        {
+                            const bool isSelected = (component.Alignment == static_cast<TextAlignment>(i));
+                            if(ImGui::Selectable(alignTypeStrings[i], isSelected))
+                                component.Alignment = static_cast<TextAlignment>(i);
+                            if(isSelected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    ImGui::PopItemWidth();
+                }
             });
         }
     }

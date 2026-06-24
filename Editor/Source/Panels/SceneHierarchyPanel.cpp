@@ -57,15 +57,20 @@ namespace Surge
 
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 
-            // Search Bar
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 40.0f);
-            ImGui::InputTextWithHint("##Search", "Search Entities...", sSearchBuffer, 256);
+            {
+                ImGuiAux::ScopedBoldFont font;
+                constexpr const char* addButtonLabel = " ADD ";
 
-            ImGui::SameLine();
+                // Search Bar
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(addButtonLabel).x - 20.0f); // 20.0f is padding + scroll bar width (approx.)
+                ImGui::InputTextWithHint("##Search", "Search Entities...", sSearchBuffer, 256);
 
-            // + Button
-            if(ImGui::Button("+", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
-                ImGui::OpenPopup("AddEntityContext");
+                ImGui::SameLine();
+
+                // + Button
+                if(ImGui::Button(addButtonLabel, ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
+                    ImGui::OpenPopup("AddEntityContext");
+            }
 
             ImGui::PopStyleVar();
             ImGui::Spacing();
@@ -147,9 +152,7 @@ namespace Surge
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4.0f, 2.0f));
 
-            constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY;
-
-            if(ImGui::BeginTable("HierarchyTable", 2, tableFlags))
+            if(ImGui::BeginTable("HierarchyTable", 2, ImGuiTableFlags_BordersInnerV))
             {
                 ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 75.0f);
@@ -192,11 +195,14 @@ namespace Surge
             {
                 ImGui::InvisibleButton("##RootDropZone", { ImGui::GetContentRegionAvail().x, emptySpaceY });
 
-                if(ImGui::IsItemClicked())
+                if(ImGui::IsItemClicked(ImGuiMouseButton_Left))
                 {
                     mSelectedEntity = {};
                     mSceneContext->SetSelectedEntity({});
                 }
+
+                if(ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                    ImGui::OpenPopup("AddEntityContext");
 
                 if(ImGui::BeginDragDropTarget())
                 {
@@ -326,11 +332,12 @@ namespace Surge
         ImGui::TableNextColumn();
 
         String typeTag = "Entity";
-        if(e.HasComponent<CameraComponent>())             typeTag = "CAMERA";
-        else if(e.HasComponent<LightComponent>())         typeTag = "LIGHT";
-        else if(e.HasComponent<MeshComponent>())          typeTag = "MESH";
-        else if(e.HasComponent<SpriteRendererComponent>())typeTag = "SPRITE";
-        else if(e.HasComponent<EnvironmentComponent>())   typeTag = "ENV";
+        if(e.HasComponent<CameraComponent>())              typeTag = "CAMERA";
+        else if(e.HasComponent<TextComponent>())           typeTag = "TEXT";
+        else if(e.HasComponent<LightComponent>())          typeTag = "LIGHT";
+        else if(e.HasComponent<MeshComponent>())           typeTag = "MESH";
+        else if(e.HasComponent<SpriteRendererComponent>()) typeTag = "SPRITE";
+        else if(e.HasComponent<EnvironmentComponent>())    typeTag = "ENV";
 
         if(isSelectedEntity)
             ImGui::TextUnformatted(typeTag.c_str());

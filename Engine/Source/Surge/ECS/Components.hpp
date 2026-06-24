@@ -3,10 +3,15 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Surge/Core/UUID.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
+
 #include "Surge/Graphics/Renderer/Lights.hpp"
+#include "Surge/Graphics/Renderer/Text.hpp"
+
 #include "Surge/Physics/RigidbodyID.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
+
+
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -240,6 +245,11 @@ namespace Surge
     {
         String Text;
         glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        float MaxWidth = 0.0f;
+        float LetterSpacing = 0.0f;
+        float LineSpacing = 0.0f;
+        TextAlignment Alignment = TextAlignment::LEFT;
 
         AssetID FontAssetID = AssetID::INVALID;
         SURGE_REFLECTION_ENABLE;

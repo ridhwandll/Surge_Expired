@@ -3,6 +3,7 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
+#include "Surge/Core/Profiler.hpp"
 
 #include <ImGuizmo.h>
 

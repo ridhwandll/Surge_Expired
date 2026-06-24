@@ -4,8 +4,10 @@
 #include "Surge/Graphics/RHI/RHISettings.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Graphics/HighLevel/Font.hpp"
+#include "Surge/Graphics/Renderer/Text.hpp"
+
 #include <glm/glm.hpp>
-#include <Surge/Graphics/HighLevel/Font.hpp>
 
 #define MAX_SHADOW_CASCADE_COUNT 3
 
@@ -104,6 +106,12 @@ namespace Surge
         glm::mat4 Transform;
         String Text;
         glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        float MaxWidth = 0.0f; // 0.0 means no wrapping
+
+        float LetterSpacing = 0.0f;
+        float LineSpacing = 0.0f;
+        TextAlignment Alignment = TextAlignment::LEFT;
 
         Ref<Font> FontAsset;
     };
