@@ -78,7 +78,8 @@ namespace Surge
                 if (txtCmp.FontAssetID)
                 {
                     Ref<Font> font = am->Load<Font>(txtCmp.FontAssetID);
-                    renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, txtCmp.MaxWidth, txtCmp.LetterSpacing, txtCmp.LineSpacing, txtCmp.Alignment, font);
+                    renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, txtCmp.MaxWidth, txtCmp.LetterSpacing, txtCmp.LineSpacing, 
+                                         txtCmp.Alignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font);
                 }
             }
         }

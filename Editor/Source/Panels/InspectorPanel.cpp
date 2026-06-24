@@ -710,6 +710,9 @@ namespace Surge
                     ImGui::PopItemWidth();
                     ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
                     ImGuiAux::TProperty<float>("Max Width", &component.MaxWidth);
+
+                    ImGuiAux::TSperator("Style");
+
                     ImGuiAux::TProperty<float>("Letter Spacing", &component.LetterSpacing);
                     ImGuiAux::TProperty<float>("Line Spacing", &component.LineSpacing);
 
@@ -733,6 +736,15 @@ namespace Surge
                         ImGui::EndCombo();
                     }
                     ImGui::PopItemWidth();
+                    ImGuiAux::TProperty<bool>("Underline", &component.Underline);
+                    ImGuiAux::TProperty<bool>("Italic", &component.Italic);
+
+                    ImGuiAux::TSperator("Shadow");
+                    ImGui::PushID("Shadow");
+                    ImGuiAux::TProperty<bool>("Enabled", &component.ShadowEnabled);
+                    ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.ShadowColor);
+                    ImGuiAux::TProperty<glm::vec2>("Offset", &component.ShadowOffset);
+                    ImGui::PopID();
                 }
             });
         }

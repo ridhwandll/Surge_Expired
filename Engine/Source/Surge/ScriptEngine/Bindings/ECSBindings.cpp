@@ -259,8 +259,10 @@ namespace Surge::ScriptBinding
                                         "LetterSpacing", BIND_PROP(TextComponent, LetterSpacing),
                                         "Alignment", BIND_PROP(TextComponent, Alignment),
                                         "LineSpacing", BIND_PROP(TextComponent, LineSpacing),
+                                        "ShadowEnabled", BIND_PROP(TextComponent, ShadowEnabled),
+                                        "ShadowColor", BIND_PROP(TextComponent, ShadowColor),
+                                        "ShadowOffset", BIND_PROP(TextComponent, ShadowOffset),
                                         "FontAssetID", BIND_PROP(TextComponent, FontAssetID),
-
-                                          STRICT_READ(TextComponent));
+                                        STRICT_READ(TextComponent));
     }
 }

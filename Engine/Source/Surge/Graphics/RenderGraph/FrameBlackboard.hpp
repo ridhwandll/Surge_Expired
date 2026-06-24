@@ -113,6 +113,14 @@ namespace Surge
         float LineSpacing = 0.0f;
         TextAlignment Alignment = TextAlignment::LEFT;
 
+        bool Italic = false;
+        bool Underline = false;
+
+        // Shadows
+        bool EnableShadow = false;
+        glm::vec2 ShadowOffset = { 0.0f, 0.0f };
+        glm::vec4 ShadowColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+
         Ref<Font> FontAsset;
     };
 

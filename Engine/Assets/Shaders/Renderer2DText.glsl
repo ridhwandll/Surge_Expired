@@ -40,7 +40,7 @@ layout(location = 0) out vec4 o_Color;
 
 layout(push_constant) uniform TextParams
 {
-    float PxRange;      // Set during cook (e.g., 2.0)
+    float PxRange;
     float pad[2];
 } u_Params;
 
@@ -62,17 +62,16 @@ void main()
 {
     vec4 fillColor = unpackUnorm4x8(inColor);
     fillColor.rgb = pow(fillColor.rgb, vec3(2.2));
-
+    
     vec3 msd = texture(uTextures[inTextureIndex], inUV).rgb;
     float sd = Median(msd.r, msd.g, msd.b);
-    float screenPxDistance = ScreenPxRange()*(sd - 0.5);
+    
+    float screenPxDistance = ScreenPxRange() * (sd - 0.5);
     float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
 
     if (opacity < 0.01)
-        discard; // Kill empty pixels early
+        discard;
 
-    vec4 bgColor = vec4(0.0);
-    vec4 finalColor = mix(bgColor, fillColor, opacity);
-
-    o_Color = finalColor;
+    fillColor.a *= opacity;
+    o_Color = fillColor;
 }
