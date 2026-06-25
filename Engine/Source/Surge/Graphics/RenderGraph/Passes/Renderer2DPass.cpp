@@ -179,17 +179,47 @@ namespace Surge
                 if(mQuadBatchCount >= MAX_QUAD_BATCHES_PER_FRAME) break;
                 slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
             }
-            static constexpr glm::vec4 sLocalPositions[4] = { { 0.5f, -0.5f, 0.0f, 1.0f}, { 0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f, -0.5f, 0.0f, 1.0f} };
-            static constexpr glm::vec2 sUVs[4] = { { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f } };
+
             const Uint packedColor = glm::packUnorm4x8(quad.Color);
-            for(Uint i = 0; i < 4; i++)
+            static constexpr glm::vec2 sUVs[4] = { { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f } };
+            if(quad.Billboard)
             {
-                QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
-                v.Position = quad.Transform * sLocalPositions[i];
-                v.Color = packedColor;
-                v.UV = sUVs[i];
-                v.TextureIndex = (Uint)slot;
+                // Extract position and scale from the transform matrix, throw away rotation
+                glm::vec3 position = glm::vec3(quad.Transform[3]);
+                float scaleX = glm::length(glm::vec3(quad.Transform[0]));
+                float scaleY = glm::length(glm::vec3(quad.Transform[1]));
+
+                float halfW = scaleX * 0.5f;
+                float halfH = scaleY * 0.5f;
+                glm::vec3 positions[4] = {
+                    position + (blackboard.CameraRight * halfW) - (blackboard.CameraUp * halfH), // Bottom-Right Corner
+                    position + (blackboard.CameraRight * halfW) + (blackboard.CameraUp * halfH), // Top-Right Corner
+                    position - (blackboard.CameraRight * halfW) + (blackboard.CameraUp * halfH), // Top-Left Corner
+                    position - (blackboard.CameraRight * halfW) - (blackboard.CameraUp * halfH)  // Bottom-Left Corner
+                };
+
+                for(Uint i = 0; i < 4; i++)
+                {
+                    QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
+                    v.Position = positions[i];
+                    v.Color = packedColor;
+                    v.UV = sUVs[i];
+                    v.TextureIndex = (Uint)slot;
+                }
             }
+            else
+            {
+                static constexpr glm::vec4 sLocalPositions[4] = { { 0.5f, -0.5f, 0.0f, 1.0f}, { 0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f, -0.5f, 0.0f, 1.0f} };
+                for(Uint i = 0; i < 4; i++)
+                {
+                    QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
+                    v.Position = quad.Transform * sLocalPositions[i];
+                    v.Color = packedColor;
+                    v.UV = sUVs[i];
+                    v.TextureIndex = (Uint)slot;
+                }
+            }
+
             mCurrentQuadBatch.QuadCount++;
             mTotalQuadCount++;
         }
@@ -273,6 +303,24 @@ namespace Surge
         {
             if(!txt.FontAsset || txt.Text.empty() || mMaxQuadCountReached)
                 continue;
+
+            // BILLBOARD
+            glm::mat4 activeTransform = txt.Transform;
+            if(txt.Billboard)
+            {
+                glm::vec3 pos = glm::vec3(txt.Transform[3]);
+                float scaleX = glm::length(glm::vec3(txt.Transform[0]));
+                float scaleY = glm::length(glm::vec3(txt.Transform[1]));
+                float scaleZ = glm::length(glm::vec3(txt.Transform[2]));
+
+                glm::vec3 forward = glm::normalize(glm::cross(blackboard.CameraRight, blackboard.CameraUp));
+                activeTransform = glm::mat4(
+                    glm::vec4(blackboard.CameraRight * scaleX, 0.0f),
+                    glm::vec4(blackboard.CameraUp * scaleY, 0.0f),
+                    glm::vec4(forward * scaleZ, 0.0f),
+                    glm::vec4(pos, 1.0f)
+                );
+            }
 
             ImageHandle fontAtlas = txt.FontAsset->GetAtlas();
 
@@ -374,7 +422,7 @@ namespace Surge
                     for(int vIdx = 0; vIdx < 4; vIdx++)
                     {
                         QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
-                        v.Position = txt.Transform * localPositions[vIdx];
+                        v.Position = activeTransform * localPositions[vIdx];
                         v.Color = packedColor; v.UV = uvs[vIdx]; v.TextureIndex = 0; // White Texture
                     }
                     mCurrentQuadBatch.QuadCount++; mTotalQuadCount++;
@@ -463,7 +511,7 @@ namespace Surge
                     for(Uint vIdx = 0; vIdx < 4; vIdx++)
                     {
                         QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
-                        v.Position = txt.Transform * localPositions[vIdx];
+                        v.Position = activeTransform * localPositions[vIdx];
                         v.Color = packedColor;
                         v.UV = uvs[vIdx];
                         v.TextureIndex = (Uint)slot;

@@ -69,7 +69,7 @@ namespace Surge
             for(const auto& [entity, sprite, transform] : view.each())
             {
                 ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? am->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
-                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, textureHandle);
+                renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Billboard, textureHandle);
             }
 
             auto txtView = mRegistry.view<TextComponent, TransformComponent>();
@@ -79,7 +79,7 @@ namespace Surge
                 {
                     Ref<Font> font = am->Load<Font>(txtCmp.FontAssetID);
                     renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, txtCmp.MaxWidth, txtCmp.LetterSpacing, txtCmp.LineSpacing, 
-                                         txtCmp.Alignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font);
+                                         txtCmp.Alignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font, txtCmp.Billboard);
                 }
             }
         }

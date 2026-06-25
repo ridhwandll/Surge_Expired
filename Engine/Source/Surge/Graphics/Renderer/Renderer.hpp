@@ -17,31 +17,39 @@ namespace Surge
         void BeginFrame(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar);
         void EndFrame();
 
-        void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, ImageHandle texture = ImageHandle::Invalid())
+        FORCEINLINE void SubmitQuad(const glm::mat4& transform, const glm::vec4& color, bool billboard = false, ImageHandle texture = ImageHandle::Invalid())
         {
-            mGraph.GetBlackboard().QuadList.emplace_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture });
+            mGraph.GetBlackboard().QuadList.emplace_back(QuadSubmitCmd { .Transform = transform, .Color = color, .Texture = texture, .Billboard = billboard });
         }
-        void SubmitLine(const glm::vec3& point0, const glm::vec3& point1, const glm::vec4& color)
+        FORCEINLINE void SubmitLine(const glm::vec3& point0, const glm::vec3& point1, const glm::vec4& color)
         {
             mGraph.GetBlackboard().LineList.emplace_back(LineSubmitCmd { .P0 = point0, .P1 = point1, .Color = color, });
         }
-        void SubmitText(const glm::mat4& transform, const String& txt, const glm::vec4& color, float maxWidth, float letterSpacing,
+        FORCEINLINE void SubmitText(const glm::mat4& transform, const String& txt, const glm::vec4& color, float maxWidth, float letterSpacing,
                         float lineSpacing, TextAlignment alignment, bool italic, bool underline,
-                        bool enableShadow, const glm::vec2& shadowOffset, const glm::vec4& shadowColor, const Ref<Font>& font)
+                        bool enableShadow, const glm::vec2& shadowOffset, const glm::vec4& shadowColor, const Ref<Font>& font, bool billboard = false)
         {
             mGraph.GetBlackboard().TextList.emplace_back(TextSubmitCmd { .Transform = transform, .Text = txt, .Color = color, .MaxWidth = maxWidth, .LetterSpacing = letterSpacing,
-                                                         .LineSpacing = lineSpacing, .Alignment = alignment, .Italic = italic, .Underline = underline,
+                                                         .LineSpacing = lineSpacing, .Alignment = alignment, .Italic = italic, .Underline = underline, .Billboard = billboard,
                                                           .EnableShadow = enableShadow, .ShadowOffset = shadowOffset, .ShadowColor = shadowColor, .FontAsset = font });
         }
-        void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow)
+        FORCEINLINE void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow) { mGraph.GetBlackboard().MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow }); }
+        FORCEINLINE void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
+        FORCEINLINE void SubmitLight(const Light& light)
         {
             FrameBlackboard& bb = mGraph.GetBlackboard();
-            bb.MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow });
+            if(light.PositionType.w == (float)LightType::DIRECTIONAL)
+            {
+                bb.HasDirectionalLight = true;
+                bb.DirectionalLightDir = glm::vec3(light.PositionType);
+            }
+            bb.LightList.emplace_back(light);
         }
-        void SubmitLight(const Light& light);
-        void SubmitEnvironment(Environnment&& env);
-
-        void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
+        FORCEINLINE void SubmitEnvironment(Environnment&& env)
+        {
+            env.HasEnvironment = true;
+            mGraph.GetBlackboard().Env = std::move(env);
+        }
 
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
@@ -75,6 +83,7 @@ namespace Surge
         FrameContext mCurrentFrameCtx;
 
         RenderGraph mGraph;
+
 
         ShaderManager mShaderManager;
         Scope<GraphicsRHI> mRHI;

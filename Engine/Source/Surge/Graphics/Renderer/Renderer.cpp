@@ -1,6 +1,5 @@
 ﻿// Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
@@ -108,6 +107,8 @@ namespace Surge
         blackBoard.InverseViewProjection = glm::inverse(blackBoard.ViewProjection);
         blackBoard.CameraPosition = glm::inverse(viewMatrix)[3];
         blackBoard.CameraNearFarPlane = cameraNearFar;
+        blackBoard.CameraRight = { viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0] };
+        blackBoard.CameraUp = { viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1] };
 
         FrameUBO frameData = {};
         frameData.View = blackBoard.ViewMatrix;
@@ -126,24 +127,6 @@ namespace Surge
 
         mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
         mGraph.ClearLists();
-    }
-
-    void Renderer::SubmitLight(const Light& light)
-    {
-        FrameBlackboard& bb = mGraph.GetBlackboard();
-        if(light.PositionType.w == (float)LightType::DIRECTIONAL)
-        {
-            bb.HasDirectionalLight = true;
-            bb.DirectionalLightDir = glm::vec3(light.PositionType);
-        }
-        bb.LightList.emplace_back(light);
-    }
-
-    void Renderer::SubmitEnvironment(Environnment&& env)
-    {
-        FrameBlackboard& bb = mGraph.GetBlackboard();
-        env.HasEnvironment = true;
-        bb.Env = std::move(env);
     }
 
     void Renderer::OnWindowResize(Uint width, Uint height)

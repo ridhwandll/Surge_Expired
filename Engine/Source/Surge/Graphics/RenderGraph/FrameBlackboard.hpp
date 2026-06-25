@@ -92,6 +92,7 @@ namespace Surge
         glm::mat4 Transform;
         glm::vec4 Color;
         ImageHandle Texture;
+        bool Billboard;
     };
 
     struct LineSubmitCmd // Pushed by Renderer::SubmitLine()
@@ -115,6 +116,7 @@ namespace Surge
 
         bool Italic = false;
         bool Underline = false;
+        bool Billboard = false;
 
         // Shadows
         bool EnableShadow = false;
@@ -133,6 +135,8 @@ namespace Surge
         glm::mat4 ViewProjection;
         glm::mat4 InverseViewProjection;
         glm::vec2 CameraNearFarPlane;
+        glm::vec3 CameraRight;
+        glm::vec3 CameraUp;
 
         bool HasDirectionalLight = false;
         glm::vec3 DirectionalLightDir; //Set by Renderer.cpp

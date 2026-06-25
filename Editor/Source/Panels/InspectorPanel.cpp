@@ -294,6 +294,7 @@ namespace Surge
             SpriteRendererComponent& component = entity.GetComponent<SpriteRendererComponent>();
             DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
                 ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
+                ImGuiAux::TProperty<bool>("Billboard", &component.Billboard);
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted("Texture");
                 ImGui::TableNextColumn();
@@ -738,6 +739,7 @@ namespace Surge
                     ImGui::PopItemWidth();
                     ImGuiAux::TProperty<bool>("Underline", &component.Underline);
                     ImGuiAux::TProperty<bool>("Italic", &component.Italic);
+                    ImGuiAux::TProperty<bool>("Billboard", &component.Billboard);
 
                     ImGuiAux::TSperator("Shadow");
                     ImGui::PushID("Shadow");

@@ -104,6 +104,7 @@ namespace Surge
             : Color(glm::vec4(color, alpha)){}
 
         glm::vec4 Color;
+        bool Billboard = false;
         AssetID Texture = AssetID::INVALID;
 
         SURGE_REFLECTION_ENABLE;
@@ -253,6 +254,7 @@ namespace Surge
 
         bool Italic = false;
         bool Underline = false;
+        bool Billboard = false;
 
         // Shadows
         bool ShadowEnabled = false;
@@ -260,6 +262,7 @@ namespace Surge
         glm::vec4 ShadowColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
         AssetID FontAssetID = AssetID::INVALID;
+
         SURGE_REFLECTION_ENABLE;
     };
 

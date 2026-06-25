@@ -78,15 +78,18 @@
 #endif
 
 // Defines and stuff
-#define BIT(x) (1 << x)
 
-#ifdef _MSC_VER
+#if defined(__clang__) || defined(__GNUC__)
+    #define FORCEINLINE __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
     #define FORCEINLINE __forceinline
 #else
-    #define FORCEINLINE __attribute__((always_inline)) inline
+    #define FORCEINLINE inline
 #endif
 
 #define NODISCARD [[nodiscard]]
+
+#define BIT(x) (1 << x)
 #define MAKE_BIT_ENUM(type, enumDeriveType)                                                                                                    \
     FORCEINLINE type operator|(type a, type b) { return static_cast<type>(static_cast<enumDeriveType>(a) | static_cast<enumDeriveType>(b)); }        \
     FORCEINLINE type& operator|=(type& a, type b) { return a = static_cast<type>(static_cast<enumDeriveType>(a) | static_cast<enumDeriveType>(b)); } \
