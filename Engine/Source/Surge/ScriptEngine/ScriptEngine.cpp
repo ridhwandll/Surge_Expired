@@ -7,7 +7,7 @@
 #include "Bindings/InputBinding.hpp"
 #include "Bindings/LogBinding.hpp"
 #include "Bindings/ECSBindings.hpp"
-
+#include "Bindings/UIBindings.hpp"
 
 namespace Surge
 {
@@ -63,6 +63,7 @@ namespace Surge
         ScriptBinding::BindMath(sLua);
         ScriptBinding::BindEntity(sLua);
         ScriptBinding::BindComponents(sLua);
+        ScriptBinding::BindUIWidgets(sLua);
 
         Log<Severity::Info>("ScriptEngine Initialized: {}", LUA_VERSION);
     }

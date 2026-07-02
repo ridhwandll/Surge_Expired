@@ -47,8 +47,11 @@ namespace Surge
             desc.storeOp = VulkanUtils::ToVkStoreOp(key.ColorStore[i]);
             desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            //desc.initialLayout = key.ColorLoad[i] == LoadOp::LOAD ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-            desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+            // (Rid) desc.initialLayout means: "What state is this image currently sitting in at the exact millisecond this Render Pass begins?"
+            // We almost always have SHADER_READ_ONLY_OPTIMAL, TODO: Automate this somehow in future
+            desc.initialLayout = key.ColorLoad[i] == LoadOp::LOAD ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+
             desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             attachments.push_back(desc);
 

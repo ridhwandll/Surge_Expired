@@ -2,6 +2,7 @@
 #include "RenderGraph.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include <set>
+#include "../RHI/Vulkan/VulkanUtils.hpp"
 
 namespace Surge
 {
@@ -23,6 +24,7 @@ namespace Surge
         ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = true, .IsSwapchain = false };
         ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
         ExecutionGroup postProcessGroup = { .Name = "PostProcess", .Type = PassGroup::POST_PROCESS, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
+        ExecutionGroup uiOverlayGroup = { .Name = "UIOverlay", .Type = PassGroup::UI_OVERLAY, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
         ExecutionGroup swapchainGroup = { .Name = "Swapchain", .Type = PassGroup::SWAPCHAIN, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .IsSwapchain = true };
 
         for(auto& pass : mPasses)
@@ -33,23 +35,27 @@ namespace Surge
                 case PassGroup::MAIN_SCENE:   mainGroup.Passes.push_back(pass.get());        break;
                 case PassGroup::OUTLINE_MASK: outlineGroup.Passes.push_back(pass.get());     break;
                 case PassGroup::POST_PROCESS: postProcessGroup.Passes.push_back(pass.get()); break;
+                case PassGroup::UI_OVERLAY:   uiOverlayGroup.Passes.push_back(pass.get());   break;
                 case PassGroup::SWAPCHAIN:    swapchainGroup.Passes.push_back(pass.get());   break;
             }
         }
 
         outlineGroup.Framebuffer = mBlackboard.OutlineFramebuffer;
         postProcessGroup.Framebuffer = mBlackboard.PostProcessFramebuffer;
+        uiOverlayGroup.Framebuffer = mBlackboard.UIOverlayFramebuffer;
         mainGroup.Framebuffer = mBlackboard.MainPassFramebuffer;
 
         DeriveBarrierBetweenExecutionGroups(shadowGroup, mainGroup);
         DeriveBarrierBetweenExecutionGroups(mainGroup, postProcessGroup);
         DeriveBarrierBetweenExecutionGroups(outlineGroup, postProcessGroup);
-        DeriveBarrierBetweenExecutionGroups(postProcessGroup, swapchainGroup);
+        DeriveBarrierBetweenExecutionGroups(postProcessGroup, uiOverlayGroup);
+        DeriveBarrierBetweenExecutionGroups(uiOverlayGroup, swapchainGroup);
 
         SortByDependencies(shadowGroup.Passes);
         SortByDependencies(mainGroup.Passes);
         SortByDependencies(outlineGroup.Passes);
         SortByDependencies(postProcessGroup.Passes);
+        SortByDependencies(uiOverlayGroup.Passes);
         SortByDependencies(swapchainGroup.Passes);
 
         // Build final groups
@@ -63,6 +69,9 @@ namespace Surge
 
         if (!postProcessGroup.Passes.empty())
             mCompiledGraph.Groups.push_back(std::move(postProcessGroup));
+
+        if(!uiOverlayGroup.Passes.empty())
+            mCompiledGraph.Groups.push_back(std::move(uiOverlayGroup));
 
         if(!swapchainGroup.Passes.empty())
             mCompiledGraph.Groups.push_back(std::move(swapchainGroup));
@@ -184,11 +193,11 @@ namespace Surge
                     {
                         if(write == read && !barrierAdded.count(write))
                         {
-                            //const ImageDesc& writeDesc = mRHI->GetDesc(write);
-                            //Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
-                            //Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
-                            //Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
-                            //Log<Severity::Warn>("From: {} -> To: SAMPLED", VulkanUtils::TextureUsageToString(writeDesc.Usage)); //TODO: Remove
+                            const ImageDesc& writeDesc = mRHI->GetDesc(write);
+                            Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
+                            Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
+                            Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
+                            Log<Severity::Warn>("From: {} -> To: SAMPLED", VulkanUtils::TextureUsageToString(writeDesc.Usage)); //TODO: Remove
                             readGroup.BarriersBeforeGroup.push_back({ write, ImageUsage::SAMPLED });
                             barrierAdded.insert(write);
                         }

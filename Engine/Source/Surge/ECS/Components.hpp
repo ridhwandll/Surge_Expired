@@ -251,6 +251,7 @@ namespace Surge
         float LetterSpacing = 0.0f;
         float LineSpacing = 0.0f;
         TextAlignment Alignment = TextAlignment::LEFT;
+        TextVerticalAlignment VerticalAlignment = TextVerticalAlignment::BASELINE;
 
         bool Italic = false;
         bool Underline = false;
@@ -266,6 +267,15 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct UICanvasComponent
+    {
+        bool ShowCanvas = true;
+        AssetID ScriptAsset = AssetID::INVALID;
+        bool IsInstantiated = false;
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
 } // namespace Surge
 
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
@@ -274,4 +284,4 @@ namespace Surge
                                 ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
                                 ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
-                                ::Surge::ScriptComponent, ::Surge::TextComponent
+                                ::Surge::ScriptComponent, ::Surge::TextComponent, ::Surge::UICanvasComponent

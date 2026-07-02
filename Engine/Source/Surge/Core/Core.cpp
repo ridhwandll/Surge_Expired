@@ -41,8 +41,10 @@ namespace Surge::Core
     void OnEvent(Event& e)
     {
         GCoreData.SurgeClient->OnEvent(e);
+        GCoreData.SurgeRenderer->OnEvent(e);
+
         EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<Surge::WindowClosedEvent>([]([[maybe_unused]] Surge::WindowClosedEvent& e) { GCoreData.Running = false; });
+        dispatcher.Dispatch<Surge::WindowClosedEvent>([](Surge::WindowClosedEvent&) { GCoreData.Running = false; });
         dispatcher.Dispatch<Surge::WindowResizeEvent>([](Surge::WindowResizeEvent& e) { GCoreData.SurgeRenderer->OnWindowResize(e.GetWidth(), e.GetHeight()); });
     }
 

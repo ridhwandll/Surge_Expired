@@ -34,15 +34,6 @@ namespace Surge
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
         mCamera.SetActive(true);
 
-        // Configure panels
-        SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
-        mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
-        mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
-        mPanelManager.PushPanel<ContentBrowserPanel>();
-        mPanelManager.PushPanel<MaterialEditorPanel>();
-        mPanelManager.PushPanel<ExportPanel>();
-
-        mProjectBrowser.Init();
 
         mAssetImporter.Initialize(mAssetManager);
         mAssetImporter.RegisterCooker(CreateScope<Texture2DCooker>());
@@ -59,6 +50,16 @@ namespace Surge
                                                 mAssetImporter.RecookAsset(id);
                                             }
                                         });
+
+        // Configure panels
+        SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
+        mPanelManager.PushPanel<InspectorPanel>()->SetHierarchy(sceneHierarchy);
+        mViewportPanel = mPanelManager.PushPanel<ViewportPanel>(&mCamera);
+        mPanelManager.PushPanel<ContentBrowserPanel>();
+        mPanelManager.PushPanel<MaterialEditorPanel>();
+        mPanelManager.PushPanel<ExportPanel>();
+
+        mProjectBrowser.Init();
 
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
     }

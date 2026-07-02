@@ -58,6 +58,7 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<MeshColliderComponent>(entityType, "MeshColliderC");
         BindComponentToEntity<ScriptComponent>(entityType, "ScriptC");
         BindComponentToEntity<TextComponent>(entityType, "TextC");
+        BindComponentToEntity<UICanvasComponent>(entityType, "UICanvasC");
     }
 
 #define BIND_PROP(COMP, PROP) \
@@ -92,6 +93,12 @@ namespace Surge::ScriptBinding
                      "LEFT", TextAlignment::LEFT,
                      "CENTER", TextAlignment::CENTER,
                      "RIGHT", TextAlignment::RIGHT
+        );
+
+        lua.new_enum("TextVerticalAlignment",
+                     "TOP", TextVerticalAlignment::TOP,
+                     "CENTER", TextVerticalAlignment::CENTER,
+                     "BOTTOM", TextVerticalAlignment::BOTTOM
         );
 
         // COMPONENTS
@@ -258,11 +265,17 @@ namespace Surge::ScriptBinding
                                         "MaxWidth", BIND_PROP(TextComponent, MaxWidth),
                                         "LetterSpacing", BIND_PROP(TextComponent, LetterSpacing),
                                         "Alignment", BIND_PROP(TextComponent, Alignment),
+                                        "VerticalAlignment", BIND_PROP(TextComponent, VerticalAlignment),
                                         "LineSpacing", BIND_PROP(TextComponent, LineSpacing),
                                         "ShadowEnabled", BIND_PROP(TextComponent, ShadowEnabled),
                                         "ShadowColor", BIND_PROP(TextComponent, ShadowColor),
                                         "ShadowOffset", BIND_PROP(TextComponent, ShadowOffset),
                                         "FontAssetID", BIND_PROP(TextComponent, FontAssetID),
                                         STRICT_READ(TextComponent));
+
+        lua.new_usertype<UICanvasComponent>("UICanvasComponent", sol::no_constructor,
+                                        "ShowCanvas", BIND_PROP(UICanvasComponent, ShowCanvas),
+                                        "ScriptAsset", BIND_PROP(UICanvasComponent, ScriptAsset),
+                                        STRICT_READ(UICanvasComponent));
     }
 }

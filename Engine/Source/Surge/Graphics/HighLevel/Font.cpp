@@ -2,22 +2,19 @@
 #include "Font.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Surge/Asset/Serializer/Texture2DSerializer.hpp"
 
 namespace Surge
 {
     Font::Font(FontSpecification&& spec)
-        : mLineHeight(spec.LineHeight), mGlyphs(spec.Glyphs), mSpecification(std::move(spec))
+        : mSpecification(std::move(spec))
     {
+        SG_ASSERT(mSpecification.PxRange >= 2.0f, "Font pixel range must be greater than or equal to 2!");
         SG_ASSERT(mSpecification.LineHeight > 0.0f, "Font line height must be greater than 0!");
-        SG_ASSERT(!mSpecification.KTX2Data.empty(), "Font KTX2 data must not be empty!");
+        SG_ASSERT(!mSpecification.UncompressedData.empty(), "Font UncompressedData must not be empty!");
 
-        TextureSpecification texSpec = Texture2DSerializer::LoadFromKTX2(mSpecification.KTX2Data, "MSDF Font Atlas");
-        Uint width = texSpec.Mips[0].Width;
-        Uint height = texSpec.Mips[0].Height;
-
+        Uint width = mSpecification.Width;
+        Uint height = mSpecification.Height;
         SG_ASSERT(width == height, "Font atlas must be square!");
-        SG_ASSERT(texSpec.Mips.size() == 1, "Font atlas must have only one mip level! (No Mips)");
 
         Renderer* renderer = Core::GetRenderer();
         ImageDesc desc = {};
@@ -29,34 +26,23 @@ namespace Surge
         desc.Sampler = renderer->GetTextSampler();
         desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
         desc.MipLevel = 1;
-        desc.Format = texSpec.Format;
+        desc.Format = ImageFormat::RGBA8_UNORM;
 
-        MipUploadData mipUpload;
-        mipUpload.Data = texSpec.Mips[0].Data.data();
-        mipUpload.Size = static_cast<Uint>(texSpec.Mips[0].Data.size());
-        mipUpload.Width = width;
-        mipUpload.Height = height;
-
-        desc.MipUploads = &mipUpload;
-        desc.MipUploadCount = 1;
+        desc.InitialData = mSpecification.UncompressedData.data();
+        desc.DataSize = static_cast<Uint>(mSpecification.UncompressedData.size());
 
         mAtlasImageHandle = renderer->GetRHI()->CreateImage(desc);
-
-        // mSpecification.KTX2Data.clear(); // TODO: Free the KTX2 data after creating the GPU image
     }
 
     Font::~Font()
     {
-        if(!mAtlasImageHandle.IsNull())
-            Core::GetRenderer()->GetRHI()->DestroyImage(mAtlasImageHandle);
-
-        mGlyphs.clear();
+        Core::GetRenderer()->GetRHI()->DestroyImage(mAtlasImageHandle);
     }
 
     const FontGlyph* Font::GetGlyph(Uint unicodeID) const
     {
-        auto it = mGlyphs.find(unicodeID);
-        if(it != mGlyphs.end())
+        auto it = mSpecification.Glyphs.find(unicodeID);
+        if(it != mSpecification.Glyphs.end())
             return &it->second;
 
         return nullptr;

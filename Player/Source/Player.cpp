@@ -2,10 +2,11 @@
 #include <Surge/Surge.hpp>
 #include "Player.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Graphics/UISystem/UIManager.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-//NOTE THIS VS Project is only for builidng and copying via Editor, it will not run from the VS ///
+/// NOTE THIS VS Project is only for builidng and copying via Editor, it will not run from the VS ///
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,8 +69,13 @@ namespace Surge
 
     void Player::Resize(Uint width, Uint height)
     {
-        if (width != 0 && height != 0)
+        if(width != 0 && height != 0)
+        {
             mActiveScene->OnResize(static_cast<float>(width), static_cast<float>(height));
+            const float windowW = Core::GetWindow()->GetSize().x;
+            const float windowH = Core::GetWindow()->GetSize().y;
+            Core::GetRenderer()->GetUIManager().SetViewportBounds(0.0f, 0.0f, windowW, windowH);
+        }
     }
 
     void Player::OnShutdown()

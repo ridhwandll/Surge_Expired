@@ -36,7 +36,7 @@ namespace Surge
         void FlushQuadBatch();
         void FlushLineBatch();
 
-    private:
+    public: //TODO MAKE PRIVATE
         //Quads
         struct QuadDrawCmd
         {

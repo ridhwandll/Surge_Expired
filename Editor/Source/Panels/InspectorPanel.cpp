@@ -14,6 +14,7 @@
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
 #include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Utility/Platform.hpp"
 
 namespace Surge
 {
@@ -185,6 +186,11 @@ namespace Surge
                     if(ImGui::MenuItem("Script Component") && !entity.HasComponent<ScriptComponent>())
                         entity.AddComponent<ScriptComponent>();
 
+                    if(ImGui::MenuItem("UICanvas Component") && !entity.HasComponent<UICanvasComponent>())
+                        entity.AddComponent<UICanvasComponent>();
+                    else
+                        Platform::ErrorMessageBox("Entity already has a UICanvas Component");
+
                     ImGui::EndPopup();
                 }
             }
@@ -254,6 +260,10 @@ namespace Surge
                     ImGui::EndCombo();
                 }
                 ImGui::PopItemWidth();
+
+                float aspectRatio = camera.GetAspectRatio();
+                if(ImGuiAux::TProperty<float>("Aspect Ratio", &aspectRatio))
+                    camera.SetAspectRatio(aspectRatio);
 
                 if(camera.GetProjectionType() == RuntimeCamera::ProjectionType::Perspective)
                 {
@@ -717,24 +727,47 @@ namespace Surge
                     ImGuiAux::TProperty<float>("Letter Spacing", &component.LetterSpacing);
                     ImGuiAux::TProperty<float>("Line Spacing", &component.LineSpacing);
 
-                    const char* alignTypeStrings[] = { "LEFT", "CENTER", "RIGHT" };
-                    const char* currentAlignTypeString = alignTypeStrings[static_cast<uint8_t>(component.Alignment)];
-
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted("ALIGNMENT");
-                    ImGui::TableNextColumn();
-                    ImGui::PushItemWidth(-1);
-                    if(ImGui::BeginCombo("##ALIGNTYPE", currentAlignTypeString))
                     {
-                        for(int i = 0; i < 3; i++)
+                        const char* alignTypeStrings[] = { "LEFT", "CENTER", "RIGHT" };
+                        const char* currentAlignTypeString = alignTypeStrings[static_cast<uint8_t>(component.Alignment)];
+
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted("ALIGNMENT");
+                        ImGui::TableNextColumn();
+                        ImGui::PushItemWidth(-1);
+                        if(ImGui::BeginCombo("##ALIGNTYPE", currentAlignTypeString))
                         {
-                            const bool isSelected = (component.Alignment == static_cast<TextAlignment>(i));
-                            if(ImGui::Selectable(alignTypeStrings[i], isSelected))
-                                component.Alignment = static_cast<TextAlignment>(i);
-                            if(isSelected)
-                                ImGui::SetItemDefaultFocus();
+                            for(int i = 0; i < 3; i++)
+                            {
+                                const bool isSelected = (component.Alignment == static_cast<TextAlignment>(i));
+                                if(ImGui::Selectable(alignTypeStrings[i], isSelected))
+                                    component.Alignment = static_cast<TextAlignment>(i);
+                                if(isSelected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
                         }
-                        ImGui::EndCombo();
+                    }
+                    {
+                        constexpr const char* verticalAlignTypeStrings[] = { "TOP", "CENTER", "BASELINE", "BOTTOM" };
+                        const char* currentAlignTypeString = verticalAlignTypeStrings[static_cast<uint8_t>(component.VerticalAlignment)];
+
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted("V ALIGNMENT");
+                        ImGui::TableNextColumn();
+                        ImGui::PushItemWidth(-1);
+                        if(ImGui::BeginCombo("##VALIGNTYPE", currentAlignTypeString))
+                        {
+                            for(int i = 0; i < 4; i++)
+                            {
+                                const bool isSelected = (component.VerticalAlignment == static_cast<TextVerticalAlignment>(i));
+                                if(ImGui::Selectable(verticalAlignTypeStrings[i], isSelected))
+                                    component.VerticalAlignment = static_cast<TextVerticalAlignment>(i);
+                                if(isSelected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
                     }
                     ImGui::PopItemWidth();
                     ImGuiAux::TProperty<bool>("Underline", &component.Underline);
@@ -747,6 +780,54 @@ namespace Surge
                     ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.ShadowColor);
                     ImGuiAux::TProperty<glm::vec2>("Offset", &component.ShadowOffset);
                     ImGui::PopID();
+                }
+            });
+        }
+        
+        if(entity.HasComponent<UICanvasComponent>())
+        {
+            UICanvasComponent& component = entity.GetComponent<UICanvasComponent>();
+            DrawComponent<UICanvasComponent>(entity, "UI Canvas Component", [&component]() {
+                AssetManager* am = Core::GetAssetManager();
+
+                ImGuiAux::TProperty<bool>("Show Canvas", &component.ShowCanvas);
+
+                String buttonText;
+                bool hasScript = component.ScriptAsset.IsValid();
+                if(hasScript)
+                {
+                    const String& scriptPath = am->GetMetadata(component.ScriptAsset).RelativePath;
+                    buttonText = Filesystem::GetFilenameWithExt(scriptPath).c_str();
+                }
+                else
+                    buttonText = "Drop UI SCRIPT";
+
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("UIScript");
+                ImGui::TableNextColumn();
+                if(ImGui::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x / 1.3f, 0)) && hasScript)
+                {
+                    Editor* editor = static_cast<Editor*>(Core::GetClient());
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset);
+                }
+                if(hasScript)
+                {
+                    ImGui::SameLine();
+                    if(ImGuiAux::Button("REMOVE", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+                        component.ScriptAsset = AssetID::INVALID;
+                }
+
+                if(ImGui::BeginDragDropTarget())
+                {
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
+                    {
+                        SG_ASSERT(payload->DataSize == sizeof(AssetID), "Payload size mismatch!");
+                        AssetID droppedAssetID = *(const AssetID*)payload->Data;
+                        AssetMetadata meta = am->GetMetadata(droppedAssetID);
+                        if(meta.Type == AssetType::SCRIPT)
+                            component.ScriptAsset = droppedAssetID;
+                    }
+                    ImGui::EndDragDropTarget();
                 }
             });
         }

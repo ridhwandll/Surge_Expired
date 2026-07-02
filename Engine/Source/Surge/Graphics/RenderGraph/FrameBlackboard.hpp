@@ -72,14 +72,14 @@ namespace Surge
     struct MeshSubmitCmd  // Pushed by Renderer::SubmitMesh()
     {
         glm::mat4 Transform;
-        Ref<Mesh> Mesh_;
+        Ref<Mesh> Mesh_; // TODO: Change this to Mesh*
         bool DropShadow;
     };
 
     struct OutlineSubmitCmd // Pushed by Renderer::SubmitOutlinedMesh()
     {
         glm::mat4 Transform;
-        Ref<Mesh> Mesh_;
+        Ref<Mesh> Mesh_; // TODO: Change this to Mesh*
     };
 
     struct LightSubmitCmd // Pushed by Renderer::SubmitLight()
@@ -91,7 +91,7 @@ namespace Surge
     {
         glm::mat4 Transform;
         glm::vec4 Color;
-        ImageHandle Texture;
+        ImageHandle Texture; //TODO Change this to Texture2D*
         bool Billboard;
     };
 
@@ -113,6 +113,7 @@ namespace Surge
         float LetterSpacing = 0.0f;
         float LineSpacing = 0.0f;
         TextAlignment Alignment = TextAlignment::LEFT;
+        TextVerticalAlignment VerticalAlignment = TextVerticalAlignment::CENTER;
 
         bool Italic = false;
         bool Underline = false;
@@ -123,12 +124,13 @@ namespace Surge
         glm::vec2 ShadowOffset = { 0.0f, 0.0f };
         glm::vec4 ShadowColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-        Ref<Font> FontAsset;
+        Ref<Font> FontAsset; //TODO: Change this to Font*
     };
 
     struct FrameBlackboard
     {
         // Written by Renderer::BeginFrame()
+        float ScreenWidth, ScreenHeight;
         glm::vec3 CameraPosition;
         glm::mat4 ViewMatrix;
         glm::mat4 ProjectionMatrix;
@@ -149,11 +151,13 @@ namespace Surge
         ImageHandle MainPassColorImage;
         ImageHandle MainPassDepthImage;
         ImageHandle OutlineMask;
+        ImageHandle UIOverlayImage;
         ImageHandle FinalImage;
         ImageHandle ShadowMap[MAX_SHADOW_CASCADE_COUNT];
 
         FramebufferHandle OutlineFramebuffer;
         FramebufferHandle PostProcessFramebuffer;
+        FramebufferHandle UIOverlayFramebuffer;
         FramebufferHandle MainPassFramebuffer;
 
         SamplerHandle DefaultSampler;
@@ -181,6 +185,10 @@ namespace Surge
         Vector<TextSubmitCmd> TextList;
         Vector<OutlineSubmitCmd> OutlineList;
 
+        // UI
+        Vector<QuadSubmitCmd> UISpriteList;
+        Vector<TextSubmitCmd> UITextList;
+
         void ClearLists()
         {
             MeshList.clear();
@@ -189,6 +197,9 @@ namespace Surge
             QuadList.clear();
             LineList.clear();
             OutlineList.clear();
+
+            UISpriteList.clear();
+            UITextList.clear();
         }
     };
 }

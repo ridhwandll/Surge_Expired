@@ -2,9 +2,7 @@
 #pragma once
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Core/Time/Timer.hpp"
-#include <memory>
-#include <vector>
-
+#include <cstdint>
 
 // Platform detection
 #ifdef _WIN32
@@ -126,17 +124,6 @@ namespace Surge
 {
     using Uint = uint32_t;
     using Byte = uint8_t;
-
-    template <typename T>
-    using Vector = std::vector<T>; // TODO(Rid): Have a dedicated vector class SURGE_API
-
-    template <typename T>
-    using Scope = std::unique_ptr<T>;
-    template <typename T, typename... Args>
-    constexpr Scope<T> CreateScope(Args&&... args)
-    {
-        return std::make_unique<T>(std::forward<Args>(args)...);
-    }
 
     template <typename T1, typename T2>
     struct Pair

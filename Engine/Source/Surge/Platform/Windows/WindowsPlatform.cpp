@@ -1,8 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Utility/Platform.hpp"
+#include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <ShlObj_core.h>
-#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

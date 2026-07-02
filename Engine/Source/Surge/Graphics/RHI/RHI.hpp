@@ -46,7 +46,7 @@ namespace Surge
         // Framebuffer
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc) { return mBackendRHI.CreateFramebuffer(desc); }
         void DestroyFramebuffer(FramebufferHandle h) { mBackendRHI.DestroyFramebuffer(h); }
-        void ResizeFramebuffer(FramebufferHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeFramebuffer(h, newWidth, newHeight); }
+        void ResizeFramebuffer(FramebufferHandle h, Uint newWidth, Uint newHeight, bool resizeImages = true) { mBackendRHI.ResizeFramebuffer(h, newWidth, newHeight, resizeImages); }
         const FramebufferDesc& GetDesc(FramebufferHandle h) const { return mBackendRHI.GetDesc(h); }
 
         // Pipeline
@@ -88,7 +88,7 @@ namespace Surge
         ImTextureID AddImGuiImage(ImageHandle h) { return mBackendRHI.AddImGuiImage(h); }
         ImTextureID GetImGuiImage(ImageHandle h) { return mBackendRHI.GetImGuiImage(h); }
 
-        //BackendRHI& GetBackendRHI() { return mBackendRHI; } // TODO: REMOVE
+        BackendRHI& GetBackendRHI() { return mBackendRHI; } // TODO: REMOVE
     private:
         BackendRHI mBackendRHI;
     };

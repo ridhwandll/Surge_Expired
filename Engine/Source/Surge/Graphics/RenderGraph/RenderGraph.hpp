@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Scope.hpp"
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 #include "Surge/Graphics/RenderGraph/RenderPass.hpp"
 #include "Surge/Graphics/RenderGraph/FrameBlackboard.hpp"

@@ -207,7 +207,7 @@ namespace Surge
 
         // On mobile -> FIFO is preferred (vsync, battery friendly)
         // MAILBOX gives lower latency(ImGui feels smooth) but burns more power
-#if 0
+#if 1
 #ifdef SURGE_PLATFORM_WINDOWS
         for(auto& m : modes)
         {

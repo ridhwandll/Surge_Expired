@@ -45,17 +45,26 @@ namespace Surge
         mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
+        // Are these good?
+        mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptDestroyed>(this);
+        mRegistry.on_destroy<UICanvasComponent>().connect<&Scene::OnUICanvasDestroyed>(this);
+
         Physics* physics = Core::GetPhysics();
         physics->OptimizeBroadPhase();
     }
 
     void Scene::OnRuntimeEnd()
     {
-        auto view = mRegistry.view<ScriptComponent>();
-
-        for(auto entityID : view)
-            OnScriptDestroyed(Entity(entityID, this), view.get<ScriptComponent>(entityID));
-
+//         {
+//             auto view = mRegistry.view<ScriptComponent>();
+//             for(auto entityID : view)
+//                 OnScriptDestroyed(mRegistry, entityID);
+//         }
+//         {
+//             auto view = mRegistry.view<UICanvasComponent>();
+//             for(auto entityID : view)
+//                 OnUICanvasDestroyed(mRegistry, entityID);
+//         }
         mIsRunning = false;
     }
 
@@ -79,7 +88,7 @@ namespace Surge
                 {
                     Ref<Font> font = am->Load<Font>(txtCmp.FontAssetID);
                     renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, txtCmp.MaxWidth, txtCmp.LetterSpacing, txtCmp.LineSpacing, 
-                                         txtCmp.Alignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font, txtCmp.Billboard);
+                                         txtCmp.Alignment, txtCmp.VerticalAlignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font, txtCmp.Billboard);
                 }
             }
         }
@@ -310,6 +319,7 @@ namespace Surge
         CopyComponent<MeshColliderComponent>(other->mRegistry, mRegistry, enttMap);
 
         CopyComponent<ScriptComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<UICanvasComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -360,7 +370,7 @@ namespace Surge
             return;
 
         if(entity.HasComponent<ScriptComponent>())
-            OnScriptDestroyed(entity, entity.GetComponent<ScriptComponent>());
+            OnScriptDestroyed(mRegistry, entity.Raw());
 
         auto& rel = entity.GetComponent<RelationshipComponent>();
 
@@ -428,6 +438,7 @@ namespace Surge
         CopyIfHas(std::type_identity<SpriteRendererComponent>{});
         CopyIfHas(std::type_identity<TextComponent>{});
         CopyIfHas(std::type_identity<ScriptComponent>{});
+        CopyIfHas(std::type_identity<UICanvasComponent>{});
 
         return newEntity;
     }
@@ -573,25 +584,46 @@ namespace Surge
 
         if(mIsRunning)
         {
-            auto view = mRegistry.view<ScriptComponent>();
             AssetManager* assetManager = Core::GetAssetManager();
-
-            for(auto entityID : view)
             {
-                auto& scriptComp = view.get<ScriptComponent>(entityID);
-                if (!scriptComp.ScriptAsset.IsValid())
-                    continue;
-
-                Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
-                Entity entityObj = { entityID, this };
-                if(!scriptComp.IsInstantiated)
+                auto view = mRegistry.view<ScriptComponent>();
+                for(auto entityID : view)
                 {
-                    script->CreateEnvironment();
-                    script->ExecuteOnCreate(entityObj);
-                    scriptComp.IsInstantiated = true;
+                    auto& scriptComp = view.get<ScriptComponent>(entityID);
+                    if(!scriptComp.ScriptAsset.IsValid())
+                        continue;
+
+                    Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
+                    Entity entityObj = { entityID, this };
+                    if(!scriptComp.IsInstantiated)
+                    {
+                        script->CreateEnvironment();
+                        script->ExecuteOnCreate(entityObj);
+                        scriptComp.IsInstantiated = true;
+                    }
+                    else
+                        script->ExecuteOnUpdate(entityObj);
                 }
-                else
-                    script->ExecuteOnUpdate(entityObj);
+            }
+            {
+                auto view = mRegistry.view<UICanvasComponent>();
+                for(auto entityID : view)
+                {
+                    auto& scriptComp = view.get<UICanvasComponent>(entityID);
+                    if(!scriptComp.ScriptAsset.IsValid())
+                        continue;
+
+                    Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
+                    Entity entityObj = { entityID, this };
+                    if(!scriptComp.IsInstantiated)
+                    {
+                        script->CreateEnvironment();
+                        script->ExecuteOnCreate(entityObj);
+                        scriptComp.IsInstantiated = true;
+                    }
+                    else
+                        script->ExecuteOnUpdate(entityObj);
+                }
             }
         }
     }
@@ -689,8 +721,20 @@ namespace Surge
         Core::GetPhysics()->DestroyRigidbody(Entity(entity, this));
     }
 
-    void Scene::OnScriptDestroyed(Entity e, ScriptComponent& comp)
+    void Scene::OnScriptDestroyed(entt::registry&, entt::entity entity)
     {
+        Entity e(entity, this);
+        ScriptComponent& comp = e.GetComponent<ScriptComponent>();
+        if(comp.IsInstantiated)
+        {
+            Core::GetAssetManager()->Load<Script>(comp.ScriptAsset)->ExecuteOnDestroy(e);
+            comp.IsInstantiated = false;
+        }
+    }
+    void Scene::OnUICanvasDestroyed(entt::registry&, entt::entity entity)
+    {
+        Entity e(entity, this);
+        UICanvasComponent& comp = e.GetComponent<UICanvasComponent>();
         if(comp.IsInstantiated)
         {
             Core::GetAssetManager()->Load<Script>(comp.ScriptAsset)->ExecuteOnDestroy(e);

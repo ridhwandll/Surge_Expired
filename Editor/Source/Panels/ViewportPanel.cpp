@@ -13,6 +13,7 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <glm/gtc/type_ptr.hpp>
+#include "Surge/Graphics/UISystem/UIManager.hpp"
 
 namespace Surge
 {
@@ -125,7 +126,7 @@ namespace Surge
                         break;
                 }
             }
-                                             });
+        });
     }
 
     void ViewportPanel::Render(bool* show)
@@ -154,6 +155,20 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
         if(ImGui::Begin(PanelCodeToString(mCode), show, windowFlags))
         {
+            auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
+            auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
+            auto viewportOffset = ImGui::GetWindowPos();
+
+            glm::vec2 vMin = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
+            glm::vec2 vMax = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
+
+            ImVec2 mainWindowPos = ImGui::GetMainViewport()->Pos;
+            vMin.x -= mainWindowPos.x;
+            vMin.y -= mainWindowPos.y;
+            vMax.x -= mainWindowPos.x;
+            vMax.y -= mainWindowPos.y;
+            Core::GetRenderer()->GetUIManager().SetViewportBounds(vMin.x, vMin.y, vMax.x - vMin.x, vMax.y - vMin.y);
+
             if(!mIsFullscreen)
                 mPreviousDockID = ImGui::GetWindowDockID();
 

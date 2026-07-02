@@ -41,13 +41,18 @@ namespace Surge
             RecalculateProjection();
         }
 
+        float GetAspectRatio() const { return mAspectRatio; }
+        void SetAspectRatio(float aspectRatio)
+        {
+            mAspectRatio = aspectRatio;
+            RecalculateProjection();
+        }
+
         void SetViewportSize(float width, float height)
         {
             mAspectRatio = width / height;
             RecalculateProjection();
         }
-
-        float GetAspectRatio() { return mAspectRatio; }
 
         //Perspective
         float GetPerspectiveVerticalFOV() const { return glm::degrees(mPerspectiveFOV); }

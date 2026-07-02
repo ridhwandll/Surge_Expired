@@ -70,7 +70,6 @@ namespace Surge
 
             // Frame UBO
             mFrameDescriptorSet = mRHI->CreateDescriptorSet(m2DQuadPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "2D_FrameData [Set0]");
-
             for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             {
                 DescriptorWrite write = {};
@@ -297,7 +296,7 @@ namespace Surge
         };
 
         std::array<TextPushConstants, MAX_QUAD_BATCHES_PER_FRAME> textBatchParams;
-        TextPushConstants currentTextParams = { 2.0f, {0.0f, 0.0f} };
+        TextPushConstants currentTextParams = { 8.0f, {0.0f, 0.0f} };
 
         for(const TextSubmitCmd& txt : blackboard.TextList)
         {
@@ -395,14 +394,28 @@ namespace Surge
             // GEOMETRY GENERATION
             auto buildTextQuads = [&](glm::vec2 posOffset, float zOffset, Uint packedColor) {
 
-                currentTextParams.PxRange = 2.0f;
+                currentTextParams.PxRange = txt.FontAsset->GetPxRange();
                 textBatchParams[mQuadBatchCount] = currentTextParams;
 
                 Uint lineIndex = 0;
                 Uint drawPrevChar = 0;
-                float cursorY = 0.0f;
-                float cursorX = getCursorX(lineIndex);
                 float italicSkew = txt.Italic ? 0.25f : 0.0f;
+
+                float capHeight = txt.FontAsset->GetLineHeight() * 0.7f;
+                float descent = txt.FontAsset->GetLineHeight() * 0.2f;
+
+                Uint numLines = (Uint)mLineLayoutCache.size();
+                float blockDrop = numLines > 0 ? ((numLines - 1) * (txt.FontAsset->GetLineHeight() + txt.LineSpacing)) : 0.0f;
+
+                float cursorY = 0.0f; // Default BASELINE
+                if(txt.VerticalAlignment == TextVerticalAlignment::CENTER)
+                    cursorY = (blockDrop + descent - capHeight) * 0.5f;
+                else if(txt.VerticalAlignment == TextVerticalAlignment::TOP)
+                    cursorY = -capHeight;
+                else if(txt.VerticalAlignment == TextVerticalAlignment::BOTTOM)
+                    cursorY = blockDrop + descent;
+
+                float cursorX = getCursorX(lineIndex);
 
                 auto drawUnderline = [&]() {
                     float lineW = mLineLayoutCache[lineIndex];
@@ -437,7 +450,8 @@ namespace Surge
                         drawUnderline();
                 };
 
-                if(txt.Underline) drawUnderline();
+                if(txt.Underline)
+                    drawUnderline();
 
                 for(size_t i = 0; i < txt.Text.size(); i++)
                 {
@@ -594,7 +608,6 @@ namespace Surge
         mTotalQuadlVertexCount += mCurrentQuadBatch.VertexCount;
         mCurrentFrameVertexOffset += mCurrentQuadBatch.VertexCount;
         mCurrentQuadBatch.Reset();
-
     }
 
     void Renderer2DPass::FlushLineBatch()

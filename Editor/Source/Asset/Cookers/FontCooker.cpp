@@ -27,7 +27,7 @@ namespace Surge
         const String charsetArg = "[0x0020, 0x007E]";
 
         String msdfCmd = std::format(
-            "\"{}\" -font \"{}\" -type msdf -dimensions 1024 1024 -minsize 32 -pxrange 2.0 -kerning "
+            "\"{}\" -font \"{}\" -type msdf -dimensions 512 512 -size 48 -pxrange 8.0 -kerning "
             "-chars \"{}\" -json \"{}\" -imageout \"{}\"",
             msdfAtlasGenExe, sourceAbsPath, charsetArg,
             tempJson.string(), tempPng.string());
@@ -41,23 +41,13 @@ namespace Surge
             return result;
         }
 
-        // Compress the font atlas to ktx2 using basisu
-        String basisuExe = Texture2DCooker::FindBasisuExe();
-        String basisuCmd = std::format("\"{}\" \"{}\" -uastc -ktx2 -output_file \"{}\"", basisuExe, tempPng.string(), tempKtx2.string());
-        Process::OutputOf(basisuCmd, exitCode);
-        if (exitCode != 0)
-        {
-            Log<Severity::Error>("[FontCooker] basisu.exe failed to compress atlas for {}", sourceAbsPath);
-            result.Success = false;
-            return result;
-        }
-
         // Parse MSDF JSON into the Runtime Specification
         String jsonStr;
         Filesystem::ReadTextFile(tempJson.string(), jsonStr);
         nlohmann::json fontJson = nlohmann::json::parse(jsonStr);
 
         FontSpecification spec;
+        spec.PxRange = fontJson["atlas"]["distanceRange"].get<float>();
         spec.LineHeight = fontJson["metrics"]["lineHeight"].get<float>();
 
         float atlasWidth = fontJson["atlas"]["width"].get<float>();
@@ -97,13 +87,18 @@ namespace Surge
             }
         }
 
-        // Slurp the compressed KTX2 data directly into the spec memory buffer
-        Filesystem::ReadBinaryFile(tempKtx2.string(), spec.KTX2Data);
+        TextureSpecification texSpec = Texture2DCooker::LoadFromSource(tempPng.string());
+        Uint size = texSpec.Width * texSpec.Height * 4;
+        spec.UncompressedData.resize(size);
+        std::memcpy(spec.UncompressedData.data(), texSpec.Content, size);
+        spec.Width = texSpec.Width;
+        spec.Height = texSpec.Height;
 
-        // Pack and Serialize the Monolithic .srgfont File!
+        // Pack runtime file
         AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
         FontBinary::Write(outputPath, stamp, spec);
 
+        Texture2DCooker::FreeLoadedSource(texSpec);
         Filesystem::RemoveFile(tempJson);
         Filesystem::RemoveFile(tempPng);
         Filesystem::RemoveFile(tempKtx2);

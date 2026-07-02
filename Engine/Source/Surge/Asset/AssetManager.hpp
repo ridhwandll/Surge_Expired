@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Scope.hpp"
 #include "Surge/Core/MemoryBlock.hpp"
 #include "Serializer/IAssetSerializer.hpp"
 #include "Surge/Asset/Asset.hpp"
@@ -88,7 +89,7 @@ namespace Surge
         }
 
         // Unload
-        // Removes the live Ref from the cache if no other objects are referencing it i.e. ref count = 1, otherwise does nothing since it's still in use 
+        // Removes the live Ref from the cache if no other objects are referencing it i.e. Ref count = 1, otherwise does nothing since it's still in use 
         // somewhere else in the program Note that the asset will still be registered and can be loaded again later, this just removes it from memory
         // @param id    AssetID of the asset to be removed
         // @return      true if unload was successful, false otherwise

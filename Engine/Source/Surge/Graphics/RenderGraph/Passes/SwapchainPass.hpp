@@ -28,6 +28,7 @@ namespace Surge
         void Shutdown(FrameBlackboard& blackBoard) override;
     private:
         GraphicsRHI* mRHI;
+        FramebufferHandle mFramebuffer;
         PipelineHandle mPresentPipeline;
         DescriptorSetHandle mPresentSet;
     };

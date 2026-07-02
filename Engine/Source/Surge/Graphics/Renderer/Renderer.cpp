@@ -10,6 +10,9 @@
 #include "Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SkyPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/ShadowPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/UIOverlayPass.hpp"
+
+#include "Surge/Graphics/UISystem/UIManager.hpp"
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
@@ -26,6 +29,8 @@ namespace Surge
         mShaderManager.Load("Renderer2D.glsl");
         mShaderManager.Load("Renderer2DLine.glsl");
         mShaderManager.Load("Renderer2DText.glsl");
+        mShaderManager.Load("UIQuad.glsl");
+        mShaderManager.Load("UIText.glsl");
         mShaderManager.Load("Renderer3D.glsl");
         mShaderManager.Load("PostProcess.glsl");
         mShaderManager.Load("OutlineMask.glsl");
@@ -56,7 +61,7 @@ namespace Surge
             samplerDesc.DebugName = "TextSampler";
             samplerDesc.Min = FilterMode::LINEAR;
             samplerDesc.Mag = FilterMode::LINEAR;
-            samplerDesc.Mip = MipmapMode::LINEAR;
+            samplerDesc.Mip = MipmapMode::NEAREST;
             samplerDesc.WrapU = WrapMode::CLAMP;
             samplerDesc.WrapV = WrapMode::CLAMP;
             blackBoard.TextSampler = mRHI->CreateSampler(samplerDesc);
@@ -89,9 +94,12 @@ namespace Surge
         mGraph.AddPass<SkyPass>();
         mGraph.AddPass<Renderer2DPass>();
         mGraph.AddPass<PostProcessPass>();
+        mGraph.AddPass<UIOverlayPass>();
         mGraph.AddPass<SwapchainPass>();
         mGraph.Setup(mRHI.get());
         mGraph.Compile();
+
+        mUIManager.Initialize();
     }
 
     void Renderer::BeginFrame(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
@@ -101,6 +109,17 @@ namespace Surge
         blackBoard.Env.HasEnvironment = false; //SHOULD we do it here? Seems hacky
 
         // Camera setup
+        if (!RHISettings::RENDER_TO_SWAPCHAIN)
+        {
+            blackBoard.ScreenWidth = mScreenSize.x;
+            blackBoard.ScreenHeight = mScreenSize.y;
+        }
+        else
+        {
+            glm::vec2 windowSize = Core::GetWindow()->GetSize();
+            blackBoard.ScreenWidth = windowSize.x; blackBoard.ScreenHeight = windowSize.y;
+        }
+
         blackBoard.ViewMatrix = viewMatrix;
         blackBoard.ProjectionMatrix = projectionMatrix;
         blackBoard.ViewProjection = blackBoard.ProjectionMatrix * blackBoard.ViewMatrix;
@@ -122,6 +141,8 @@ namespace Surge
 
     void Renderer::EndFrame()
     {
+        mUIManager.ExtractRenderData(mGraph.GetBlackboard());
+
         SURGE_PROFILE_FUNC("Renderer::EndFrame()");
         mGraph.Execute(mCurrentFrameCtx);
 
@@ -131,11 +152,13 @@ namespace Surge
 
     void Renderer::OnWindowResize(Uint width, Uint height)
     {
+        mScreenSize = { width, height };
         mGraph.OnWindowResize(width, height);
     }
 
     void Renderer::ForceResize(Uint width, Uint height)
     {
+        mScreenSize = { width, height };
         mGraph.ForceResize(width, height);
     }
 
@@ -179,6 +202,8 @@ namespace Surge
         SURGE_PROFILE_FUNC("Renderer::Shutdown()");
         FrameBlackboard& blackBoard = mGraph.GetBlackboard();
 
+        mUIManager.Shutdown();
+
         mRHI->WaitIdle();
         mGraph.Shutdown();
 
@@ -190,6 +215,14 @@ namespace Surge
         mRHI->DestroySampler(blackBoard.DefaultSampler);
         mRHI->DestroySampler(blackBoard.TextSampler);
         mRHI->Shutdown();
+    }
+
+    void Renderer::OnEvent(Event& e)
+    {
+        EventDispatcher dispatcher(e);
+        dispatcher.Dispatch<MouseMovedEvent>([&](MouseMovedEvent& e) { mUIManager.ProcessMouseMove(e.GetX(), e.GetY()); });
+        dispatcher.Dispatch<MouseButtonPressedEvent>([&](MouseButtonPressedEvent& e) { mUIManager.ProcessMouseButton(e.GetX(), e.GetY(), true); });
+        dispatcher.Dispatch<MouseButtonReleasedEvent>([&](MouseButtonReleasedEvent& e) { mUIManager.ProcessMouseButton(e.GetX(), e.GetY(), false); });
     }
 
 } // namespace Surge

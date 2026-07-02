@@ -16,8 +16,13 @@
 #include "Asset/SourceWriters/MaterialSourceWriter.hpp"
 #include "Asset/SourceWriters/ScriptSourceWriter.hpp"
 
+#include <imgui_stdlib.h>
 #include <stb_image.h>
 #include <Surge/Graphics/HighLevel/Font.hpp>
+
+#include "Surge/Graphics/UISystem/UIManager.hpp"
+#include "Surge/Graphics/UISystem/UIWidgets.hpp"
+#include "Surge/Core/Input/Input.hpp"
 
 namespace Surge
 {
@@ -60,9 +65,9 @@ namespace Surge
 
     void ContentBrowserPanel::Init(void*)
     {
+        mAssetManager = Core::GetAssetManager();
         mCode = GetStaticCode();
         OnAssetManagerInit();
-
         Renderer* renderer = Core::GetRenderer();
         Scope<GraphicsRHI>& rhi = renderer->GetRHI();
 
@@ -101,8 +106,6 @@ namespace Surge
         mEmptyDirectoryIconHandle = rhi->CreateImage(desc);
         mEmptyDirectoryIconImGuiID = rhi->GetImGuiImage(mEmptyDirectoryIconHandle);
         FreeIcon(loadData);
-
-        mAssetManager = Core::GetAssetManager();
     }
 
     void ContentBrowserPanel::OnAssetManagerInit()
@@ -177,7 +180,14 @@ namespace Surge
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
             if(keyEvent.GetKeyCode() == Key::F2)
                 StartRename(mSelectedPath);
-                                             });
+
+            if(keyEvent.GetKeyCode() == Key::C && !mSelectedPath.empty())
+            {
+                bool ctrlHeld = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
+                if(ctrlHeld)
+                    ImGui::SetClipboardText(Filesystem::GetRelativePath(mSelectedPath, mBaseDirectory).generic_string().c_str());
+            }
+        });
     }
 
     void ContentBrowserPanel::Render(bool* show)
@@ -395,6 +405,9 @@ namespace Surge
                                         }
                                         if(ImGui::MenuItem("Rename"))
                                             StartRename(item.Path_);
+                                        ImGui::Separator();
+                                        if(ImGui::MenuItem("\"Copy RPath\""))
+                                            ImGui::SetClipboardText(Filesystem::GetRelativePath(item.Path_, mBaseDirectory).generic_string().c_str());
 
                                         ImGui::EndPopup();
                                     }

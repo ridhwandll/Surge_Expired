@@ -16,6 +16,7 @@ namespace Surge
     struct IDComponent;
     struct TransformComponent;
     struct ScriptComponent;
+    struct UICanvasComponent;
 
     class Scene final : public Asset
     {
@@ -64,7 +65,8 @@ namespace Surge
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
         void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
-        void OnScriptDestroyed(Entity e, ScriptComponent& comp);
+        void OnScriptDestroyed(entt::registry& registry, entt::entity entity);
+        void OnUICanvasDestroyed(entt::registry& registry, entt::entity entity);
 
     private:
         bool mIsRunning = false;

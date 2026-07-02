@@ -57,6 +57,8 @@ namespace Surge
     NLOHMANN_JSON_SERIALIZE_ENUM(LightType, { {LightType::POINT, "POINT"}, {LightType::DIRECTIONAL, "DIRECTIONAL"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(RigidbodyType, { {RigidbodyType::STATIC, "STATIC"}, {RigidbodyType::DYNAMIC, "DYNAMIC"}, {RigidbodyType::KINEMATIC, "KINEMATIC"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(TextAlignment, { {TextAlignment::LEFT, "LEFT"}, {TextAlignment::CENTER, "CENTER"}, {TextAlignment::RIGHT, "RIGHT"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(TextVerticalAlignment, { {TextVerticalAlignment::TOP, "TOP"}, {TextVerticalAlignment::CENTER, "CENTER"}, {TextVerticalAlignment::BOTTOM, "BOTTOM"}, {TextVerticalAlignment::BASELINE, "BASELINE"} });
+
 
     template <typename XComponent>
     static void SerializeComponent(nlohmann::json& j, Entity& e)
@@ -122,6 +124,8 @@ namespace Surge
                     out[name] = *reinterpret_cast<const RigidbodyType*>(source);
                 else if(type.EqualTo<TextAlignment>())
                     out[name] = *reinterpret_cast<const TextAlignment*>(source);
+                else if(type.EqualTo<TextVerticalAlignment>())
+                    out[name] = *reinterpret_cast<const TextVerticalAlignment*>(source);
                 else
                     Log<Severity::Warn>("Unhandled Variable of type: {0} while serializing!", type.GetFullName());
             }
@@ -234,6 +238,8 @@ namespace Surge
                 *reinterpret_cast<RigidbodyType*>(dest) = inJson.value(name, RigidbodyType::STATIC);
             else if(type.EqualTo<TextAlignment>())
                 *reinterpret_cast<TextAlignment*>(dest) = inJson.value(name, TextAlignment::LEFT);
+            else if(type.EqualTo<TextVerticalAlignment>())
+                *reinterpret_cast<TextVerticalAlignment*>(dest) = inJson.value(name, TextVerticalAlignment::BASELINE);
             else
                 Log<Severity::Warn>("DeserializeComponent: Unhandled type '{}' for field '{}'", type.GetFullName(), name);
         }

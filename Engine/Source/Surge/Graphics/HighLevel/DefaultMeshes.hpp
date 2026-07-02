@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Core/Vector.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>

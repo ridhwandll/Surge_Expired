@@ -25,8 +25,23 @@
 #define VK_RHI_LOG(x)
 #endif
 
+#ifndef SURGE_RELEASE
+#define LOG_FORGOT_DELETE(x, h) Log<Severity::Fatal>("{}, NAME/ID: {}", x, RHIHandleToString(h))
+#else
+#define LOG_FORGOT_DELETE(x, h)
+#endif
+
 namespace Surge
 {
+    template<typename Tag>
+    static String RHIHandleToString([[maybe_unused]] RHIHandle<Tag> handle)
+    {
+#if defined(SURGE_DEBUG)
+        return std::format("RHIHandle<Index: {}, Generation: {}>", handle.Index, handle.Generation);
+#endif
+        return {};
+    }
+
     static Vector<String> ValidateExtensions(const Vector<const char*>& required, const Vector<VkExtensionProperties>& available)
     {
         Vector<String> missingExtensions;
@@ -106,12 +121,12 @@ namespace Surge
         mRenderPassCache.Shutdown(*this);
         mImGuiContext.Shutdown(*this);
 
-        mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry&) { DestroyDescriptorSet(h); SG_ASSERT_INTERNAL("You forgot to destroy a descriptor layout manually!"); });
-        mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry&){ DestroySampler(h); SG_ASSERT_INTERNAL("You forgot to destroy a sampler manually!"); });
-        mFramebufferPool.ForEachAlive([&](const FramebufferHandle&, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a framebuffer manually!"); });
-        mTexturePool.ForEachAlive([&](const ImageHandle&, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a texture manually!"); });
-        mBufferPool.ForEachAlive([&](const BufferHandle&, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a buffer manually!"); });
-        mPipelinePool.ForEachAlive([&](const PipelineHandle&, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); SG_ASSERT_INTERNAL("You forgot to destroy a pipeline manually!"); });
+        mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry&) { DestroyDescriptorSet(h); LOG_FORGOT_DELETE("You forgot to destroy a descriptor layout manually!", h); });
+        mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry&){ DestroySampler(h); LOG_FORGOT_DELETE("You forgot to destroy a sampler manually!", h); });
+        mFramebufferPool.ForEachAlive([&]([[maybe_unused]] const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a framebuffer manually!", h); });
+        mTexturePool.ForEachAlive([&]([[maybe_unused]] const ImageHandle& h, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a texture manually!", h); });
+        mBufferPool.ForEachAlive([&]([[maybe_unused]] const BufferHandle& h, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a buffer manually!", h); });
+        mPipelinePool.ForEachAlive([&]([[maybe_unused]] const PipelineHandle& h, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a pipeline manually!", h); });
 
         DestroySwapchainFramebuffers();
         DestroySwapchainRenderpass();
@@ -353,7 +368,7 @@ namespace Surge
         mFramebufferPool.Free(h);
     }
 
-    void VulkanRHI::ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height)
+    void VulkanRHI::ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height, bool resizeImages)
     {
         WaitIdle();
         FramebufferEntry* entry = mFramebufferPool.Get(h);
@@ -366,10 +381,13 @@ namespace Surge
         VulkanFramebuffer::Destroy(*this, oldEntry);
 
         // Resize the attached Textures
-        for (Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
-            ResizeImage(entry->Desc.ColorAttachments[i].Handle, width, height);
-        if (entry->Desc.HasDepth)
-            ResizeImage(entry->Desc.DepthAttachment.Handle, width, height);
+        if(resizeImages)
+        {
+            for(Uint i = 0; i < entry->Desc.ColorAttachmentCount; i++)
+                ResizeImage(entry->Desc.ColorAttachments[i].Handle, width, height);
+            if(entry->Desc.HasDepth)
+                ResizeImage(entry->Desc.DepthAttachment.Handle, width, height);
+        }
 
         // Rebuild with new dimensions
         FramebufferDesc desc = entry->Desc;
@@ -635,6 +653,14 @@ namespace Surge
         SG_ASSERT(entry, "VulkanRHI::CmdTransitionTextureLayout: invalid TextureHandle");
 
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+        VkImageLayout vkLayout = VulkanUtils::ImageUsageToVkLayout(newLayout); // Validate newLayout is compatible with our supported usages
+        VulkanImage::TransitionLayout(cmd, *entry, vkLayout);
+    }
+
+    void VulkanRHI::CmdTransitionImageLayout(VkCommandBuffer cmd, ImageHandle h, ImageUsage newLayout)
+    {
+        ImageEntry* entry = mTexturePool.Get(h);
+        SG_ASSERT(entry, "VulkanRHI::CmdTransitionTextureLayout: invalid TextureHandle");
         VkImageLayout vkLayout = VulkanUtils::ImageUsageToVkLayout(newLayout); // Validate newLayout is compatible with our supported usages
         VulkanImage::TransitionLayout(cmd, *entry, vkLayout);
     }

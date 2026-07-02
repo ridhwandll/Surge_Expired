@@ -10,4 +10,12 @@ namespace Surge
         CENTER,
         RIGHT
     };
+
+    enum class TextVerticalAlignment : uint8_t
+    {
+        TOP = 0,
+        CENTER,
+        BASELINE,
+        BOTTOM
+    };
 }

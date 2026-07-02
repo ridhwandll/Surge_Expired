@@ -91,33 +91,33 @@ namespace Surge
 
     }
 
-    //Ref<Asset> Texture2DCooker::LoadFromSource(const String& absPath) const
-    //{
-    //    Vector<uint8_t> fileData;
-    //    if(!Filesystem::ReadBinaryFile(absPath, fileData))
-    //    {
-    //        Log<Severity::Error>("[Texture2DSerializer::LoadFromSource] Failed to read binary file at path: {0}", absPath);
-    //        return nullptr;
-    //    }
-    //
-    //    int width = 0, height = 0, channels = 0;
-    //    stbi_uc* data = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels, 4);
-    //
-    //    if(!data)
-    //        return nullptr;
-    //
-    //    TextureSpecification spec;
-    //    spec.Format = ImageFormat::RGBA8_SRGB;
-    //    spec.DebugName = Filesystem::GetFilenameWithExt(absPath);
-    //    spec.Width = static_cast<Uint>(width);
-    //    spec.Height = static_cast<Uint>(height);
-    //    spec.Content = data;
-    //    spec.GenerateMips = true;
-    //    Ref<Texture2D> texture = Texture2D::Create(spec);
-    //
-    //    stbi_image_free(data);
-    //
-    //    Log<Severity::Trace>("[Texture2DSerializer] Created Texture2D form SOURCE {}", Filesystem::GetFilenameWithExt(absPath));
-    //    return texture.As<Asset>();
-    //}
+    TextureSpecification Texture2DCooker::LoadFromSource(const String& absPath)
+    {
+        Vector<Byte> fileData;
+        if(!Filesystem::ReadBinaryFile(absPath, fileData))
+        {
+            Log<Severity::Error>("[Texture2DCooker::LoadFromSource] Failed to read source file at path: {0}", absPath);
+            return {};
+        }
+    
+        int width = 0, height = 0, channels = 0;
+        stbi_uc* data = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels, 4);
+    
+        if(!data)
+            return {};
+    
+        TextureSpecification spec;
+        spec.Format = ImageFormat::RGBA8_UNORM;
+        spec.DebugName = Filesystem::GetFilenameWithExt(absPath);
+        spec.Width = static_cast<Uint>(width);
+        spec.Height = static_cast<Uint>(height);
+        spec.Content = data;
+        spec.GenerateMips = false;
+        return spec;
+    }
+
+    void Texture2DCooker::FreeLoadedSource(TextureSpecification sourceData)
+    {
+        stbi_image_free(sourceData.Content);
+    }
 }

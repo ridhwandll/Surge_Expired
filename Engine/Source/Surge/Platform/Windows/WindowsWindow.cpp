@@ -280,42 +280,42 @@ namespace Surge
             case WM_LBUTTONDOWN:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                MouseButtonPressedEvent event(static_cast<MouseCode>(VK_LBUTTON));
+                MouseButtonPressedEvent event((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam), static_cast<MouseCode>(VK_LBUTTON));
                 data->mEventCallback(event);
                 break;
             }
             case WM_LBUTTONUP:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                MouseButtonReleasedEvent event(static_cast<MouseCode>(VK_LBUTTON));
+                MouseButtonReleasedEvent event((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam), static_cast<MouseCode>(VK_LBUTTON));
                 data->mEventCallback(event);
                 break;
             }
             case WM_MBUTTONDOWN:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                MouseButtonPressedEvent event(static_cast<MouseCode>(VK_MBUTTON));
+                MouseButtonPressedEvent event((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam), static_cast<MouseCode>(VK_MBUTTON));
                 data->mEventCallback(event);
                 break;
             }
             case WM_MBUTTONUP:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                MouseButtonReleasedEvent event(static_cast<MouseCode>(VK_MBUTTON));
+                MouseButtonReleasedEvent event((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam), static_cast<MouseCode>(VK_MBUTTON));
                 data->mEventCallback(event);
                 break;
             }
             case WM_RBUTTONDOWN:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                MouseButtonPressedEvent event(static_cast<MouseCode>(VK_RBUTTON));
+                MouseButtonPressedEvent event((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam), static_cast<MouseCode>(VK_RBUTTON));
                 data->mEventCallback(event);
                 break;
             }
             case WM_RBUTTONUP:
             {
                 WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                MouseButtonReleasedEvent event(static_cast<MouseCode>(VK_RBUTTON));
+                MouseButtonReleasedEvent event((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam), static_cast<MouseCode>(VK_RBUTTON));
                 data->mEventCallback(event);
                 break;
             }

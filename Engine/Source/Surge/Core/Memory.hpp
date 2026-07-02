@@ -179,6 +179,10 @@ namespace Surge
         [[nodiscard]] T* Raw() { return mInstance; }
         [[nodiscard]] const T* Raw() const { return mInstance; }
 
+        // --- STL COMPATIBILITY ---
+        [[nodiscard]] T* get() { return mInstance; }
+        [[nodiscard]] const T* get() const { return mInstance; }
+
         // Potentially dangerous, use with caution. This will forcibly destroy the managed object regardless of
         // current ref count which can lead to dangling pointers if other Refs are still referencing it
         void ForceDestroy()

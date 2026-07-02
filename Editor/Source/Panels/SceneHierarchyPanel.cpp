@@ -67,7 +67,7 @@ namespace Surge
 
                 ImGui::SameLine();
 
-                // + Button
+                // ADD Button
                 if(ImGui::Button(addButtonLabel, ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
                     ImGui::OpenPopup("AddEntityContext");
             }
@@ -144,6 +144,12 @@ namespace Surge
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Text");
                     mSelectedEntity.AddComponent<TextComponent>();
+                }
+                ImGui::Separator();
+                if(ImGui::MenuItem("UI"))
+                {
+                    mSceneContext->CreateEntity(mSelectedEntity, "Canvas");
+                    mSelectedEntity.AddComponent<UICanvasComponent>();
                 }
                 ImGui::EndPopup();
             }

@@ -52,7 +52,7 @@ namespace Surge
         Key mKeyCode;
     };
 
-    class SURGE_API KeyPressedEvent : public KeyEvent
+    class KeyPressedEvent : public KeyEvent
     {
     public:
         KeyPressedEvent(const Key keycode, const uint16_t repeatCount) : KeyEvent(keycode), mRepeatCount(repeatCount) {}
@@ -71,7 +71,7 @@ namespace Surge
         uint16_t mRepeatCount;
     };
 
-    class SURGE_API KeyReleasedEvent : public KeyEvent
+    class KeyReleasedEvent : public KeyEvent
     {
     public:
         KeyReleasedEvent(const KeyCode keycode) : KeyEvent((Key)keycode) {}
@@ -85,7 +85,7 @@ namespace Surge
         EVENT_CLASS_TYPE(KeyReleased);
     };
 
-    class SURGE_API KeyTypedEvent : public KeyEvent
+    class KeyTypedEvent : public KeyEvent
     {
     public:
         KeyTypedEvent(const KeyCode keycode) : KeyEvent((Key)keycode) {}
@@ -100,7 +100,7 @@ namespace Surge
     };
 
     // Mouse Events
-    class SURGE_API MouseMovedEvent : public Event
+    class MouseMovedEvent : public Event
     {
     public:
         MouseMovedEvent(const float x, const float y) : mMouseX(x), mMouseY(y) {}
@@ -120,7 +120,7 @@ namespace Surge
         float mMouseX, mMouseY;
     };
 
-    class SURGE_API MouseScrolledEvent : public Event
+    class MouseScrolledEvent : public Event
     {
     public:
         MouseScrolledEvent(const float delta) : mDelta(delta) {}
@@ -139,21 +139,26 @@ namespace Surge
         float mDelta;
     };
 
-    class SURGE_API MouseButtonEvent : public Event
+    class MouseButtonEvent : public Event
     {
     public:
         MouseCode GetMouseButton() const { return mButton; }
 
+        float GetX() const { return mMouseX; }
+        float GetY() const { return mMouseY; }
+
     protected:
-        MouseButtonEvent(const MouseCode button) : mButton(button) {}
+        MouseButtonEvent(float mouseX, float mouseY, const MouseCode button) : mButton(button), mMouseX(mouseX), mMouseY(mouseY) {}
 
         MouseCode mButton;
+        float mMouseX, mMouseY;
     };
 
-    class SURGE_API MouseButtonPressedEvent : public MouseButtonEvent
+    class MouseButtonPressedEvent : public MouseButtonEvent
     {
     public:
-        MouseButtonPressedEvent(const MouseCode button) : MouseButtonEvent(button) {}
+        MouseButtonPressedEvent(float mouseX, float mouseY, const MouseCode button)
+            : MouseButtonEvent(mouseX, mouseY, button) {}
 
         virtual String ToString() const override
         {
@@ -164,10 +169,11 @@ namespace Surge
         EVENT_CLASS_TYPE(MouseButtonPressed);
     };
 
-    class SURGE_API MouseButtonReleasedEvent : public MouseButtonEvent
+    class MouseButtonReleasedEvent : public MouseButtonEvent
     {
     public:
-        MouseButtonReleasedEvent(const MouseCode button) : MouseButtonEvent(button) {}
+        MouseButtonReleasedEvent(float mouseX, float mouseY, const MouseCode button)
+            : MouseButtonEvent(mouseX, mouseY, button) {}
 
         virtual String ToString() const override
         {
@@ -179,7 +185,7 @@ namespace Surge
     };
 
     // App Events
-    class SURGE_API WindowResizeEvent : public Event
+    class WindowResizeEvent : public Event
     {
     public:
         WindowResizeEvent(Uint width, Uint height) : mWidth(width), mHeight(height) {}
@@ -199,7 +205,7 @@ namespace Surge
         Uint mWidth, mHeight;
     };
 
-    class SURGE_API WindowClosedEvent : public Event
+    class WindowClosedEvent : public Event
     {
     public:
         WindowClosedEvent() {}
@@ -208,7 +214,7 @@ namespace Surge
         EVENT_CLASS_TYPE(WindowClose);
     };
 
-    class SURGE_API EventDispatcher
+    class EventDispatcher
     {
     public:
         EventDispatcher(Event& event)

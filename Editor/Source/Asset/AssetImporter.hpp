@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Scope.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
 
 #include "Asset/Cookers/AssetCooker.hpp"

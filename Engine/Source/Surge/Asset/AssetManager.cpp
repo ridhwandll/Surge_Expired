@@ -159,10 +159,7 @@ namespace Surge
 
         // Cannot unload if there are external Refs still alive
         if(cacheIt->second->GetRefCount() > 1)
-        {
-            Log<Severity::Warn>("[AssetManager] Unload: AssetID {} has external references, cannot unload!", id.Get());
             return false;
-        }
 
         mLoadedAssets.erase(cacheIt);
 

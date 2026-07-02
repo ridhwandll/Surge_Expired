@@ -8,11 +8,7 @@ layout(location = 3) in uint inTextureIndex;
 
 layout(set = 0, binding = 0) uniform FrameUBO
 {
-    mat4 View;
     mat4 ViewProjection;
-    vec3 CameraPos;
-    float _pad;
-
 } uFrame;
 
 layout(location = 0) flat out uint outColor;
@@ -22,6 +18,7 @@ layout(location = 2) flat out uint outTextureIndex;
 void main()
 {
     gl_Position = uFrame.ViewProjection * vec4(inPosition, 1.0);
+
     outColor = inColor;
     outUV = inUV;
     outTextureIndex = inTextureIndex;
@@ -69,10 +66,8 @@ void main()
     float screenPxDistance = ScreenPxRange() * (sd - 0.5);
     float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
 
-    if (opacity < 0.01)
+    if (opacity < 0.001)
         discard;
 
-    fillColor.a *= opacity;
-    fillColor.rgb *= fillColor.a;
-    o_Color = fillColor;
+    o_Color = vec4(fillColor.rgb, opacity);
 }

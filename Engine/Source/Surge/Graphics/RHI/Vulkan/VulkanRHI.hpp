@@ -57,7 +57,7 @@ namespace Surge
 
         FramebufferHandle CreateFramebuffer(const FramebufferDesc& desc);
         void DestroyFramebuffer(FramebufferHandle h);
-        void ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height);
+        void ResizeFramebuffer(FramebufferHandle h, Uint width, Uint height, bool resizeImages);
         const FramebufferDesc& GetDesc(FramebufferHandle h) const;
 
         PipelineHandle CreatePipeline(const PipelineDesc& desc);
@@ -81,6 +81,7 @@ namespace Surge
         void CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data);
         void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle);
         void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout);
+        void CmdTransitionImageLayout(VkCommandBuffer cmd, ImageHandle h, ImageUsage newLayout);
 
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
         void CmdEndSwapchainRenderpass(const FrameContext& ctx);

@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
+#include "Surge/Core/Vector.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
 

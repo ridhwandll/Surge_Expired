@@ -8,7 +8,7 @@ namespace Surge
     // Android has no keyboard; key queries always return false
     bool Input::IsKeyPressed(Key)
     {
-        SG_ASSERT_INTERNAL("Android has no keyboard so bool Input::IsKeyPressed(Key) is always return false!");
+        //Log<Severity::Warn>("Android has no keyboard so bool Input::IsKeyPressed(Key) is always return false!");
         return false;
     }
 
@@ -33,7 +33,7 @@ namespace Surge
     void Input::SetCursorMode(CursorMode)
     {
         // No cursor on Android
-        SG_ASSERT_INTERNAL("Android has no keyboard so bool Input::IsKeyPressed(KeyCode) is always return false!");
+        //Log<Severity::Warn>("Android has no mouse, you cant do Input::SetCursorMode(CursorMode) on your finger!");
     }
 
 } // namespace Surge

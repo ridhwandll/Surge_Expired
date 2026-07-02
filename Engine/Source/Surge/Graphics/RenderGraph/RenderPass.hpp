@@ -12,6 +12,7 @@ namespace Surge
         MAIN_SCENE,
         OUTLINE_MASK,
         POST_PROCESS,
+        UI_OVERLAY,
         SWAPCHAIN
     };
 
