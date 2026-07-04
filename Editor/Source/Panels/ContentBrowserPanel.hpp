@@ -45,6 +45,7 @@ namespace Surge
             bool IsRegisteredAsset;
             ImTextureID ThumbnailImGuiID;
             AssetID Id = UUID::INVALID;
+            AssetType AssetType_ = AssetType::NONE;
             String AssetTypeStr;
         };
         Vector<ContentBrowserItem> mCurrentDirectoryItems;

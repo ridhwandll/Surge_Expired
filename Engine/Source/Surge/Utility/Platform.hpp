@@ -9,6 +9,10 @@ namespace Surge::Platform
     String GetPersistantStoragePath();
     void RequestExit();
     void ErrorMessageBox(const char* text);
+
+    void OpenInExplorer(const String& path);
+    void OpenInVSCode(const String& workspacePath, const String& path);
+
     glm::vec2 GetScreenSize();
 
     bool SetEnvVariable(const String& key, const String& value);

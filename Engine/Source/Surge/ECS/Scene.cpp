@@ -71,24 +71,23 @@ namespace Surge
     void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
     {
         Renderer* renderer = Core::GetRenderer();
-        AssetManager* am = Core::GetAssetManager();
         renderer->BeginFrame(viewMatrix, projectionMatrix, cameraNearFar);
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
             {
-                ImageHandle textureHandle = sprite.Texture != AssetID(AssetID::INVALID) ? am->Load<Texture2D>(sprite.Texture)->GetRHIImage() : ImageHandle::Invalid();
+                ImageHandle textureHandle = sprite.TextureAsset ? sprite.TextureAsset.As<Texture2D>()->GetRHIImage() : ImageHandle::Invalid();
                 renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Billboard, textureHandle);
             }
 
             auto txtView = mRegistry.view<TextComponent, TransformComponent>();
             for(const auto& [entity, txtCmp, transform] : txtView.each())
             {
-                if (txtCmp.FontAssetID)
+                if (txtCmp.FontAsset)
                 {
-                    Ref<Font> font = am->Load<Font>(txtCmp.FontAssetID);
+                    Ref<Font> font = txtCmp.FontAsset.As<Font>();
                     renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, txtCmp.MaxWidth, txtCmp.LetterSpacing, txtCmp.LineSpacing, 
-                                         txtCmp.Alignment, txtCmp.VerticalAlignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font, txtCmp.Billboard);
+                                         txtCmp.Alignment, txtCmp.VerticalAlignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font.Raw(), txtCmp.Billboard);
                 }
             }
         }
@@ -143,11 +142,11 @@ namespace Surge
             auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
             for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
             {
-                if(meshComponent.MeshID)
+                if(meshComponent.MeshAsset)
                 {
-                    Ref<Mesh> mesh = am->Load<Mesh>(meshComponent.MeshID);
+                    Ref<Mesh> mesh = meshComponent.MeshAsset.As<Mesh>();
                     if(mesh) //Asset might be missing/corrupted, so check before submitting
-                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh, meshComponent.DropShadow);
+                        renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Raw(), meshComponent.DropShadow);
                 }
             }
 
@@ -158,13 +157,13 @@ namespace Surge
         {
             if(const MeshComponent* meshComp = sSelectedEntity.TryGetComponent<MeshComponent>())
             {
-                if(meshComp->MeshID)
+                if(meshComp->MeshAsset)
                 {
-                    Ref<Mesh> mesh = am->Load<Mesh>(meshComp->MeshID);
+                    Ref<Mesh> mesh = meshComp->MeshAsset.As<Mesh>();
                     if(mesh) //Asset might be missing/corrupted, so check before submitting
                     {
                         const glm::mat4& transform = sSelectedEntity.GetComponent<TransformComponent>().GetTransform();
-                        renderer->SubmitMeshOutline(transform, mesh);
+                        renderer->SubmitMeshOutline(transform, mesh.Raw());
                     }
                 }
             }
@@ -584,16 +583,15 @@ namespace Surge
 
         if(mIsRunning)
         {
-            AssetManager* assetManager = Core::GetAssetManager();
             {
                 auto view = mRegistry.view<ScriptComponent>();
                 for(auto entityID : view)
                 {
                     auto& scriptComp = view.get<ScriptComponent>(entityID);
-                    if(!scriptComp.ScriptAsset.IsValid())
+                    if(!scriptComp.ScriptAsset)
                         continue;
 
-                    Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
+                    Ref<Script> script = scriptComp.ScriptAsset.As<Script>();
                     Entity entityObj = { entityID, this };
                     if(!scriptComp.IsInstantiated)
                     {
@@ -610,10 +608,10 @@ namespace Surge
                 for(auto entityID : view)
                 {
                     auto& scriptComp = view.get<UICanvasComponent>(entityID);
-                    if(!scriptComp.ScriptAsset.IsValid())
+                    if(!scriptComp.ScriptAsset)
                         continue;
 
-                    Ref<Script> script = assetManager->Load<Script>(scriptComp.ScriptAsset);
+                    Ref<Script> script = scriptComp.ScriptAsset.As<Script>();
                     Entity entityObj = { entityID, this };
                     if(!scriptComp.IsInstantiated)
                     {
@@ -669,7 +667,8 @@ namespace Surge
             Entity e;
             CreateEntity(e, "Cube");
             MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-            meshComp.MeshID = assetManager->Import(DefaultMesh::CUBE, AssetType::MESH);
+            AssetID kek = assetManager->Import(DefaultMesh::CUBE, AssetType::MESH);
+            meshComp.MeshAsset = assetManager->Load<Mesh>(kek);
 
             TransformComponent& t = e.GetComponent<TransformComponent>();
             t.Position = glm::vec3(0.0f, 2.5f, 0.0f);
@@ -681,7 +680,8 @@ namespace Surge
             Entity floor;
             CreateEntity(floor, "Floor");
             MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-            meshComp.MeshID = assetManager->Import(DefaultMesh::CYLINDER, AssetType::MESH);
+            AssetID kek = assetManager->Import(DefaultMesh::CYLINDER, AssetType::MESH);
+            meshComp.MeshAsset = assetManager->Load<Mesh>(kek);
 
             TransformComponent& t = floor.GetComponent<TransformComponent>();
             t.Position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -727,7 +727,7 @@ namespace Surge
         ScriptComponent& comp = e.GetComponent<ScriptComponent>();
         if(comp.IsInstantiated)
         {
-            Core::GetAssetManager()->Load<Script>(comp.ScriptAsset)->ExecuteOnDestroy(e);
+            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e);
             comp.IsInstantiated = false;
         }
     }
@@ -737,7 +737,7 @@ namespace Surge
         UICanvasComponent& comp = e.GetComponent<UICanvasComponent>();
         if(comp.IsInstantiated)
         {
-            Core::GetAssetManager()->Load<Script>(comp.ScriptAsset)->ExecuteOnDestroy(e);
+            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e);
             comp.IsInstantiated = false;
         }
     }

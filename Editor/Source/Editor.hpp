@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
+#include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Panels/PanelManager.hpp"
 #include "ProjectBrowser.hpp"
 
@@ -40,9 +41,14 @@ namespace Surge
     private:
         void CheckResize();
         void OnImGuiRender();
+        void DrawCustomTitlebar(const char* title, float titleBarHeight, bool showMenuItems = true);
         void RenderEditorSettings();
     private:
         bool mShowAxes = true;
+        ImageHandle mEngineLogo;
+        ImageHandle mMinimize;
+        ImageHandle mMaximize;
+        ImageHandle mClose;
 
         Ref<Scene> mRuntimeScene;
 

@@ -37,11 +37,14 @@ namespace Surge
         DeserializeRecentProjects();
     }
 
-    void ProjectBrowser::Render()
+    void ProjectBrowser::Render(float titleBarHeight)
     {
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->WorkPos);
-        ImGui::SetNextWindowSize(viewport->WorkSize);
+
+        ImVec2 windowPos = ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + titleBarHeight);
+        ImVec2 windowSize = ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - titleBarHeight);
+        ImGui::SetNextWindowPos(windowPos);
+        ImGui::SetNextWindowSize(windowSize);
         ImGui::SetNextWindowViewport(viewport->ID);
 
         ImVec4 windowBg = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -49,13 +52,7 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         ImGui::PushStyleColor(ImGuiCol_WindowBg, windowBg);
 
-        ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoBringToFrontOnFocus |
-            ImGuiWindowFlags_NoNavFocus;
-
+        constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
         if(ImGui::Begin("Surge Engine Launcher", nullptr, windowFlags))
         {
             ImFont* regularFont = ImGui::GetIO().Fonts->Fonts[0];
@@ -102,13 +99,6 @@ namespace Surge
                 float titleWidth = ImGui::CalcTextSize(titleText).x;
                 ImGui::SetCursorPosX((formWidth - titleWidth) * 0.5f);
                 ImGui::TextColored(accentColor, "%s", titleText);
-                ImGui::PopFont();
-
-                ImGui::PushFont(regularFont, 19.0f);
-                const char* subText = "Project Browser";
-                float subWidth = ImGui::CalcTextSize(subText).x;
-                ImGui::SetCursorPosX((formWidth - subWidth) * 0.5f);
-                ImGui::TextColored(textMuted, "%s", subText);
                 ImGui::PopFont();
 
                 ImGui::Spacing();

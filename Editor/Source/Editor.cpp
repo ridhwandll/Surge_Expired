@@ -1,6 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include <Surge/Surge.hpp>
 #include "Editor.hpp"
+#include "Surge/Core/Core.hpp"
+#include "Surge/Core/Time/Clock.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 
@@ -22,6 +24,29 @@
 
 namespace Surge
 {
+    static ImageHandle GenerateImage(const String& path)
+    {
+        Renderer* renderer = Core::GetRenderer();
+        Scope<GraphicsRHI>& rhi = renderer->GetRHI();
+
+        TextureSpecification spec = Texture2DCooker::LoadFromSource(path);
+        ImageDesc desc = {};
+        desc.Format = ImageFormat::RGBA8_UNORM;
+        desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
+        desc.GenerateImGuiID = true;
+        desc.Sampler = renderer->GetDefaultSampler();
+
+        desc.Width = spec.Width;
+        desc.Height = spec.Height;
+        desc.DebugName = Filesystem::GetFilenameWithExt(path);
+        desc.InitialData = spec.Content;
+        desc.DataSize = spec.Width * spec.Height * 4;
+        ImageHandle imageHandle = rhi->CreateImage(desc);
+        Texture2DCooker::FreeLoadedSource(spec);
+
+        return imageHandle;
+    }
+
     void Editor::OnInitialize()
     {
         // Dummy Scene to render the project browser ImGui. We can probably find a better way to do this later, but for now it works and doesn't cause any issues
@@ -62,6 +87,11 @@ namespace Surge
         mProjectBrowser.Init();
 
         mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
+
+        mEngineLogo = GenerateImage("Editor/Assets/Textures/EngineLogo.png");
+        mMinimize = GenerateImage("Editor/Assets/Textures/Minimize.png");
+        mMaximize = GenerateImage("Editor/Assets/Textures/Maximize.png");
+        mClose = GenerateImage("Editor/Assets/Textures/Close.png");
     }
 
     void Editor::OnUpdate()
@@ -95,10 +125,18 @@ namespace Surge
 
     void Editor::OnImGuiRender()
     {
+        constexpr float titleBarHeight = 65.0f;
+
         if(mCurrentProject.IsValid())
         {
             mRenderer->ShowInternalImGui(true);
-            ImGuiAux::DockSpace();
+
+#ifdef SURGE_DEBUG
+            DrawCustomTitlebar(("[DEBUG] Surge Editor //" + mCurrentProject.Name).c_str(), titleBarHeight);
+#elif defined(SURGE_RELEASE)
+            DrawCustomTitlebar(("Surge Editor //" + mCurrentProject.Name).c_str(), titleBarHeight);
+#endif
+            ImGuiAux::DockSpace(titleBarHeight);
             mPanelManager.RenderPanels();
             RenderEditorSettings();
 
@@ -120,9 +158,224 @@ namespace Surge
         }
         else
         {
+            constexpr float projectWindowTitlebarHeight = 40.0f;
             mRenderer->ShowInternalImGui(false);
-            mProjectBrowser.Render();
+            DrawCustomTitlebar("Project Browser", projectWindowTitlebarHeight, false);
+            mProjectBrowser.Render(projectWindowTitlebarHeight);
         }
+    }
+
+    void Editor::DrawCustomTitlebar(const char* title, float titleBarHeight, bool showMenuItems)
+    {
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+        ImVec4 bgColor = ImGuiAux::Colors::ExtraDark;
+        ImVec4 textColor = ImGuiAux::Colors::White;
+        if(IsPlaying())
+        {
+            float time = static_cast<float>(ImGui::GetTime());
+            float pulse = (glm::sin(time * 2.0f) + 1.0f) * 0.5f;
+
+            glm::vec4 bgBright = ImGuiAux::Colors::ThemeColor2;
+            glm::vec4 bgDark = ImGuiAux::Colors::ExtraDark;
+
+            glm::vec4 txtBright = ImGuiAux::Colors::White;
+            glm::vec4 txtDark = bgDark;
+
+            bgColor = glm::mix(bgDark, bgBright, pulse);
+            textColor = glm::mix(txtBright, txtDark, pulse);
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, bgColor);
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, titleBarHeight));
+
+        constexpr ImGuiWindowFlags titlebarFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse;
+
+        if(ImGui::Begin("##SurgeTitleBar", nullptr, titlebarFlags))
+        {
+            ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+            float availableWidth = ImGui::GetContentRegionAvail().x;
+            constexpr float topPadding = 10.0f;
+            float currentX = 10.0f; // Left padding
+
+            // ENGINE ICON
+            float logoWidthHeight = showMenuItems ? 50.0f : 28.0f;
+            float logoYPos = showMenuItems ? topPadding : ((titleBarHeight - logoWidthHeight) * 0.5f);
+
+            ImGui::SetCursorPos(ImVec2(currentX, logoYPos));
+            ImTextureID engineLogoTextureID = mRenderer->GetRHI()->GetImGuiImage(mEngineLogo);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Transparent button
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+            if(ImGui::ImageButton("EngineIcon", engineLogoTextureID, ImVec2(logoWidthHeight, logoWidthHeight)))
+            {
+                mCurrentProject = {}; // Reset project to go back to the Project Browser
+            }
+            ImGui::PopStyleColor(2);
+            currentX += logoWidthHeight + 5.0f;
+
+            // EDITOR MENUS & PLAYBACK
+            if(showMenuItems)
+            {
+                // MENUS
+                ImGui::SetCursorPos(ImVec2(currentX, topPadding));
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Transparent button
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.1f));
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
+
+                if(ImGui::Button("VIEW"))
+                    ImGui::OpenPopup("WindowMenu");
+                ImGui::SameLine();
+                ImGui::Button("HELP");
+
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(2);
+
+                currentX = ImGui::GetCursorPosX();
+
+                // Menu Popups
+                ImGuiAux::StyledPopupVars::Push();
+                ImGui::SetCursorPosY(titleBarHeight);
+                if(ImGui::BeginPopup("WindowMenu", ImGuiPopupFlags_None))
+                {
+                    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]); // Bold font
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "EDITOR PANELS");
+                    ImGui::PopFont();
+
+                    ImGuiAux::StyledSeparator();
+
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+                    for(auto& [panelCode, panel] : mPanelManager.GetAllPanels())
+                        ImGui::MenuItem(PanelCodeToString(panelCode), nullptr, &panel.Show);
+
+                    ImGuiAux::StyledSeparator();
+
+                    if(ImGui::MenuItem("Reset Default Layout"))
+                    {
+                        for(auto& [panelCode, panel] : mPanelManager.GetAllPanels())
+                            panel.Show = true;
+                        // TODO: ImGui::LoadIniSettingsFromDisk("imgui_default.ini");
+                    }
+                    ImGui::PopStyleColor();
+                    ImGui::EndPopup();
+                }
+                ImGuiAux::StyledPopupVars::Pop();
+
+                // PLAYBACK CONTROLS (BOTTOM ROW)
+                float buttonWidth = 40.0f; // Width to fit "STOP" and "PLAY"
+                float playControlsX = (availableWidth - buttonWidth) * 0.5f;
+
+                ImGui::PushFont(boldFont);
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Transparent button
+                if(playControlsX > currentX + 50.0f)
+                {
+                    ImGui::SetCursorPos(ImVec2(playControlsX, 36.0f));
+
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 2.0f));
+
+                    bool isPlaying = IsPlaying();
+                    if(isPlaying)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Red);
+                        if(ImGui::Button("STOP", ImVec2(buttonWidth, 0)))
+                            OnRuntimeEnd();
+                        ImGui::PopStyleColor();
+                    }
+                    else
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::ThemeColor1);
+                        if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0)))
+                            OnRuntimeStart();
+                        ImGui::PopStyleColor();
+                    }
+
+                    ImGui::PopStyleVar(2);
+                }
+                ImGui::PopStyleColor();
+                ImGui::PopFont();
+            }
+
+            // TITLE
+            constexpr float titleFontSize = 19.0f;
+            ImGui::PushFont(boldFont, titleFontSize);
+            float textWidth = ImGui::CalcTextSize(title).x;
+            float centerPosX = (availableWidth - textWidth) * 0.5f;
+            float titleYPos = showMenuItems ? topPadding : ((titleBarHeight - titleFontSize) * 0.5f);
+
+            // Prevent overlap with menus/logo if the window gets squished
+            if(centerPosX > currentX + 20.0f)
+            {
+                ImGui::SetCursorPos(ImVec2(centerPosX, titleYPos));
+                ImGui::Text("%s", title);
+            }
+            ImGui::PopFont();
+
+            // WINDOW CONTROLS
+            constexpr float controlsWidth = 120.0f;
+            constexpr float rightPadding = 10.0f;
+
+            // Button height is 24px + 6px + 6px = 36px. Center it perfectly when in 40px mode.
+            float windowTopPadding = showMenuItems ? topPadding : ((titleBarHeight - 36.0f) * 0.5f);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Transparent buttons
+            ImGui::SetCursorPos(ImVec2(availableWidth - controlsWidth - rightPadding, windowTopPadding));
+
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 6.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+            if(ImGui::ImageButton("##Minimize", mRenderer->GetRHI()->GetImGuiImage(mMinimize), ImVec2(24.0f, 24.0f)))
+                Core::GetWindow()->Minimize();
+
+            ImGui::SameLine();
+
+            if(ImGui::ImageButton("##Maximize", mRenderer->GetRHI()->GetImGuiImage(mMaximize), ImVec2(24.0f, 24.0f)))
+            {
+                Window* window = Core::GetWindow();
+                if(window->IsWindowMaximized())
+                    window->RestoreFromMaximize();
+                else
+                    window->Maximize();
+            }
+            ImGui::PopStyleColor();
+
+            ImGui::SameLine();
+
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.2f, 0.2f, 1.0f));
+            if(ImGui::ImageButton("##Close", mRenderer->GetRHI()->GetImGuiImage(mClose), ImVec2(24.0f, 24.0f)))
+                Platform::RequestExit();
+
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
+
+            // FPS
+            if(showMenuItems)
+            {
+                static float sUpdateTimer = 0.0f;
+                static String sFpsText = "0.00 ms | 0 FPS";
+
+                sUpdateTimer += ImGui::GetIO().DeltaTime;
+                if(sUpdateTimer >= 0.25f)
+                {
+                    float frameTimeMs = Core::GetClock().GetMilliseconds();
+                    float fps = ImGui::GetIO().Framerate;
+                    sFpsText = std::format("{:.2f} ms | {:.0f} FPS", frameTimeMs, fps);
+                    sUpdateTimer = 0.0f;
+                }
+
+                float fpsWidth = ImGui::CalcTextSize(sFpsText.c_str()).x;
+
+                ImGui::SetCursorPos(ImVec2(availableWidth - fpsWidth - rightPadding, 48.0f));
+                ImGui::Text("%s", sFpsText.c_str());
+            }
+        }
+        ImGui::End();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(2);
     }
 
     void Editor::RenderEditorSettings()
@@ -216,6 +469,11 @@ namespace Surge
     void Editor::OnShutdown()
     {
         mAssetImporter.Shutdown();
+        Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
+        rhi->DestroyImage(mEngineLogo);
+        rhi->DestroyImage(mMinimize);
+        rhi->DestroyImage(mMaximize);
+        rhi->DestroyImage(mClose);
     }
 
 } // namespace Surge
@@ -225,7 +483,7 @@ int main()
 {
     Surge::ClientOptions clientOptions;
     clientOptions.RenderFinalImageToSwapchian = false; // We grab the imgui image id from renderer
-    clientOptions.WindowDescription = {1280, 720, "Surge Editor", Surge::WindowFlags::CreateDefault};
+    clientOptions.WindowDescription = {1280, 720, "Surge Editor", Surge::WindowFlags::NoTitlebar};
 
     Surge::Editor* app = Surge::MakeClient<Surge::Editor>();
     app->SetOptions(clientOptions);

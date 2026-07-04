@@ -179,7 +179,7 @@ namespace Surge
         [[nodiscard]] T* Raw() { return mInstance; }
         [[nodiscard]] const T* Raw() const { return mInstance; }
 
-        // --- STL COMPATIBILITY ---
+        // STL COMPATIBILITY
         [[nodiscard]] T* get() { return mInstance; }
         [[nodiscard]] const T* get() const { return mInstance; }
 

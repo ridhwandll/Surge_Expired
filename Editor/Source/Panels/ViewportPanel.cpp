@@ -14,6 +14,7 @@
 #include <ImGuizmo.h>
 #include <glm/gtc/type_ptr.hpp>
 #include "Surge/Graphics/UISystem/UIManager.hpp"
+#include "Utility/ImGuiAux.hpp"
 
 namespace Surge
 {
@@ -155,6 +156,9 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
         if(ImGui::Begin(PanelCodeToString(mCode), show, windowFlags))
         {
+            Editor* editor = static_cast<Editor*>(Core::GetClient());
+            bool isPlaying = editor->IsPlaying();
+
             auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
             auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
             auto viewportOffset = ImGui::GetWindowPos();
@@ -172,12 +176,10 @@ namespace Surge
             if(!mIsFullscreen)
                 mPreviousDockID = ImGui::GetWindowDockID();
 
+
             mIsViewportHovered = ImGui::IsWindowHovered();
             mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
             ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
-
-            ImVec2 cursorLocalPos = ImGui::GetCursorPos();
-            ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
 
             ImGui::Image(mTexID, { mViewportSize.x, mViewportSize.y });
 
@@ -212,7 +214,7 @@ namespace Surge
                                 Ref<Scene> currentScene = editor->GetCurrentScene();
                                 Entity newEntity;
                                 currentScene->CreateEntity(newEntity, "Mesh");
-                                newEntity.AddComponent<MeshComponent>().MeshID = droppedAssetID;
+                                newEntity.AddComponent<MeshComponent>().MeshAsset = droppedMesh;
                                 mSceneHierarchy->SetSelectedEntity(newEntity);
                             }
                             break;
@@ -227,9 +229,7 @@ namespace Surge
             }
 
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
-
-            Editor* editor = static_cast<Editor*>(Core::GetClient());
-            bool isPlaying = editor->IsPlaying();
+            ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
 
             // Scene Name
             const char* displayText = isPlaying ? "RUNTIME" : mSceneName.c_str();
@@ -242,29 +242,7 @@ namespace Surge
             ImVec2 bgMin = ImVec2(bgMax.x - textWidth - (padding * 2.0f), cursorScreenPos.y + 10.0f);
             drawList->AddRectFilled(bgMin, bgMax, IM_COL32(15, 15, 15, 200), 4.0f);
             drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), displayText);
-
-            // Play Button
-            const float buttonWidth = ImGui::CalcTextSize("STOP").x + 10.0f; //OR PLAY, both 4 chars
-            float totalButtonsWidth = buttonWidth;
-            ImVec2 buttonsPos = ImVec2(cursorLocalPos.x + (mViewportSize.x - totalButtonsWidth) * 0.5f, cursorLocalPos.y + 10.0f);
-            ImGui::SetCursorPos(buttonsPos);
-
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.1f, 0.5f));
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-            if(isPlaying)
-            {
-                if(ImGui::Button("STOP", ImVec2(buttonWidth, 0)))
-                    editor->OnRuntimeEnd();
-            }
-            else
-            {
-                if(ImGui::Button("PLAY", ImVec2(buttonWidth, 0)))
-                    editor->OnRuntimeStart();
-            }
-
             ImGui::PopFont();
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor();
 
             // GIZMOS
             if(!isPlaying)

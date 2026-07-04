@@ -28,21 +28,6 @@ namespace Surge
         }
     }
 
-    void UI::Widget::ClearAll()
-    {
-        mOnClick = nullptr;
-        mOnHoverEnter = nullptr;
-        mOnHoverExit = nullptr;
-
-        for(auto& child : mChildren)
-        {
-            if(child)
-                child->ClearAll();
-        }
-        mChildren.clear();
-        mParent = nullptr;
-    }
-
     void UI::Text::GenerateDrawCommands(FrameBlackboard& blackboard)
     {
         glm::vec2 globalPos, globalSize;
@@ -58,7 +43,7 @@ namespace Surge
         cmd.Transform = transform;
         cmd.Text = mText;
         cmd.Color = mColor;
-        cmd.FontAsset = Core::GetAssetManager()->Load<Font>(mFontAsset);
+        cmd.FontAsset = Core::GetAssetManager()->Load<Font>(mFontAsset).Raw();
         cmd.Billboard = false;
         cmd.Alignment = mTextAlignment;
         cmd.VerticalAlignment = mTextVerticalAlignment;

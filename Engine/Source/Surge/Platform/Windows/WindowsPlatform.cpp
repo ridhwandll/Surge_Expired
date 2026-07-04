@@ -23,6 +23,61 @@ namespace Surge
         return resultantPath;
     }
 
+    void Platform::OpenInExplorer(const String& path)
+    {
+        int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), (int)path.size(), NULL, 0);
+        if(sizeNeeded <= 0)
+            return;
+
+        std::wstring wpath(sizeNeeded, 0);
+        MultiByteToWideChar(CP_UTF8, 0, path.c_str(), (int)path.size(), &wpath[0], sizeNeeded);
+
+        // Convert all forward slashes to backslashes for the Shell API
+        for(auto& ch : wpath)
+        {
+            if(ch == L'/')
+                ch = L'\\';
+        }
+
+        HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+        bool shouldUninitialize = SUCCEEDED(hr);
+        if(FAILED(hr) && hr != RPC_E_CHANGED_MODE)
+            return;
+
+        PIDLIST_ABSOLUTE pidl = ILCreateFromPathW(wpath.c_str());
+        if(pidl)
+        {
+            SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
+            ILFree(pidl);
+        }
+
+        if(shouldUninitialize && hr != S_FALSE)
+            CoUninitialize();
+    }
+
+    void Platform::OpenInVSCode(const String& workspacePath, const String& path)
+    {
+        SG_ASSERT_NOMSG(!path.empty());
+
+        String combinedArgs;
+        if (!workspacePath.empty())
+            combinedArgs = "\"" + workspacePath + "\" \"" + path + "\"";
+        else
+            combinedArgs = "\"" + path + "\"";
+
+        int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, combinedArgs.c_str(), (int)combinedArgs.size(), NULL, 0);
+        if(sizeNeeded <= 0)
+            return;
+
+        std::wstring wArgs(sizeNeeded, 0);
+        MultiByteToWideChar(CP_UTF8, 0, combinedArgs.c_str(), (int)combinedArgs.size(), &wArgs[0], sizeNeeded);
+
+        ShellExecuteW( NULL, L"open", L"code.cmd",
+            wArgs.c_str(), // Contains: "Folder" "File"
+            NULL, SW_HIDE);
+    }
+
     void Platform::RequestExit()
     {
         SendMessage(static_cast<HWND>(Core::GetWindow()->GetNativeWindowHandle()), WM_QUIT, 0, 0);

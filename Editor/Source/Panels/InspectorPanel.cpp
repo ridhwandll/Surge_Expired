@@ -15,6 +15,8 @@
 #include <imgui_internal.h>
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
+#include <Surge/Graphics/HighLevel/Font.hpp>
+#include <Surge/ScriptEngine/ScriptAsset.hpp>
 
 namespace Surge
 {
@@ -50,7 +52,7 @@ namespace Surge
             if(ImGui::DragFloat(id, &val, 0.1f, 0.0f, 0.0f, "%.2f"))
                 modified = true;
             ImGui::PopItemWidth();
-        };
+            };
 
         drawAxis("##X", "X", values.x, ImVec4 { 0.85f, 0.35f, 0.35f, 1.0f });
         ImGui::SameLine();
@@ -87,12 +89,22 @@ namespace Surge
             if(ImGui::Button(".../", ImVec2 { lineHeight, lineHeight }))
                 ImGui::OpenPopup("ComponentSettings");
 
+            ImGuiAux::StyledPopupVars::Push();
             if(ImGui::BeginPopup("ComponentSettings"))
             {
-                if(ImGui::MenuItem("Remove Component"))
+                ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+                ImGui::PushFont(boldFont);
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "OPTIONS");
+                ImGui::PopFont();
+                ImGuiAux::StyledSeparator();
+
+                if(ImGuiAux::StyledMenuItem("Remove Component"))
                     removeComponent = true;
-                ImGui::EndPopup();
+
+                ImGuiAux::EndStyledPopup();
             }
+            else
+                ImGuiAux::StyledPopupVars::Pop();
         }
 
         if(open)
@@ -149,49 +161,79 @@ namespace Surge
                     ImGui::OpenPopup("AddComponentPopup");
                 ImGui::PopStyleVar();
 
+                ImGuiAux::StyledPopupVars::Push();
                 if(ImGui::BeginPopup("AddComponentPopup"))
                 {
-                    if(ImGui::MenuItem("Camera Component") && !entity.HasComponent<CameraComponent>())
+                    ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+
+                    ImGui::PushFont(boldFont);
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "RENDERING");
+                    ImGui::PopFont();
+                    ImGuiAux::StyledSeparator();
+
+                    if(ImGuiAux::StyledMenuItem("Camera Component") && !entity.HasComponent<CameraComponent>())
                         entity.AddComponent<CameraComponent>();
-                    if(ImGui::MenuItem("Sprite Renderer  Component") && !entity.HasComponent<SpriteRendererComponent>())
+                    if(ImGuiAux::StyledMenuItem("Sprite Renderer Component") && !entity.HasComponent<SpriteRendererComponent>())
                         entity.AddComponent<SpriteRendererComponent>(ImGuiAux::Colors::ThemeColor1);
-                    if(ImGui::MenuItem("Mesh Component") && !entity.HasComponent<MeshComponent>())
+                    if(ImGuiAux::StyledMenuItem("Mesh Component") && !entity.HasComponent<MeshComponent>())
                         entity.AddComponent<MeshComponent>();
-                    if(ImGui::MenuItem("Light Components") && !entity.HasComponent<LightComponent>())
+                    if(ImGuiAux::StyledMenuItem("Light Component") && !entity.HasComponent<LightComponent>())
                         entity.AddComponent<LightComponent>();
-                    if(ImGui::MenuItem("Environment Component") && !entity.HasComponent<EnvironmentComponent>())
+                    if(ImGuiAux::StyledMenuItem("Environment Component") && !entity.HasComponent<EnvironmentComponent>())
                         entity.AddComponent<EnvironmentComponent>();
-                    if(ImGui::MenuItem("Text Component") && !entity.HasComponent<TextComponent>())
+                    if(ImGuiAux::StyledMenuItem("Text Component") && !entity.HasComponent<TextComponent>())
                         entity.AddComponent<TextComponent>();
 
-                    if(ImGui::BeginMenu("Physics"))
+                    ImGuiAux::StyledSeparator();
+                    ImGui::PushFont(boldFont);
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "PHYSICS");
+                    ImGui::PopFont();
+                    ImGuiAux::StyledSeparator();
+
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
+                    if(ImGui::BeginMenu("Colliders & Dynamics"))
                     {
-                        if(ImGui::MenuItem("Rigidbody Component") && !entity.HasComponent<RigidbodyComponent>())
+                        if(ImGuiAux::StyledMenuItem("Rigidbody Component") && !entity.HasComponent<RigidbodyComponent>())
                             entity.AddComponent<RigidbodyComponent>();
-                        if(ImGui::MenuItem("Box Collider") && !entity.HasComponent<BoxColliderComponent>())
+                        if(ImGuiAux::StyledMenuItem("Box Collider") && !entity.HasComponent<BoxColliderComponent>())
                             entity.AddComponent<BoxColliderComponent>();
-                        if(ImGui::MenuItem("Sphere Collider") && !entity.HasComponent<SphereColliderComponent>())
+                        if(ImGuiAux::StyledMenuItem("Sphere Collider") && !entity.HasComponent<SphereColliderComponent>())
                             entity.AddComponent<SphereColliderComponent>();
-                        if(ImGui::MenuItem("Capsule Collider") && !entity.HasComponent<CapsuleColliderComponent>())
+                        if(ImGuiAux::StyledMenuItem("Capsule Collider") && !entity.HasComponent<CapsuleColliderComponent>())
                             entity.AddComponent<CapsuleColliderComponent>();
-                        if(ImGui::MenuItem("Cylinder Collider") && !entity.HasComponent<CylinderColliderComponent>())
+                        if(ImGuiAux::StyledMenuItem("Cylinder Collider") && !entity.HasComponent<CylinderColliderComponent>())
                             entity.AddComponent<CylinderColliderComponent>();
-                        if(ImGui::MenuItem("Convex Collider") && !entity.HasComponent<ConvexColliderComponent>() && entity.HasComponent<MeshComponent>())
+                        if(ImGuiAux::StyledMenuItem("Convex Collider") && !entity.HasComponent<ConvexColliderComponent>() && entity.HasComponent<MeshComponent>())
                             entity.AddComponent<ConvexColliderComponent>();
-                        if(ImGui::MenuItem("Mesh Collider") && !entity.HasComponent<MeshColliderComponent>())
+                        if(ImGuiAux::StyledMenuItem("Mesh Collider") && !entity.HasComponent<MeshColliderComponent>())
                             entity.AddComponent<MeshColliderComponent>();
 
-                        ImGui::EndPopup();
+                        ImGui::EndMenu();
                     }
-                    if(ImGui::MenuItem("Script Component") && !entity.HasComponent<ScriptComponent>())
+                    ImGui::PopStyleVar();
+
+                    ImGuiAux::StyledSeparator();
+                    ImGui::PushFont(boldFont);
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "SCRIPTING");
+                    ImGui::PopFont();
+                    ImGuiAux::StyledSeparator();
+
+                    if(ImGuiAux::StyledMenuItem("Script Component") && !entity.HasComponent<ScriptComponent>())
                         entity.AddComponent<ScriptComponent>();
 
-                    if(ImGui::MenuItem("UICanvas Component") && !entity.HasComponent<UICanvasComponent>())
-                        entity.AddComponent<UICanvasComponent>();
-                    else
-                        Platform::ErrorMessageBox("Entity already has a UICanvas Component");
+                    if(ImGuiAux::StyledMenuItem("UICanvas Component"))
+                    {
+                        if(!entity.HasComponent<UICanvasComponent>())
+                            entity.AddComponent<UICanvasComponent>();
+                        else
+                            Platform::ErrorMessageBox("Entity already has a UICanvas Component");
+                    }
 
-                    ImGui::EndPopup();
+                    ImGuiAux::EndStyledPopup();
+                }
+                else
+                {
+                    ImGuiAux::StyledPopupVars::Pop();
                 }
             }
         }
@@ -296,7 +338,7 @@ namespace Surge
 
                     ImGuiAux::TProperty<bool>("Fixed Aspect Ratio", &component.FixedAspectRatio);
                 }
-            });
+                                           });
         }
 
         if(entity.HasComponent<SpriteRendererComponent>())
@@ -309,14 +351,14 @@ namespace Surge
                 ImGui::TextUnformatted("Texture");
                 ImGui::TableNextColumn();
 
-                const char* buttonText = component.Texture.IsValid() ? Core::GetAssetManager()->GetMetadata(component.Texture).RelativePath.c_str() : "Drop TEXTURE2D";
+                const char* buttonText = component.TextureAsset ? Core::GetAssetManager()->GetMetadata(component.TextureAsset->GetID()).RelativePath.c_str() : "Drop TEXTURE2D";
                 ImGui::PushID(buttonText);
 
                 float fullWidth = ImGui::GetContentRegionAvail().x;
                 if(ImGuiAux::Button(buttonText, ImVec2(fullWidth * 0.7f, 0)))
                 {
                     Editor* editor = static_cast<Editor*>(Core::GetClient());
-                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.Texture);
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.TextureAsset->GetID());
                 }
 
                 if(ImGui::BeginDragDropTarget())
@@ -328,15 +370,15 @@ namespace Surge
                         AssetID droppedAssetID = *(const AssetID*)payload->Data;
                         AssetMetadata meta = am->GetMetadata(droppedAssetID);
                         if(meta.Type == AssetType::TEXTURE2D)
-                            component.Texture = droppedAssetID;
+                            component.TextureAsset = am->Load<Texture2D>(droppedAssetID);
                     }
                     ImGui::EndDragDropTarget();
                 }
                 ImGui::SameLine();
                 if(ImGui::Button("REMOVE", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-                    component.Texture = AssetID::INVALID;
+                    component.TextureAsset = nullptr;
                 ImGui::PopID();
-            });
+                                                   });
         }
 
         if(entity.HasComponent<MeshComponent>())
@@ -346,8 +388,8 @@ namespace Surge
 
                 AssetManager* am = Core::GetAssetManager();
 
-                if(component.MeshID.IsValid())
-                    ImGuiAux::TString("Asset Handle: ", "%llu", component.MeshID.Get());
+                if(component.MeshAsset)
+                    ImGuiAux::TString("Asset Handle: ", "%llu", component.MeshAsset->GetID().Get());
                 else
                 {
                     ImGui::TableNextColumn(); ImGui::TextUnformatted("Mesh ID");
@@ -362,16 +404,16 @@ namespace Surge
                         AssetID droppedAssetID = *(const AssetID*)payload->Data;
                         AssetMetadata meta = am->GetMetadata(droppedAssetID);
                         if(meta.Type == AssetType::MESH)
-                            component.MeshID = droppedAssetID;
+                            component.MeshAsset = am->Load<Mesh>(droppedAssetID);
                     }
                     ImGui::EndDragDropTarget();
                 }
 
-                if(component.MeshID.IsValid())
+                if(component.MeshAsset)
                 {
                     ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
 
-                    Ref<Mesh> mesh = am->Load<Mesh>(component.MeshID);
+                    Ref<Mesh> mesh = component.MeshAsset;
                     if(!mesh)
                     {
                         ImGuiAux::ScopedBoldFont font;
@@ -422,7 +464,7 @@ namespace Surge
                                     {
                                         mesh->SetMaterialOverride(i, am->Load<Material>(droppedAssetID));
                                         am->Save(meta.ID);
-                                        am->Save(component.MeshID);
+                                        am->Save(component.MeshAsset->GetID());
                                     }
                                 }
                                 ImGui::EndDragDropTarget();
@@ -432,7 +474,7 @@ namespace Surge
                         }
                     }
                 }
-            });
+                                         });
         }
 
         if(entity.HasComponent<LightComponent>())
@@ -471,7 +513,7 @@ namespace Surge
                     ImGuiAux::TProperty<float>("Radius", &component.Radius);
                     ImGuiAux::TSlider<float>("Falloff", &component.Falloff, 0.1f, 2.0f);
                 }
-            });
+                                          });
         }
 
         if(entity.HasComponent<EnvironmentComponent>())
@@ -492,7 +534,7 @@ namespace Surge
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("SkyAmbient", &component.SkyAmbient);
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("HorizonAmbient", &component.HorizonAmbient);
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("GroundAmbient", &component.GroundAmbient);
-            });
+                                                });
         }
 
         if(entity.HasComponent<RigidbodyComponent>())
@@ -543,7 +585,7 @@ namespace Surge
                     ImGuiAux::TProperty<bool>("Y Axis", &component.FreezeRotationY);
                     ImGuiAux::TProperty<bool>("Z Axis", &component.FreezeRotationZ);
                 }
-            });
+                                              });
         }
 
         if(entity.HasComponent<BoxColliderComponent>())
@@ -552,7 +594,7 @@ namespace Surge
             DrawComponent<BoxColliderComponent>(entity, "Box Collider", [&component]() {
                 ImGuiAux::TProperty<glm::vec3>("Half Extents", &component.HalfExtents);
                 ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
-            });
+                                                });
         }
 
         if(entity.HasComponent<SphereColliderComponent>())
@@ -561,7 +603,7 @@ namespace Surge
             DrawComponent<SphereColliderComponent>(entity, "Sphere Collider", [&component]() {
                 ImGuiAux::TProperty<float>("Radius", &component.Radius);
                 ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
-            });
+                                                   });
         }
 
         if(entity.HasComponent<CapsuleColliderComponent>())
@@ -571,7 +613,7 @@ namespace Surge
                 ImGuiAux::TProperty<float>("Radius", &component.Radius);
                 ImGuiAux::TProperty<float>("Height", &component.Height);
                 ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
-            });
+                                                    });
         }
 
         if(entity.HasComponent<CylinderColliderComponent>())
@@ -581,7 +623,7 @@ namespace Surge
                 ImGuiAux::TProperty<float>("Radius", &component.Radius);
                 ImGuiAux::TProperty<float>("Height", &component.Height);
                 ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
-            });
+                                                     });
         }
 
         if(entity.HasComponent<ConvexColliderComponent>())
@@ -596,7 +638,7 @@ namespace Surge
                         component.IsDirty = true;
                 }
                 ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
-            });
+                                                   });
         }
 
         if(entity.HasComponent<MeshColliderComponent>())
@@ -619,7 +661,7 @@ namespace Surge
                     ImGuiAux::TString("ERROR", "Invalid setup: Change Rigidbody to STATIC or KINEMATIC!");
                     ImGui::PopStyleColor();
                 }
-            });
+                                                 });
         }
 
         if(entity.HasComponent<ScriptComponent>())
@@ -629,10 +671,10 @@ namespace Surge
                 AssetManager* am = Core::GetAssetManager();
 
                 String buttonText;
-                bool hasScript = component.ScriptAsset.IsValid();
+                bool hasScript = (bool)component.ScriptAsset;
                 if(hasScript)
                 {
-                    const String& scriptPath = am->GetMetadata(component.ScriptAsset).RelativePath;
+                    const String& scriptPath = am->GetMetadata(component.ScriptAsset->GetID()).RelativePath;
                     buttonText = Filesystem::GetFilenameWithExt(scriptPath).c_str();
                 }
                 else
@@ -644,13 +686,13 @@ namespace Surge
                 if(ImGui::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x / 1.3f, 0)) && hasScript)
                 {
                     Editor* editor = static_cast<Editor*>(Core::GetClient());
-                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset);
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset->GetID());
                 }
                 if(hasScript)
                 {
                     ImGui::SameLine();
                     if(ImGuiAux::Button("REMOVE", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-                        component.ScriptAsset = AssetID::INVALID;
+                        component.ScriptAsset = nullptr;
                 }
 
                 if(ImGui::BeginDragDropTarget())
@@ -661,11 +703,11 @@ namespace Surge
                         AssetID droppedAssetID = *(const AssetID*)payload->Data;
                         AssetMetadata meta = am->GetMetadata(droppedAssetID);
                         if(meta.Type == AssetType::SCRIPT)
-                            component.ScriptAsset = droppedAssetID;
+                            component.ScriptAsset = am->Load<Script>(droppedAssetID);
                     }
                     ImGui::EndDragDropTarget();
                 }
-            });
+                                           });
         }
         if(entity.HasComponent<TextComponent>())
         {
@@ -674,10 +716,10 @@ namespace Surge
                 AssetManager* am = Core::GetAssetManager();
 
                 String buttonText;
-                bool hasFontAsset = component.FontAssetID.IsValid();
+                bool hasFontAsset = (bool)component.FontAsset;
                 if(hasFontAsset)
                 {
-                    const String& fontPath = am->GetMetadata(component.FontAssetID).RelativePath;
+                    const String& fontPath = am->GetMetadata(component.FontAsset->GetID()).RelativePath;
                     buttonText = Filesystem::GetFilenameWithExt(fontPath).c_str();
                 }
                 else
@@ -689,13 +731,13 @@ namespace Surge
                 if(ImGui::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x / 1.5f, 0)) && hasFontAsset)
                 {
                     Editor* editor = static_cast<Editor*>(Core::GetClient());
-                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.FontAssetID);
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.FontAsset->GetID());
                 }
                 if(hasFontAsset)
                 {
                     ImGui::SameLine();
                     if(ImGuiAux::Button("REMOVE", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-                        component.FontAssetID = AssetID::INVALID;
+                        component.FontAsset = nullptr;
                 }
 
                 if(ImGui::BeginDragDropTarget())
@@ -706,12 +748,12 @@ namespace Surge
                         AssetID droppedAssetID = *(const AssetID*)payload->Data;
                         AssetMetadata meta = am->GetMetadata(droppedAssetID);
                         if(meta.Type == AssetType::FONT)
-                            component.FontAssetID = droppedAssetID;
+                            component.FontAsset = am->Load<Font>(droppedAssetID);
                     }
                     ImGui::EndDragDropTarget();
                 }
 
-                if(component.FontAssetID)
+                if(component.FontAsset)
                 {
                     ImGui::TableNextColumn();
                     ImGui::TextUnformatted("Text");
@@ -781,9 +823,9 @@ namespace Surge
                     ImGuiAux::TProperty<glm::vec2>("Offset", &component.ShadowOffset);
                     ImGui::PopID();
                 }
-            });
+                                         });
         }
-        
+
         if(entity.HasComponent<UICanvasComponent>())
         {
             UICanvasComponent& component = entity.GetComponent<UICanvasComponent>();
@@ -793,10 +835,10 @@ namespace Surge
                 ImGuiAux::TProperty<bool>("Show Canvas", &component.ShowCanvas);
 
                 String buttonText;
-                bool hasScript = component.ScriptAsset.IsValid();
+                bool hasScript = (bool)component.ScriptAsset;
                 if(hasScript)
                 {
-                    const String& scriptPath = am->GetMetadata(component.ScriptAsset).RelativePath;
+                    const String& scriptPath = am->GetMetadata(component.ScriptAsset->GetID()).RelativePath;
                     buttonText = Filesystem::GetFilenameWithExt(scriptPath).c_str();
                 }
                 else
@@ -808,13 +850,13 @@ namespace Surge
                 if(ImGui::Button(buttonText.c_str(), ImVec2(ImGui::GetContentRegionAvail().x / 1.3f, 0)) && hasScript)
                 {
                     Editor* editor = static_cast<Editor*>(Core::GetClient());
-                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset);
+                    editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(component.ScriptAsset->GetID());
                 }
                 if(hasScript)
                 {
                     ImGui::SameLine();
                     if(ImGuiAux::Button("REMOVE", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-                        component.ScriptAsset = AssetID::INVALID;
+                        component.ScriptAsset = nullptr;
                 }
 
                 if(ImGui::BeginDragDropTarget())
@@ -825,11 +867,11 @@ namespace Surge
                         AssetID droppedAssetID = *(const AssetID*)payload->Data;
                         AssetMetadata meta = am->GetMetadata(droppedAssetID);
                         if(meta.Type == AssetType::SCRIPT)
-                            component.ScriptAsset = droppedAssetID;
+                            component.ScriptAsset = am->Load<Script>(droppedAssetID);
                     }
                     ImGui::EndDragDropTarget();
                 }
-            });
+                                             });
         }
     }
 

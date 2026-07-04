@@ -14,6 +14,16 @@
 
 namespace Surge
 {
+    void Platform::OpenInExplorer(const String&)
+    {
+        // Tf is this supposed to do on Android? We don't have a file explorer to open
+    }
+
+    void Platform::OpenInVSCode(const String& workspacePath, const String& path)
+    {
+        // Tf is this supposed to do on Android? We don't have VSCode to open
+    }
+
     String Platform::GetPersistantStoragePath()
     {
         android_app* app = Android::GAndroidApp;

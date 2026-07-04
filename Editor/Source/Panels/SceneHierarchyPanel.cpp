@@ -5,6 +5,7 @@
 #include "Utility/ImGuiAux.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <algorithm>
@@ -75,38 +76,50 @@ namespace Surge
             ImGui::PopStyleVar();
             ImGui::Spacing();
 
-            // Unified Popup Context
+            // Unified Popup Context (Handles both the ADD button and right-clicking empty space)
+            ImGuiAux::StyledPopupVars::Push();
             if(ImGui::BeginPopup("AddEntityContext") || ImGui::BeginPopupContextWindow("HierarchySpace", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
             {
-                if(ImGui::MenuItem("Empty Entity"))
+                ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+
+                if(ImGuiAux::StyledMenuItem("Empty Entity"))
                     mSceneContext->CreateEntity(mSelectedEntity, "Entity");
 
-                ImGui::Separator();
-                ImGui::TextDisabled("Rendering");
-                if(ImGui::MenuItem("Camera"))
+                ImGuiAux::StyledSeparator();
+                ImGui::PushFont(boldFont);
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "RENDERING");
+                ImGui::PopFont();
+                ImGuiAux::StyledSeparator();
+
+                if(ImGuiAux::StyledMenuItem("Camera"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Camera");
                     mSelectedEntity.AddComponent<CameraComponent>();
                 }
-                if(ImGui::MenuItem("Sprite Renderer"))
+                if(ImGuiAux::StyledMenuItem("Sprite Renderer"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Sprite");
                     mSelectedEntity.AddComponent<SpriteRendererComponent>(glm::vec4 { 1.0f, 1.0f, 1.0f, 1.0f });
                 }
 
-                ImGui::Separator();
-                ImGui::TextDisabled("3D Primitives");
+                ImGuiAux::StyledSeparator();
+                ImGui::PushFont(boldFont);
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "3D PRIMITIVES");
+                ImGui::PopFont();
+                ImGuiAux::StyledSeparator();
+
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
                 if(ImGui::BeginMenu("Meshes"))
                 {
                     const char* defMesh = "";
-                    if(ImGui::MenuItem("Empty Mesh")) defMesh = "Empty";
-                    if(ImGui::MenuItem("Cube"))       defMesh = DefaultMesh::CUBE;
-                    if(ImGui::MenuItem("Sphere"))     defMesh = DefaultMesh::SPHERE;
-                    if(ImGui::MenuItem("Bean"))       defMesh = DefaultMesh::BEAN;
-                    if(ImGui::MenuItem("Cone"))       defMesh = DefaultMesh::CONE;
-                    if(ImGui::MenuItem("Cylinder"))   defMesh = DefaultMesh::CYLINDER;
-                    if(ImGui::MenuItem("Torus"))      defMesh = DefaultMesh::TORUS;
-                    if(ImGui::MenuItem("Plane"))      defMesh = DefaultMesh::PLANE;
+                    if(ImGuiAux::StyledMenuItem("Empty Mesh")) defMesh = "Empty";
+                    if(ImGuiAux::StyledMenuItem("Cube"))       defMesh = DefaultMesh::CUBE;
+                    if(ImGuiAux::StyledMenuItem("Sphere"))     defMesh = DefaultMesh::SPHERE;
+                    if(ImGuiAux::StyledMenuItem("Bean"))       defMesh = DefaultMesh::BEAN;
+                    if(ImGuiAux::StyledMenuItem("Cone"))       defMesh = DefaultMesh::CONE;
+                    if(ImGuiAux::StyledMenuItem("Cylinder"))   defMesh = DefaultMesh::CYLINDER;
+                    if(ImGuiAux::StyledMenuItem("Torus"))      defMesh = DefaultMesh::TORUS;
+                    if(ImGuiAux::StyledMenuItem("Plane"))      defMesh = DefaultMesh::PLANE;
 
                     if(strcmp(defMesh, "Empty") == 0)
                     {
@@ -117,41 +130,50 @@ namespace Surge
                     {
                         mSceneContext->CreateEntity(mSelectedEntity, "Mesh");
                         MeshComponent& meshComponent = mSelectedEntity.AddComponent<MeshComponent>();
-                        meshComponent.MeshID = Core::GetAssetManager()->Import(defMesh, AssetType::MESH);
+                        AssetManager* am = Core::GetAssetManager();
+                        meshComponent.MeshAsset = am->Load<Mesh>(am->Import(defMesh, AssetType::MESH));
                     }
-                    ImGui::EndPopup();
+                    ImGui::EndMenu();
                 }
+                ImGui::PopStyleVar();
 
-                ImGui::Separator();
-                ImGui::TextDisabled("World");
-                if(ImGui::MenuItem("Environment"))
+                ImGuiAux::StyledSeparator();
+                ImGui::PushFont(boldFont);
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "WORLD & UI");
+                ImGui::PopFont();
+                ImGuiAux::StyledSeparator();
+
+                if(ImGuiAux::StyledMenuItem("Environment"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Environment");
                     mSelectedEntity.AddComponent<EnvironmentComponent>();
                 }
-                if(ImGui::MenuItem("Directional Light"))
+                if(ImGuiAux::StyledMenuItem("Directional Light"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Directional Light");
                     mSelectedEntity.AddComponent<LightComponent>().Type = LightType::DIRECTIONAL;
                 }
-                if(ImGui::MenuItem("Point Light"))
+                if(ImGuiAux::StyledMenuItem("Point Light"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Point Light");
                     mSelectedEntity.AddComponent<LightComponent>().Type = LightType::POINT;
                 }
-                ImGui::Separator();
-                if(ImGui::MenuItem("Text"))
+                if(ImGuiAux::StyledMenuItem("Text"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Text");
                     mSelectedEntity.AddComponent<TextComponent>();
                 }
-                ImGui::Separator();
-                if(ImGui::MenuItem("UI"))
+                if(ImGuiAux::StyledMenuItem("UI Canvas"))
                 {
                     mSceneContext->CreateEntity(mSelectedEntity, "Canvas");
                     mSelectedEntity.AddComponent<UICanvasComponent>();
                 }
-                ImGui::EndPopup();
+
+                ImGuiAux::EndStyledPopup();
+            }
+            else
+            {
+                ImGuiAux::StyledPopupVars::Pop();
             }
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
@@ -236,7 +258,7 @@ namespace Surge
         bool hasChildren = (rel.FirstChild != entt::null) && !isSearching;
 
         ImGuiTreeNodeFlags flags = (isSelectedEntity ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick
-                                                                                        | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DrawLinesFull;
+            | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_DrawLinesFull;
 
         if(!hasChildren)
             flags |= ImGuiTreeNodeFlags_Leaf;
@@ -306,24 +328,31 @@ namespace Surge
             mSceneContext->SetSelectedEntity(mSelectedEntity);
             ImGui::SetWindowFocus("Inspector");
         }
-
-        // CONTEXT MENU
-        if(ImGui::BeginPopupContextItem())
+\
+        if(ImGuiAux::BeginStyledPopupContextItem())
         {
+            ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+
+            // Header showing the selected entity's name
+            ImGui::PushFont(boldFont);
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", name.c_str());
+            ImGui::PopFont();
+            ImGuiAux::StyledSeparator();
+
             if(rel.Parent != entt::null)
             {
-                if(ImGui::MenuItem("Unparent"))
+                if(ImGuiAux::StyledMenuItem("Unparent"))
                     mSceneContext->SetParent(e, Entity {});
-                ImGui::Separator();
+                ImGuiAux::StyledSeparator();
             }
 
-            if(ImGui::MenuItem("Duplicate"))
+            if(ImGuiAux::StyledMenuItem("Duplicate", "ScrollLock"))
             {
                 Entity clone = mSceneContext->DuplicateEntity(e);
                 if(clone)
                     mSelectedEntity = clone;
             }
-            if(ImGui::MenuItem("Delete"))
+            if(ImGuiAux::StyledMenuItem("Delete", "Del"))
             {
                 if(mSelectedEntity == e)
                 {
@@ -332,7 +361,7 @@ namespace Surge
                 }
                 Core::AddFrameEndCallback([this, e]() { mSceneContext->DestroyEntity(e); });
             }
-            ImGui::EndPopup();
+            ImGuiAux::EndStyledPopup();
         }
 
         ImGui::TableNextColumn();
@@ -367,6 +396,7 @@ namespace Surge
     }
 
     void SceneHierarchyPanel::Shutdown()
-    {}
+    {
+    }
 
 } // namespace Surge

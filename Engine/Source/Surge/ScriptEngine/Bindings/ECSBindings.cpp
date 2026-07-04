@@ -138,7 +138,6 @@ namespace Surge::ScriptBinding
                                           STRICT_READ(CameraComponent));
 
         lua.new_usertype<MeshComponent>("MeshComponent", sol::no_constructor,
-                                        "MeshID", BIND_PROP(MeshComponent, MeshID),
                                         "DropShadow", BIND_PROP(MeshComponent, DropShadow),
                                         STRICT_READ(MeshComponent));
 
@@ -270,7 +269,6 @@ namespace Surge::ScriptBinding
                                         "ShadowEnabled", BIND_PROP(TextComponent, ShadowEnabled),
                                         "ShadowColor", BIND_PROP(TextComponent, ShadowColor),
                                         "ShadowOffset", BIND_PROP(TextComponent, ShadowOffset),
-                                        "FontAssetID", BIND_PROP(TextComponent, FontAssetID),
                                         STRICT_READ(TextComponent));
 
         lua.new_usertype<UICanvasComponent>("UICanvasComponent", sol::no_constructor,

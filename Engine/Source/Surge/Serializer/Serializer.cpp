@@ -1,9 +1,16 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Serializer/Serializer.hpp"
+#include "Surge/Core/Core.hpp"
+#include "Surge/Asset/Asset.hpp"
+#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/Graphics/HighLevel/Font.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Asset/Asset.hpp"
+
 #include <glm/gtc/type_ptr.hpp>
 #include <json/json.hpp>
 
@@ -58,7 +65,6 @@ namespace Surge
     NLOHMANN_JSON_SERIALIZE_ENUM(RigidbodyType, { {RigidbodyType::STATIC, "STATIC"}, {RigidbodyType::DYNAMIC, "DYNAMIC"}, {RigidbodyType::KINEMATIC, "KINEMATIC"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(TextAlignment, { {TextAlignment::LEFT, "LEFT"}, {TextAlignment::CENTER, "CENTER"}, {TextAlignment::RIGHT, "RIGHT"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(TextVerticalAlignment, { {TextVerticalAlignment::TOP, "TOP"}, {TextVerticalAlignment::CENTER, "CENTER"}, {TextVerticalAlignment::BOTTOM, "BOTTOM"}, {TextVerticalAlignment::BASELINE, "BASELINE"} });
-
 
     template <typename XComponent>
     static void SerializeComponent(nlohmann::json& j, Entity& e)
@@ -126,8 +132,16 @@ namespace Surge
                     out[name] = *reinterpret_cast<const TextAlignment*>(source);
                 else if(type.EqualTo<TextVerticalAlignment>())
                     out[name] = *reinterpret_cast<const TextVerticalAlignment*>(source);
+                else if(type.EqualTo<Ref<Asset>>())
+                {
+                    const Ref<Asset>& asset = *reinterpret_cast<const Ref<Asset>*>(source);
+                    if(asset)
+                        out[name] = asset->GetID().Get();
+                    else
+                        out[name] = AssetID::INVALID;
+                }
                 else
-                    Log<Severity::Warn>("Unhandled Variable of type: {0} while serializing!", type.GetFullName());
+                    Log<Severity::Warn>("Unhandled Variable while serializing!");
             }
         }
     }
@@ -240,8 +254,38 @@ namespace Surge
                 *reinterpret_cast<TextAlignment*>(dest) = inJson.value(name, TextAlignment::LEFT);
             else if(type.EqualTo<TextVerticalAlignment>())
                 *reinterpret_cast<TextVerticalAlignment*>(dest) = inJson.value(name, TextVerticalAlignment::BASELINE);
+            else if(type.EqualTo<Ref<Asset>>())
+            {
+                AssetManager* am = Core::GetAssetManager();
+                AssetID assetID = inJson.value(name, 0ULL);
+                const AssetMetadata& metadata = am->GetMetadata(assetID);
+
+                if(assetID == AssetID(AssetID::INVALID))
+                {
+                    *reinterpret_cast<Ref<Asset>*>(dest) = nullptr;
+                    continue;
+                }
+
+                if(metadata.IsValid() && !metadata.IsMissing())
+                {
+                    if (metadata.Type == AssetType::TEXTURE2D)
+                        *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Texture2D>(assetID);
+                    if (metadata.Type == AssetType::MESH)
+                        *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Mesh>(assetID);
+                    if (metadata.Type == AssetType::FONT)
+                        *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Font>(assetID);
+                    if (metadata.Type == AssetType::SCRIPT)
+                        *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Script>(assetID);
+                }
+
+                else
+                {
+                    Log<Severity::Warn>("DeserializeComponent: Asset with ID {} is missing or invalid", assetID.Get());
+                    *reinterpret_cast<Ref<Asset>*>(dest) = nullptr;
+                }
+            }
             else
-                Log<Severity::Warn>("DeserializeComponent: Unhandled type '{}' for field '{}'", type.GetFullName(), name);
+                Log<Severity::Warn>("DeserializeComponent: Unhandled type {} for field {}", type.GetFullName(), name);
         }
     }
 

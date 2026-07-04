@@ -29,14 +29,14 @@ namespace Surge
         }
         FORCEINLINE void SubmitText(const glm::mat4& transform, const String& txt, const glm::vec4& color, float maxWidth, float letterSpacing,
                         float lineSpacing, TextAlignment alignment, TextVerticalAlignment vAlignment, bool italic, bool underline,
-                        bool enableShadow, const glm::vec2& shadowOffset, const glm::vec4& shadowColor, const Ref<Font>& font, bool billboard = false)
+                        bool enableShadow, const glm::vec2& shadowOffset, const glm::vec4& shadowColor, const Font* font, bool billboard = false)
         {
             mGraph.GetBlackboard().TextList.emplace_back(TextSubmitCmd { .Transform = transform, .Text = txt, .Color = color, .MaxWidth = maxWidth, .LetterSpacing = letterSpacing,
                                                          .LineSpacing = lineSpacing, .Alignment = alignment, .VerticalAlignment = vAlignment, .Italic = italic, .Underline = underline, .Billboard = billboard,
                                                           .EnableShadow = enableShadow, .ShadowOffset = shadowOffset, .ShadowColor = shadowColor, .FontAsset = font });
         }
-        FORCEINLINE void SubmitMesh(const glm::mat4& transform, const Ref<Mesh>& mesh, bool dropShadow) { mGraph.GetBlackboard().MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow }); }
-        FORCEINLINE void SubmitMeshOutline(const glm::mat4& transform, const Ref<Mesh>& mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
+        FORCEINLINE void SubmitMesh(const glm::mat4& transform, const Mesh* mesh, bool dropShadow) { mGraph.GetBlackboard().MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow }); }
+        FORCEINLINE void SubmitMeshOutline(const glm::mat4& transform, const Mesh* mesh) { mGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
         FORCEINLINE void SubmitLight(const Light& light)
         {
             FrameBlackboard& bb = mGraph.GetBlackboard();

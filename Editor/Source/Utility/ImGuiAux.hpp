@@ -112,7 +112,7 @@ namespace Surge::ImGuiAux
     };
 
     void DrawRectAroundWidget(const glm::vec4& color, float thickness = 1.5f, float rounding = 1.0f);
-    void DockSpace();
+    void DockSpace(float titleBarHeight);
     bool Spinner(const char* label, float radius, float thickness);
     bool PropertyGridHeader(const String& name, bool openByDefault = true, const glm::vec2& size = {4.5f, 4.5f}, bool spacing = false);
 
@@ -312,5 +312,71 @@ namespace Surge::ImGuiAux
     {
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y);
     }
+
+    struct StyledPopupVars
+    {
+        static void Push()
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.11f, 0.11f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+        }
+
+        static void Pop()
+        {
+            ImGui::PopStyleVar(4);
+            ImGui::PopStyleColor(6);
+        }
+    };
+
+    inline bool BeginStyledPopupContextItem(const char* strID = nullptr, ImGuiPopupFlags popupFlags = 1)
+    {
+        StyledPopupVars::Push();
+        if(ImGui::BeginPopupContextItem(strID, popupFlags))
+            return true;
+
+        StyledPopupVars::Pop();
+        return false;
+    }
+
+    inline bool BeginStyledPopupContextWindow(const char* strID = nullptr, ImGuiPopupFlags popupFlags = 1 | 2)
+    {
+        StyledPopupVars::Push();
+        if(ImGui::BeginPopupContextWindow(strID, popupFlags))
+            return true;
+
+        StyledPopupVars::Pop();
+        return false;
+    }
+
+    inline void EndStyledPopup()
+    {
+        ImGui::EndPopup();
+        StyledPopupVars::Pop();
+    }
+
+    inline void StyledSeparator()
+    {
+        ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(Colors::ThemeColor1));
+        ImGui::Separator();
+        ImGui::PopStyleColor();
+    }
+
+    inline bool StyledMenuItem(const char* label, const char* shortcut = nullptr, bool* p_selected = nullptr, bool enabled = true)
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
+        bool clicked = ImGui::MenuItem(label, shortcut, p_selected, enabled);
+        ImGui::PopStyleVar();
+        return clicked;
+    }
+
 
 } // namespace Surge::ImGuiAux

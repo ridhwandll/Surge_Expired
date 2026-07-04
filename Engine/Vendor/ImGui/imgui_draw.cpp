@@ -6062,10 +6062,20 @@ void ImGui::RenderArrowPointingAt(ImDrawList* draw_list, ImVec2 pos, ImVec2 half
 
 // This is less wide than RenderArrow() and we use in dock nodes instead of the regular RenderArrow() to denote a change of functionality,
 // and because the saved space means that the left-most tab label can stay at exactly the same position as the label of a loose window.
-void ImGui::RenderArrowDockMenu(ImDrawList* draw_list, ImVec2 p_min, float sz, ImU32 col)
+void ImGui::RenderArrowDockMenu(ImDrawList* draw_list, ImVec2 p_min, float sz, ImU32 /*col*/)
 {
-    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.20f, sz * 0.15f), p_min + ImVec2(sz * 0.80f, sz * 0.30f), col);
-    RenderArrowPointingAt(draw_list, p_min + ImVec2(sz * 0.50f, sz * 0.85f), ImVec2(sz * 0.30f, sz * 0.40f), ImGuiDir_Down, col);
+    // (Rid) Original ImGui Code
+    //draw_list->AddRectFilled(p_min + ImVec2(sz * 0.20f, sz * 0.15f), p_min + ImVec2(sz * 0.80f, sz * 0.30f), col);
+    //RenderArrowPointingAt(draw_list, p_min + ImVec2(sz * 0.50f, sz * 0.85f), ImVec2(sz * 0.30f, sz * 0.40f), ImGuiDir_Down, col);
+
+    // Edited Code:
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // (Rid) Edit for Surge Engine: Custom Menu Icon (2 horizontal bars)
+    // Top Bar (Cyber Violet) Y: 15% to 40% (25% thickness)
+    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.15f, sz * 0.15f), p_min + ImVec2(sz * 0.85f, sz * 0.40f), IM_COL32(139, 92, 246, 255));
+    // Bottom Bar (Amber) Y: 60% to 85% (25% thickness)
+    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.15f, sz * 0.60f), p_min + ImVec2(sz * 0.85f, sz * 0.85f), IM_COL32(255, 165, 0, 255));
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 static inline float ImAcos01(float x)

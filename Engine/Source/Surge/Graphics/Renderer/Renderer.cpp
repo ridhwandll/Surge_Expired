@@ -141,9 +141,10 @@ namespace Surge
 
     void Renderer::EndFrame()
     {
+        SURGE_PROFILE_FUNC("Renderer::EndFrame()");
+
         mUIManager.ExtractRenderData(mGraph.GetBlackboard());
 
-        SURGE_PROFILE_FUNC("Renderer::EndFrame()");
         mGraph.Execute(mCurrentFrameCtx);
 
         mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain

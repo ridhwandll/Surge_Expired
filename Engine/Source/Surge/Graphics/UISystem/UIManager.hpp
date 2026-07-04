@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "UIWidgets.hpp"
+#include "Surge/Core/Profiler.hpp"
 
 namespace Surge
 {
@@ -63,6 +64,7 @@ namespace Surge::UI
         // @param blackboard: The frame blackboard containing render information
         void ExtractRenderData(FrameBlackboard& blackboard)
         {
+            SURGE_PROFILE_FUNC("Surgte::UI::Manager::ExtractRenderData");
             //Log<Severity::Trace>("RootWidget: {}", mRootWidget ? "Valid" : "nullptr");
 
             mTargetResolution = { blackboard.ScreenWidth, blackboard.ScreenHeight };
@@ -78,6 +80,7 @@ namespace Surge::UI
 
         void ProcessMouseMove(float rawX, float rawY)
         {
+            SURGE_PROFILE_FUNC("Surgte::UI::Manager::ProcessMouseMove");
             if(!mRootWidget)
                 return;
 
@@ -110,6 +113,7 @@ namespace Surge::UI
 
         bool ProcessMouseButton(float rawX, float rawY, bool isDown)
         {
+            SURGE_PROFILE_FUNC("Surgte::UI::Manager::ProcessMouseButton");
             if(!mRootWidget)
                 return false;
 

@@ -40,7 +40,7 @@ namespace Surge
         String windowTitle = GetWindowTitle();
         glm::ivec2 screenSize = Platform::GetScreenSize();
         mWin32Window = CreateWindow(wc.lpszClassName, windowTitle.c_str(),
-                                    WS_OVERLAPPEDWINDOW, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
+                                    WS_OVERLAPPEDWINDOW | WS_VISIBLE, (screenSize.x - mWindowData.Width) / 2, (screenSize.y - mWindowData.Height) / 2, mWindowData.Width,
                                     mWindowData.Height, nullptr, NULL, wc.hInstance, this);
 
         // Set the title bar & border color
@@ -337,6 +337,13 @@ namespace Surge
                     }
                 }
                 return DefWindowProc(hWnd, msg, wParam, lParam);
+                break;
+            }
+            case WM_QUIT:
+            {
+                WindowsWindow* data = reinterpret_cast<WindowsWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+                WindowClosedEvent event;
+                data->mEventCallback(event);
                 break;
             }
             case WM_SETCURSOR:

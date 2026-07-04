@@ -145,6 +145,8 @@ namespace Surge
         if(blackboard.UISpriteList.empty() && blackboard.UITextList.empty())
             return;
 
+        //Log<Severity::Info>("UIOverlay Metrics: {} sprites, {} texts", blackboard.UISpriteList.size(), blackboard.UITextList.size());
+
         // Orthographic Matrix
         glm::vec2 size = { blackboard.ScreenWidth, blackboard.ScreenHeight };
         struct UIFrameUBO

@@ -417,10 +417,10 @@ namespace Surge
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
             }
             auto& meshComp = registry.get<MeshComponent>(entity.Raw());
-            if(!meshComp.MeshID)
+            if(!meshComp.MeshAsset)
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
 
-            Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+            Ref<Mesh> mesh = meshComp.MeshAsset.As<Mesh>();
             if(!mesh)
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
 
@@ -490,10 +490,10 @@ namespace Surge
             if(!registry.any_of<MeshComponent>(entity.Raw()))
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
             auto& meshComp = registry.get<MeshComponent>(entity.Raw());
-            if(!meshComp.MeshID)
+            if(!meshComp.MeshAsset)
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
 
-            Ref<Mesh> mesh = Core::GetAssetManager()->Load<Mesh>(meshComp.MeshID);
+            Ref<Mesh> mesh = meshComp.MeshAsset.As<Mesh>();
             if(!mesh)
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
 

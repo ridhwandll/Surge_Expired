@@ -11,7 +11,6 @@
 #include "Surge/Asset/Asset.hpp"
 #include "SurgeReflect/SurgeReflect.hpp"
 
-
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -105,7 +104,7 @@ namespace Surge
 
         glm::vec4 Color;
         bool Billboard = false;
-        AssetID Texture = AssetID::INVALID;
+        Ref<Asset> TextureAsset = nullptr;
 
         SURGE_REFLECTION_ENABLE;
     };
@@ -125,7 +124,7 @@ namespace Surge
 
     struct MeshComponent
     {
-        AssetID MeshID = AssetID::INVALID;
+        Ref<Asset> MeshAsset = nullptr;
         bool DropShadow = true;
         SURGE_REFLECTION_ENABLE;
     };
@@ -237,7 +236,7 @@ namespace Surge
 
     struct ScriptComponent
     {
-        AssetID ScriptAsset = AssetID::INVALID;
+        Ref<Asset> ScriptAsset = nullptr;
         bool IsInstantiated = false;
         SURGE_REFLECTION_ENABLE;
     };
@@ -262,7 +261,7 @@ namespace Surge
         glm::vec2 ShadowOffset = { 0.05, -0.05 };
         glm::vec4 ShadowColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-        AssetID FontAssetID = AssetID::INVALID;
+        Ref<Asset> FontAsset = nullptr;
 
         SURGE_REFLECTION_ENABLE;
     };
@@ -270,7 +269,7 @@ namespace Surge
     struct UICanvasComponent
     {
         bool ShowCanvas = true;
-        AssetID ScriptAsset = AssetID::INVALID;
+        Ref<Asset> ScriptAsset = nullptr;
         bool IsInstantiated = false;
 
         SURGE_REFLECTION_ENABLE;

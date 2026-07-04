@@ -72,14 +72,14 @@ namespace Surge
     struct MeshSubmitCmd  // Pushed by Renderer::SubmitMesh()
     {
         glm::mat4 Transform;
-        Ref<Mesh> Mesh_; // TODO: Change this to Mesh*
+        const Mesh* Mesh_;
         bool DropShadow;
     };
 
     struct OutlineSubmitCmd // Pushed by Renderer::SubmitOutlinedMesh()
     {
         glm::mat4 Transform;
-        Ref<Mesh> Mesh_; // TODO: Change this to Mesh*
+        const Mesh* Mesh_;
     };
 
     struct LightSubmitCmd // Pushed by Renderer::SubmitLight()
@@ -91,7 +91,7 @@ namespace Surge
     {
         glm::mat4 Transform;
         glm::vec4 Color;
-        ImageHandle Texture; //TODO Change this to Texture2D*
+        ImageHandle Texture;
         bool Billboard;
     };
 
@@ -124,7 +124,7 @@ namespace Surge
         glm::vec2 ShadowOffset = { 0.0f, 0.0f };
         glm::vec4 ShadowColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-        Ref<Font> FontAsset; //TODO: Change this to Font*
+        const Font* FontAsset;
     };
 
     struct FrameBlackboard

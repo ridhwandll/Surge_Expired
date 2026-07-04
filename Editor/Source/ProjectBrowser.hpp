@@ -16,7 +16,7 @@ namespace Surge
     {
     public:
         void Init();
-        void Render();
+        void Render(float titleBarHeight);
     private:
         void CreateProject();
         void OpenProject();

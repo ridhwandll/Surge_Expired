@@ -54,8 +54,6 @@ namespace Surge::UI
     public:
         virtual ~Widget() = default;
 
-        void ClearAll();
-
         Vector<Ref<Widget>>& GetChildren() { return mChildren; }
         void AddChild(Ref<Widget> child)
         {

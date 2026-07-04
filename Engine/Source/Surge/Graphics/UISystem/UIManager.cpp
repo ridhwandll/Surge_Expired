@@ -7,6 +7,7 @@ namespace Surge::UI
 
     void Manager::ClearRoot()
     {
+        SURGE_PROFILE_FUNC("Surgte::UI::Manager::ClearRoot");
         if(mHoveredWidget)
         {
             mHoveredWidget->OnMouseExit();
@@ -17,9 +18,6 @@ namespace Surge::UI
             mPressedWidget = nullptr;
 
         if (mRootWidget)
-        {
-            mRootWidget->ClearAll();
-            mRootWidget.ForceDestroy();
-        }
+            mRootWidget = nullptr;
     }
 }

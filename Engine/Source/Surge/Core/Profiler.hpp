@@ -15,10 +15,19 @@
     #include <optick.h>
     #endif
 
-    #ifdef SURGE_RELEASE
-    #define PROFILE_SURGE 0
-    #define USE_OPTICK 0 // Enable if required in release mode
+// Enable profiling for release builds if SURGE_RELEASE is defined
+#define PROFILE_RELEASE 0
+
+#ifdef SURGE_RELEASE
+    #ifdef PROFILE_RELEASE
+        #define PROFILE_SURGE 1
+        #define USE_OPTICK 1
+        #include <optick.h>
+    #else
+        #define PROFILE_SURGE 0
+        #define USE_OPTICK 0
     #endif
+#endif
 
 #endif
 

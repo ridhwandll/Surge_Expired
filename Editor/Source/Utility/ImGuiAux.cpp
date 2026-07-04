@@ -1,8 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Core/Core.hpp"
-#include "Surge/Core/Input/Input.hpp"
 #include "Utility/ImGuiAux.hpp"
-#include "Editor.hpp"
 #include "imgui_internal.h"
 
 namespace Surge
@@ -23,24 +20,34 @@ namespace Surge
         ImGui::TextUnformatted(text);
     }
 
-    void ImGuiAux::DockSpace()
+    void ImGuiAux::DockSpace(float titleBarHeight)
     {
-        ImGuiID dockspaceID = ImGui::GetID("DockSpace");
-#ifdef SURGE_PLATFORM_ANDROID
-        // On mobile we need a padding, else docking/undocking becomes a nightmare
-        float padding = 2.0f;
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + padding, viewport->WorkPos.y + padding));
-        ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - (padding * 2), viewport->WorkSize.y - (padding * 2)));
-        ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
-        ImGui::Begin("SafeDockSpaceHost", nullptr, hostFlags);
-        ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+
+        ImVec2 dockspacePos = ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + titleBarHeight);
+        ImVec2 dockspaceSize = ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - titleBarHeight);
+
+        ImGui::SetNextWindowPos(dockspacePos);
+        ImGui::SetNextWindowSize(dockspaceSize);
+        ImGui::SetNextWindowViewport(viewport->ID);
+
+        ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+            ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+        ImGui::Begin("SurgeMainDockSpace", nullptr, windowFlags);
+        ImGui::PopStyleVar(3);
+
+        ImGuiID dockspaceID = ImGui::GetID("SurgeEditorDockspace");
+        ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
         ImGui::End();
-        ImGui::PopStyleColor();
-#elif defined(SURGE_PLATFORM_WINDOWS)
-        ImGui::DockSpaceOverViewport(dockspaceID, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-#endif
     }
 
     bool ImGuiAux::PropertyGridHeader(const String& name, bool openByDefault, const glm::vec2& size, bool spacing)

@@ -23,6 +23,7 @@
 #include "Surge/Graphics/UISystem/UIManager.hpp"
 #include "Surge/Graphics/UISystem/UIWidgets.hpp"
 #include "Surge/Core/Input/Input.hpp"
+#include "Surge/Utility/Platform.hpp"
 
 namespace Surge
 {
@@ -126,7 +127,7 @@ namespace Surge
             item.Path_ = directoryEntry.path();
             item.Filename = item.Path_.filename().string();
 
-            if (item.Filename == "AssetRegistry.surge" || item.Filename == "Internal")
+            if(item.Filename == "AssetRegistry.surge" || item.Filename == "Internal")
                 continue;
 
             item.IsDirectory = directoryEntry.is_directory();
@@ -149,6 +150,7 @@ namespace Surge
                         item.ThumbnailImGuiID = NULL;
 
                     item.AssetTypeStr = SurgeReflect::EnumToString(meta.Type).data();
+                    item.AssetType_ = meta.Type;
                 }
             }
             mCurrentDirectoryItems.push_back(item);
@@ -156,17 +158,13 @@ namespace Surge
 
         // Sort directories first, then alphabetically
         std::sort(mCurrentDirectoryItems.begin(), mCurrentDirectoryItems.end(),
-                  [](const auto& a, const auto& b)
-                  {
-                      // Folders come first
+                  [](const auto& a, const auto& b) {
                       if(a.IsDirectory != b.IsDirectory)
                           return a.IsDirectory > b.IsDirectory;
 
-                      // Registered assets come before raw/unregistered files
                       if(a.IsRegisteredAsset != b.IsRegisteredAsset)
                           return a.IsRegisteredAsset > b.IsRegisteredAsset;
 
-                      // If they are the same type (both folders, both registered, or both raw), sort alphabetically
                       return a.Filename < b.Filename;
                   });
 
@@ -176,7 +174,6 @@ namespace Surge
     void ContentBrowserPanel::OnEvent(Event& e)
     {
         EventDispatcher dispatcher(e);
-        // TODO: Press spacebar to hide/show content browser like in Unreal Engine 5
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
             if(keyEvent.GetKeyCode() == Key::F2)
                 StartRename(mSelectedPath);
@@ -187,12 +184,11 @@ namespace Surge
                 if(ctrlHeld)
                     ImGui::SetClipboardText(Filesystem::GetRelativePath(mSelectedPath, mBaseDirectory).generic_string().c_str());
             }
-        });
+                                             });
     }
 
     void ContentBrowserPanel::Render(bool* show)
     {
-        // CONTENT BROWSER
         if(*show)
         {
             ImFont* regularFont = ImGui::GetIO().Fonts->Fonts[0];
@@ -251,7 +247,6 @@ namespace Surge
                     float cellSize = mThumbnailSize + padding;
                     int columnCount = std::max(1, (int)(ImGui::GetContentRegionAvail().x / cellSize));
 
-                    // Build Filtered List for Clipper
                     mItemsToDisplay.clear();
                     mItemsToDisplay.reserve(mCurrentDirectoryItems.size());
 
@@ -329,12 +324,12 @@ namespace Surge
                                         }
                                         else if(item.IsRegisteredAsset)
                                         {
-                                            if (item.AssetTypeStr == "MATERIAL")
+                                            if(item.AssetType_ == AssetType::MATERIAL)
                                             {
                                                 Editor* editor = (Editor*)Core::GetClient();
                                                 editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(mAssetManager->Load<Material>(item.Id));
                                             }
-                                            else // TODO: Double clicking an asset should open it in the Inspector
+                                            else
                                                 Log<Severity::Info>("[ContentBrowser] Double-clicked asset: {}", item.Filename);
                                         }
                                     }
@@ -378,38 +373,58 @@ namespace Surge
                                     ImGui::PopStyleVar();
                                     ImGui::PopStyleColor(3);
 
-                                    // Context Menu for specific files
-                                    if(ImGui::BeginPopupContextItem())
+                                    if(ImGuiAux::BeginStyledPopupContextItem())
                                     {
+                                        // Header showing the filename
+                                        ImGui::PushFont(boldFont);
+                                        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", item.Filename.c_str());
+                                        ImGui::PopFont();
+                                        ImGuiAux::StyledSeparator();
+
                                         // IMPORT
                                         if(!item.IsDirectory && !item.IsRegisteredAsset)
                                         {
-                                            if(ImGui::MenuItem("IMPORT"))
+                                            if(ImGuiAux::StyledMenuItem("Import Asset..."))
                                             {
                                                 String extension = item.Path_.extension().string();
                                                 AssetType typeToImport = AssetTypeFromExtension(extension.c_str());
                                                 AssetID importedID = AssetID::INVALID;
                                                 if(typeToImport != AssetType::NONE)
                                                 {
-                                                    String relativeToAssets =  Filesystem::GetRelativePath(item.Path_, mBaseDirectory).generic_string();
+                                                    String relativeToAssets = Filesystem::GetRelativePath(item.Path_, mBaseDirectory).generic_string();
                                                     importedID = mAssetManager->Import(relativeToAssets, typeToImport);
                                                     mNeedsCacheRefresh = true;
                                                 }
-
-                                                // Temp
-                                                if(typeToImport == AssetType::FONT)
-                                                {
-                                                    mAssetManager->Load<Font>(importedID);
-                                                }
                                             }
+                                            ImGuiAux::StyledSeparator();
                                         }
-                                        if(ImGui::MenuItem("Rename"))
+
+                                        if(ImGuiAux::StyledMenuItem("Rename", "F2"))
                                             StartRename(item.Path_);
-                                        ImGui::Separator();
-                                        if(ImGui::MenuItem("\"Copy RPath\""))
+
+                                        if(ImGuiAux::StyledMenuItem("Copy Relative Path", "Ctrl+C"))
                                             ImGui::SetClipboardText(Filesystem::GetRelativePath(item.Path_, mBaseDirectory).generic_string().c_str());
 
-                                        ImGui::EndPopup();
+                                        if(ImGuiAux::StyledMenuItem("Show in Explorer"))
+                                            Platform::OpenInExplorer(item.Path_.string());
+
+                                        if(item.IsRegisteredAsset)
+                                        {
+                                            if(item.AssetType_ == AssetType::SCRIPT)
+                                            {
+                                                ImGuiAux::StyledSeparator();
+                                                if(ImGuiAux::StyledMenuItem("Open with VSCode"))
+                                                    Platform::OpenInVSCode(mAssetManager->GetAssetsDirectory() + "/Scripts", item.Path_.string());
+                                            }
+                                            else if(item.AssetType_ == AssetType::MATERIAL || item.AssetType_ == AssetType::SCENE)
+                                            {
+                                                ImGuiAux::StyledSeparator();
+                                                if(ImGuiAux::StyledMenuItem("Open with VSCode"))
+                                                    Platform::OpenInVSCode("", item.Path_.string());
+                                            }
+                                        }
+
+                                        ImGuiAux::EndStyledPopup();
                                     }
 
                                     ImGui::PushFont(regularFont, 15.0f);
@@ -423,7 +438,6 @@ namespace Surge
                                             ImGui::SetKeyboardFocusHere();
                                             mFocusRenameInput = false;
                                         }
-                                        // Execute rename on Enter key
                                         if(ImGui::InputText("##Rename", mRenameBuffer, IM_ARRAYSIZE(mRenameBuffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
                                         {
                                             std::filesystem::path newPath = mCurrentDirectory / mRenameBuffer;
@@ -436,7 +450,7 @@ namespace Surge
                                                     String newRelativePath = std::filesystem::relative(newPath, mBaseDirectory).generic_string();
                                                     mAssetManager->UpdateAssetPath(item.Id, newRelativePath);
 
-                                                    if (item.AssetTypeStr == "MATERIAL")
+                                                    if(item.AssetType_ == AssetType::MATERIAL)
                                                     {
                                                         Ref<Material> newMaterial = mAssetManager->Load<Material>(item.Id);
                                                         newMaterial->SetName(Filesystem::GetFilenameWithoutExt(mRenameBuffer));
@@ -444,7 +458,7 @@ namespace Surge
                                                         mAssetManager->Save(item.Id);
                                                         mAssetManager->Unload(item.Id);
                                                     }
-                                                    else if (item.AssetTypeStr == "SCRIPT")
+                                                    else if(item.AssetType_ == AssetType::SCRIPT)
                                                     {
                                                         mAssetManager->Save(item.Id);
                                                         mAssetManager->Unload(item.Id);
@@ -459,7 +473,6 @@ namespace Surge
                                             mIsRenaming = false;
                                         }
 
-                                        // Cancel rename if the user clicks anywhere else
                                         if(!ImGui::IsItemActive() && !mFocusRenameInput && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)))
                                             mIsRenaming = false;
 
@@ -491,12 +504,18 @@ namespace Surge
                         ImGui::EndTable();
                     }
 
-                    // CONTEXT MENU (CREATE ASSETS)
-                    if(ImGui::BeginPopupContextWindow("ContentBrowserBackground", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+                    if(ImGuiAux::BeginStyledPopupContextWindow("ContentBrowserBackground", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
                     {
-                        if(ImGui::BeginMenu("Create"))
+                        // Header
+                        ImGui::PushFont(boldFont);
+                        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "ACTIONS");
+                        ImGui::PopFont();
+                        ImGuiAux::StyledSeparator();
+
+                        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f)); // Taller menus
+                        if(ImGui::BeginMenu("Create New Asset..."))
                         {
-                            if(ImGui::MenuItem("Scene"))
+                            if(ImGuiAux::StyledMenuItem("Scene"))
                             {
                                 const char* extension = GetExtensionFromAssetType(AssetType::SCENE);
                                 std::filesystem::path newFilePath = mCurrentDirectory / ("NewScene" + String(extension));
@@ -513,10 +532,9 @@ namespace Surge
                                     mSelectedPath = newFilePath;
                                     StartRename(newFilePath);
                                 }
-
                                 mNeedsCacheRefresh = true;
                             }
-                            if(ImGui::MenuItem("Material"))
+                            if(ImGuiAux::StyledMenuItem("Material"))
                             {
                                 const char* extension = GetExtensionFromAssetType(AssetType::MATERIAL);
                                 std::filesystem::path newFilePath = mCurrentDirectory / ("NewMaterial" + String(extension));
@@ -536,7 +554,7 @@ namespace Surge
                                 }
                                 mNeedsCacheRefresh = true;
                             }
-                            if(ImGui::MenuItem("Script"))
+                            if(ImGuiAux::StyledMenuItem("Script"))
                             {
                                 const char* extension = GetExtensionFromAssetType(AssetType::SCRIPT);
                                 std::filesystem::path newFilePath = mCurrentDirectory / ("NewScript" + String(extension));
@@ -554,14 +572,19 @@ namespace Surge
 
                                 mSelectedPath = newFilePath;
                                 StartRename(newFilePath);
-                                
+
                                 mNeedsCacheRefresh = true;
                             }
-                            if(ImGui::MenuItem("Physics Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new physics material asset"); }
+
+                            ImGuiAux::StyledSeparator();
+
+                            if(ImGuiAux::StyledMenuItem("Physics Material")) { Log<Severity::Warn>("[ContentBrowserPanel] TODO: Create new physics material asset"); }
 
                             ImGui::EndMenu();
                         }
-                        ImGui::EndPopup();
+                        ImGui::PopStyleVar();
+
+                        ImGuiAux::EndStyledPopup();
                     }
                 }
                 ImGui::EndChild();
@@ -702,10 +725,10 @@ namespace Surge
                         const AssetID& id = entry.first;
                         const AssetMetadata& meta = entry.second;
 
-                        if (meta.Type != mSelectedFilterType && mSelectedFilterType != AssetType::NONE)
+                        if(meta.Type != mSelectedFilterType && mSelectedFilterType != AssetType::NONE)
                             continue;
 
-                        if (!searchStr.empty())
+                        if(!searchStr.empty())
                         {
                             String idStr = std::to_string(id.Get());
                             String typeStr = SurgeReflect::EnumToString(meta.Type).data();
@@ -716,10 +739,10 @@ namespace Surge
                             std::transform(pathStr.begin(), pathStr.end(), pathStr.begin(), ::tolower);
 
                             bool matches = false;
-                            if (idStr.find(searchStr) != String::npos || typeStr.find(searchStr) != String::npos || pathStr.find(searchStr) != String::npos)
+                            if(idStr.find(searchStr) != String::npos || typeStr.find(searchStr) != String::npos || pathStr.find(searchStr) != String::npos)
                                 matches = true;
 
-                            if (!matches)
+                            if(!matches)
                                 continue;
                         }
 
@@ -832,7 +855,7 @@ namespace Surge
     void ContentBrowserPanel::StartRename(const Path& path)
     {
         // We don't allow renaming of directories
-        if (std::filesystem::is_directory(path))
+        if(std::filesystem::is_directory(path))
             return;
 
         mRenamingPath = path;
