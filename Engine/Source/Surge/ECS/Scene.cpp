@@ -21,6 +21,10 @@ namespace Surge
     Scene::Scene()
     {
         AddStartupEntities();
+
+        // Are these good here?
+        mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptDestroyed>(this);
+        mRegistry.on_destroy<UICanvasComponent>().connect<&Scene::OnUICanvasDestroyed>(this);
     }
 
     Scene::~Scene()
@@ -45,9 +49,17 @@ namespace Surge
         mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
-        // Are these good?
-        mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptDestroyed>(this);
-        mRegistry.on_destroy<UICanvasComponent>().connect<&Scene::OnUICanvasDestroyed>(this);
+        // Refresh the asset references from the asset manager to ensure it's loaded and valid
+        for(const auto& [entity, script] : mRegistry.view<ScriptComponent>().each())
+        {
+            if (script.ScriptAsset)
+                script.ScriptAsset = Core::GetAssetManager()->Load<Script>(script.ScriptAsset->GetID());
+        }
+        for(const auto& [entity, canvas] : mRegistry.view<UICanvasComponent>().each())
+        {
+            if (canvas.ScriptAsset)
+                canvas.ScriptAsset = Core::GetAssetManager()->Load<Script>(canvas.ScriptAsset->GetID());
+        }
 
         Physics* physics = Core::GetPhysics();
         physics->OptimizeBroadPhase();
@@ -70,6 +82,8 @@ namespace Surge
 
     void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
     {
+        SURGE_PROFILE_FUNC("Scene::UpdateRendering");
+
         Renderer* renderer = Core::GetRenderer();
         renderer->BeginFrame(viewMatrix, projectionMatrix, cameraNearFar);
         {
@@ -226,7 +240,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::Update(Editor)");
 
-        SyncPhysics();
+        UpdatePhysics();
         UpdateScripts();
         UpdateTransforms();
         UpdateRendering(camera.GetViewMatrix(), camera.GetProjectionMatrix(), camera.GetNearAndFarPlane());
@@ -237,7 +251,7 @@ namespace Surge
         SURGE_PROFILE_FUNC("Scene::Update()");
 
         // Order matters here
-        SyncPhysics();
+        UpdatePhysics();
         UpdateScripts();
         UpdateTransforms();
 
@@ -511,6 +525,9 @@ namespace Surge
 
     void Scene::OnResize(float width, float height)
     {
+        if (width <= 0 || height <= 0)
+            return;
+
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
         if (camera.Data1)
             camera.Data1->SetViewportSize(width, height);
@@ -607,28 +624,34 @@ namespace Surge
                 auto view = mRegistry.view<UICanvasComponent>();
                 for(auto entityID : view)
                 {
-                    auto& scriptComp = view.get<UICanvasComponent>(entityID);
-                    if(!scriptComp.ScriptAsset)
+                    auto& uiComp = view.get<UICanvasComponent>(entityID);
+                    if(!uiComp.ScriptAsset)
                         continue;
 
-                    Ref<Script> script = scriptComp.ScriptAsset.As<Script>();
+                    
+                    Core::GetRenderer()->ShowUI(uiComp.ShowCanvas); // (Rid) This should be here?
+
+                    Ref<Script> script = uiComp.ScriptAsset.As<Script>();
                     Entity entityObj = { entityID, this };
-                    if(!scriptComp.IsInstantiated)
+                    if(uiComp.ShowCanvas)
                     {
-                        script->CreateEnvironment();
-                        script->ExecuteOnCreate(entityObj);
-                        scriptComp.IsInstantiated = true;
+                        if(!uiComp.IsInstantiated)
+                        {
+                            script->CreateEnvironment();
+                            script->ExecuteOnCreate(entityObj);
+                            uiComp.IsInstantiated = true;
+                        }
+                        else if(uiComp.IsInstantiated)
+                            script->ExecuteOnUpdate(entityObj);
                     }
-                    else
-                        script->ExecuteOnUpdate(entityObj);
                 }
             }
         }
     }
 
-    void Scene::SyncPhysics()
+    void Scene::UpdatePhysics()
     {
-        SURGE_PROFILE_FUNC("Scene::SyncPhysics");
+        SURGE_PROFILE_FUNC("Scene::UpdatePhysics");
 
         if(mIsRunning)
         {

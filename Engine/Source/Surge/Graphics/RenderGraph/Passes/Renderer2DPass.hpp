@@ -25,7 +25,7 @@ namespace Surge
     public:
         static constexpr Uint MAX_QUADS_TOTAL = 100000;    // 100k quads total, across all(10) batches
         static constexpr Uint MAX_QUADS_PER_BATCH = 10000; // 10k quads in 1 batch
-        static constexpr Uint MAX_QUAD_BATCHES_PER_FRAME = 1000;
+        static constexpr Uint MAX_QUAD_BATCHES_PER_FRAME = 32; //32 batches max, thus 512 unique textures max, incerease if needed
         static constexpr Uint MAX_TEX_SLOTS_PER_BATCH = 16; // TODO: Query from RHI caps
 
         // 1 draw call for ALL lines

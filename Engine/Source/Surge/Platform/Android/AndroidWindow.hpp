@@ -31,7 +31,7 @@ namespace Surge
         virtual void RegisterEventCallback(std::function<void(Event&)> eventCallback) override { mEventCallback = eventCallback; }
 
         virtual bool IsWindowMaximized() const override { return false; }
-        virtual bool IsWindowMinimized() const override { return mWindowState == WindowState::Minimized; }
+        virtual bool IsWindowMinimized() const override { return mWindowState == WindowState::MINIMIZED; }
 
         virtual String GetTitle() const override { return mWindowData.Title; }
         virtual void SetTitle(const String& name) override { mWindowData.Title = name; }
@@ -54,7 +54,7 @@ namespace Surge
     private:
         std::function<void(Event&)> mEventCallback;
         ANativeWindow* mNativeWindow = nullptr;
-        WindowState mWindowState = WindowState::Normal;
+        WindowState mWindowState = WindowState::NORMAL;
         bool mDestroyFired = false;
 
         // Touch state for input polling

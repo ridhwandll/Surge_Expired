@@ -57,7 +57,9 @@ namespace Surge
         void ForceResize(Uint width, Uint height);
         void ShowInternalImGui(bool show) { mGraph.ShowInternalImGui(show); }
         void SubmitDirLightDebug(const glm::vec3& origin, const glm::vec3& forward, const glm::vec4& color);
+        void ShowUI(bool show) { mGraph.GetBlackboard().ShowUI = show; }
 
+        const UI::Manager& GetUIManager() const { return mUIManager; }
         UI::Manager& GetUIManager() { return mUIManager; }
 
         const FrameBlackboard& GetRenderGraphBlackBoard() const { return mGraph.GetBlackboard(); }
@@ -82,7 +84,7 @@ namespace Surge
         const Scope<GraphicsRHI>& GetRHI() const { return mRHI; }
         Scope<GraphicsRHI>& GetRHI() { return mRHI; }
 
-        void AddImGuiRenderCallback(std::function<void()> callback) { mGraph.AddImGuiRenderCallback(std::move(callback)); }
+        void AddImGuiRenderCallback(std::function<void()>&& callback) { mGraph.AddImGuiRenderCallback(std::move(callback)); }
 
     private:
         FrameContext mCurrentFrameCtx;

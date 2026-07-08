@@ -90,8 +90,9 @@ namespace Surge
 int main()
 {
     Surge::ClientOptions clientOptions;
+    clientOptions.EnableImGui = false;
     clientOptions.RenderFinalImageToSwapchian = true;
-    clientOptions.WindowDescription = { 1280, 720, "Runtime", Surge::WindowFlags::CreateDefault /*| Surge::WindowFlags::NoTitlebar*/ };
+    clientOptions.WindowDescription = { 1280, 720, "Runtime", Surge::WindowFlags::DEFAULT };
 
     Surge::Player* app = Surge::MakeClient<Surge::Player>();
     app->SetOptions(clientOptions);

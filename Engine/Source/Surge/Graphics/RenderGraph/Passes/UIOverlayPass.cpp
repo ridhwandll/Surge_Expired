@@ -149,10 +149,7 @@ namespace Surge
 
         // Orthographic Matrix
         glm::vec2 size = { blackboard.ScreenWidth, blackboard.ScreenHeight };
-        struct UIFrameUBO
-        {
-            glm::mat4 ViewProjection;
-        } uiUboData;
+        struct UIFrameUBO { glm::mat4 ViewProjection; } uiUboData;
         uiUboData.ViewProjection = glm::ortho(0.0f, size.x, 0.0f, size.y, -1.0f, 1.0f);
         mRHI->UploadBuffer(mUIFrameUBOs[ctx.FrameIndex], &uiUboData, sizeof(FrameUBO), 0);
 
@@ -165,155 +162,90 @@ namespace Surge
         // ==========================================================================
         // UI SPRITES
         // ==========================================================================
-        for(const QuadSubmitCmd& quad : blackboard.UISpriteList)
         {
-            if(mCurrentQuadBatch.QuadCount >= MAX_UI_QUADS_PER_BATCH) FlushQuadBatch();
-            if(mQuadBatchCount >= MAX_UI_QUAD_BATCHES || mTotalQuadCount == MAX_UI_QUADS_TOTAL)
+            SURGE_PROFILE_FUNC("UI SPRITES");
+            for(const QuadSubmitCmd& quad : blackboard.UISpriteList)
             {
-                mMaxQuadCountReached = true; break;
+                if(mCurrentQuadBatch.QuadCount >= MAX_UI_QUADS_PER_BATCH) FlushQuadBatch();
+                if(mQuadBatchCount >= MAX_UI_QUAD_BATCHES || mTotalQuadCount == MAX_UI_QUADS_TOTAL)
+                {
+                    mMaxQuadCountReached = true; break;
+                }
+
+                int slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
+                if(slot == Renderer2DPass::QuadBatchData::MAX_TEX_IN_BATCH_REACHED)
+                {
+                    FlushQuadBatch();
+                    if(mQuadBatchCount >= MAX_UI_QUAD_BATCHES) break;
+                    slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
+                }
+
+                const Uint packedColor = glm::packUnorm4x8(quad.Color);
+
+                // Inverted V-coordinates so Sprites render right-side up in Y-Down space!
+                static constexpr glm::vec2 sUVs[4] = { { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f } };
+                static constexpr glm::vec4 sLocalPositions[4] = { { 0.5f, -0.5f, 0.0f, 1.0f}, { 0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f, -0.5f, 0.0f, 1.0f} };
+
+                for(Uint i = 0; i < 4; i++)
+                {
+                    Renderer2DPass::QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
+                    v.Position = quad.Transform * sLocalPositions[i];
+                    v.Color = packedColor;
+                    v.UV = sUVs[i];
+                    v.TextureIndex = (Uint)slot;
+                }
+                mCurrentQuadBatch.QuadCount++;
+                mTotalQuadCount++;
             }
 
-            int slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
-            if(slot == Renderer2DPass::QuadBatchData::MAX_TEX_IN_BATCH_REACHED)
+            if(mCurrentQuadBatch.QuadCount > 0) FlushQuadBatch();
+
+            if(mQuadBatchCount > 0)
             {
-                FlushQuadBatch();
-                if(mQuadBatchCount >= MAX_UI_QUAD_BATCHES) break;
-                slot = mCurrentQuadBatch.FindOrAssignTextureSlot(quad.Texture);
-            }
+                mRHI->CmdBindPipeline(ctx, mUIQuadPipeline);
+                mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mUIFrameDescriptorSet, DescriptorSetSlot::ZERO);
+                mRHI->CmdBindVertexBuffer(ctx, mQuadVB[ctx.FrameIndex], 0);
+                mRHI->CmdBindIndexBuffer(ctx, mQuadIB, 0);
 
-            const Uint packedColor = glm::packUnorm4x8(quad.Color);
-
-            // Inverted V-coordinates so Sprites render right-side up in Y-Down space!
-            static constexpr glm::vec2 sUVs[4] = { { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f } };
-            static constexpr glm::vec4 sLocalPositions[4] = { { 0.5f, -0.5f, 0.0f, 1.0f}, { 0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f,  0.5f, 0.0f, 1.0f}, {-0.5f, -0.5f, 0.0f, 1.0f} };
-
-            for(Uint i = 0; i < 4; i++)
-            {
-                Renderer2DPass::QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
-                v.Position = quad.Transform * sLocalPositions[i];
-                v.Color = packedColor;
-                v.UV = sUVs[i];
-                v.TextureIndex = (Uint)slot;
-            }
-            mCurrentQuadBatch.QuadCount++;
-            mTotalQuadCount++;
-        }
-
-        if(mCurrentQuadBatch.QuadCount > 0) FlushQuadBatch();
-
-        if(mQuadBatchCount > 0)
-        {
-            mRHI->CmdBindPipeline(ctx, mUIQuadPipeline);
-            mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mUIFrameDescriptorSet, DescriptorSetSlot::ZERO);
-            mRHI->CmdBindVertexBuffer(ctx, mQuadVB[ctx.FrameIndex], 0);
-            mRHI->CmdBindIndexBuffer(ctx, mQuadIB, 0);
-
-            for(Uint i = 0; i < mQuadBatchCount; i++)
-            {
-                const Renderer2DPass::QuadDrawCmd& cmd = mQuadDrawCommands[i];
-                mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
-                mRHI->CmdDrawIndexed(ctx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
+                for(Uint i = 0; i < mQuadBatchCount; i++)
+                {
+                    const Renderer2DPass::QuadDrawCmd& cmd = mQuadDrawCommands[i];
+                    mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
+                    mRHI->CmdDrawIndexed(ctx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
+                }
             }
         }
 
         // ==========================================================================
         // UI TEXT
         // ==========================================================================
-        Uint textBatchStartIndex = mQuadBatchCount;
-
-        struct TextPushConstants { float PxRange; float pad[2]; };
-        std::array<TextPushConstants, MAX_UI_QUAD_BATCHES> textBatchParams;
-        TextPushConstants currentTextParams = {};
-
-        for(const TextSubmitCmd& txt : blackboard.UITextList)
         {
-            if(!txt.FontAsset || txt.Text.empty() || mMaxQuadCountReached) continue;
+            SURGE_PROFILE_FUNC("UI TEXT");
+            Uint textBatchStartIndex = mQuadBatchCount;
 
-            glm::mat4 activeTransform = txt.Transform;
-            ImageHandle fontAtlas = txt.FontAsset->GetAtlas();
-            const Uint packedColorText = glm::packUnorm4x8(txt.Color);
-            //const Uint packedColorShadow = glm::packUnorm4x8(txt.ShadowColor);
+            struct TextPushConstants { float PxRange; float pad[2]; };
+            std::array<TextPushConstants, MAX_UI_QUAD_BATCHES> textBatchParams;
+            TextPushConstants currentTextParams = {};
 
-            glm::vec4 localPositions[4];
-            glm::vec2 uvs[4];
-
-            mLineLayoutCache.clear();
-            float currentLineWidth = 0.0f;
-            Uint measurePrevChar = 0;
-
-            for(size_t i = 0; i < txt.Text.size(); i++)
+            for(const TextSubmitCmd& txt : blackboard.UITextList)
             {
-                char c = txt.Text[i];
-                if(txt.MaxWidth > 0.0f && c == ' ')
-                {
-                    float nextWordLength = 0.0f;
-                    for(size_t j = i + 1; j < txt.Text.size() && txt.Text[j] != ' ' && txt.Text[j] != '\n'; j++)
-                    {
-                        const FontGlyph* nextGlyph = txt.FontAsset->GetGlyph(txt.Text[j]);
-                        if(nextGlyph) nextWordLength += nextGlyph->Advance;
-                    }
-                    if(currentLineWidth + nextWordLength > txt.MaxWidth)
-                    {
-                        mLineLayoutCache.push_back(currentLineWidth);
-                        currentLineWidth = 0.0f; measurePrevChar = 0; continue;
-                    }
-                }
-                if(c == '\n') { mLineLayoutCache.push_back(currentLineWidth); currentLineWidth = 0.0f; measurePrevChar = 0; continue; }
+                if(!txt.FontAsset || txt.Text.empty() || mMaxQuadCountReached) continue;
 
-                const FontGlyph* glyph = txt.FontAsset->GetGlyph(c);
-                if(!glyph) continue;
+                glm::mat4 activeTransform = txt.Transform;
+                ImageHandle fontAtlas = txt.FontAsset->GetAtlas();
+                const Uint packedColorText = glm::packUnorm4x8(txt.Color);
+                //const Uint packedColorShadow = glm::packUnorm4x8(txt.ShadowColor);
 
-                if(measurePrevChar != 0) currentLineWidth += txt.FontAsset->GetKerning(measurePrevChar, c);
-                currentLineWidth += (glyph->Advance + txt.LetterSpacing);
-                measurePrevChar = c;
-            }
-            mLineLayoutCache.push_back(currentLineWidth);
+                glm::vec4 localPositions[4];
+                glm::vec2 uvs[4];
 
-            auto getCursorX = [&](Uint lineIdx) -> float {
-                if(lineIdx >= mLineLayoutCache.size()) [[unlikely]] return 0.0f;
-                float lineWidth = mLineLayoutCache[lineIdx];
-                if(txt.Alignment == TextAlignment::CENTER) return -lineWidth * 0.5f;
-                else if(txt.Alignment == TextAlignment::RIGHT) return -lineWidth;
-                return 0.0f;
-            };
-
-            auto buildTextQuads = [&](glm::vec2 posOffset, float zOffset, Uint packedColor) {
-                currentTextParams.PxRange = txt.FontAsset->GetPxRange();
-                textBatchParams[mQuadBatchCount] = currentTextParams;
-                Uint lineIndex = 0;
-                Uint drawPrevChar = 0;
-                float italicSkew = txt.Italic ? 0.25f : 0.0f;
-
-                // (Rid) In MSDF EM units, visual letters are typically ~70% of the line height (capHeight)
-                // The descending tails (p, g, y) typically extend ~20% below the baseline (descent)
-                float capHeight = txt.FontAsset->GetLineHeight() * 0.7f;
-                float descent = txt.FontAsset->GetLineHeight() * 0.2f;
-                Uint numLines = (Uint)mLineLayoutCache.size();
-                float blockDrop = numLines > 0 ? ((numLines - 1) * (txt.FontAsset->GetLineHeight() + txt.LineSpacing)) : 0.0f;
-
-                float cursorY = 0.0f; // Default BASELINE
-                if(txt.VerticalAlignment == TextVerticalAlignment::CENTER)
-                    cursorY = (capHeight - descent - blockDrop) * 0.5f;
-                else if(txt.VerticalAlignment == TextVerticalAlignment::TOP)
-                    cursorY = capHeight;
-                else if(txt.VerticalAlignment == TextVerticalAlignment::BOTTOM)
-                    cursorY = -blockDrop - descent;
-
-                float cursorX = getCursorX(lineIndex);
-
-                auto nextLine = [&]() {
-                    // Since +Y goes DOWN the screen, next line must INCREASE the cursorY
-                    cursorY += (txt.FontAsset->GetLineHeight() + txt.LineSpacing);
-                    lineIndex++;
-                    cursorX = getCursorX(lineIndex);
-                    drawPrevChar = 0;
-                };
+                mLineLayoutCache.clear();
+                float currentLineWidth = 0.0f;
+                Uint measurePrevChar = 0;
 
                 for(size_t i = 0; i < txt.Text.size(); i++)
                 {
-                    if(mTotalQuadCount >= MAX_UI_QUADS_TOTAL) { mMaxQuadCountReached = true; break; }
                     char c = txt.Text[i];
-
                     if(txt.MaxWidth > 0.0f && c == ' ')
                     {
                         float nextWordLength = 0.0f;
@@ -322,85 +254,156 @@ namespace Surge
                             const FontGlyph* nextGlyph = txt.FontAsset->GetGlyph(txt.Text[j]);
                             if(nextGlyph) nextWordLength += nextGlyph->Advance;
                         }
-                        float baseWidth = txt.Alignment == TextAlignment::LEFT ? cursorX : cursorX + (txt.Alignment == TextAlignment::CENTER ? mLineLayoutCache[lineIndex] * 0.5f : mLineLayoutCache[lineIndex]);
-                        if(baseWidth + nextWordLength > txt.MaxWidth) { nextLine(); continue; }
+                        if(currentLineWidth + nextWordLength > txt.MaxWidth)
+                        {
+                            mLineLayoutCache.push_back(currentLineWidth);
+                            currentLineWidth = 0.0f; measurePrevChar = 0; continue;
+                        }
                     }
-
-                    if(c == '\n') { nextLine(); continue; }
+                    if(c == '\n') { mLineLayoutCache.push_back(currentLineWidth); currentLineWidth = 0.0f; measurePrevChar = 0; continue; }
 
                     const FontGlyph* glyph = txt.FontAsset->GetGlyph(c);
                     if(!glyph) continue;
 
-                    if(drawPrevChar != 0) cursorX += txt.FontAsset->GetKerning(drawPrevChar, c);
-
-                    int slot = mCurrentQuadBatch.FindOrAssignTextureSlot(fontAtlas);
-                    if(slot == Renderer2DPass::QuadBatchData::MAX_TEX_IN_BATCH_REACHED || mCurrentQuadBatch.QuadCount >= MAX_UI_QUADS_PER_BATCH)
-                    {
-                        textBatchParams[mQuadBatchCount] = currentTextParams;
-                        FlushQuadBatch();
-                        if(mTotalQuadCount == MAX_UI_QUADS_TOTAL || mQuadBatchCount >= MAX_UI_QUAD_BATCHES) { mMaxQuadCountReached = true; break; }
-                        slot = mCurrentQuadBatch.FindOrAssignTextureSlot(fontAtlas);
-                        textBatchParams[mQuadBatchCount] = currentTextParams;
-                    }
-
-                    // Invert MSDF PlaneBounds Y so Text renders right-side up
-                    glm::vec2 quadMin = glm::vec2(cursorX + glyph->PlaneBounds[0].x + posOffset.x, cursorY - glyph->PlaneBounds[1].y + posOffset.y);
-                    glm::vec2 quadMax = glm::vec2(cursorX + glyph->PlaneBounds[1].x + posOffset.x, cursorY - glyph->PlaneBounds[0].y + posOffset.y);
-
-                    localPositions[0] = { quadMax.x + (glyph->PlaneBounds[1].y * italicSkew), quadMin.y, zOffset, 1.0f };
-                    localPositions[1] = { quadMax.x + (glyph->PlaneBounds[0].y * italicSkew), quadMax.y, zOffset, 1.0f };
-                    localPositions[2] = { quadMin.x + (glyph->PlaneBounds[0].y * italicSkew), quadMax.y, zOffset, 1.0f };
-                    localPositions[3] = { quadMin.x + (glyph->PlaneBounds[1].y * italicSkew), quadMin.y, zOffset, 1.0f };
-
-                    uvs[0] = { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[1].y };
-                    uvs[1] = { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[0].y };
-                    uvs[2] = { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[0].y };
-                    uvs[3] = { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[1].y };
-
-                    for(Uint vIdx = 0; vIdx < 4; vIdx++)
-                    {
-                        Renderer2DPass::QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
-                        v.Position = activeTransform * localPositions[vIdx];
-                        v.Color = packedColor;
-                        v.UV = uvs[vIdx];
-                        v.TextureIndex = (Uint)slot;
-                    }
-
-                    cursorX += (glyph->Advance + txt.LetterSpacing);
-                    drawPrevChar = c;
-                    mCurrentQuadBatch.QuadCount++;
-                    mTotalQuadCount++;
+                    if(measurePrevChar != 0) currentLineWidth += txt.FontAsset->GetKerning(measurePrevChar, c);
+                    currentLineWidth += (glyph->Advance + txt.LetterSpacing);
+                    measurePrevChar = c;
                 }
-            };
+                mLineLayoutCache.push_back(currentLineWidth);
 
-            // NO SHADOWS in UI for Now
-            //if(txt.EnableShadow && txt.ShadowColor.a > 0.001f)
-            //    buildTextQuads(txt.ShadowOffset, -0.01f, packedColorShadow);
+                auto getCursorX = [&](Uint lineIdx) -> float {
+                    if(lineIdx >= mLineLayoutCache.size()) [[unlikely]] return 0.0f;
+                    float lineWidth = mLineLayoutCache[lineIdx];
+                    if(txt.Alignment == TextAlignment::CENTER) return -lineWidth * 0.5f;
+                    else if(txt.Alignment == TextAlignment::RIGHT) return -lineWidth;
+                    return 0.0f;
+                    };
 
-            buildTextQuads({ 0.0f, 0.0f }, 0.0f, packedColorText);
-        }
+                auto buildTextQuads = [&](glm::vec2 posOffset, float zOffset, Uint packedColor) {
+                    currentTextParams.PxRange = txt.FontAsset->GetPxRange();
+                    textBatchParams[mQuadBatchCount] = currentTextParams;
+                    Uint lineIndex = 0;
+                    Uint drawPrevChar = 0;
+                    float italicSkew = txt.Italic ? 0.25f : 0.0f;
 
-        if(mCurrentQuadBatch.QuadCount > 0)
-        {
-            textBatchParams[mQuadBatchCount] = currentTextParams;
-            FlushQuadBatch();
-        }
+                    // (Rid) In MSDF EM units, visual letters are typically ~70% of the line height (capHeight)
+                    // The descending tails (p, g, y) typically extend ~20% below the baseline (descent)
+                    float capHeight = txt.FontAsset->GetLineHeight() * 0.7f;
+                    float descent = txt.FontAsset->GetLineHeight() * 0.2f;
+                    Uint numLines = (Uint)mLineLayoutCache.size();
+                    float blockDrop = numLines > 0 ? ((numLines - 1) * (txt.FontAsset->GetLineHeight() + txt.LineSpacing)) : 0.0f;
 
-        if(mQuadBatchCount > textBatchStartIndex)
-        {
-            mRHI->CmdBindPipeline(ctx, mUITextPipeline);
-            mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mUIFrameDescriptorSet, DescriptorSetSlot::ZERO);
-            mRHI->CmdBindVertexBuffer(ctx, mQuadVB[ctx.FrameIndex], 0);
-            mRHI->CmdBindIndexBuffer(ctx, mQuadIB, 0);
+                    float cursorY = 0.0f; // Default BASELINE
+                    if(txt.VerticalAlignment == TextVerticalAlignment::CENTER)
+                        cursorY = (capHeight - descent - blockDrop) * 0.5f;
+                    else if(txt.VerticalAlignment == TextVerticalAlignment::TOP)
+                        cursorY = capHeight;
+                    else if(txt.VerticalAlignment == TextVerticalAlignment::BOTTOM)
+                        cursorY = -blockDrop - descent;
 
-            for(Uint i = textBatchStartIndex; i < mQuadBatchCount; i++)
+                    float cursorX = getCursorX(lineIndex);
+
+                    auto nextLine = [&]() {
+                        // Since +Y goes DOWN the screen, next line must INCREASE the cursorY
+                        cursorY += (txt.FontAsset->GetLineHeight() + txt.LineSpacing);
+                        lineIndex++;
+                        cursorX = getCursorX(lineIndex);
+                        drawPrevChar = 0;
+                        };
+
+                    for(size_t i = 0; i < txt.Text.size(); i++)
+                    {
+                        if(mTotalQuadCount >= MAX_UI_QUADS_TOTAL) { mMaxQuadCountReached = true; break; }
+                        char c = txt.Text[i];
+
+                        if(txt.MaxWidth > 0.0f && c == ' ')
+                        {
+                            float nextWordLength = 0.0f;
+                            for(size_t j = i + 1; j < txt.Text.size() && txt.Text[j] != ' ' && txt.Text[j] != '\n'; j++)
+                            {
+                                const FontGlyph* nextGlyph = txt.FontAsset->GetGlyph(txt.Text[j]);
+                                if(nextGlyph) nextWordLength += nextGlyph->Advance;
+                            }
+                            float baseWidth = txt.Alignment == TextAlignment::LEFT ? cursorX : cursorX + (txt.Alignment == TextAlignment::CENTER ? mLineLayoutCache[lineIndex] * 0.5f : mLineLayoutCache[lineIndex]);
+                            if(baseWidth + nextWordLength > txt.MaxWidth) { nextLine(); continue; }
+                        }
+
+                        if(c == '\n') { nextLine(); continue; }
+
+                        const FontGlyph* glyph = txt.FontAsset->GetGlyph(c);
+                        if(!glyph) continue;
+
+                        if(drawPrevChar != 0) cursorX += txt.FontAsset->GetKerning(drawPrevChar, c);
+
+                        int slot = mCurrentQuadBatch.FindOrAssignTextureSlot(fontAtlas);
+                        if(slot == Renderer2DPass::QuadBatchData::MAX_TEX_IN_BATCH_REACHED || mCurrentQuadBatch.QuadCount >= MAX_UI_QUADS_PER_BATCH)
+                        {
+                            textBatchParams[mQuadBatchCount] = currentTextParams;
+                            FlushQuadBatch();
+                            if(mTotalQuadCount == MAX_UI_QUADS_TOTAL || mQuadBatchCount >= MAX_UI_QUAD_BATCHES) { mMaxQuadCountReached = true; break; }
+                            slot = mCurrentQuadBatch.FindOrAssignTextureSlot(fontAtlas);
+                            textBatchParams[mQuadBatchCount] = currentTextParams;
+                        }
+
+                        // Invert MSDF PlaneBounds Y so Text renders right-side up
+                        glm::vec2 quadMin = glm::vec2(cursorX + glyph->PlaneBounds[0].x + posOffset.x, cursorY - glyph->PlaneBounds[1].y + posOffset.y);
+                        glm::vec2 quadMax = glm::vec2(cursorX + glyph->PlaneBounds[1].x + posOffset.x, cursorY - glyph->PlaneBounds[0].y + posOffset.y);
+
+                        localPositions[0] = { quadMax.x + (glyph->PlaneBounds[1].y * italicSkew), quadMin.y, zOffset, 1.0f };
+                        localPositions[1] = { quadMax.x + (glyph->PlaneBounds[0].y * italicSkew), quadMax.y, zOffset, 1.0f };
+                        localPositions[2] = { quadMin.x + (glyph->PlaneBounds[0].y * italicSkew), quadMax.y, zOffset, 1.0f };
+                        localPositions[3] = { quadMin.x + (glyph->PlaneBounds[1].y * italicSkew), quadMin.y, zOffset, 1.0f };
+
+                        uvs[0] = { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[1].y };
+                        uvs[1] = { glyph->UVBounds[1].x, 1.0f - glyph->UVBounds[0].y };
+                        uvs[2] = { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[0].y };
+                        uvs[3] = { glyph->UVBounds[0].x, 1.0f - glyph->UVBounds[1].y };
+
+                        for(Uint vIdx = 0; vIdx < 4; vIdx++)
+                        {
+                            Renderer2DPass::QuadVertex& v = mCurrentQuadBatch.VertexData[mCurrentQuadBatch.VertexCount++];
+                            v.Position = activeTransform * localPositions[vIdx];
+                            v.Color = packedColor;
+                            v.UV = uvs[vIdx];
+                            v.TextureIndex = (Uint)slot;
+                        }
+
+                        cursorX += (glyph->Advance + txt.LetterSpacing);
+                        drawPrevChar = c;
+                        mCurrentQuadBatch.QuadCount++;
+                        mTotalQuadCount++;
+                    }
+                    };
+
+                    // NO SHADOWS in UI for Now
+                    //if(txt.EnableShadow && txt.ShadowColor.a > 0.001f)
+                    //    buildTextQuads(txt.ShadowOffset, -0.01f, packedColorShadow);
+
+                buildTextQuads({ 0.0f, 0.0f }, 0.0f, packedColorText);
+            }
+
+            if(mCurrentQuadBatch.QuadCount > 0)
             {
-                const TextPushConstants& params = textBatchParams[i];
-                mRHI->CmdPushConstants(ctx, mUITextPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(TextPushConstants), &params);
+                textBatchParams[mQuadBatchCount] = currentTextParams;
+                FlushQuadBatch();
+            }
 
-                const Renderer2DPass::QuadDrawCmd& cmd = mQuadDrawCommands[i];
-                mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
-                mRHI->CmdDrawIndexed(ctx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
+            if(mQuadBatchCount > textBatchStartIndex)
+            {
+                mRHI->CmdBindPipeline(ctx, mUITextPipeline);
+                mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mUIFrameDescriptorSet, DescriptorSetSlot::ZERO);
+                mRHI->CmdBindVertexBuffer(ctx, mQuadVB[ctx.FrameIndex], 0);
+                mRHI->CmdBindIndexBuffer(ctx, mQuadIB, 0);
+
+                for(Uint i = textBatchStartIndex; i < mQuadBatchCount; i++)
+                {
+                    const TextPushConstants& params = textBatchParams[i];
+                    mRHI->CmdPushConstants(ctx, mUITextPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(TextPushConstants), &params);
+
+                    const Renderer2DPass::QuadDrawCmd& cmd = mQuadDrawCommands[i];
+                    mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
+                    mRHI->CmdDrawIndexed(ctx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
+                }
             }
         }
     }

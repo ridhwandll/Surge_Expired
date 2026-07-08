@@ -62,10 +62,13 @@ namespace Surge::UI
         // ExtractRenderData
         // Extracts render data from the UI hierarchy for rendering
         // @param blackboard: The frame blackboard containing render information
+        // @param showUI:     Whether to display the UI
         void ExtractRenderData(FrameBlackboard& blackboard)
         {
             SURGE_PROFILE_FUNC("Surgte::UI::Manager::ExtractRenderData");
             //Log<Severity::Trace>("RootWidget: {}", mRootWidget ? "Valid" : "nullptr");
+            if (!blackboard.ShowUI)
+                return;
 
             mTargetResolution = { blackboard.ScreenWidth, blackboard.ScreenHeight };
 

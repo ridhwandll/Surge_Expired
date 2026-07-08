@@ -30,12 +30,14 @@ void android_main(android_app* app)
     }
 
     Surge::ClientOptions clientOptions;
+    clientOptions.EnableImGui = false;
     clientOptions.RenderFinalImageToSwapchian = true;
+
     Surge::WindowDesc desc;
     desc.Width = static_cast<Surge::Uint>(ANativeWindow_getWidth(app->window));
     desc.Height = static_cast<Surge::Uint>(ANativeWindow_getHeight(app->window));
     desc.Title = "SurgePlayer";
-    desc.Flags = Surge::WindowFlags::CreateDefault;
+    desc.Flags = Surge::WindowFlags::DEFAULT;
     clientOptions.WindowDescription = desc;
 
     auto* playerApp = Surge::MakeClient<Surge::Player>();
@@ -44,6 +46,7 @@ void android_main(android_app* app)
     Surge::Core::Initialize(playerApp);
     Surge::Core::Run();
     Surge::Core::Shutdown();
+
     Surge::Log<Surge::Severity::Info>("Shutting down");
 }
 

@@ -43,6 +43,8 @@ namespace Surge
             sol::lib::math,
             sol::lib::string,
             sol::lib::table,
+            sol::lib::os,
+            sol::lib::package,
             sol::lib::coroutine
         );
 

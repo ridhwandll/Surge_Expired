@@ -59,11 +59,13 @@ namespace Surge
     private:
         void UpdateTransforms();
         void UpdateScripts();
-        void SyncPhysics();
+        void UpdatePhysics();
         void UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar);
 
+    private:
         void AddStartupEntities();
         void OnColliderAdded(entt::registry& registry, entt::entity entity);
+
         void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
         void OnScriptDestroyed(entt::registry& registry, entt::entity entity);
         void OnUICanvasDestroyed(entt::registry& registry, entt::entity entity);

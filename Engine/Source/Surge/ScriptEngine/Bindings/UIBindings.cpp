@@ -51,7 +51,6 @@ namespace Surge::ScriptBinding
         sol::protected_function mFunc;
     };
 
-
     void BindUIWidgets(void* luaState)
     {
         sol::state_view& lua = *static_cast<sol::state_view*>(luaState);

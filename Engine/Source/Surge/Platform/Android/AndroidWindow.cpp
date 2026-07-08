@@ -102,7 +102,7 @@ namespace Surge
         case APP_CMD_INIT_WINDOW:
         {
             self->mNativeWindow = app->window;
-            self->mWindowState = WindowState::Normal;
+            self->mWindowState = WindowState::NORMAL;
             if (self->mNativeWindow)
             {
                 Uint w = static_cast<Uint>(ANativeWindow_getWidth(self->mNativeWindow));
@@ -120,18 +120,18 @@ namespace Surge
 
         case APP_CMD_TERM_WINDOW:
             Log<Severity::Info>("APP_CMD_TERM_WINDOW");
-            self->mWindowState = WindowState::Minimized;
+            self->mWindowState = WindowState::MINIMIZED;
             self->mNativeWindow = nullptr;
             break;
 
         case APP_CMD_GAINED_FOCUS:
             Log<Severity::Info>("APP_CMD_GAINED_FOCUS");
-            self->mWindowState = WindowState::Normal;
+            self->mWindowState = WindowState::NORMAL;
             break;
 
         case APP_CMD_LOST_FOCUS:
             Log<Severity::Info>("APP_CMD_LOST_FOCUS");
-            self->mWindowState = WindowState::Minimized;
+            self->mWindowState = WindowState::MINIMIZED;
             break;
 
         case APP_CMD_WINDOW_RESIZED:
@@ -190,7 +190,10 @@ namespace Surge
 
         // Feed ImGui directly, GameActivity has no AInputEvent*, so we drive
         // ImGui IO manually instead of calling ImGui_ImplAndroid_HandleInputEvent
-        ImGuiIO& io = ImGui::GetIO();
+        bool imGuiEnabled = Core::GetClient()->GetClientOptions().EnableImGui;
+        ImGuiIO* io = nullptr;
+        if (imGuiEnabled)
+            io = &ImGui::GetIO();
 
         switch (actionMasked)
         {
@@ -198,9 +201,11 @@ namespace Surge
         case AMOTION_EVENT_ACTION_POINTER_DOWN:
         {
             window->mTouchDown = true;
-            io.AddMousePosEvent(x, y);
-            io.AddMouseButtonEvent(0, true);
-
+            if (imGuiEnabled)
+            {
+                io->AddMousePosEvent(x, y);
+                io->AddMouseButtonEvent(0, true);
+            }
             MouseMovedEvent moveEvent(x, y);
             MouseButtonPressedEvent pressEvent(x, y, static_cast<MouseCode>(Mouse::ButtonLeft));
             if (window->mEventCallback)
@@ -216,7 +221,8 @@ namespace Surge
         case AMOTION_EVENT_ACTION_CANCEL:
         {
             window->mTouchDown = false;
-            io.AddMouseButtonEvent(0, false);
+            if (imGuiEnabled)
+                io->AddMouseButtonEvent(0, false);
 
             MouseButtonReleasedEvent releaseEvent(x, y, static_cast<MouseCode>(Mouse::ButtonLeft));
             if (window->mEventCallback)
@@ -237,7 +243,8 @@ namespace Surge
                 {
                     window->mTouchX = px;
                     window->mTouchY = py;
-                    io.AddMousePosEvent(px, py);
+                    if (imGuiEnabled)
+                        io->AddMousePosEvent(px, py);
                 }
 
                 MouseMovedEvent moveEvent(px, py);
@@ -253,7 +260,8 @@ namespace Surge
             {
                 float xScroll = GameActivityPointerAxes_getAxisValue(&event->pointers[p], AMOTION_EVENT_AXIS_HSCROLL);
                 float yScroll = GameActivityPointerAxes_getAxisValue(&event->pointers[p], AMOTION_EVENT_AXIS_VSCROLL);
-                io.AddMouseWheelEvent(xScroll, yScroll);
+                if (imGuiEnabled)
+                    io->AddMouseWheelEvent(xScroll, yScroll);
             }
         }
         default:

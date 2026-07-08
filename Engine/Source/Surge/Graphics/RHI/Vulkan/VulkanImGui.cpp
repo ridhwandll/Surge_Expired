@@ -286,9 +286,10 @@ namespace Surge
         colors[ImGuiCol_HeaderActive] = colorFromBytesS(22);
         colors[ImGuiCol_CheckMark] = colorFromBytes(10, 200, 10); // Green
 
-        colors[ImGuiCol_Button] = colorFromBytesS(20);
-        colors[ImGuiCol_ButtonHovered] = colorFromBytesS(15);
-        colors[ImGuiCol_ButtonActive] = colorFromBytesS(50);
+        // Buttons
+        colors[ImGuiCol_Button] = ImVec4(0.12f, 0.12f, 0.12f, 1.0f);
+        colors[ImGuiCol_ButtonHovered] = ImVec4(0.18f, 0.18f, 0.18f, 1.0f);
+        colors[ImGuiCol_ButtonActive] = ImVec4(0.09f, 0.09f, 0.09f, 1.0f);
         colors[ImGuiCol_SeparatorHovered] = { 0.8f, 0.4f, 0.1f, 1.0f };
         colors[ImGuiCol_SeparatorActive] = { 1.0f, 0.5f, 0.1f, 1.0f };
 

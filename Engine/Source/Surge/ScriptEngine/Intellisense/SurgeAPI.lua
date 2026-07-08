@@ -1,0 +1,726 @@
+---@meta SurgeAPI
+
+-- ==============================================================================
+-- SURGE ENGINE: MASTER INTELLISENSE FILE
+-- Do NOT Add this file in ScriptComponent, drop this file in your Assets/Scripts
+-- directory and VSCode should automatically provide you with intellisense. You 
+-- need to have the VSCode Lua extension by sumneko installed
+-- https://marketplace.visualstudio.com/items?itemName=sumneko.lua
+-- ==============================================================================
+
+-- ==============================================================================
+-- LOGGING
+-- ==============================================================================
+---@class Log
+Log = {}
+
+--- Logs a trace message.
+---@param message string
+function Log.Trace(message) end
+
+--- Logs an info message.
+---@param message string
+function Log.Info(message) end
+
+--- Logs a debug message.
+---@param message string
+function Log.Debug(message) end
+
+--- Logs a warning message.
+---@param message string
+function Log.Warn(message) end
+
+--- Logs an error message.
+---@param message string
+function Log.Error(message) end
+
+-- ==============================================================================
+-- INPUT
+-- ==============================================================================
+---@class Input
+Input = {}
+
+--- Checks if a specific keyboard key is currently being held down.
+---@param key number
+---@return boolean
+function Input.IsKeyPressed(key) end
+
+--- Checks if a specific mouse button is currently being held down.
+---@param button number
+---@return boolean
+function Input.IsMouseButtonPressed(button) end
+
+--- Gets the current X and Y position of the mouse cursor.
+---@return Vec2
+function Input.GetMousePosition() end
+
+--- Gets the current X position of the mouse cursor.
+---@return number
+function Input.GetMouseX() end
+
+--- Gets the current Y position of the mouse cursor.
+---@return number
+function Input.GetMouseY() end
+
+--- Sets the cursor mode (e.g., locked, hidden, normal).
+---@param cursorMode number
+function Input.SetCursorMode(cursorMode) end
+
+-- ==============================================================================
+-- ENUMS & CODES
+-- ==============================================================================
+Key = {
+    Space = 32, Comma = 188, Minus = 189, Period = 190,
+    D0 = 48, D1 = 49, D2 = 50, D3 = 51, D4 = 52, D5 = 53, D6 = 54, D7 = 55, D8 = 56, D9 = 57,
+    Semicolon = 186,
+    A = 65, B = 66, C = 67, D = 68, E = 69, F = 70, G = 71, H = 72, I = 73, J = 74, K = 75, L = 76, M = 77, N = 78, O = 79, P = 80, Q = 81, R = 82, S = 83, T = 84, U = 85, V = 86, W = 87, X = 88, Y = 89, Z = 90,
+    LeftBracket = 219, BackSlash = 220, RightBracket = 221, GraveAccent = 222,
+    Backspace = 8, Enter = 13, Tab = 9, Pause = 19, NumLock = 144, ScrollLock = 145, CapsLock = 20, Escape = 27,
+    PageUp = 33, PageDown = 34, End = 35, Home = 36, Left = 37, Up = 38, Right = 39, Down = 40,
+    PrintScreen = 44, Insert = 45, Delete = 46,
+    F1 = 112, F2 = 113, F3 = 114, F4 = 115, F5 = 116, F6 = 117, F7 = 118, F8 = 119, F9 = 120, F10 = 121, F11 = 122, F12 = 123, F13 = 124, F14 = 125, F15 = 126, F16 = 127, F17 = 128, F18 = 129, F19 = 130, F20 = 131, F21 = 132, F22 = 133, F23 = 134, F24 = 135,
+    KP0 = 96, KP1 = 97, KP2 = 98, KP3 = 99, KP4 = 100, KP5 = 101, KP6 = 102, KP7 = 103, KP8 = 104, KP9 = 105,
+    KPMultiply = 106, KPAdd = 107, KPEqual = 108, KPSubtract = 109, KPDecimal = 110, KPDivide = 111,
+    LeftShift = 160, RightShift = 161, LeftControl = 162, RightControl = 163, LeftAlt = 164, RightAlt = 165
+}
+
+Mouse = {
+    ButtonLeft = 1,
+    ButtonRight = 2,
+    ButtonMiddle = 4
+}
+
+RigidbodyType = {
+    STATIC = 0,
+    DYNAMIC = 1,
+    KINEMATIC = 2
+}
+
+LightType = {
+    DIRECTIONAL = 0,
+    POINT = 1
+}
+
+TextAlignment = {
+    LEFT = 0,
+    CENTER = 1,
+    RIGHT = 2
+}
+
+TextVerticalAlignment = {
+    TOP = 0,
+    CENTER = 1,
+    BOTTOM = 2
+}
+
+-- ==============================================================================
+-- MATH (VECTORS, QUATERNIONS & MATRICES)
+-- ==============================================================================
+
+---@class Vec2
+---@field x number
+---@field y number
+---@operator add(Vec2): Vec2
+---@operator sub(Vec2): Vec2
+---@operator mul(number|Vec2): Vec2
+---@operator div(number|Vec2): Vec2
+---@operator unm: Vec2
+local Vec2 = {}
+---@return Vec2
+function Vec2:Normalize() end
+---@return number
+function Vec2:Length() end
+---@param other Vec2
+---@return number
+function Vec2:Dot(other) end
+---@param other Vec2
+---@return number
+function Vec2:Distance(other) end
+
+---@class Vec3
+---@field x number
+---@field y number
+---@field z number
+---@operator add(Vec3): Vec3
+---@operator sub(Vec3): Vec3
+---@operator mul(number|Vec3): Vec3
+---@operator div(number|Vec3): Vec3
+---@operator unm: Vec3
+local Vec3 = {}
+---@return Vec3
+function Vec3:Normalize() end
+---@return number
+function Vec3:Length() end
+---@param other Vec3
+---@return number
+function Vec3:Dot(other) end
+---@param other Vec3
+---@return Vec3
+function Vec3:Cross(other) end
+---@param other Vec3
+---@return number
+function Vec3:Distance(other) end
+---@param n Vec3
+---@return Vec3
+function Vec3:Reflect(n) end
+---@param n Vec3
+---@param eta number
+---@return Vec3
+function Vec3:Refract(n, eta) end
+
+---@class Vec4
+---@field x number
+---@field y number
+---@field z number
+---@field w number
+---@operator add(Vec4): Vec4
+---@operator sub(Vec4): Vec4
+---@operator mul(number): Vec4
+---@operator div(number|Vec4): Vec4
+---@operator unm: Vec4
+local Vec4 = {}
+---@return Vec4
+function Vec4:Normalize() end
+---@return number
+function Vec4:Length() end
+---@param other Vec4
+---@return number
+function Vec4:Dot(other) end
+---@param other Vec4
+---@return number
+function Vec4:Distance(other) end
+---@param n Vec4
+---@return Vec4
+function Vec4:Reflect(n) end
+---@param n Vec4
+---@param eta number
+---@return Vec4
+function Vec4:Refract(n, eta) end
+
+---@class Quat
+---@field x number
+---@field y number
+---@field z number
+---@field w number
+---@operator mul(Quat): Quat
+---@operator mul(Vec3): Vec3
+local Quat = {}
+---@return Vec3
+function Quat:Euler() end
+---@return Quat
+function Quat:Normalize() end
+---@return Quat
+function Quat:Inverse() end
+---@param b Quat
+---@param t number
+---@return Quat
+function Quat:Slerp(b, t) end
+
+---@class Mat4
+---@operator mul(Mat4): Mat4
+---@operator mul(Vec4): Vec4
+local Mat4 = {}
+---@return Mat4
+function Mat4.Identity() end
+---@param v Vec3
+---@return Mat4
+function Mat4:Translate(v) end
+---@param angleRad number
+---@param axis Vec3
+---@return Mat4
+function Mat4:Rotate(angleRad, axis) end
+---@param v Vec3
+---@return Mat4
+function Mat4:Scale(v) end
+---@return Mat4
+function Mat4:Inverse() end
+
+-- ==============================================================================
+-- MATH (FUNCTIONS)
+-- ==============================================================================
+
+---@class Math
+Math = {
+    Pi = 3.14159265359,
+    Epsilon = 0.000001,
+    Vec2 = {},
+    Vec3 = {},
+    Vec4 = {},
+    Quat = {},
+    Mat4 = {},
+    Easing = {}
+}
+
+---@param x number|nil
+---@param y number|nil
+---@return Vec2
+function Math.Vec2.new(x, y) end
+
+---@param x number|nil
+---@param y number|nil
+---@param z number|nil
+---@return Vec3
+function Math.Vec3.new(x, y, z) end
+
+---@param x number|nil
+---@param y number|nil
+---@param z number|nil
+---@param w number|nil
+---@return Vec4
+function Math.Vec4.new(x, y, z, w) end
+
+---@param dir Vec3
+---@param up Vec3
+---@return Quat
+function Math.Quat.LookRotation(dir, up) end
+
+---@param euler Vec3
+---@return Quat
+function Math.Quat.FromEuler(euler) end
+
+---@param t number
+---@return number
+function Math.Easing.QuadIn(t) end
+---@param t number
+---@return number
+function Math.Easing.QuadOut(t) end
+---@param t number
+---@return number
+function Math.Easing.QuadInOut(t) end
+---@param t number
+---@return number
+function Math.Easing.ElasticOut(t) end
+
+-- Core Math
+---@param min number
+---@param max number
+---@return number
+function Math.RandomRange(min, max) end
+
+---@return number
+function Math.Random() end
+
+---@param val number
+---@param min number
+---@param max number
+---@return number
+function Math.Clamp(val, min, max) end
+
+---@param a number
+---@param b number
+---@param t number
+---@return number
+function Math.Lerp(a, b, t) end
+
+---@param edge0 number
+---@param edge1 number
+---@param x number
+---@return number
+function Math.SmoothStep(edge0, edge1, x) end
+
+---@param a number
+---@param b number
+---@return number
+function Math.Min(a, b) end
+
+---@param a number
+---@param b number
+---@return number
+function Math.Max(a, b) end
+
+---@param rad number
+---@return number
+function Math.Cos(rad) end
+
+---@param rad number
+---@return number
+function Math.Sin(rad) end
+
+---@param rad number
+---@return number
+function Math.Tan(rad) end
+
+---@param rad number
+---@return number
+function Math.Asin(rad) end
+
+---@param rad number
+---@return number
+function Math.Acos(rad) end
+
+---@param y number
+---@param x number
+---@return number
+function Math.Atan2(y, x) end
+
+---@param deg number
+---@return number
+function Math.ToRadians(deg) end
+
+---@param rad number
+---@return number
+function Math.ToDegrees(rad) end
+
+---@param val number
+---@return number
+function Math.Abs(val) end
+
+---@param val number
+---@return number
+function Math.Sign(val) end
+
+---@param val number
+---@return number
+function Math.Floor(val) end
+
+---@param val number
+---@return number
+function Math.Ceil(val) end
+
+---@param val number
+---@return number
+function Math.Round(val) end
+
+---@param base number
+---@param exp number
+---@return number
+function Math.Pow(base, exp) end
+
+---@param val number
+---@return number
+function Math.Sqrt(val) end
+
+-- Vector Math
+---@param a Vec3
+---@param b Vec3
+---@param t number
+---@return Vec3
+function Math.LerpVec3(a, b, t) end
+
+-- Directional Vectors
+---@return Vec3
+function Math.Up() end
+---@return Vec3
+function Math.Right() end
+---@return Vec3
+function Math.Forward() end
+
+-- Colors
+---@param hsv Vec3
+---@return Vec3
+function Math.HSVToRGB(hsv) end
+
+---@param rgb Vec3
+---@return Vec3
+function Math.RGBToHSV(rgb) end
+
+---@param hex string
+---@return Vec3
+function Math.HexToRGB(hex) end
+
+-- ==============================================================================
+-- UI SYSTEM
+-- ==============================================================================
+
+--- Sets the root widget for the UI Manager. Pass nil to clear.
+---@param root UIWidget|nil
+function SetUIRoot(root) end
+
+---@class UIWidget
+---@field Anchor Vec2
+---@field Pivot Vec2
+---@field Offset Vec2
+---@field Size Vec2
+---@field Color Vec4
+UIWidget = {}
+
+--- Creates a new UIWidget.
+---@return UIWidget
+function UIWidget.new() end
+---@param child UIWidget
+function UIWidget:AddChild(child) end
+---@param callback function
+function UIWidget:OnClick(callback) end
+---@param callback function
+function UIWidget:OnHoverEnter(callback) end
+---@param callback function
+function UIWidget:OnHoverExit(callback) end
+
+---@class UIImage : UIWidget
+UIImage = {}
+
+--- Creates a new UIImage from a texture relative path.
+---@param textureRelPath string
+---@return UIImage
+function UIImage.new(textureRelPath) end
+
+---@class UIText : UIWidget
+---@field Text string
+---@field FontSize number
+---@field TextAlignment number
+---@field TextVAlignment number
+UIText = {}
+
+--- Creates a new UIText.
+---@param text string
+---@param fontRelPath string
+---@return UIText
+function UIText.new(text, fontRelPath) end
+
+---@class UIButton : UIImage
+---@field NormalColor Vec4
+---@field HoverColor Vec4
+---@field PressedColor Vec4
+UIButton = {}
+
+--- Creates a new UIButton.
+---@param text string
+---@param fontRelPath string
+---@param textureRelPath string
+---@return UIButton
+function UIButton.new(text, fontRelPath, textureRelPath) end
+
+-- ==============================================================================
+-- ECS COMPONENTS
+-- ==============================================================================
+
+---@class NameComponent
+---@field Name string
+local NameComponent = {}
+
+---@class TransformComponent
+---@field Position Vec3
+---@field Rotation Vec3
+---@field Scale Vec3
+---@field IsDirty boolean
+local TransformComponent = {}
+---@param offset Vec3
+function TransformComponent:Translate(offset) end
+---@param offset Vec3
+function TransformComponent:Rotate(offset) end
+---@param multi Vec3
+function TransformComponent:ScaleBy(multi) end
+function TransformComponent:MarkDirty() end
+
+---@class SpriteRendererComponent
+---@field Color Vec4
+local SpriteRendererComponent = {}
+
+---@class CameraComponent
+---@field Primary boolean
+---@field FixedAspectRatio boolean
+local CameraComponent = {}
+
+---@class MeshComponent
+---@field DropShadow boolean
+local MeshComponent = {}
+
+---@class LightComponent
+---@field Color Vec3
+---@field Intensity number
+---@field Radius number
+---@field Falloff number
+---@field Type number
+local LightComponent = {}
+
+---@class EnvironmentComponent
+---@field Elevation number
+---@field Azimuth number
+---@field Turbidity number
+---@field Exposure number
+---@field SunIntensity number
+---@field EnableSunDisk boolean
+---@field SkyAmbient Vec3
+---@field HorizonAmbient Vec3
+---@field GroundAmbient Vec3
+local EnvironmentComponent = {}
+
+---@class RigidbodyComponent
+---@field Type number
+---@field Mass number
+---@field IsSensor boolean
+---@field ContinuousCollision boolean
+---@field FreezeRotationX boolean
+---@field FreezeRotationY boolean
+---@field FreezeRotationZ boolean
+---@field LinearDamping number
+---@field AngularDamping number
+---@field Friction number
+---@field Bounciness number
+local RigidbodyComponent = {}
+---@param force Vec3
+function RigidbodyComponent:AddForce(force) end
+---@param impulse Vec3
+function RigidbodyComponent:AddImpulse(impulse) end
+---@param vel Vec3
+function RigidbodyComponent:SetLinearVelocity(vel) end
+---@return Vec3
+function RigidbodyComponent:GetLinearVelocity() end
+---@param torque Vec3
+function RigidbodyComponent:AddTorque(torque) end
+---@param impulse Vec3
+function RigidbodyComponent:AddAngularImpulse(impulse) end
+---@param vel Vec3
+function RigidbodyComponent:SetAngularVelocity(vel) end
+---@return Vec3
+function RigidbodyComponent:GetAngularVelocity() end
+
+---@class BoxColliderComponent
+---@field ShowCollider boolean
+---@field HalfExtents Vec3
+local BoxColliderComponent = {}
+
+---@class SphereColliderComponent
+---@field ShowCollider boolean
+---@field Radius number
+local SphereColliderComponent = {}
+
+---@class CapsuleColliderComponent
+---@field ShowCollider boolean
+---@field Height number
+---@field Radius number
+local CapsuleColliderComponent = {}
+
+---@class CylinderColliderComponent
+---@field ShowCollider boolean
+---@field Height number
+---@field Radius number
+local CylinderColliderComponent = {}
+
+---@class ConvexColliderComponent
+---@field ShowCollider boolean
+---@field LocalOffset Vec3
+---@field LocalRotation Vec3
+local ConvexColliderComponent = {}
+
+---@class MeshColliderComponent
+---@field LocalOffset Vec3
+---@field LocalRotation Vec3
+local MeshColliderComponent = {}
+
+---@class ScriptComponent
+---@field ScriptAsset number
+local ScriptComponent = {}
+
+---@class TextComponent
+---@field Text string
+---@field Color Vec4
+---@field MaxWidth number
+---@field LetterSpacing number
+---@field Alignment number
+---@field VerticalAlignment number
+---@field LineSpacing number
+---@field ShadowEnabled boolean
+---@field ShadowColor Vec4
+---@field ShadowOffset Vec2
+local TextComponent = {}
+
+---@class UICanvasComponent
+---@field ShowCanvas boolean
+---@field ScriptAsset number
+local UICanvasComponent = {}
+
+-- ==============================================================================
+-- ECS ENTITY
+-- ==============================================================================
+
+---@class Entity
+---@field NameC NameComponent|nil
+---@field TransformC TransformComponent|nil
+---@field SpriteRendererC SpriteRendererComponent|nil
+---@field CameraC CameraComponent|nil
+---@field MeshC MeshComponent|nil
+---@field LightC LightComponent|nil
+---@field EnvironmentC EnvironmentComponent|nil
+---@field RigidbodyC RigidbodyComponent|nil
+---@field BoxColliderC BoxColliderComponent|nil
+---@field SphereColliderC SphereColliderComponent|nil
+---@field CapsuleColliderC CapsuleColliderComponent|nil
+---@field CylinderColliderC CylinderColliderComponent|nil
+---@field ConvexColliderC ConvexColliderComponent|nil
+---@field MeshColliderC MeshColliderComponent|nil
+---@field ScriptC ScriptComponent|nil
+---@field TextC TextComponent|nil
+---@field UICanvasC UICanvasComponent|nil
+local Entity = {}
+
+---@return boolean
+function Entity:IsValid() end
+
+---@return number
+function Entity:GetID() end
+
+function Entity:Destroy() end
+
+---@param targetName string
+---@return Entity
+function Entity:FindEntityByName(targetName) end
+
+-- Generated Has/Add/Remove/GetOrAdd functions
+function Entity:HasNameC() end
+function Entity:AddNameC() end
+function Entity:RemoveNameC() end
+
+function Entity:HasTransformC() end
+function Entity:AddTransformC() end
+function Entity:RemoveTransformC() end
+
+function Entity:HasSpriteRendererC() end
+function Entity:AddSpriteRendererC() end
+function Entity:RemoveSpriteRendererC() end
+
+function Entity:HasCameraC() end
+function Entity:AddCameraC() end
+function Entity:RemoveCameraC() end
+
+function Entity:HasMeshC() end
+function Entity:AddMeshC() end
+function Entity:RemoveMeshC() end
+
+function Entity:HasLightC() end
+function Entity:AddLightC() end
+function Entity:RemoveLightC() end
+
+function Entity:HasEnvironmentC() end
+function Entity:AddEnvironmentC() end
+function Entity:RemoveEnvironmentC() end
+
+function Entity:HasRigidbodyC() end
+function Entity:AddRigidbodyC() end
+function Entity:RemoveRigidbodyC() end
+
+function Entity:HasBoxColliderC() end
+function Entity:AddBoxColliderC() end
+function Entity:RemoveBoxColliderC() end
+
+function Entity:HasSphereColliderC() end
+function Entity:AddSphereColliderC() end
+function Entity:RemoveSphereColliderC() end
+
+function Entity:HasCapsuleColliderC() end
+function Entity:AddCapsuleColliderC() end
+function Entity:RemoveCapsuleColliderC() end
+
+function Entity:HasCylinderColliderC() end
+function Entity:AddCylinderColliderC() end
+function Entity:RemoveCylinderColliderC() end
+
+function Entity:HasConvexColliderC() end
+function Entity:AddConvexColliderC() end
+function Entity:RemoveConvexColliderC() end
+
+function Entity:HasMeshColliderC() end
+function Entity:AddMeshColliderC() end
+function Entity:RemoveMeshColliderC() end
+
+function Entity:HasScriptC() end
+function Entity:AddScriptC() end
+function Entity:RemoveScriptC() end
+
+function Entity:HasTextC() end
+function Entity:AddTextC() end
+function Entity:RemoveTextC() end
+
+function Entity:HasUICanvasC() end
+function Entity:AddUICanvasC() end
+function Entity:RemoveUICanvasC() end

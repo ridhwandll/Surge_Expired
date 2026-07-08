@@ -1,19 +1,32 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Scope.hpp"
-#include "Surge/Core/MemoryBlock.hpp"
 #include "Serializer/IAssetSerializer.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
 #include "Surge/Core/Path.hpp"
 #include "SurgeReflect/Enum.hpp"
 #include <unordered_map>
-#include <functional>
 
 namespace Surge
 {
     template<typename T>
     concept IsAssetConcept = std::is_base_of_v<Surge::Asset, T> && !std::is_same_v<Surge::Asset, T> && requires { { T::GetStaticType() } -> std::same_as<AssetType>; };
+
+    class AssetManager;
+    class AssetLoadCallback
+    {
+    public:
+        virtual ~AssetLoadCallback() = default;
+    protected:
+        // OnAssetLoad
+        // Called internally when an asset is requested to be loaded. Return true to force a reload(skip cache), false to use the cached version if available.
+        // @param id    AssetID of the asset being loaded
+        // @param meta  AssetMetadata of the asset being loaded
+        // @return      true to force a reload, false to use cached version if available
+        virtual bool OnAssetLoad(AssetID id, AssetMetadata& meta) = 0;
+        friend class AssetManager;
+    };
 
     class AssetManager
     {
@@ -65,28 +78,71 @@ namespace Surge
 
         // Load<T>
         // Returns a cached Ref<T> immediately if already loaded, performs a full synchronous load (CPU + GPU) otherwise
+        // DO NOT CALL Load<T> every frame!
         // @param id    AssetID of the requested asset
         // @return      Ref<T> of the requested underlying concrete asset
         template<IsAssetConcept T>
         Ref<T> Load(AssetID id)
         {
-            const AssetMetadata& metadata = GetMetadata(id);
+            auto cacheIt = mLoadedAssets.find(id);
+            bool isCached = cacheIt != mLoadedAssets.end();
+            bool shouldReload = false;
 
-            if(HasFlag(metadata.Flags, AssetFlags::MISSING))
+            AssetMetadata* metadata = nullptr;
+            if(mLoadCallback)
             {
-                Log<Severity::Error>("[AssetManager] Load: asset is missing for ID {}!", id.Get());
+                metadata = GetMetadataForEdit(id);
+                if(!metadata)
+                {
+                    Log<Severity::Error>("[AssetManager] Load: Invalid AssetID {}!", id.Get());
+                    return nullptr;
+                }
+
+                // Trigger user callback (In Editor this reads the binary file header to see if it is uptodate, Cooks the asset if needed)
+                shouldReload = mLoadCallback->OnAssetLoad(id, *metadata);
+            }
+
+            // FAST PATH
+            if(isCached && !shouldReload)
+            {
+                SG_ASSERT(cacheIt->second->GetAssetType() == T::GetStaticType(), "[AssetManager] Load: Cached asset type mismatch!");
+                return cacheIt->second.As<T>();
+            }
+
+            // SLOW PATH
+            if(!metadata)
+                metadata = GetMetadataForEdit(id); // Fetch if we are in Release mode (no hook)
+
+            if(!metadata)
+            {
+                Log<Severity::Error>("[AssetManager] Load: No metadata found for AssetID {}!", id.Get());
                 return nullptr;
             }
-            if(metadata.Type != T::GetStaticType())
+
+            if(HasFlag(metadata->Flags, AssetFlags::MISSING))
             {
-                Log<Severity::Error>("[AssetManager] Load: type mismatch for ID {}! " "Requested '{}' but registry says '{}'.", id.Get(), SurgeReflect::EnumToString(T::GetStaticType()).data(), SurgeReflect::EnumToString(metadata.Type).data());
+                Log<Severity::Error>("[AssetManager] Load: Asset is marked as MISSING for ID {}!", id.Get());
                 return nullptr;
             }
 
-            Ref<Asset> asset = LoadAsset(id);
+            if(metadata->Type != T::GetStaticType())
+            {
+                Log<Severity::Error>("[AssetManager] Load: Type mismatch for ID {}! Requested {} but registry says {}!", id.Get(), SurgeReflect::EnumToString(T::GetStaticType()).data(), SurgeReflect::EnumToString(metadata->Type).data());
+                return nullptr;
+            }
+            Ref<Asset> asset = LoadAssetInternal(id, metadata);
             SG_ASSERT(!asset || asset->GetAssetType() == T::GetStaticType(), "[AssetManager] LoadInternal returned wrong type, loader bug!");
-            return asset.As<T>();
+            return asset ? asset.As<T>() : nullptr;
         }
+
+// TODO: Make a faster version of Load
+//         Ref<T> Get(AssetID id)
+//         {
+//             auto cacheIt = mLoadedAssets.find(id);
+//             if(cacheIt != mLoadedAssets.end())
+//                 return cacheIt->second.As<T>();
+//             return nullptr;
+//         }
 
         // Unload
         // Removes the live Ref from the cache if no other objects are referencing it i.e. Ref count = 1, otherwise does nothing since it's still in use 
@@ -154,10 +210,12 @@ namespace Surge
         // @param type        [Internal] Used for internal purposes, do NOT specify
         String GetSidecarPath(AssetID id, AssetType type = AssetType::NONE);
 
-        // AddAssetLoadHook
-        // Add a callback function that will be called every time an asset is loaded
-        // @param hook    Function to call on asset load, parameters are the AssetID and AssetMetadata of the loaded asset
-        void AddAssetLoadHook(std::function<void(AssetID id, const AssetMetadata& meta)>&& hook) { mAssetLoadHook = std::move(hook); }
+        // AddAssetLoadCallback
+        // Use this to add a callback function that will be called every time an asset is loaded
+        // @param hook An overriden class of AssetLoadCallback that implements the OnAssetLoad method.
+        //             The method will be called with the AssetID and AssetMetadata of the asset being loaded, and should return true if the asset should be 
+        //             reloaded from disk or false if it should not be reloaded
+        void AddAssetLoadCallback(Scope<AssetLoadCallback>&& hook) { mLoadCallback = std::move(hook); }
 
         // Registry
         void SerializeRegistry();
@@ -166,7 +224,8 @@ namespace Surge
         // Utilities
         String GetAbsolutePath(const String& relativePath) const { return sAssetsDirectory + '/' + relativePath; }
     private:
-        Ref<Asset> LoadAsset(AssetID id);
+        Ref<Asset> LoadAssetInternal(AssetID id, AssetMetadata* meta);
+        AssetMetadata* GetMetadataForEdit(AssetID id);
         String GetSidecarDirectory(AssetType type);
 
     private:
@@ -174,7 +233,8 @@ namespace Surge
         std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;
         std::unordered_map<AssetID, Ref<Asset>> mLoadedAssets;
         std::unordered_map<AssetType, Scope<AssetSerializer>> mSerializers;
-        std::function<void(AssetID id, const AssetMetadata& meta)> mAssetLoadHook;
+        Scope<AssetLoadCallback> mLoadCallback = nullptr;
+
         bool mInitialized = false;
 
         static constexpr const char* kRegistryFilename = "AssetRegistry.surge";

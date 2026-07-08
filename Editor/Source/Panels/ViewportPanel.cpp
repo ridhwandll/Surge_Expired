@@ -79,7 +79,7 @@ namespace Surge
                         if(!mIsFullscreen)
                             mRestoreScreenPosBeforeFullscreen = true;
 
-                        ImGui::SetWindowFocus(PanelCodeToString(mCode));
+                        static_cast<Editor*>(Core::GetClient())->ShowTitlebar(!mIsFullscreen);
                         break;
                     }
                     case Key::Escape:
@@ -88,7 +88,7 @@ namespace Surge
                         {
                             mIsFullscreen = false;
                             mRestoreScreenPosBeforeFullscreen = true;
-                            ImGui::SetWindowFocus(PanelCodeToString(mCode));
+                            static_cast<Editor*>(Core::GetClient())->ShowTitlebar(true);
                         }
                         break;
                     }
@@ -151,6 +151,7 @@ namespace Surge
         {
             ImGui::SetNextWindowDockID(mPreviousDockID, ImGuiCond_Always);
             mRestoreScreenPosBeforeFullscreen = false;
+            ImGui::SetWindowFocus(PanelCodeToString(mCode));
         }
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
@@ -176,10 +177,10 @@ namespace Surge
             if(!mIsFullscreen)
                 mPreviousDockID = ImGui::GetWindowDockID();
 
-
             mIsViewportHovered = ImGui::IsWindowHovered();
             mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
             ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
+            ImVec2 viewportBoundsMin = ImGui::GetCursorScreenPos();
 
             ImGui::Image(mTexID, { mViewportSize.x, mViewportSize.y });
 
@@ -254,7 +255,7 @@ namespace Surge
                 glm::mat4 cameraView = camera.GetViewMatrix();
                 glm::mat4 cameraProjection = camera.GetProjectionMatrix();
                 cameraProjection[1][1] *= -1;
-                ImGuizmo::SetRect(cursorScreenPos.x, cursorScreenPos.y, mViewportSize.x, mViewportSize.y);
+                ImGuizmo::SetRect(viewportBoundsMin.x, viewportBoundsMin.y, mViewportSize.x, mViewportSize.y);
                 //ImGuizmo::DrawGrid(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), glm::value_ptr(glm::mat4(1.0f)), 16);
 
                 if(selectedEntity && mGizmoType > 0)

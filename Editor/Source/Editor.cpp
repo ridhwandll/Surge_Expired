@@ -47,6 +47,22 @@ namespace Surge
         return imageHandle;
     }
 
+    class EditorAssetLoadCallback : public AssetLoadCallback
+    {
+    protected:
+        virtual bool OnAssetLoad(AssetID id, AssetMetadata& meta) override
+        {
+            Editor* editor = static_cast<Editor*>(Core::GetClient());
+            if(editor->GetAssetImporter().NeedsCook(id, meta.Type))
+            {
+                Log<Severity::Warn>("[EditorAssetLoadCallback] Cooked file outdated/missing on Load, cooking now: {}", meta.RelativePath);
+                editor->GetAssetImporter().RecookAsset(id);
+                return true; // Reload the asset from disk after cooking
+            }
+            return false;
+        }
+    };
+
     void Editor::OnInitialize()
     {
         // Dummy Scene to render the project browser ImGui. We can probably find a better way to do this later, but for now it works and doesn't cause any issues
@@ -59,7 +75,6 @@ namespace Surge
         mCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
         mCamera.SetActive(true);
 
-
         mAssetImporter.Initialize(mAssetManager);
         mAssetImporter.RegisterCooker(CreateScope<Texture2DCooker>());
         mAssetImporter.RegisterCooker(CreateScope<MaterialCooker>());
@@ -67,14 +82,7 @@ namespace Surge
         mAssetImporter.RegisterCooker(CreateScope<ScriptCooker>());
         mAssetImporter.RegisterCooker(CreateScope<FontCooker>());
 
-        mAssetManager->AddAssetLoadHook([this](AssetID id, const AssetMetadata& meta)
-                                        {
-                                            if(mAssetImporter.NeedsCook(id, meta.Type))
-                                            {
-                                                Log<Severity::Warn>("[AssetManager::AddAssetLoadHook] Cooked file outdated/missing on Load, cooking now: {}", meta.RelativePath);
-                                                mAssetImporter.RecookAsset(id);
-                                            }
-                                        });
+        mAssetManager->AddAssetLoadCallback(CreateScope<EditorAssetLoadCallback>());
 
         // Configure panels
         SceneHierarchyPanel* sceneHierarchy = mPanelManager.PushPanel<SceneHierarchyPanel>();
@@ -167,6 +175,9 @@ namespace Surge
 
     void Editor::DrawCustomTitlebar(const char* title, float titleBarHeight, bool showMenuItems)
     {
+        if (!mShowTitlebar)
+            return;
+
         ImGuiViewport* viewport = ImGui::GetMainViewport();
 
         ImVec4 bgColor = ImGuiAux::Colors::ExtraDark;
@@ -397,25 +408,34 @@ namespace Surge
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent)
                                              {
-                                                 if(keyEvent.GetKeyCode() == Key::F2)
+                                                 if(keyEvent.GetKeyCode() == Key::F5)
                                                  {
-                                                     mAssetManager->Save(mActiveScene->GetID());
+                                                     if(IsPlaying())
+                                                         OnRuntimeEnd();
+                                                     else
+                                                         OnRuntimeStart();
+                                                 }
+                                                 if(keyEvent.GetKeyCode() == Key::S)
+                                                 {
+                                                     bool ctrlPressed = Input::IsKeyPressed(Key::LeftControl);
+                                                     if(ctrlPressed)
+                                                     {
+                                                         mAssetManager->Save(mActiveScene->GetID());
+                                                         Log<Severity::Info>("[Editor] Saved scene: {}", mAssetManager->GetMetadata(mActiveScene->GetID()).RelativePath);
+                                                     }
                                                  }
                                              });
     }
 
     void Editor::OnRuntimeStart()
     {
-        mAssetImporter.ScanAndRecookScripts();
-
         mRuntimeScene = Ref<Scene>::Create();
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(mRuntimeScene.Raw());
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
 
-        mRuntimeScene->OnRuntimeStart();
         mActiveScene->CopyTo(mRuntimeScene.Raw());
-        mRuntimeScene->SetRunning(true);
 
+        mRuntimeScene->OnRuntimeStart();
         glm::vec2 viewportSize = mPanelManager.GetPanel<ViewportPanel>()->GetViewportSize();
         mRuntimeScene->OnResize(viewportSize.x, viewportSize.y);
 
@@ -482,8 +502,9 @@ namespace Surge
 int main()
 {
     Surge::ClientOptions clientOptions;
+    clientOptions.EnableImGui = true;
     clientOptions.RenderFinalImageToSwapchian = false; // We grab the imgui image id from renderer
-    clientOptions.WindowDescription = {1280, 720, "Surge Editor", Surge::WindowFlags::NoTitlebar};
+    clientOptions.WindowDescription = {1280, 720, "Surge Editor", Surge::WindowFlags::NO_TITLEBAR};
 
     Surge::Editor* app = Surge::MakeClient<Surge::Editor>();
     app->SetOptions(clientOptions);

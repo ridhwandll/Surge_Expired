@@ -17,6 +17,8 @@
 
 namespace Surge
 {
+    static const AssetMetadata sNullMetadata {};
+
     AssetManager::AssetManager()
     {
         mSerializers[AssetType::SCENE] = CreateScope<SceneSerializer>();
@@ -104,53 +106,38 @@ namespace Surge
         return id;
     }
 
-    // Load (template in header points here)
-    Ref<Asset> AssetManager::LoadAsset(AssetID id)
+    // Load (template in header points here, do not call directly)
+    Ref<Asset> AssetManager::LoadAssetInternal(AssetID id, AssetMetadata* meta)
     {
-        // Already live in the cache
-        {
-            auto cacheIt = mLoadedAssets.find(id);
-            if(cacheIt != mLoadedAssets.end())
-                return cacheIt->second;
-        }
+        auto serIt = mSerializers.find(meta->Type);
+        SG_ASSERT(serIt != mSerializers.end() && serIt->second, "[AssetManager] No serializer for type {}!", SurgeReflect::EnumToString(meta->Type).data());
 
-        // Validate registry
-        auto metaIt = mAssetRegistry.find(id);
-        if(metaIt == mAssetRegistry.end())
-        {
-            Log<Severity::Error>("[AssetManager] Load: AssetID {} is not registered!", id.Get());
-            return nullptr;
-        }
-
-        AssetMetadata& meta = metaIt->second;
-        if(meta.IsMissing())
-        {
-            Log<Severity::Error>("[AssetManager] Load: Source file missing for '{}'!", meta.RelativePath);
-            return nullptr;
-        }
-
-        auto serIt = mSerializers.find(meta.Type);
-        SG_ASSERT(serIt != mSerializers.end() && serIt->second, "[AssetManager] No serializer for type '{}'!", SurgeReflect::EnumToString(meta.Type).data());
-
-        if (mAssetLoadHook)
-            mAssetLoadHook(id, meta);
-
-        Ref<Asset> asset = serIt->second->Deserialize(meta);
+        Ref<Asset> asset = serIt->second->Deserialize(*meta);
         if(!asset)
         {
-            Log<Severity::Error>("[AssetManager] Load: Loader returned null for '{}'!", meta.RelativePath);
-            meta.Flags |= AssetFlags::MISSING;
+            Log<Severity::Error>("[AssetManager] Load: Loader returned null for {}! Is the asset Missing?", meta->RelativePath);
+            meta->Flags |= AssetFlags::MISSING;
             return nullptr;
         }
 
-        asset->mID = id; // Stamp the ID
-        meta.Flags |= AssetFlags::LOADED;
+        asset->mID = id;
+        meta->Flags |= AssetFlags::LOADED;
+        meta->Flags &= ~AssetFlags::MISSING;
 
         mLoadedAssets[id] = asset;
         return asset;
     }
 
-    // Unload
+    AssetMetadata* AssetManager::GetMetadataForEdit(AssetID id)
+    {
+        auto it = mAssetRegistry.find(id);
+        if(it != mAssetRegistry.end())
+            return &it->second;
+
+        return nullptr;
+    }
+
+        // Unload
     bool AssetManager::Unload(AssetID id)
     {
         auto cacheIt = mLoadedAssets.find(id);
@@ -194,10 +181,8 @@ namespace Surge
 
     const AssetMetadata& AssetManager::GetMetadata(AssetID id)
     {
-        static const AssetMetadata kNull {};
-
         auto it = mAssetRegistry.find(id);
-        return it != mAssetRegistry.end() ? it->second : kNull;
+        return it != mAssetRegistry.end() ? it->second : sNullMetadata;
     }
 
     String AssetManager::GetSidecarPath(AssetID id, AssetType type)

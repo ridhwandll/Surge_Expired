@@ -1,14 +1,16 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "RenderGraph.hpp"
+#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
-#include <set>
 #include "../RHI/Vulkan/VulkanUtils.hpp"
+#include <set>
 
 namespace Surge
 {
     void RenderGraph::Setup(GraphicsRHI* rhi)
     {
         mRHI = rhi;
+        mImGuiEnabled = Core::GetClient()->GetClientOptions().EnableImGui;
 
         // Producers must be registered before consumers so blackboard handles are valid
         for(auto& pass : mPasses)
@@ -96,7 +98,7 @@ namespace Surge
             }
 
             if(!group.ManagesOwnExecution)
-                group.IsSwapchain ? (OnImGuiRender(), mRHI->CmdEndSwapchainRenderpass(ctx)) : mRHI->CmdEndRenderPass(ctx, group.Framebuffer);
+                group.IsSwapchain ? (mImGuiEnabled ? OnImGuiRender() : void(), mRHI->CmdEndSwapchainRenderpass(ctx)) : mRHI->CmdEndRenderPass(ctx, group.Framebuffer);
         }
     }
 
@@ -119,6 +121,12 @@ namespace Surge
     {
         for(auto& pass : mPasses)
             pass->Shutdown(mBlackboard);
+    }
+
+    void RenderGraph::AddImGuiRenderCallback(std::function<void()> callback)
+    {
+        if(callback && mImGuiEnabled)
+            mImGuiRenderCallbacks.push_back(std::move(callback));
     }
 
     void RenderGraph::SortByDependencies(Vector<RenderPass*>& passes)
@@ -193,13 +201,15 @@ namespace Surge
                     {
                         if(write == read && !barrierAdded.count(write))
                         {
+                            readGroup.BarriersBeforeGroup.push_back({ write, ImageUsage::SAMPLED });
+                            barrierAdded.insert(write);
+#if 0
                             const ImageDesc& writeDesc = mRHI->GetDesc(write);
                             Log<Severity::Warn>("-----------IMAGE BARRIER-----------");
                             Log<Severity::Warn>("Image: {}", writeDesc.DebugName);
                             Log<Severity::Warn>("[After executing {} pass | Before executing {} pass]", writeGroup.Name, readGroup.Name);
                             Log<Severity::Warn>("From: {} -> To: SAMPLED", VulkanUtils::TextureUsageToString(writeDesc.Usage)); //TODO: Remove
-                            readGroup.BarriersBeforeGroup.push_back({ write, ImageUsage::SAMPLED });
-                            barrierAdded.insert(write);
+#endif
                         }
                     }
                 }
@@ -212,10 +222,17 @@ namespace Surge
     ///////////
     void RenderGraph::OnImGuiRender()
     {
+        if(!mImGuiEnabled)
+        {
+            Log<Severity::Warn>("RenderGraph::OnImGuiRender() called but ImGui is disabled. Enable ImGui in ClientOptions to use Dear ImGui");
+            return;
+        }
+
+        // Client ImGui callbacks
         for(auto& callback : mImGuiRenderCallbacks)
             callback();
 
-        if(!mShowImGui)
+        if(!mShowInternalImGui)
             return;
 
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];

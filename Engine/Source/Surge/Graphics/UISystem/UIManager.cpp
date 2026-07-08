@@ -13,11 +13,13 @@ namespace Surge::UI
             mHoveredWidget->OnMouseExit();
             mHoveredWidget = nullptr;
         }
-
         if(mPressedWidget)
             mPressedWidget = nullptr;
 
         if (mRootWidget)
+        {
+            mRootWidget->Destroy();
             mRootWidget = nullptr;
+        }
     }
 }

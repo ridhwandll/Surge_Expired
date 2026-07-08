@@ -4,6 +4,7 @@
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Vector.hpp"
 #include "Surge/Core/String.hpp"
+#include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RenderGraph/FrameBlackboard.hpp"
 
 #include <glm/vec2.hpp>
@@ -84,6 +85,7 @@ namespace Surge::UI
 
         virtual void GenerateDrawCommands(FrameBlackboard& blackboard)
         {
+            SURGE_PROFILE_FUNC("Widget::GenerateDrawCommands");
             for(auto& child : mChildren)
                 child->GenerateDrawCommands(blackboard);
         }
@@ -109,6 +111,19 @@ namespace Surge::UI
                 return this;
 
             return nullptr;
+        }
+
+        virtual void Destroy()
+        {
+            mOnClick = nullptr;
+            mOnHoverEnter = nullptr;
+            mOnHoverExit = nullptr;
+
+            for(auto& child : mChildren)
+                child->Destroy();
+
+            mChildren.clear();
+            mParent = nullptr;
         }
 
         virtual void OnMouseEnter() { mIsHovered = true; if(mOnHoverEnter) mOnHoverEnter->Invoke(); }
@@ -168,10 +183,7 @@ namespace Surge::UI
     class Text final : public Widget
     {
     public:
-        Text(const String& text, AssetID fontAsset)
-            : mText(text), mFontAsset(fontAsset) {}
-
-        ~Text();
+        Text(const String& text, AssetID fontAsset);
 
         virtual void GenerateDrawCommands(FrameBlackboard& blackboard) override;
 
@@ -180,7 +192,7 @@ namespace Surge::UI
         void SetTextAlignment(TextAlignment alignment) { mTextAlignment = alignment; }
         void SetTextVAlignment(TextVerticalAlignment alignment) { mTextVerticalAlignment = alignment; }
 
-        AssetID GetFontAssetID() const { return mFontAsset; }
+        Ref<Font> GetFontAsset() const { return mFontAsset; }
         String& GetTextBuffer() { return mText; }
         float GetFontSize() const { return mFontSize; }
         TextAlignment GetTextAlignment() const { return mTextAlignment; }
@@ -191,7 +203,7 @@ namespace Surge::UI
         TextAlignment mTextAlignment = TextAlignment::LEFT;
         TextVerticalAlignment mTextVerticalAlignment = TextVerticalAlignment::CENTER;
         float mFontSize = 18.0f;
-        AssetID mFontAsset;
+        Ref<Font> mFontAsset;
     };
 
     class Button final : public Image
@@ -212,7 +224,15 @@ namespace Surge::UI
             SetTextVAlignment(TextVerticalAlignment::CENTER);
         }
 
-        ~Button();
+        void Destroy() override
+        {
+            if(mTextWidget)
+            {
+                mTextWidget->Destroy();
+                mTextWidget = nullptr;
+            }
+            UI::Widget::Destroy(); // Call base class destroy to clear mChildren
+        }
 
         Ref<Text> GetTextWidget() { return mTextWidget; }
         void SetText(const String& text) { if(mTextWidget) mTextWidget->SetText(text); }

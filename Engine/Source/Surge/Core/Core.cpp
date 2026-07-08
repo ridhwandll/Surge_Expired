@@ -101,7 +101,7 @@ namespace Surge::Core
             GCoreData.SurgeClock.Update();
             GCoreData.SurgeWindow->Update();
 
-            if (GCoreData.SurgeWindow->GetWindowState() == WindowState::Minimized)
+            if (GCoreData.SurgeWindow->GetWindowState() == WindowState::MINIMIZED)
                 continue;
 
             GCoreData.SurgePhysics->Update(GCoreData.SurgeClock.GetSeconds());

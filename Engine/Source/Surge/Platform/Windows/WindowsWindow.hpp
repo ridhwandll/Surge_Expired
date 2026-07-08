@@ -35,7 +35,7 @@ namespace Surge
     private:
         void ApplyFlags();
         String GetWindowTitle() const;
-        static LRESULT CALLBACK WindowProcWithImgui(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+        static LRESULT CALLBACK WindowProcBorderless(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
         static LRESULT CALLBACK WindowProcWithoutImGui(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
     private:

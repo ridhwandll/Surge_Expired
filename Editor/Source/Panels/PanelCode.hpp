@@ -20,7 +20,7 @@ namespace Surge
             case PanelCode::Viewport: return "Viewport";
             case PanelCode::SceneHierarchy: return "Hierarchy";
             case PanelCode::Inspector: return "Inspector";
-            case PanelCode::ContentBrowser: return "ContentBrowser";
+            case PanelCode::ContentBrowser: return "ContentBrowser & AssetRegistry";
             case PanelCode::MaterialEditor: return "MaterialEditor";
             case PanelCode::Export: return "Export";
         }

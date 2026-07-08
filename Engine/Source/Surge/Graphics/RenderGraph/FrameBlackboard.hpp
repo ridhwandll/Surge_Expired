@@ -186,6 +186,7 @@ namespace Surge
         Vector<OutlineSubmitCmd> OutlineList;
 
         // UI
+        bool ShowUI = true;
         Vector<QuadSubmitCmd> UISpriteList;
         Vector<TextSubmitCmd> UITextList;
 

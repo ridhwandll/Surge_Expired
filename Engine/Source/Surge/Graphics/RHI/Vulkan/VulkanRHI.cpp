@@ -93,9 +93,11 @@ namespace Surge
         CreateSwapchainRenderpass();
         CreateSwapchainFramebuffers();
 
-        mImGuiContext.Init(*this);
-        FillStats();
+        if (Core::GetClient()->GetClientOptions().EnableImGui == true)
+            mImGuiContext.Init(*this);
+
         CreateDescriptorPools();
+        FillStats();
     }
 
     void VulkanRHI::WaitIdle() const
@@ -119,7 +121,8 @@ namespace Surge
             vkDestroyDescriptorPool(mDevice, pool, nullptr);
 
         mRenderPassCache.Shutdown(*this);
-        mImGuiContext.Shutdown(*this);
+        if (mImGuiContext.IsInitialized())
+            mImGuiContext.Shutdown(*this);
 
         mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry&) { DestroyDescriptorSet(h); LOG_FORGOT_DELETE("You forgot to destroy a descriptor layout manually!", h); });
         mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry&){ DestroySampler(h); LOG_FORGOT_DELETE("You forgot to destroy a sampler manually!", h); });
@@ -143,7 +146,10 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("VulkanRHI::BeginFrame");
         mStats.Reset();
-        mImGuiContext.BeginFrame();
+
+        if (mImGuiContext.IsInitialized())
+            mImGuiContext.BeginFrame();
+
         VkDevice device = mDevice.GetDevice();
 
         const PerFrame& frame = mFrame.GetCurrentVkFrame();
@@ -290,7 +296,7 @@ namespace Surge
 
         ImageEntry entry = VulkanImage::Create(*this, desc);
 
-        if(desc.GenerateImGuiID)
+        if(desc.GenerateImGuiID && mImGuiContext.IsInitialized())
         {
             SG_ASSERT(desc.Usage & ImageUsage::SAMPLED, "ImageDesc: GenerateImGuiID is true but SAMPLED not set in Usage!");
             entry.ImGuiID = mImGuiContext.AddImage(entry.View);
@@ -315,7 +321,7 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying texture with handle index {0} and generation {1}", h.Index, h.Generation));
 
-        if(entry->Desc.GenerateImGuiID)
+        if(entry->Desc.GenerateImGuiID && mImGuiContext.IsInitialized())
             mImGuiContext.DestroyImage(entry->ImGuiID);
 
         mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
@@ -328,7 +334,7 @@ namespace Surge
         if (!entry)
             return;
 
-        if (entry->Desc.GenerateImGuiID)
+        if (entry->Desc.GenerateImGuiID && mImGuiContext.IsInitialized())
             DestroyImGuiImage(h);
 
         ImageDesc desc = entry->Desc;
@@ -338,7 +344,7 @@ namespace Surge
         mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
 
         *entry = VulkanImage::Create(*this, desc);
-        if (desc.GenerateImGuiID)
+        if (desc.GenerateImGuiID && mImGuiContext.IsInitialized())
             entry->ImGuiID = mImGuiContext.AddImage(entry->View);
     }
 
@@ -697,7 +703,9 @@ namespace Surge
     void VulkanRHI::CmdEndSwapchainRenderpass(const FrameContext& ctx)
     {
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
-        mImGuiContext.EndFrame(cmd);
+        if (mImGuiContext.IsInitialized())
+            mImGuiContext.EndFrame(cmd);
+
         vkCmdEndRenderPass(cmd);
     }
 
@@ -787,6 +795,12 @@ namespace Surge
 
     ImTextureID VulkanRHI::AddImGuiImage(ImageHandle h)
     {
+        if (!mImGuiContext.IsInitialized())
+        {
+            Log<Severity::Warn>("VulkanRHI::AddImGuiImage: ImGui context not initialized, enable ImGui in Surge::ClientOptions while creating the Client");
+            return 0;
+        }
+
         ImageEntry* entry = mTexturePool.Get(h);
         SG_ASSERT(entry, "AddImGuiImage: invalid TextureHandle");
 
@@ -795,17 +809,27 @@ namespace Surge
 
     ImTextureID VulkanRHI::GetImGuiImage(ImageHandle h)
     {
+        if (!mImGuiContext.IsInitialized())
+        {
+            Log<Severity::Warn>("VulkanRHI::GetImGuiImage: ImGui context not initialized, enable ImGui in Surge::ClientOptions while creating the Client");
+            return 0;
+        }
         ImageEntry* entry = mTexturePool.Get(h);
-        SG_ASSERT(entry, "GetImGuiImage: invalid TextureHandle");
-        SG_ASSERT(entry->Desc.GenerateImGuiID, "GetImGuiImage: Texture was not created with GenerateImGuiID flag!");
+        SG_ASSERT(entry, "VulkanRHI::GetImGuiImage: invalid TextureHandle");
+        SG_ASSERT(entry->Desc.GenerateImGuiID, "VulkanRHI::GetImGuiImage: Texture was not created with GenerateImGuiID flag!");
         return entry->ImGuiID;
     }
 
     void VulkanRHI::DestroyImGuiImage(ImageHandle h)
     {
+        if (!mImGuiContext.IsInitialized())
+        {
+            Log<Severity::Warn>("VulkanRHI::DestroyImGuiImage: ImGui context not initialized, enable ImGui in Surge::ClientOptions while creating the Client");
+            return;
+        }
         ImageEntry* entry = mTexturePool.Get(h);
-        SG_ASSERT(entry, "DestroyImGuiImage: invalid TextureHandle");
-        SG_ASSERT(entry->Desc.GenerateImGuiID, "DestroyImGuiImage: Texture was not created with GenerateImGuiID flag!");
+        SG_ASSERT(entry, "VulkanRHI::DestroyImGuiImage: invalid TextureHandle");
+        SG_ASSERT(entry->Desc.GenerateImGuiID, "VulkanRHI::DestroyImGuiImage: Texture was not created with GenerateImGuiID flag!");
         mImGuiContext.DestroyImage(entry->ImGuiID);
     }
 

@@ -43,7 +43,7 @@ namespace Surge
         cmd.Transform = transform;
         cmd.Text = mText;
         cmd.Color = mColor;
-        cmd.FontAsset = Core::GetAssetManager()->Load<Font>(mFontAsset).Raw();
+        cmd.FontAsset = mFontAsset.Raw();
         cmd.Billboard = false;
         cmd.Alignment = mTextAlignment;
         cmd.VerticalAlignment = mTextVerticalAlignment;
@@ -53,16 +53,10 @@ namespace Surge
         Widget::GenerateDrawCommands(blackboard);
     }
 
-    UI::Text::~Text()
+    UI::Text::Text(const String& text, AssetID fontAsset)
+        : mText(text)
     {
-        if (Core::GetAssetManager()->Unload(mFontAsset))
-            Log<Severity::Info>("UI::Text::~Text(): Font asset unloaded successfully.");
+        mFontAsset = Core::GetAssetManager()->Load<Font>(fontAsset);
+        //Log<Severity::Info>("[UI::Text::Constructor] Font Ref: {}", mFontAsset->GetRefCount());
     }
-
-    UI::Button::~Button()
-    {
-        if (Core::GetAssetManager()->Unload(mTextWidget->GetFontAssetID()))
-            Log<Severity::Info>("UI::Button::~Button(): Font asset unloaded successfully.");
-    }
-
 }

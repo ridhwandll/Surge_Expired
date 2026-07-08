@@ -5,6 +5,7 @@
 
 namespace Surge
 {
+    static Uint sActiveDescriptorSets = 0;
 
     DescriptorSetEntry VulkanDescriptorSet::Create(const VulkanRHI& rhi, const PipelineEntry* pipeline, Uint setNumber, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
     {
@@ -32,6 +33,8 @@ namespace Surge
             SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)entry.Sets[i], name);
         }
 
+        sActiveDescriptorSets++;
+        //Log<Severity::Info>("VulkanDescriptorSet::Create: Active descriptor sets: {0}", sActiveDescriptorSets);
         return entry;
     }
 
@@ -119,6 +122,8 @@ namespace Surge
             vkFreeDescriptorSets(device, pool, 1, &entry.Sets[index]);
             entry.Sets[index] = VK_NULL_HANDLE;
         }
+        sActiveDescriptorSets--;
+        //Log<Severity::Trace>("VulkanDescriptorSet::Destroy: Active descriptor sets remaining: {0}", sActiveDescriptorSets);
     }
 
 }

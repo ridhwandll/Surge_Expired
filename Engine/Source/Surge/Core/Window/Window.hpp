@@ -9,24 +9,23 @@ namespace Surge
 {
     enum class WindowFlags : Uint
     {
-        // TODO: Add more flags
-        Minimized = BIT(1),
-        Maximized = BIT(2),
-        CreateDefault = BIT(3),
-        NoTitlebar = BIT(4)
+        MINIMIZED = BIT(1),
+        MAXIMIZED = BIT(2),
+        DEFAULT = BIT(3),
+        NO_TITLEBAR = BIT(4) // Only works when ImGui is enabled, otherwise it will be ignored
     };
     MAKE_BIT_ENUM(WindowFlags, Uint);
 
     enum class WindowState
     {
-        Normal = 0,
-        Minimized
+        NORMAL = 0,
+        MINIMIZED
     };
 
     struct WindowDesc
     {
-        WindowDesc(Uint width, Uint height, const String& title, WindowFlags flags = WindowFlags::CreateDefault) : Width(width), Height(height), Title(title), Flags(flags) {}
-        WindowDesc() : Width(1280), Height(720), Title("Surge Window"), Flags(WindowFlags::CreateDefault) {}
+        WindowDesc(Uint width, Uint height, const String& title, WindowFlags flags = WindowFlags::DEFAULT) : Width(width), Height(height), Title(title), Flags(flags) {}
+        WindowDesc() : Width(1280), Height(720), Title("Surge Window"), Flags(WindowFlags::DEFAULT) {}
         ~WindowDesc() = default;
 
         Uint Width;

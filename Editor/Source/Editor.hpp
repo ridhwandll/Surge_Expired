@@ -23,8 +23,8 @@ namespace Surge
         virtual void OnEvent(Event& e) override;
         virtual void OnShutdown() override;
 
-        // Editor specific
         bool IsPlaying() const { return (bool)mRuntimeScene; }
+        void ShowTitlebar(bool show) { mShowTitlebar = show; }
         void OnRuntimeStart();
         void OnRuntimeEnd();
 
@@ -44,6 +44,7 @@ namespace Surge
         void DrawCustomTitlebar(const char* title, float titleBarHeight, bool showMenuItems = true);
         void RenderEditorSettings();
     private:
+        bool mShowTitlebar = true;
         bool mShowAxes = true;
         ImageHandle mEngineLogo;
         ImageHandle mMinimize;

@@ -54,7 +54,7 @@ namespace Surge
         void OnWindowResize(Uint width, Uint height);
         void ForceResize(Uint width, Uint height);
 
-        void ShowInternalImGui(bool show) { mShowImGui = show; }
+        void ShowInternalImGui(bool show) { mShowInternalImGui = show; }
 
         // Destroys all passses and registry resources
         void Shutdown();
@@ -69,7 +69,7 @@ namespace Surge
             return raw;
         }
 
-        void AddImGuiRenderCallback(std::function<void()> callback) { if(callback) { mImGuiRenderCallbacks.push_back(std::move(callback)); } }
+        void AddImGuiRenderCallback(std::function<void()> callback);
 
         FrameBlackboard& GetBlackboard() { return mBlackboard; }
         const FrameBlackboard& GetBlackboard() const { return mBlackboard; }
@@ -78,7 +78,8 @@ namespace Surge
         void SortByDependencies(Vector<RenderPass*>& passes); // Topological sort within a group based on ImageReads/ImageWrites
         void DeriveBarrierBetweenExecutionGroups(ExecutionGroup& writeGroup, ExecutionGroup& readGroup);
     private:
-        bool mShowImGui = true;
+        bool mImGuiEnabled = false;
+        bool mShowInternalImGui = true;
         Vector<Scope<RenderPass>> mPasses;
 
         Vector<std::function<void()>> mImGuiRenderCallbacks;
