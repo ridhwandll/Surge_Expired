@@ -102,6 +102,7 @@ namespace Surge
         SpriteRendererComponent(const glm::vec3& color, float alpha)
             : Color(glm::vec4(color, alpha)){}
 
+        bool Active = true;
         glm::vec4 Color;
         bool Billboard = false;
         Ref<Asset> TextureAsset = nullptr;
@@ -115,6 +116,7 @@ namespace Surge
         CameraComponent(const RuntimeCamera& cam, bool primary, bool fixedAspectRatio)
             : Camera(cam), Primary(primary), FixedAspectRatio(fixedAspectRatio) {}
 
+        bool Active = true;
         RuntimeCamera Camera;
         bool Primary = true;
         bool FixedAspectRatio = false;
@@ -124,6 +126,7 @@ namespace Surge
 
     struct MeshComponent
     {
+        bool Active = true;
         Ref<Asset> MeshAsset = nullptr;
         bool DropShadow = true;
         SURGE_REFLECTION_ENABLE;
@@ -135,6 +138,7 @@ namespace Surge
         LightComponent(LightType type, const glm::vec3& color, float intensity, float radius, float falloff)
             : Color(color), Intensity(intensity), Radius(radius), Falloff(falloff), Type(type) {}
 
+        bool Active = true;
         glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
         float Intensity = 1.0f;
         float Radius = 3.0f;
@@ -145,6 +149,7 @@ namespace Surge
 
     struct EnvironmentComponent
     {
+        bool Active = true;
         float Elevation = 30.0f; // In degrees
         float Azimuth = 0.0f;   // In degrees
         float Turbidity = 2.0f;
@@ -164,6 +169,7 @@ namespace Surge
 
     struct RigidbodyComponent
     {
+        bool Active = true;
         RigidBodyID RuntimeBodyID; // Jolt's internal handle under the hood
         RigidbodyType Type = RigidbodyType::DYNAMIC;
         float Mass = 1.0f;
@@ -186,6 +192,7 @@ namespace Surge
 
     struct BoxColliderComponent
     {
+        bool Active = true;
         bool ShowCollider = true;
         glm::vec3 HalfExtents = { 0.5f, 0.5f, 0.5f }; // A 1x1x1 meter cube
         SURGE_REFLECTION_ENABLE;
@@ -193,6 +200,7 @@ namespace Surge
 
     struct SphereColliderComponent
     {
+        bool Active = true;
         bool ShowCollider = true;
         float Radius = 0.5f;
         SURGE_REFLECTION_ENABLE;
@@ -200,6 +208,7 @@ namespace Surge
 
     struct CapsuleColliderComponent
     {
+        bool Active = true;
         bool ShowCollider = true;
         float Height = 1.0f;
         float Radius = 0.25f;
@@ -208,6 +217,7 @@ namespace Surge
 
     struct CylinderColliderComponent
     {
+        bool Active = true;
         bool ShowCollider = true;
         float Height = 1.0f;
         float Radius = 0.5f;
@@ -216,6 +226,7 @@ namespace Surge
 
     struct ConvexColliderComponent
     {
+        bool Active = true;
         glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
         glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f }; // In degrees
         // Uses the entity's MeshComponent to generate the hull
@@ -229,6 +240,7 @@ namespace Surge
 
     struct MeshColliderComponent
     {
+        bool Active = true;
         glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
         glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f };
         SURGE_REFLECTION_ENABLE;
@@ -236,6 +248,7 @@ namespace Surge
 
     struct ScriptComponent
     {
+        bool Active = true;
         Ref<Asset> ScriptAsset = nullptr;
         bool IsInstantiated = false;
         SURGE_REFLECTION_ENABLE;
@@ -243,6 +256,7 @@ namespace Surge
 
     struct TextComponent
     {
+        bool Active = true;
         String Text;
         glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
@@ -268,6 +282,7 @@ namespace Surge
 
     struct UICanvasComponent
     {
+        bool Active = true;
         bool ShowCanvas = true;
         Ref<Asset> ScriptAsset = nullptr;
         bool IsInstantiated = false;

@@ -139,4 +139,105 @@ namespace Surge
         return true;
     }
 
+
+    struct ConfirmationState
+    {
+        bool IsOpen = false;
+        String Title;
+        String Message;
+        std::function<void()> OnConfirm;
+        std::function<void()> OnCancel;
+    };
+    static ConfirmationState sConfirmState;
+
+    void ImGuiAux::ShowConfirmationBox(const String& title, const String& message, std::function<void()> onConfirm, std::function<void()> onCancel)
+    {
+        sConfirmState.Title = title;
+        sConfirmState.Message = message;
+        sConfirmState.OnConfirm = onConfirm;
+        sConfirmState.OnCancel = onCancel;
+        sConfirmState.IsOpen = true;
+    }
+
+    void ImGuiAux::RenderConfirmationBox()
+    {
+        if(sConfirmState.IsOpen)
+        {
+            ImGui::OpenPopup(sConfirmState.Title.c_str());
+            sConfirmState.IsOpen = false;
+        }
+
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(400, 0), ImGuiCond_Appearing);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 3.0f);
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
+
+        bool popupOpen = true;
+        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+
+        ImGui::PushFont(boldFont);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Gold);
+        if(ImGui::BeginPopupModal(sConfirmState.Title.c_str(), &popupOpen, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::PopFont();
+            ImGui::PopStyleColor();
+
+            ImGui::TextWrapped("%s", sConfirmState.Message.c_str());
+            ImGui::Dummy(ImVec2(0, 20));
+
+            float spacing = ImGui::GetStyle().ItemSpacing.x;
+            float availableWidth = ImGui::GetContentRegionAvail().x;
+
+            // Split the width in half + spacing
+            float buttonWidth = (availableWidth - spacing) * 0.5f;
+
+            // CANCEL BUTTON
+            ImGui::PushFont(boldFont);
+            if(ImGui::Button("CANCEL", ImVec2(buttonWidth, 30)))
+            {
+                if(sConfirmState.OnCancel)
+                    sConfirmState.OnCancel();
+
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+
+            // CONFIRM BUTTON
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.25f, 0.25f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.55f, 0.10f, 0.10f, 1.0f));
+
+            if(ImGui::Button("CONFIRM", ImVec2(buttonWidth, 30)))
+            {
+                if(sConfirmState.OnConfirm)
+                    sConfirmState.OnConfirm();
+
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::PopFont();
+
+            ImGui::EndPopup();
+        }
+        else
+        {
+            ImGui::PopFont();
+            ImGui::PopStyleColor();
+        }
+
+        // User clicked the "X"
+        if(!popupOpen)
+        {
+            if(sConfirmState.OnCancel)
+                sConfirmState.OnCancel();
+        }
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
+    }
+
 } // namespace Surge

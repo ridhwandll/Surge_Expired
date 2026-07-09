@@ -170,8 +170,13 @@ namespace Surge
         return modified;
     }
 
-    template <typename XComponent, typename Func>
-    static void DrawComponent(Entity& entity, const String& name, Func&& function, bool isRemoveable = true)
+    template <typename, typename = void>
+    constexpr bool HasActiveProperty_v = false;
+    template <typename T>
+    constexpr bool HasActiveProperty_v<T, std::void_t<decltype(std::declval<T>().Active)>> = true;
+
+    template <typename XComponent, bool IsRemoveable = true, typename Func>
+    static void DrawComponent(Entity& entity, const String& name, Func&& function)
     {
         const int64_t& hash = SurgeReflect::GetReflection<XComponent>()->GetHash();
         ImGui::PushID(static_cast<int>(hash));
@@ -179,18 +184,32 @@ namespace Surge
         ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2 { 4, 4 });
-        float lineHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
+        const float lineHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
 
         ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
 
-        bool open = ImGui::TreeNodeEx((void*)hash, treeNodeFlags, "%s", name.c_str());
-        ImGui::PopStyleVar();
+        const bool open = ImGui::TreeNodeEx((void*)hash, treeNodeFlags, "%s", name.c_str());
 
+        XComponent& component = entity.GetComponent<XComponent>();
         bool removeComponent = false;
-        if(isRemoveable)
+
+        const float optionsBtnSize = lineHeight;
+        const float checkboxSize = ImGui::GetFrameHeight();
+        const float spacing = 0;
+
+        const float optionsPos = contentRegionAvailable.x - optionsBtnSize * 0.5f;
+        const float checkboxPos = optionsPos - checkboxSize - spacing;
+
+        if constexpr (HasActiveProperty_v<XComponent>)
         {
-            // Right align the options gear/button
-            ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
+            // If it's not removeable, we don't have the options button, so move checkbox to the far right
+            ImGui::SameLine(IsRemoveable ? checkboxPos : optionsPos);
+            ImGui::Checkbox("##ActiveToggle", &component.Active);
+        }
+
+        if constexpr (IsRemoveable)
+        {
+            ImGui::SameLine(optionsPos);
             if(ImGui::Button(".../", ImVec2 { lineHeight, lineHeight }))
                 ImGui::OpenPopup("ComponentSettings");
 
@@ -211,12 +230,11 @@ namespace Surge
             else
                 ImGuiAux::StyledPopupVars::Pop();
         }
+        ImGui::PopStyleVar();
 
         if(open)
         {
             ImGui::Dummy(ImVec2(0.0f, 2.0f));
-
-            // SizingStretchProp keeps property columns consistently sized
             if(ImGui::BeginTable("##ComponentTable", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp))
             {
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 100.0f);
@@ -230,8 +248,11 @@ namespace Surge
             ImGui::TreePop();
         }
 
-        if(removeComponent)
-            Surge::Core::AddFrameEndCallback([entity]() mutable { entity.RemoveComponent<XComponent>(); });
+        if constexpr (IsRemoveable)
+        {
+            if(removeComponent)
+                Core::AddFrameEndCallback([entity]() mutable { entity.RemoveComponent<XComponent>(); });
+        }
 
         ImGui::PopID();
     }
@@ -365,7 +386,7 @@ namespace Surge
         if(entity.HasComponent<TransformComponent>())
         {
             TransformComponent& component = entity.GetComponent<TransformComponent>();
-            DrawComponent<TransformComponent>(
+            DrawComponent<TransformComponent, false>(
                 entity, "Transform", [&component]() {
                     if(DrawVec3Control("Position", component.Position))
                         component.MarkDirty();
@@ -374,7 +395,7 @@ namespace Surge
                     if(DrawVec3Control("Scale", component.Scale, 1.0f))
                         component.MarkDirty();
 
-                }, false);
+                });
         }
 
         if(entity.HasComponent<CameraComponent>())
@@ -489,7 +510,7 @@ namespace Surge
 
                             ImGui::TableSetColumnIndex(1);
                             ImGui::PushItemWidth(-FLT_MIN);
-
+                            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
                             if(material)
                             {
                                 const String& matName = material->GetName();
@@ -505,6 +526,7 @@ namespace Surge
                                 ImGuiAux::ScopedBoldFont font;
                                 ImGui::TextColored(ImGuiAux::Colors::Red, "MISSING MATERIAL");
                             }
+                            ImGui::PopStyleVar();
 
                             if(ImGui::BeginDragDropTarget())
                             {

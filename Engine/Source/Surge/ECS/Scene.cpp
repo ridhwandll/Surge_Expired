@@ -90,6 +90,9 @@ namespace Surge
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
             {
+                if(!sprite.Active)
+                    continue;
+
                 ImageHandle textureHandle = sprite.TextureAsset ? sprite.TextureAsset.As<Texture2D>()->GetRHIImage() : ImageHandle::Invalid();
                 renderer->SubmitQuad(transform.GetTransform(), sprite.Color, sprite.Billboard, textureHandle);
             }
@@ -97,6 +100,9 @@ namespace Surge
             auto txtView = mRegistry.view<TextComponent, TransformComponent>();
             for(const auto& [entity, txtCmp, transform] : txtView.each())
             {
+                if (!txtCmp.Active)
+                    continue;
+
                 if (txtCmp.FontAsset)
                 {
                     Ref<Font> font = txtCmp.FontAsset.As<Font>();
@@ -109,6 +115,9 @@ namespace Surge
             auto view = mRegistry.view<LightComponent, TransformComponent>();
             for(const auto& [entity, light, transform] : view.each())
             {
+                if(!light.Active)
+                    continue;
+
                 Light gpuLight {};
                 gpuLight.Color = light.Color;
                 gpuLight.Intensity = light.Intensity;
@@ -137,6 +146,9 @@ namespace Surge
             auto view = mRegistry.view<EnvironmentComponent>();
             for(const auto& [entity, env] : view.each())
             {
+                if(!env.Active)
+                    continue;
+
                 Environnment e {};
                 e.Elevation = env.Elevation;
                 e.Azimuth = env.Azimuth;
@@ -156,6 +168,9 @@ namespace Surge
             auto meshGroup = mRegistry.group<MeshComponent>(entt::get<TransformComponent>);
             for(const auto& [entity, meshComponent, transformComponent] : meshGroup.each())
             {
+                if(!meshComponent.Active)
+                    continue;
+
                 if(meshComponent.MeshAsset)
                 {
                     Ref<Mesh> mesh = meshComponent.MeshAsset.As<Mesh>();
@@ -552,7 +567,7 @@ namespace Surge
         for (auto& entity : view)
         {
             const auto& [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
-            if (camera.Primary)
+            if (camera.Primary && camera.Active)
             {
                 result = {&camera.Camera, transform.GetTransform()};
                 break;
@@ -605,7 +620,7 @@ namespace Surge
                 for(auto entityID : view)
                 {
                     auto& scriptComp = view.get<ScriptComponent>(entityID);
-                    if(!scriptComp.ScriptAsset)
+                    if(!scriptComp.ScriptAsset || !scriptComp.Active)
                         continue;
 
                     Ref<Script> script = scriptComp.ScriptAsset.As<Script>();
@@ -625,10 +640,9 @@ namespace Surge
                 for(auto entityID : view)
                 {
                     auto& uiComp = view.get<UICanvasComponent>(entityID);
-                    if(!uiComp.ScriptAsset)
+                    if(!uiComp.ScriptAsset || !uiComp.Active)
                         continue;
 
-                    
                     Core::GetRenderer()->ShowUI(uiComp.ShowCanvas); // (Rid) This should be here?
 
                     Ref<Script> script = uiComp.ScriptAsset.As<Script>();
@@ -659,7 +673,7 @@ namespace Surge
             auto view = mRegistry.view<TransformComponent, RigidbodyComponent>();
             for(auto [entity, transformComp, rb] : view.each())
             {
-                if(physics->IsInValid(rb.RuntimeBodyID) || !physics->IsActive(rb.RuntimeBodyID))
+                if(physics->IsInValid(rb.RuntimeBodyID) || !physics->IsActive(rb.RuntimeBodyID) || !rb.Active)
                     continue;
 
                 transformComp.Position = physics->GetPosition(rb.RuntimeBodyID);

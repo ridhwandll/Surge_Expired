@@ -315,7 +315,7 @@ namespace Surge::UI
             else if(mIsHovered) mColor = HoverColor;
             else                mColor = NormalColor;
 
-            // Calls GenerateDrawCommands on mTextWidget(child) recursively so it draws on top!
+            // Calls GenerateDrawCommands on mTextWidget(child) recursively so it draws on top
             Image::GenerateDrawCommands(blackboard);
         }
 

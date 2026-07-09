@@ -63,7 +63,7 @@ namespace Surge
         desc.Raster.Polygon = PolygonMode::FILL;
         desc.Raster.Cull = CullMode::FRONT; //Cull front to reduce Peter panning
 
-        desc.Raster.DepthBiasEnable = false;
+        desc.Raster.DepthBiasEnable = true;
         desc.Raster.DepthBiasConstantFactor = 1.25f;
         desc.Raster.DepthBiasSlopeFactor = 1.75f;
         desc.Raster.DepthBiasClamp = 0.0f;
@@ -111,6 +111,11 @@ namespace Surge
             mRHI->CmdBeginRenderPass(ctx, mShadowPassFramebuffer[cascade]);
             mRHI->CmdBindPipeline(ctx, mShadowPipelines[cascade]);
 
+            const float cascadeScale = 1.0f / (static_cast<float>(cascade) + 1.0f);
+            const float currentConstant = mDepthBiasConstant * cascadeScale;
+            const float currentSlope = mDepthBiasSlope * cascadeScale;
+            mRHI->CmdSetDepthBias(ctx, currentConstant, mDepthBiasClamp, currentSlope);
+
             for(const MeshSubmitCmd& cmd : blackBoard.MeshList)
             {
                 if(!cmd.DropShadow)
@@ -142,6 +147,14 @@ namespace Surge
         ImGui::Separator();
         ImGui::PopFont();
 
+        ImGui::PushFont(boldFont, 20.0f);
+        ImGui::TextUnformatted("Depth Bias");
+        ImGui::Separator();
+        ImGui::PopFont();
+        ImGui::DragFloat("Constant", &mDepthBiasConstant, 0.1f, 0.0f, 100.0f, "%.2f");
+        ImGui::DragFloat("Clamp", &mDepthBiasClamp, 0.1f, 0.0f, 100.0f, "%.2f");
+        ImGui::DragFloat("Slope", &mDepthBiasSlope, 0.1f, 0.0f, 100.0f, "%.2f");
+        ImGui::Separator();
         ImGui::Checkbox("Visualize Cascades", &blackBoard.ShadowSettings_.ShowCascades);
         ImGui::SliderInt("Cascade Count", &blackBoard.ShadowSettings_.CascadeCount, 2, MAX_SHADOW_CASCADE_COUNT);
         ImGui::SliderFloat("Cascade Split Lambda", &blackBoard.ShadowSettings_.CascadeSplitLambda, 0.0f, 1.0f, "%.3f");

@@ -43,5 +43,8 @@ namespace Surge
         std::array<float, MAX_SHADOW_CASCADE_COUNT> mCascadeSplits = {};
         std::array<float, MAX_SHADOW_CASCADE_COUNT> mCascadeEnds = {};
         float mShadowMapResolution;
+        float mDepthBiasConstant = 1.25f;
+        float mDepthBiasClamp = 0.0f;
+        float mDepthBiasSlope = 1.75f;
     };
 }

@@ -671,6 +671,11 @@ namespace Surge
         VulkanImage::TransitionLayout(cmd, *entry, vkLayout);
     }
 
+    void VulkanRHI::CmdSetDepthBias(const FrameContext& ctx, float constantFactor, float clamp, float slopeFactor)
+    {
+        vkCmdSetDepthBias(mFrame.GetFrame(ctx.FrameIndex).CmdBuffer, constantFactor, clamp, slopeFactor);
+    }
+
     void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
     {
         // Set clear color values

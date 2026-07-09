@@ -3,6 +3,7 @@
 #include "Surge/Core/Defines.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <functional>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <cstdarg>
@@ -115,7 +116,9 @@ namespace Surge::ImGuiAux
     void DockSpace(float titleBarHeight);
     bool Spinner(const char* label, float radius, float thickness);
     bool PropertyGridHeader(const String& name, bool openByDefault = true, const glm::vec2& size = {4.5f, 4.5f}, bool spacing = false);
+    void ShowConfirmationBox(const String& title, const String& message, std::function<void()> onConfirm, std::function<void()> onCancel = nullptr);
 
+    void RenderConfirmationBox();
     void TextCentered(const char* text);
     bool ButtonCentered(const char* title);
 

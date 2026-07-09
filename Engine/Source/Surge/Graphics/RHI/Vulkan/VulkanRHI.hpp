@@ -82,7 +82,7 @@ namespace Surge
         void CmdBlitToSwapchain(const FrameContext& ctx, ImageHandle srcHandle);
         void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout);
         void CmdTransitionImageLayout(VkCommandBuffer cmd, ImageHandle h, ImageUsage newLayout);
-
+        void CmdSetDepthBias(const FrameContext& ctx, float constantFactor, float clamp, float slopeFactor);
         void CmdBeginSwapchainRenderpass(const FrameContext& ctx);
         void CmdEndSwapchainRenderpass(const FrameContext& ctx);
 

@@ -11,7 +11,8 @@
 
 namespace Surge
 {
-    namespace LogColor {
+    namespace LogColor
+    {
         constexpr const char* Reset = "\x1b[0m";
         constexpr const char* Red = "\x1b[31m";
         constexpr const char* Green = "\x1b[32m";

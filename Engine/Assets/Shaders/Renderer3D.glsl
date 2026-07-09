@@ -110,7 +110,7 @@ float SampleShadowMap(int cascadeIndex, vec3 texCoords)
 float SampleShadow(int cascade, vec3 shadowCoord)
 {
     vec2 uv = shadowCoord.xy * 0.5 + 0.5;
-    float depth = shadowCoord.z;
+    float depth = shadowCoord.z; // (Rid) No shadow bias, we use hardware bias
 
     vec2 texelSize = vec2(1.0 / 2048.0);
     float shadow = 0.0;
@@ -119,6 +119,7 @@ float SampleShadow(int cascade, vec3 shadowCoord)
 
     return shadow / 4.0;
 }
+
 //float SampleShadow(int cascade, vec3 shadowCoord) // Hard Shadows
 //{
 //    vec2 uv = shadowCoord.xy * 0.5 + 0.5;

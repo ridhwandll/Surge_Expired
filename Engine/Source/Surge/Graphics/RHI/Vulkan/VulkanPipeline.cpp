@@ -222,11 +222,14 @@ namespace Surge
         viewport.viewportCount = 1;
         viewport.scissorCount = 1;
 
-        std::array<VkDynamicState, 2> dynamics = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        Vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        if (desc.Raster.DepthBiasEnable)
+            dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
+
         VkPipelineDynamicStateCreateInfo dynamic = {};
         dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        dynamic.dynamicStateCount = dynamics.size();
-        dynamic.pDynamicStates = dynamics.data();
+        dynamic.dynamicStateCount = dynamicStates.size();
+        dynamic.pDynamicStates = dynamicStates.data();
 
         // No MSAA on mobile
         VkPipelineMultisampleStateCreateInfo multisample = {};

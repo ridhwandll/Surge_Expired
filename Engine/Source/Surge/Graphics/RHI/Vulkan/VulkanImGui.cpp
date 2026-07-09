@@ -261,14 +261,14 @@ namespace Surge
     {
         auto colorFromBytes = [](const uint8_t r, const uint8_t g, const uint8_t b) { return ImVec4(static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f, static_cast<float>(b) / 255.0f, 1.0f); };
         auto colorFromBytesS = [&colorFromBytes](const uint8_t s) { return colorFromBytes(s, s, s); };
-        ImVec4 themeColor = colorFromBytesS(30);
+        ImVec4 themeColor = colorFromBytesS(25);
 
         auto& style = ImGui::GetStyle();
 
         ImVec4* colors = style.Colors;
 
         style.TabRounding = 1.5f;
-        style.FrameRounding = 1.5f;
+        style.FrameRounding = 0.5f;
         //style.FrameBorderSize = 1.0f;
         style.PopupRounding = 3.5f;
         style.ScrollbarSize = 10.0f;
@@ -287,14 +287,14 @@ namespace Surge
         colors[ImGuiCol_CheckMark] = colorFromBytes(10, 200, 10); // Green
 
         // Buttons
-        colors[ImGuiCol_Button] = ImVec4(0.12f, 0.12f, 0.12f, 1.0f);
-        colors[ImGuiCol_ButtonHovered] = ImVec4(0.18f, 0.18f, 0.18f, 1.0f);
-        colors[ImGuiCol_ButtonActive] = ImVec4(0.09f, 0.09f, 0.09f, 1.0f);
+        colors[ImGuiCol_Button] = colorFromBytesS(40);
+        colors[ImGuiCol_ButtonHovered] = colorFromBytesS(120);
+        colors[ImGuiCol_ButtonActive] = colorFromBytesS(10);
         colors[ImGuiCol_SeparatorHovered] = { 0.8f, 0.4f, 0.1f, 1.0f };
         colors[ImGuiCol_SeparatorActive] = { 1.0f, 0.5f, 0.1f, 1.0f };
 
         // Frame
-        colors[ImGuiCol_FrameBg] = colorFromBytesS(21);
+        colors[ImGuiCol_FrameBg] = colorFromBytesS(10);
         colors[ImGuiCol_FrameBgHovered] = colorFromBytesS(35);
         colors[ImGuiCol_FrameBgActive] = colorFromBytesS(80);
 

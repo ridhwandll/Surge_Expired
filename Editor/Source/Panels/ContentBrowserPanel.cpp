@@ -424,6 +424,19 @@ namespace Surge
                                                 Platform::OpenInVSCode("", item.Path_.string());
                                         }
                                     }
+                                    {
+                                        ImGuiAux::ScopedBoldFont bf;
+                                        ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Red);
+                                        if(ImGuiAux::StyledMenuItem("DELETE"))
+                                        {
+                                            String message = std::format("Are you sure you want to delete {}?\nThis action cannot be undone.", item.Filename);
+                                            ImGuiAux::ShowConfirmationBox("WARNING", message, [&]() {
+                                                Filesystem::RemoveFile(item.Path_);
+                                                mNeedsCacheRefresh = true;
+                                             });
+                                        }
+                                        ImGui::PopStyleColor();
+                                    }
 
                                     ImGuiAux::EndStyledPopup();
                                 }

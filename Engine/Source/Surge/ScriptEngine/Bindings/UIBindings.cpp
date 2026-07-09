@@ -7,6 +7,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/UISystem/UIManager.hpp"
 #include "Surge/Graphics/UISystem/UIWidgets.hpp"
+#include "BindingUtils.hpp"
 
 namespace sol
 {
@@ -20,12 +21,6 @@ namespace sol
         static type* get(const actual_type& ptr) { return const_cast<type*>(ptr.get()); }
     };
 }
-
-#define BIND_PROP(COMP, PROP) \
-        sol::property( \
-            [](COMP& c) -> decltype(COMP::PROP) { return c.PROP; }, \
-            [](COMP& c, const decltype(COMP::PROP)& val) { c.PROP = val; } \
-        )
 
 namespace Surge::ScriptBinding
 {
@@ -100,7 +95,7 @@ namespace Surge::ScriptBinding
                                         {
                                             Ref<Texture2D> texture = am->Load<Texture2D>(id);
                                             if(texture) handle = texture->GetRHIImage();
-                                            else        Log<Severity::Warn>("[UIBindings] Lua: UIImage: Failed to load texture at path {}", textureRelPath);
+                                            else        Log<Severity::Warn>("[UIBindings.cpp] Lua: UIImage: Failed to load texture at path {}", textureRelPath);
                                         }
                                         return Ref<UI::Image>::Create(handle);
                                     }),
@@ -114,7 +109,7 @@ namespace Surge::ScriptBinding
                                        if(id)
                                            return Ref<UI::Text>::Create(text, id);
 
-                                       Log<Severity::Warn>("[UIBindings] Lua: UIText: Failed to load font at path {}", fontRelPath);
+                                       Log<Severity::Warn>("[UIBindings.cpp] Lua: UIText: Failed to load font at path {}", fontRelPath);
                                        return Ref<UI::Text>::Create(text, AssetID::INVALID);
                                    }),
                                    sol::base_classes, sol::bases<UI::Widget>(),
@@ -151,7 +146,7 @@ namespace Surge::ScriptBinding
                                                      if(texture)
                                                          textureId = texture->GetRHIImage();
                                                      else
-                                                         Log<Severity::Warn>("[UIBindings] Lua: UIButton: Failed to load texture at path {}", textureRelPath);
+                                                         Log<Severity::Warn>("[UIBindings.cpp] Lua: UIButton: Failed to load texture at path {}", textureRelPath);
                                                  }
                                              }
                                              {
@@ -159,7 +154,7 @@ namespace Surge::ScriptBinding
                                                  if(id)
                                                      fontID = id;
                                                  else
-                                                     Log<Severity::Warn>("[UIBindings] Lua: UIButton: Failed to load font at path {}", fontRelPath);
+                                                     Log<Severity::Warn>("[UIBindings.cpp] Lua: UIButton: Failed to load font at path {}", fontRelPath);
                                              }
                                              return Ref<UI::Button>::Create(text, fontID, textureId);
                                      }),

@@ -5,6 +5,7 @@
 #include "Surge/ECS/Components.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Physics/Physics.hpp"
+#include "BindingUtils.hpp"
 
 namespace Surge::ScriptBinding
 {
@@ -60,18 +61,6 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<TextComponent>(entityType, "TextC");
         BindComponentToEntity<UICanvasComponent>(entityType, "UICanvasC");
     }
-
-#define BIND_PROP(COMP, PROP) \
-        sol::property( \
-            [](COMP& c) -> decltype(COMP::PROP) { return c.PROP; }, \
-            [](COMP& c, const decltype(COMP::PROP)& val) { c.PROP = val; } \
-        )
-#define STRICT_READ(COMP) \
-        sol::meta_function::index, [](COMP&, sol::stack_object key, sol::this_state s) -> sol::object { \
-            String keyStr = key.is<String>() ? key.as<String>() : "<non-string-key>"; \
-            Log<Severity::Warn>("Script accessed invalid field {} on {}. Returning nil.", keyStr, #COMP); \
-            return sol::make_object(s, sol::lua_nil); \
-        }
 
     void BindComponents(void* luaState)
     {
@@ -130,18 +119,24 @@ namespace Surge::ScriptBinding
         );
 
         // RENDERER
-        lua.new_usertype<SpriteRendererComponent>("SpriteRendererComponent", sol::no_constructor, "Color", BIND_PROP(SpriteRendererComponent, Color), STRICT_READ(SpriteRendererComponent));
+        lua.new_usertype<SpriteRendererComponent>("SpriteRendererComponent", sol::no_constructor, 
+                                                  "Active", BIND_PROP(SpriteRendererComponent, Active),
+                                                  "Color", BIND_PROP(SpriteRendererComponent, Color),
+                                                  STRICT_READ(SpriteRendererComponent));
 
         lua.new_usertype<CameraComponent>("CameraComponent", sol::no_constructor,
+                                          "Active", BIND_PROP(CameraComponent, Active),
                                           "Primary", BIND_PROP(CameraComponent, Primary),
                                           "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio),
                                           STRICT_READ(CameraComponent));
 
         lua.new_usertype<MeshComponent>("MeshComponent", sol::no_constructor,
+                                        "Active", BIND_PROP(MeshComponent, Active),
                                         "DropShadow", BIND_PROP(MeshComponent, DropShadow),
                                         STRICT_READ(MeshComponent));
 
         lua.new_usertype<LightComponent>("LightComponent", sol::no_constructor,
+                                         "Active", BIND_PROP(LightComponent, Active),
                                          "Color", BIND_PROP(LightComponent, Color),
                                          "Intensity", BIND_PROP(LightComponent, Intensity),
                                          "Radius", BIND_PROP(LightComponent, Radius),
@@ -150,6 +145,7 @@ namespace Surge::ScriptBinding
                                          STRICT_READ(LightComponent));
 
         lua.new_usertype<EnvironmentComponent>("EnvironmentComponent", sol::no_constructor,
+                                               "Active", BIND_PROP(EnvironmentComponent, Active),
                                                "Elevation", BIND_PROP(EnvironmentComponent, Elevation),
                                                "Azimuth", BIND_PROP(EnvironmentComponent, Azimuth),
                                                "Turbidity", BIND_PROP(EnvironmentComponent, Turbidity),
@@ -163,6 +159,7 @@ namespace Surge::ScriptBinding
 
         // PHYSICS
         lua.new_usertype<RigidbodyComponent>("RigidbodyComponent", sol::no_constructor,
+                                             "Active", BIND_PROP(RigidbodyComponent, Active),
                                              "Type", BIND_PROP(RigidbodyComponent, Type),
                                              "Mass", BIND_PROP(RigidbodyComponent, Mass),
                                              "IsSensor", BIND_PROP(RigidbodyComponent, IsSensor),
@@ -216,28 +213,33 @@ namespace Surge::ScriptBinding
                                              STRICT_READ(RigidbodyComponent));
 
         lua.new_usertype<BoxColliderComponent>("BoxColliderComponent", sol::no_constructor,
+                                               "Active", BIND_PROP(BoxColliderComponent, Active),
                                                "ShowCollider", BIND_PROP(BoxColliderComponent, ShowCollider),
                                                "HalfExtents", BIND_PROP(BoxColliderComponent, HalfExtents),
                                                STRICT_READ(BoxColliderComponent));
 
         lua.new_usertype<SphereColliderComponent>("SphereColliderComponent", sol::no_constructor,
+                                                  "Active", BIND_PROP(SphereColliderComponent, Active),
                                                   "ShowCollider", BIND_PROP(SphereColliderComponent, ShowCollider),
                                                   "Radius", BIND_PROP(SphereColliderComponent, Radius),
                                                   STRICT_READ(SphereColliderComponent));
 
         lua.new_usertype<CapsuleColliderComponent>("CapsuleColliderComponent", sol::no_constructor,
+                                                   "Active", BIND_PROP(CapsuleColliderComponent, Active),
                                                    "ShowCollider", BIND_PROP(CapsuleColliderComponent, ShowCollider),
                                                    "Height", BIND_PROP(CapsuleColliderComponent, Height),
                                                    "Radius", BIND_PROP(CapsuleColliderComponent, Radius),
                                                    STRICT_READ(CapsuleColliderComponent));
 
         lua.new_usertype<CylinderColliderComponent>("CylinderColliderComponent", sol::no_constructor,
+                                                    "Active", BIND_PROP(CylinderColliderComponent, Active),
                                                     "ShowCollider", BIND_PROP(CylinderColliderComponent, ShowCollider),
                                                     "Height", BIND_PROP(CylinderColliderComponent, Height),
                                                     "Radius", BIND_PROP(CylinderColliderComponent, Radius),
                                                     STRICT_READ(CylinderColliderComponent));
 
         lua.new_usertype<ConvexColliderComponent>("ConvexColliderComponent", sol::no_constructor,
+                                                  "Active", BIND_PROP(ConvexColliderComponent, Active),
                                                   "ShowCollider", BIND_PROP(ConvexColliderComponent, ShowCollider),
                                                   "LocalOffset", sol::property(
                                                       [](ConvexColliderComponent& c) -> glm::vec3 { return c.LocalOffset; },
@@ -250,15 +252,18 @@ namespace Surge::ScriptBinding
                                                   STRICT_READ(ConvexColliderComponent));
 
         lua.new_usertype<MeshColliderComponent>("MeshColliderComponent", sol::no_constructor,
+                                                "Active", BIND_PROP(MeshColliderComponent, Active),
                                                 "LocalOffset", BIND_PROP(MeshColliderComponent, LocalOffset),
                                                 "LocalRotation", BIND_PROP(MeshColliderComponent, LocalRotation),
                                                 STRICT_READ(MeshColliderComponent));
 
         lua.new_usertype<ScriptComponent>("ScriptComponent", sol::no_constructor,
+                                          "Active", BIND_PROP(ScriptComponent, Active),
                                           "ScriptAsset", BIND_PROP(ScriptComponent, ScriptAsset),
                                           STRICT_READ(ScriptComponent));
 
         lua.new_usertype<TextComponent>("TextComponent", sol::no_constructor,
+                                        "Active", BIND_PROP(TextComponent, Active),
                                         "Text", BIND_PROP(TextComponent, Text),
                                         "Color", BIND_PROP(TextComponent, Color),
                                         "MaxWidth", BIND_PROP(TextComponent, MaxWidth),
@@ -272,6 +277,7 @@ namespace Surge::ScriptBinding
                                         STRICT_READ(TextComponent));
 
         lua.new_usertype<UICanvasComponent>("UICanvasComponent", sol::no_constructor,
+                                        "Active", BIND_PROP(UICanvasComponent, Active),
                                         "ShowCanvas", BIND_PROP(UICanvasComponent, ShowCanvas),
                                         "ScriptAsset", BIND_PROP(UICanvasComponent, ScriptAsset),
                                         STRICT_READ(UICanvasComponent));

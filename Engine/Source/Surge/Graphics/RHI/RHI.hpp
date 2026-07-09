@@ -82,7 +82,7 @@ namespace Surge
         void CmdBeginRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdBeginRenderPass(ctx, h); }
         void CmdEndRenderPass(const FrameContext& ctx, FramebufferHandle h) { mBackendRHI.CmdEndRenderPass(ctx, h); }
         void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
-
+        void CmdSetDepthBias(const FrameContext& ctx, float constantFactor, float clamp, float slopeFactor) { mBackendRHI.CmdSetDepthBias(ctx, constantFactor, clamp, slopeFactor); }
         void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
 
         ImTextureID AddImGuiImage(ImageHandle h) { return mBackendRHI.AddImGuiImage(h); }

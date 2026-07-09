@@ -171,6 +171,7 @@ namespace Surge
             DrawCustomTitlebar("Project Browser", projectWindowTitlebarHeight, false);
             mProjectBrowser.Render(projectWindowTitlebarHeight);
         }
+        ImGuiAux::RenderConfirmationBox();
     }
 
     void Editor::DrawCustomTitlebar(const char* title, float titleBarHeight, bool showMenuItems)
