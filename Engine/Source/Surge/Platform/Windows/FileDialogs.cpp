@@ -72,33 +72,43 @@ namespace Surge
 
     String FileDialog::ChooseFolder()
     {
-        TCHAR path[MAX_PATH];
+        String resultPath;
 
-        BROWSEINFO bi = {};
-        bi.lpszTitle = ("Choose Folder");
-        bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_USENEWUI;
-        bi.lpfn = NULL;
-        bi.lParam = NULL;
+        IFileOpenDialog* pFolderDialog = nullptr;
 
-        LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
-        if (pidl != 0)
+        HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL, IID_IFileOpenDialog, (void**)(&pFolderDialog));
+
+        if(SUCCEEDED(hr))
         {
-            // Get the name of the folder and put it in path
-            SHGetPathFromIDList(pidl, path);
-
-            //Free memory used
-            IMalloc* imalloc = 0;
-            if (SUCCEEDED(SHGetMalloc(&imalloc)))
+            DWORD dwOptions;
+            if(SUCCEEDED(pFolderDialog->GetOptions(&dwOptions)))
             {
-                imalloc->Free((void*)pidl);
-                imalloc->Release();
+                pFolderDialog->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
             }
 
-            String result = path;
-            std::replace(result.begin(), result.end(), '\\', '/');
-            return result;
+            HWND hwnd = static_cast<HWND>(Core::GetWindow()->GetNativeWindowHandle());
+            hr = pFolderDialog->Show(hwnd);
+
+            if(SUCCEEDED(hr))
+            {
+                IShellItem* pItem;
+                if(SUCCEEDED(pFolderDialog->GetResult(&pItem)))
+                {
+                    PWSTR pszFilePath;
+                    if(SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
+                    {
+                        std::wstring wPath(pszFilePath);
+                        resultPath = String(wPath.begin(), wPath.end());
+                        std::replace(resultPath.begin(), resultPath.end(), '\\', '/');
+                        CoTaskMemFree(pszFilePath);
+                    }
+                    pItem->Release();
+                }
+            }
+            pFolderDialog->Release();
         }
-        return "";
+
+        return resultPath;
     }
 
 } // namespace Surge

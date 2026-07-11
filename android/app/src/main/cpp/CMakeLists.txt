@@ -143,6 +143,11 @@ add_library(lua_android STATIC ${LUA_SOURCES})
 target_include_directories(lua_android PUBLIC "${VENDOR_ROOT}/lua/src")
 target_compile_options(lua_android PRIVATE -w)
 
+# miniaudio
+file(GLOB MA_SOURCES "${VENDOR_ROOT}/miniaudio/miniaudio.c" "${VENDOR_ROOT}/miniaudio/miniaudio.h")
+add_library(miniaudio_android STATIC ${MA_SOURCES})
+target_compile_options(miniaudio_android PRIVATE -w)
+
 # Link everything together
 target_link_libraries(SurgePlayer PRIVATE
     game-activity::game-activity_static
@@ -152,6 +157,7 @@ target_link_libraries(SurgePlayer PRIVATE
     basisu_android
     Jolt_android
     lua_android
+    miniaudio_android
     ${log-lib}
     ${android-lib}
     ${vulkan-lib}

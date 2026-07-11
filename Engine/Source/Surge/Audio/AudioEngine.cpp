@@ -2,6 +2,7 @@
 #include "Surge/Audio/AudioEngine.hpp"
 #include "Audio.hpp"
 #include <miniaudio/miniaudio.h>
+#include <glm/common.hpp>
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include "Surge/Platform/Android/AndroidApp.hpp"

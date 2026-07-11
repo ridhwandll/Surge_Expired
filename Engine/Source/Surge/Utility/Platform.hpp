@@ -6,6 +6,9 @@
 
 namespace Surge::Platform
 {
+    void Initialize();
+    void Shutdown();
+
     String GetPersistantStoragePath();
     void RequestExit();
     void ErrorMessageBox(const char* text);

@@ -39,7 +39,8 @@ namespace Surge
     {
         if(mOnCreate.valid())
         {
-            auto createResult = mOnCreate(e);
+            // We Use std::move() to force sol2 to copy the Entity into Lua's memory instead of capturing a reference to the local stack variable
+            auto createResult = mOnCreate(std::move(e));
             if(!createResult.valid())
             {
                 sol::error err = createResult;
@@ -53,7 +54,7 @@ namespace Surge
         if(mOnUpdate.valid())
         {
             float dt = Core::GetClock().GetSeconds();
-            auto updateResult = mOnUpdate(e, dt);
+            auto updateResult = mOnUpdate(std::move(e), dt);
             if(!updateResult.valid())
             {
                 sol::error err = updateResult;
@@ -66,7 +67,7 @@ namespace Surge
     {
         if(mOnDestroy.valid())
         {
-            auto destroyResult = mOnDestroy(e);
+            auto destroyResult = mOnDestroy(std::move(e));
             if(!destroyResult.valid())
             {
                 sol::error err = destroyResult;

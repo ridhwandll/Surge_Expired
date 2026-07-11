@@ -7,6 +7,26 @@
 namespace Surge
 {
     static bool sPersistantDirectoryExists = false;
+    static bool sComInit = false;
+
+    void Platform::Initialize()
+    {
+        HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        if(FAILED(hr) && hr != RPC_E_CHANGED_MODE)
+            Log<Severity::Fatal>("Failed to initialize Windows COM library!");
+
+        sComInit = true;
+    }
+
+    void Platform::Shutdown()
+    {
+        if (sComInit)
+        {
+            CoUninitialize();
+            sComInit = false;
+        }
+    }
+
     String Platform::GetPersistantStoragePath()
     {
         String resultantPath;

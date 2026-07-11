@@ -56,6 +56,7 @@ namespace Surge::Core
         SG_ASSERT(application, "Invalid Application!");
 
         sCoreData.SurgeClock.Start();
+        Platform::Initialize();
 
         // Reflection Engine
         SurgeReflect::Registry::Initialize();
@@ -152,6 +153,8 @@ namespace Surge::Core
         delete sCoreData.SurgeWindow;
 
         SurgeReflect::Registry::Shutdown();
+
+        Platform::Shutdown();
     }
 
     void AddFrameEndCallback(const std::function<void()>& func)

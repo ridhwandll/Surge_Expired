@@ -14,6 +14,16 @@
 
 namespace Surge
 {
+    void Platform::Initialize()
+    {
+        //Empty for now
+    }
+
+    void Platform::Shutdown()
+    {
+        //Empty for now
+    }
+
     void Platform::OpenInExplorer(const String&)
     {
         // Tf is this supposed to do on Android? We don't have a file explorer to open

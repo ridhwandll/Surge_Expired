@@ -176,7 +176,7 @@ namespace Surge
                     ImGui::SameLine();
                     ImGui::PushFont(boldFont);
                     ImGui::PushStyleColor(ImGuiCol_Button, inputBg);
-                    if(ImGuiAux::Button(" BROWSE ##Win", ImVec2(browseBtnWidth, 0.0f)))
+                    if(ImGuiAux::Button("BROWSE ##Win", ImVec2(browseBtnWidth, 0.0f)))
                     {
                         String selectedPath = FileDialog::ChooseFolder();
                         if(!selectedPath.empty())
@@ -189,7 +189,7 @@ namespace Surge
 
                     // Advanced Settings
                     ImGui::PushFont(boldFont);
-                    if(ImGui::CollapsingHeader(" Advanced Settings", ImGuiTreeNodeFlags_DefaultOpen))
+                    if(ImGui::CollapsingHeader("Advanced Settings", ImGuiTreeNodeFlags_DefaultOpen))
                     {
                         ImGui::PopFont();
                         ImGui::PushFont(regularFont);

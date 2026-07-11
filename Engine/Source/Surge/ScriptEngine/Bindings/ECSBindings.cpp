@@ -5,6 +5,7 @@
 #include "Surge/ECS/Components.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Physics/Physics.hpp"
+#include "Surge/Audio/AudioEngine.hpp"
 #include "BindingUtils.hpp"
 
 namespace Surge::ScriptBinding
@@ -60,6 +61,7 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<ScriptComponent>(entityType, "ScriptC");
         BindComponentToEntity<TextComponent>(entityType, "TextC");
         BindComponentToEntity<UICanvasComponent>(entityType, "UICanvasC");
+        BindComponentToEntity<AudioSourceComponent>(entityType, "AudioSourceC");
     }
 
     void BindComponents(void* luaState)
@@ -281,5 +283,67 @@ namespace Surge::ScriptBinding
                                         "ShowCanvas", BIND_PROP(UICanvasComponent, ShowCanvas),
                                         "ScriptAsset", BIND_PROP(UICanvasComponent, ScriptAsset),
                                         STRICT_READ(UICanvasComponent));
+
+        lua.new_usertype<AudioSourceComponent>("AudioSourceComponent", sol::no_constructor,
+                                        "Active", BIND_PROP(AudioSourceComponent, Active),
+                                        "PlayOnAwake", BIND_PROP(AudioSourceComponent, PlayOnAwake),
+                                        "IsSpatialized", BIND_PROP(AudioSourceComponent, IsSpatialized),
+                                        "IsStreaming", BIND_PROP(AudioSourceComponent, IsStreaming),
+                                        "IsPlaying", sol::property([](AudioSourceComponent& c) { return c.IsPlaying; }),
+                                        "IsInitialized", sol::property([](AudioSourceComponent& c) { return c.IsInitialized; }),
+                                        "Volume", sol::property(
+                                            [](AudioSourceComponent& c) { return c.Volume; },
+                                            [](AudioSourceComponent& c, float v) {
+                                                c.Volume = v;
+                                                if(c.RuntimeID) Core::GetAudioEngine()->SetVolume(c.RuntimeID, v);
+                                            }),
+
+                                        "Pitch", sol::property(
+                                            [](AudioSourceComponent& c) { return c.Pitch; },
+                                            [](AudioSourceComponent& c, float v) {
+                                                c.Pitch = v;
+                                                if(c.RuntimeID) Core::GetAudioEngine()->SetPitch(c.RuntimeID, v);
+                                            }),
+
+                                        "Loop", sol::property(
+                                            [](AudioSourceComponent& c) { return c.Loop; },
+                                            [](AudioSourceComponent& c, bool v) {
+                                                c.Loop = v;
+                                                if(c.RuntimeID) Core::GetAudioEngine()->SetLooping(c.RuntimeID, v);
+                                            }),
+
+                                        "MinDistance", sol::property(
+                                            [](AudioSourceComponent& c) { return c.MinDistance; },
+                                            [](AudioSourceComponent& c, float v) {
+                                                c.MinDistance = v;
+                                                if(c.RuntimeID) Core::GetAudioEngine()->SetMinDistance(c.RuntimeID, v);
+                                            }),
+
+                                        "MaxDistance", sol::property(
+                                            [](AudioSourceComponent& c) { return c.MaxDistance; },
+                                            [](AudioSourceComponent& c, float v) {
+                                                c.MaxDistance = v;
+                                                if(c.RuntimeID) Core::GetAudioEngine()->SetMaxDistance(c.RuntimeID, v);
+                                            }),
+
+                                        "Play", [](AudioSourceComponent& ac) {
+                                            if(ac.RuntimeID)
+                                            {
+                                                Core::GetAudioEngine()->PlayAudio(ac.RuntimeID);
+                                                ac.IsPlaying = true;
+                                            }
+                                            else
+                                                Log<Severity::Warn>("ECSBindings: AudioSourceComponent is not initialized. Cannot play audio!");
+                                        },
+                                        "Stop", [](AudioSourceComponent& ac) {
+                                            if(ac.RuntimeID)
+                                            {
+                                                Core::GetAudioEngine()->StopAudio(ac.RuntimeID);
+                                                ac.IsPlaying = false;
+                                            }
+                                            else
+                                                Log<Severity::Warn>("ECSBindings: AudioSourceComponent is not initialized. Cannot stop audio!");
+                                        }
+        );
     }
 }
