@@ -280,9 +280,7 @@ namespace Surge
                     }
                     ImGui::PopStyleColor();
                     ImGui::PopFont();
-
                     ImGui::Dummy(ImVec2(0.0f, 20.0f));
-
                     // Advanced Settings
                     ImGui::PushFont(boldFont);
                     if(ImGui::CollapsingHeader(" Advanced Settings", ImGuiTreeNodeFlags_DefaultOpen))

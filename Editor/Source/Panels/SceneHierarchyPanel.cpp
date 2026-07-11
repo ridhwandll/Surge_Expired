@@ -168,7 +168,11 @@ namespace Surge
                     mSceneContext->CreateEntity(mSelectedEntity, "Canvas");
                     mSelectedEntity.AddComponent<UICanvasComponent>();
                 }
-
+                if(ImGuiAux::StyledMenuItem("Audio Source"))
+                {
+                    mSceneContext->CreateEntity(mSelectedEntity, "AudioSource");
+                    mSelectedEntity.AddComponent<AudioSourceComponent>();
+                }
                 ImGuiAux::EndStyledPopup();
             }
             else
@@ -368,6 +372,8 @@ namespace Surge
 
         String typeTag = "Entity";
         if(e.HasComponent<CameraComponent>())              typeTag = "CAMERA";
+        else if(e.HasComponent<AudioSourceComponent>())    typeTag = "AUDIO";
+        else if(e.HasComponent<AudioListenerComponent>())  typeTag = "AUDIO";
         else if(e.HasComponent<TextComponent>())           typeTag = "TEXT";
         else if(e.HasComponent<LightComponent>())          typeTag = "LIGHT";
         else if(e.HasComponent<MeshComponent>())           typeTag = "MESH";

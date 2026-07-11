@@ -15,8 +15,7 @@
 
 namespace Surge::Filesystem
 {
-#ifdef SURGE_PLATFORM_ANDROID
-    static String SanitizeAndroidPath(const Path& path)
+    String SanitizeAndroidPath(const Path& path)
     {
         String p = path.generic_string();
         std::replace(p.begin(), p.end(), '\\', '/');
@@ -25,6 +24,7 @@ namespace Surge::Filesystem
 
         return p;
     }
+#ifdef SURGE_PLATFORM_ANDROID
 
     bool Exists(const Path& path)
     {

@@ -13,6 +13,8 @@
 #include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
 #include <regex>
+#include "../Audio/AudioEngine.hpp"
+#include "../Audio/Audio.hpp"
 
 namespace Surge
 {
@@ -25,6 +27,7 @@ namespace Surge
         // Are these good here?
         mRegistry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptDestroyed>(this);
         mRegistry.on_destroy<UICanvasComponent>().connect<&Scene::OnUICanvasDestroyed>(this);
+        mRegistry.on_destroy<AudioSourceComponent>().connect<&Scene::OnAudioSourceComponentDestroyed>(this);
     }
 
     Scene::~Scene()
@@ -78,6 +81,55 @@ namespace Surge
 //                 OnUICanvasDestroyed(mRegistry, entityID);
 //         }
         mIsRunning = false;
+    }
+
+    void Scene::UpdateAudio()
+    {
+        SURGE_PROFILE_FUNC("Scene::UpdateAudio");
+        if (!mIsRunning)
+            return;
+
+        auto listenerView = mRegistry.view<TransformComponent, AudioListenerComponent>();
+        AudioEngine* audioEngine = Core::GetAudioEngine();
+
+        // Listener
+        for(auto entity : listenerView)
+        {
+            auto& transform = listenerView.get<TransformComponent>(entity);
+            audioEngine->SetListenerPosition(transform.Position.x, transform.Position.y, transform.Position.z);
+            break; // Grab the first listener we find, since there should only be one atp
+        }
+
+        // Audio Sources
+        auto sourceView = mRegistry.view<TransformComponent, AudioSourceComponent>();
+        for(auto [entity, transform, audioSrc] : sourceView.each())
+        {
+            Ref<Audio> asset = audioSrc.AudioClip.As<Audio>();
+            if(asset)
+            {
+                if(!audioSrc.IsInitialized)
+                {
+                    audioSrc.RuntimeID = audioEngine->CreateAudio(asset->GetFilepath(), audioSrc.IsStreaming, audioSrc.IsSpatialized);
+                    audioEngine->SetVolume(audioSrc.RuntimeID, audioSrc.Volume);
+                    audioEngine->SetPitch(audioSrc.RuntimeID, audioSrc.Pitch);
+                    audioEngine->SetLooping(audioSrc.RuntimeID, audioSrc.Loop);
+                    audioEngine->SetMinDistance(audioSrc.RuntimeID, audioSrc.MinDistance);
+                    audioEngine->SetMaxDistance(audioSrc.RuntimeID, audioSrc.MaxDistance);
+                    audioEngine->SetAttenuationModel(audioSrc.RuntimeID, audioSrc.Attenuation);
+
+                    if(audioSrc.PlayOnAwake)
+                    {
+                        audioEngine->PlayAudio(audioSrc.RuntimeID);
+                        audioSrc.IsPlaying = true;
+                    }
+                    audioSrc.IsInitialized = true;
+                }
+
+                // Sync 3D Position
+                if(audioSrc.IsSpatialized && audioSrc.RuntimeID)
+                    audioEngine->SetPosition(transform.Position.x, transform.Position.y, transform.Position.z, audioSrc.RuntimeID);
+            }
+        }
     }
 
     void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
@@ -137,7 +189,7 @@ namespace Surge
                     }
                 }
                 else if(light.Type == LightType::POINT)
-                    gpuLight.PositionType = glm::vec4(transform.Position, 1.0f); // w = 1.0f for point lights
+                    gpuLight.PositionType = glm::vec4((glm::vec3)transform.GetTransform()[3], 1.0f); // w = 1.0f for point lights
 
                 renderer->SubmitLight(gpuLight);
             }
@@ -182,7 +234,7 @@ namespace Surge
         }
 
         // DEBUG
-        if(sSelectedEntity && !mIsRunning)
+        if(sSelectedEntity && mRenderDebug)
         {
             if(const MeshComponent* meshComp = sSelectedEntity.TryGetComponent<MeshComponent>())
             {
@@ -247,6 +299,38 @@ namespace Surge
                     }
                 }
             }
+            if(sSelectedEntity.HasComponent<AudioSourceComponent>())
+            {
+                auto& audioSrc = sSelectedEntity.GetComponent<AudioSourceComponent>();
+                auto& transform = sSelectedEntity.GetComponent<TransformComponent>();
+
+                if(audioSrc.IsSpatialized)
+                {
+                    const int segments = 32;
+                    const float pi = 3.14159265359f;
+
+                    // LIFT the circles 0.1f units above the entity so they don't clip into the floor!
+                    glm::vec3 center = transform.Position + glm::vec3(0.0f, 0.1f, 0.0f);
+
+                    for(int i = 0; i < segments; ++i)
+                    {
+                        float theta1 = (float)i / segments * 2.0f * pi;
+                        float theta2 = (float)(i + 1) / segments * 2.0f * pi;
+
+                        // --- MIN DISTANCE (GREEN CIRCLE) ---
+                        glm::vec3 minP0 = center + glm::vec3(std::cos(theta1) * audioSrc.MinDistance, 0.0f, std::sin(theta1) * audioSrc.MinDistance);
+                        glm::vec3 minP1 = center + glm::vec3(std::cos(theta2) * audioSrc.MinDistance, 0.0f, std::sin(theta2) * audioSrc.MinDistance);
+
+                        renderer->SubmitLine(minP0, minP1, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+
+                        // --- MAX DISTANCE (RED CIRCLE) ---
+                        glm::vec3 maxP0 = center + glm::vec3(std::cos(theta1) * audioSrc.MaxDistance, 0.0f, std::sin(theta1) * audioSrc.MaxDistance);
+                        glm::vec3 maxP1 = center + glm::vec3(std::cos(theta2) * audioSrc.MaxDistance, 0.0f, std::sin(theta2) * audioSrc.MaxDistance);
+
+                        renderer->SubmitLine(maxP0, maxP1, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+                    }
+                }
+            }
         }
         renderer->EndFrame();
     }
@@ -255,6 +339,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::Update(Editor)");
 
+        UpdateAudio();
         UpdatePhysics();
         UpdateScripts();
         UpdateTransforms();
@@ -266,6 +351,7 @@ namespace Surge
         SURGE_PROFILE_FUNC("Scene::Update()");
 
         // Order matters here
+        UpdateAudio();
         UpdatePhysics();
         UpdateScripts();
         UpdateTransforms();
@@ -348,6 +434,9 @@ namespace Surge
 
         CopyComponent<ScriptComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<UICanvasComponent>(other->mRegistry, mRegistry, enttMap);
+
+        CopyComponent<AudioListenerComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<AudioSourceComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
     Surge::Entity Scene::FindEntityByUUID(UUID id)
@@ -467,6 +556,8 @@ namespace Surge
         CopyIfHas(std::type_identity<TextComponent>{});
         CopyIfHas(std::type_identity<ScriptComponent>{});
         CopyIfHas(std::type_identity<UICanvasComponent>{});
+        CopyIfHas(std::type_identity<AudioListenerComponent>{});
+        CopyIfHas(std::type_identity<AudioSourceComponent>{});
 
         return newEntity;
     }
@@ -777,6 +868,14 @@ namespace Surge
             comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e);
             comp.IsInstantiated = false;
         }
+    }
+
+    void Scene::OnAudioSourceComponentDestroyed(entt::registry&, entt::entity entity)
+    {
+        Entity e(entity, this);
+        AudioSourceComponent& comp = e.GetComponent<AudioSourceComponent>();
+        if(comp.IsInitialized && comp.RuntimeID)
+            Core::GetAudioEngine()->DestroyAudio(comp.RuntimeID);
     }
 
 } // namespace Surge

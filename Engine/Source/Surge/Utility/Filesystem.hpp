@@ -68,6 +68,7 @@ namespace Surge::Filesystem
     bool ReadBinaryFile(const Path& path, Vector<uint8_t>& outData);
     bool ReadBinaryFilePartial(const Path& path, Vector<Byte>& outBuffer, size_t maxBytes);
     bool ReadTextFile(const Path& path, String& outData);
+    String SanitizeAndroidPath(const Path& path);
 
     // PC Only (Logs error on Android)
     bool WriteBinaryFile(const Path& path, const void* data, size_t size);

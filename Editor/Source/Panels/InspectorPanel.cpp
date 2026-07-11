@@ -3,20 +3,22 @@
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Components.hpp"
-#include "Utility/ImGuiAux.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/HighLevel/Font.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/Audio/Audio.hpp"
 
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "ContentBrowserPanel.hpp"
+#include "Utility/ImGuiAux.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
-#include <Surge/Graphics/HighLevel/Font.hpp>
-#include <Surge/ScriptEngine/ScriptAsset.hpp>
+#include "Surge/Audio/AudioEngine.hpp"
 
 namespace Surge
 {
@@ -354,6 +356,14 @@ namespace Surge
                         else
                             Platform::ErrorMessageBox("Entity already has a UICanvas Component");
                     }
+                    ImGui::PushFont(boldFont);
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "AUDIO");
+                    ImGui::PopFont();
+                    ImGuiAux::StyledSeparator();
+                    if(ImGuiAux::StyledMenuItem("Audio Source Component") && !entity.HasComponent<AudioSourceComponent>())
+                        entity.AddComponent<AudioSourceComponent>();
+                    if(ImGuiAux::StyledMenuItem("Audio Listener Component") && !entity.HasComponent<AudioListenerComponent>())
+                        entity.AddComponent<AudioListenerComponent>();
 
                     ImGuiAux::EndStyledPopup();
                 }
@@ -407,7 +417,6 @@ namespace Surge
 
                 const char* projectionTypeStrings[] = { "PERSPECTIVE", "ORTHOGRAPHIC" };
                 const char* currentProjectionTypeString = projectionTypeStrings[static_cast<int>(camera.GetProjectionType())];
-
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted("Projection");
                 ImGui::TableNextColumn();
@@ -558,30 +567,9 @@ namespace Surge
         {
             LightComponent& component = entity.GetComponent<LightComponent>();
             DrawComponent<LightComponent>(entity, "Light", [&component]() {
-                const char* lightTypeStrings[] = { "DIRECTIONAL", "POINT" };
-                const char* currentLightTypeString = lightTypeStrings[static_cast<int>(component.Type)];
 
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("TYPE");
-                ImGui::TableNextColumn();
-                ImGui::PushItemWidth(-1);
-                if(ImGui::BeginCombo("##TYPE", currentLightTypeString))
-                {
-                    for(int i = 0; i < 2; i++)
-                    {
-                        const bool isSelected = currentLightTypeString == lightTypeStrings[i];
-                        if(ImGui::Selectable(lightTypeStrings[i], isSelected))
-                        {
-                            currentLightTypeString = lightTypeStrings[i];
-                            component.Type = static_cast<LightType>(i);
-                        }
-                        if(isSelected)
-                            ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-                ImGui::PopItemWidth();
-
+                constexpr auto lightTypeStrings = std::array { "DIRECTIONAL", "POINT" };
+                ImGuiAux::TComboBox("TYPE", component.Type, lightTypeStrings);
                 ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
                 ImGuiAux::TProperty<float>("Intensity", &component.Intensity);
 
@@ -618,26 +606,9 @@ namespace Surge
         {
             RigidbodyComponent& component = entity.GetComponent<RigidbodyComponent>();
             DrawComponent<RigidbodyComponent>(entity, "Rigidbody", [&component]() {
-                const char* rbTypeStrings[] = { "STATIC", "DYNAMIC", "KINEMATIC" };
-                const char* currentRbTypeString = rbTypeStrings[static_cast<int>(component.Type)];
 
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("TYPE");
-                ImGui::TableNextColumn();
-                ImGui::PushItemWidth(-1);
-                if(ImGui::BeginCombo("##RBTYPE", currentRbTypeString))
-                {
-                    for(int i = 0; i < 3; i++)
-                    {
-                        const bool isSelected = (component.Type == static_cast<RigidbodyType>(i));
-                        if(ImGui::Selectable(rbTypeStrings[i], isSelected))
-                            component.Type = static_cast<RigidbodyType>(i);
-                        if(isSelected)
-                            ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-                ImGui::PopItemWidth();
+                constexpr auto rbTypeStrings = std::array { "STATIC", "DYNAMIC", "KINEMATIC" };
+                ImGuiAux::TComboBox("TYPE", component.Type, rbTypeStrings);
 
                 if(component.Type != RigidbodyType::STATIC)
                     ImGuiAux::TProperty<float>("Mass", &component.Mass);
@@ -770,49 +741,10 @@ namespace Surge
 
                     ImGuiAux::TProperty<float>("Letter Spacing", &component.LetterSpacing);
                     ImGuiAux::TProperty<float>("Line Spacing", &component.LineSpacing);
-
-                    {
-                        const char* alignTypeStrings[] = { "LEFT", "CENTER", "RIGHT" };
-                        const char* currentAlignTypeString = alignTypeStrings[static_cast<uint8_t>(component.Alignment)];
-
-                        ImGui::TableNextColumn();
-                        ImGui::TextUnformatted("ALIGNMENT");
-                        ImGui::TableNextColumn();
-                        ImGui::PushItemWidth(-1);
-                        if(ImGui::BeginCombo("##ALIGNTYPE", currentAlignTypeString))
-                        {
-                            for(int i = 0; i < 3; i++)
-                            {
-                                const bool isSelected = (component.Alignment == static_cast<TextAlignment>(i));
-                                if(ImGui::Selectable(alignTypeStrings[i], isSelected))
-                                    component.Alignment = static_cast<TextAlignment>(i);
-                                if(isSelected)
-                                    ImGui::SetItemDefaultFocus();
-                            }
-                            ImGui::EndCombo();
-                        }
-                    }
-                    {
-                        constexpr const char* verticalAlignTypeStrings[] = { "TOP", "CENTER", "BASELINE", "BOTTOM" };
-                        const char* currentAlignTypeString = verticalAlignTypeStrings[static_cast<uint8_t>(component.VerticalAlignment)];
-
-                        ImGui::TableNextColumn();
-                        ImGui::TextUnformatted("V ALIGNMENT");
-                        ImGui::TableNextColumn();
-                        ImGui::PushItemWidth(-1);
-                        if(ImGui::BeginCombo("##VALIGNTYPE", currentAlignTypeString))
-                        {
-                            for(int i = 0; i < 4; i++)
-                            {
-                                const bool isSelected = (component.VerticalAlignment == static_cast<TextVerticalAlignment>(i));
-                                if(ImGui::Selectable(verticalAlignTypeStrings[i], isSelected))
-                                    component.VerticalAlignment = static_cast<TextVerticalAlignment>(i);
-                                if(isSelected)
-                                    ImGui::SetItemDefaultFocus();
-                            }
-                            ImGui::EndCombo();
-                        }
-                    }
+                    constexpr auto alignTypeStrings = std::array { "LEFT", "CENTER", "RIGHT" };
+                    ImGuiAux::TComboBox("Horizontal Alignment", component.Alignment, alignTypeStrings);
+                    constexpr auto verticalAlignTypeStrings = std::array { "TOP", "CENTER", "BASELINE", "BOTTOM" };
+                    ImGuiAux::TComboBox("Vertical Alignment", component.VerticalAlignment, verticalAlignTypeStrings);
                     ImGui::PopItemWidth();
                     ImGuiAux::TProperty<bool>("Underline", &component.Underline);
                     ImGuiAux::TProperty<bool>("Italic", &component.Italic);
@@ -834,6 +766,48 @@ namespace Surge
             DrawComponent<UICanvasComponent>(entity, "UI Canvas Component", [&component]() {
                 ImGuiAux::TProperty<bool>("Show Canvas", &component.ShowCanvas);
                 DrawAssetDropSlot<Script>("Script", component.ScriptAsset, AssetType::SCRIPT, "Drop UI SCRIPT");
+            });
+        }
+        if(entity.HasComponent<AudioListenerComponent>())
+        {
+            DrawComponent<AudioListenerComponent>(entity, "Audio Listener Component", []() {});
+        }
+        if(entity.HasComponent<AudioSourceComponent>())
+        {
+            AudioSourceComponent& component = entity.GetComponent<AudioSourceComponent>();
+            DrawComponent<AudioSourceComponent>(entity, "Audio Source Component", [&component]() {
+                AudioEngine* audioEngine = Core::GetAudioEngine();
+
+                DrawAssetDropSlot<Audio>("Audio Clip", component.AudioClip, AssetType::AUDIO, "Drop Audio Clip");
+
+                if(component.AudioClip)
+                {
+                    ImGuiAux::TProperty<bool>("Streaming", &component.IsStreaming);
+                    ImGuiAux::TProperty<bool>("Play On Awake", &component.PlayOnAwake);
+
+                    ImGuiAux::TProperty<bool>("Spatialized", &component.IsSpatialized);
+                    if (component.IsSpatialized)
+                    {
+                        constexpr auto attenuationModelStrings = std::array { "NONE", "INVERSE_DISTANCE", "LINEAR_DISTANCE", "EXPONENTIAL_DISTANCE" };
+                        ImGuiAux::TComboBox("Attenuation", component.Attenuation, attenuationModelStrings);
+
+                        if(ImGuiAux::TProperty<float>("Min Distance", &component.MinDistance) && component.RuntimeID)
+                            audioEngine->SetMinDistance(component.RuntimeID, component.MinDistance);
+
+                        if(ImGuiAux::TProperty<float>("Max Distance", &component.MaxDistance) && component.RuntimeID)
+                            audioEngine->SetMaxDistance(component.RuntimeID, component.MaxDistance);
+                    }
+
+                    if (ImGuiAux::TProperty<bool>("Loop", &component.Loop) && component.RuntimeID)
+                        audioEngine->SetLooping(component.RuntimeID, component.Loop);
+
+                    if (ImGuiAux::TSlider<float>("Volume", &component.Volume, 0.0f, 2.0f, "%.1f") && component.RuntimeID)
+                        audioEngine->SetVolume(component.RuntimeID, component.Volume);
+
+                    if (ImGuiAux::TSlider<float>("Pitch", &component.Pitch, 0.1f, 3.0f, "%.1f") && component.RuntimeID)
+                        audioEngine->SetPitch(component.RuntimeID, component.Pitch);
+
+                }
             });
         }
     }

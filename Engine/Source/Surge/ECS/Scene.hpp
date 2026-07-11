@@ -47,6 +47,7 @@ namespace Surge
 
         void OnResize(float width, float height);
 
+        void SetRenderDebug(bool renderDebug) { mRenderDebug = renderDebug; }
         void SetRunning(bool isRunning) { mIsRunning = isRunning; }
         bool IsRunning() const { return mIsRunning; }
 
@@ -60,6 +61,7 @@ namespace Surge
         void UpdateTransforms();
         void UpdateScripts();
         void UpdatePhysics();
+        void UpdateAudio();
         void UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar);
 
     private:
@@ -69,8 +71,10 @@ namespace Surge
         void OnRigidbodyDestroyed(entt::registry& registry, entt::entity entity);
         void OnScriptDestroyed(entt::registry& registry, entt::entity entity);
         void OnUICanvasDestroyed(entt::registry& registry, entt::entity entity);
+        void OnAudioSourceComponentDestroyed(entt::registry& registry, entt::entity entity);
 
     private:
+        bool mRenderDebug = false;
         bool mIsRunning = false;
         entt::registry mRegistry;
     };

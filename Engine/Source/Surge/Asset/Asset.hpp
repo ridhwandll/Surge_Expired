@@ -27,7 +27,8 @@ namespace Surge
         MATERIAL,
         SCENE,
         SCRIPT,
-        FONT
+        FONT,
+        AUDIO
     };
 
     inline constexpr auto sAssetTypeArray = std::array {
@@ -37,7 +38,8 @@ namespace Surge
         AssetType::MATERIAL,
         AssetType::SCENE,
         AssetType::SCRIPT,
-        AssetType::FONT
+        AssetType::FONT,
+        AssetType::AUDIO
     };
 
     inline AssetType AssetTypeFromString(const char* str)
@@ -49,6 +51,7 @@ namespace Surge
         if(strcmp(str, "SCENE") == 0) return AssetType::SCENE;
         if(strcmp(str, "SCRIPT") == 0) return AssetType::SCRIPT;
         if(strcmp(str, "FONT") == 0) return AssetType::FONT;
+        if(strcmp(str, "AUDIO") == 0) return AssetType::AUDIO;
         return AssetType::NONE;
     }
 
@@ -60,6 +63,7 @@ namespace Surge
         if(strcmp(str, ".srg") == 0) return AssetType::SCENE;
         if(strcmp(str, ".lua") == 0) return AssetType::SCRIPT;
         if(strcmp(str, ".ttf") == 0 || strcmp(str, ".otf") == 0) return AssetType::FONT;
+        if(strcmp(str, ".wav") == 0 || strcmp(str, ".mp3") == 0 || strcmp(str, ".ogg") == 0) return AssetType::AUDIO;
         return AssetType::NONE;
     }
 

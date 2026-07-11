@@ -11,6 +11,7 @@ namespace Surge
     class Renderer;
     class AssetManager;
     class ScriptEngine;
+    class AudioEngine;
 
     namespace Core
     {
@@ -25,6 +26,7 @@ namespace Surge
         Renderer* GetRenderer();
         AssetManager* GetAssetManager();
         ScriptEngine* GetScriptEngine();
+        AudioEngine* GetAudioEngine();
         Client* GetClient();
         Clock& GetClock();
     }

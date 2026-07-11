@@ -17,7 +17,7 @@ namespace Surge
 
         ScriptEngine* scriptEngine = Core::GetScriptEngine();
         sol::state_view* luaState = static_cast<sol::state_view*>(scriptEngine->GetSOLState());
-
+        // TODO: move this to ScriptEngine and make it a function that returns a sol::environment thingy
         mEnv = sol::environment(*luaState, sol::create, luaState->globals());
         std::string_view bytecodeView(reinterpret_cast<const char*>(mBytecode.data()), mBytecode.size());
         auto result = luaState->safe_script(bytecodeView, mEnv, sol::script_pass_on_error);

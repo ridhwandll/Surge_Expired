@@ -19,6 +19,7 @@
 #include "Asset/Cookers/MaterialCooker.hpp"
 #include "Asset/Cookers/ScriptCooker.hpp"
 #include "Asset/Cookers/FontCooker.hpp"
+#include "Asset/Cookers/AudioCooker.hpp"
 
 #include "Surge/Physics/Physics.hpp"
 
@@ -81,6 +82,7 @@ namespace Surge
         mAssetImporter.RegisterCooker(CreateScope<MeshCooker>());
         mAssetImporter.RegisterCooker(CreateScope<ScriptCooker>());
         mAssetImporter.RegisterCooker(CreateScope<FontCooker>());
+        mAssetImporter.RegisterCooker(CreateScope<AudioCooker>());
 
         mAssetManager->AddAssetLoadCallback(CreateScope<EditorAssetLoadCallback>());
 

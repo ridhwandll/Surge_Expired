@@ -131,32 +131,6 @@ namespace Surge::ImGuiAux
         ImGui::TableNextColumn();
     }
 
-    template <typename T>
-    void TComboBox(const char* title, const char** stringArray, Uint stringArraySize, Uint currentStringIndexInArray, T callbackFunction)
-    {
-        ImGui::PushID(title);
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted(title);
-        ImGui::TableNextColumn();
-        const char* currentString = stringArray[currentStringIndexInArray];
-        if (ImGui::BeginCombo("##cbox", currentString))
-        {
-            for (Uint i = 0; i < stringArraySize; i++)
-            {
-                const bool isSelected = currentString == stringArray[i];
-                if (ImGui::Selectable(stringArray[i], isSelected))
-                {
-                    currentString = stringArray[i];
-                    callbackFunction(i);
-                }
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::PopID();
-    }
-
     inline void TString(const char* title, const char* fmt, ...)
     {
         ImGui::PushID(title);
@@ -282,6 +256,41 @@ namespace Surge::ImGuiAux
         }
 
         ImGui::PopItemWidth();
+
+        ImGui::PopID();
+        return modified;
+    }
+
+    template <typename T, size_t N>
+    bool TComboBox(const char* label, T& currentValue, const std::array<const char*, N>& options)
+    {
+        bool modified = false;
+
+        size_t currentIndex = static_cast<size_t>(currentValue);
+        const char* currentString = (currentIndex < N) ? options[currentIndex] : "UNKNOWN THIS SHOULD NOT HAPPEN!";
+
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(label);
+        ImGui::TableNextColumn();
+        ImGui::PushItemWidth(-1);
+
+        ImGui::PushID(label);
+        if(ImGui::BeginCombo("##Combo", currentString))
+        {
+            for(size_t i = 0; i < N; i++)
+            {
+                const bool isSelected = (currentIndex == i);
+                if(ImGui::Selectable(options[i], isSelected))
+                {
+                    currentValue = static_cast<T>(i);
+                    modified = true;
+                }
+
+                if(isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
 
         ImGui::PopID();
         return modified;

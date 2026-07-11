@@ -324,4 +324,5 @@ namespace Surge::UI
         glm::vec4 HoverColor = { 0.8f, 0.8f, 0.8f, 1.0f };
         glm::vec4 PressedColor = { 0.5f, 0.5f, 0.5f, 1.0f };
     };
+
 }

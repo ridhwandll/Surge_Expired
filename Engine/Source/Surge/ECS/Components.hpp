@@ -13,6 +13,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <Surge/Audio/AudioID.hpp>
 
 namespace Surge
 {
@@ -290,6 +291,35 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct AudioListenerComponent
+    {
+        bool Active = true;
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    struct AudioSourceComponent
+    {
+        bool Active = true;
+        Ref<Asset> AudioClip = nullptr;
+
+        float Volume = 1.0f;
+        float Pitch = 1.0f;
+        bool Loop = false;
+        bool PlayOnAwake = false;
+        bool IsSpatialized = false;
+        bool IsStreaming = false;
+        float MinDistance = 1.0f;
+        float MaxDistance = 100.0f;
+        AttenuationModel Attenuation = AttenuationModel::INVERSE_DISTANCE;
+
+        // Runtime State
+        AudioID RuntimeID = nullptr;
+        bool IsInitialized = false;
+        bool IsPlaying = false;
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
 } // namespace Surge
 
 //! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
@@ -298,4 +328,5 @@ namespace Surge
                                 ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
                                 ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
-                                ::Surge::ScriptComponent, ::Surge::TextComponent, ::Surge::UICanvasComponent
+                                ::Surge::ScriptComponent, ::Surge::TextComponent, ::Surge::UICanvasComponent, \
+                                ::Surge::AudioListenerComponent, ::Surge::AudioSourceComponent

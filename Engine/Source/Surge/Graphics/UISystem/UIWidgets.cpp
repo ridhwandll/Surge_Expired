@@ -59,4 +59,5 @@ namespace Surge
         mFontAsset = Core::GetAssetManager()->Load<Font>(fontAsset);
         //Log<Severity::Info>("[UI::Text::Constructor] Font Ref: {}", mFontAsset->GetRefCount());
     }
+
 }

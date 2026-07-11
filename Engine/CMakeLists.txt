@@ -35,6 +35,7 @@ set(LIB_LINKS
     basisu
     Jolt
     lua
+    miniaudio
     ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib
 )
 

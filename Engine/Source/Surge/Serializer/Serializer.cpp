@@ -6,6 +6,7 @@
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components.hpp"
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/Audio/Audio.hpp"
 #include "Surge/Graphics/HighLevel/Font.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
@@ -65,6 +66,7 @@ namespace Surge
     NLOHMANN_JSON_SERIALIZE_ENUM(RigidbodyType, { {RigidbodyType::STATIC, "STATIC"}, {RigidbodyType::DYNAMIC, "DYNAMIC"}, {RigidbodyType::KINEMATIC, "KINEMATIC"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(TextAlignment, { {TextAlignment::LEFT, "LEFT"}, {TextAlignment::CENTER, "CENTER"}, {TextAlignment::RIGHT, "RIGHT"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(TextVerticalAlignment, { {TextVerticalAlignment::TOP, "TOP"}, {TextVerticalAlignment::CENTER, "CENTER"}, {TextVerticalAlignment::BOTTOM, "BOTTOM"}, {TextVerticalAlignment::BASELINE, "BASELINE"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(AttenuationModel, { {AttenuationModel::NONE, "NONE"}, {AttenuationModel::INVERSE_DISTANCE, "INVERSE_DISTANCE"}, {AttenuationModel::LINEAR_DISTANCE, "LINEAR_DISTANCE"}, {AttenuationModel::EXPONENTIAL_DISTANCE, "EXPONENTIAL_DISTANCE"} });
 
     template <typename XComponent>
     static void SerializeComponent(nlohmann::json& j, Entity& e)
@@ -126,6 +128,8 @@ namespace Surge
                 }
                 else if(type.EqualTo<LightType>())
                     out[name] = *reinterpret_cast<const LightType*>(source);
+                else if(type.EqualTo<AttenuationModel>())
+                    out[name] = *reinterpret_cast<const AttenuationModel*>(source);
                 else if(type.EqualTo<RigidbodyType>())
                     out[name] = *reinterpret_cast<const RigidbodyType*>(source);
                 else if(type.EqualTo<TextAlignment>())
@@ -248,6 +252,8 @@ namespace Surge
             }
             else if(type.EqualTo<LightType>())
                 *reinterpret_cast<LightType*>(dest) = inJson.value(name, LightType::DIRECTIONAL);
+            else if(type.EqualTo<AttenuationModel>())
+                *reinterpret_cast<AttenuationModel*>(dest) = inJson.value(name, AttenuationModel::INVERSE_DISTANCE);
             else if(type.EqualTo<RigidbodyType>())
                 *reinterpret_cast<RigidbodyType*>(dest) = inJson.value(name, RigidbodyType::STATIC);
             else if(type.EqualTo<TextAlignment>())
@@ -276,8 +282,9 @@ namespace Surge
                         *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Font>(assetID);
                     if (metadata.Type == AssetType::SCRIPT)
                         *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Script>(assetID);
+                    if (metadata.Type == AssetType::AUDIO)
+                        *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Audio>(assetID);
                 }
-
                 else
                 {
                     Log<Severity::Warn>("DeserializeComponent: Asset with ID {} is missing or invalid", assetID.Get());
