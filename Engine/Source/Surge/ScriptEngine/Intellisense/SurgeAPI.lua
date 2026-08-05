@@ -113,6 +113,13 @@ TextVerticalAlignment = {
     BOTTOM = 2
 }
 
+AttenuationModel = {
+    NONE = 0,
+    INVERSE_DISTANCE = 1,
+    LINEAR_DISTANCE = 2,
+    EXPONENTIAL_DISTANCE = 3
+}
+
 -- ==============================================================================
 -- MATH (VECTORS, QUATERNIONS & MATRICES)
 -- ==============================================================================
@@ -620,6 +627,21 @@ local TextComponent = {}
 ---@field ScriptAsset number
 local UICanvasComponent = {}
 
+---@class AudioSourceComponent
+---@field Active boolean
+---@field Volume number
+---@field Pitch number
+---@field Loop boolean
+---@field PlayOnAwake boolean
+---@field IsSpatialized boolean
+---@field IsStreaming boolean
+---@field MinDistance number
+---@field MaxDistance number
+---@field Attenuation number
+local AudioSourceComponent = {}
+function AudioSourceComponent:Play() end
+function AudioSourceComponent:Stop() end
+
 -- ==============================================================================
 -- ECS ENTITY
 -- ==============================================================================
@@ -724,3 +746,7 @@ function Entity:RemoveTextC() end
 function Entity:HasUICanvasC() end
 function Entity:AddUICanvasC() end
 function Entity:RemoveUICanvasC() end
+
+function Entity:HasAudioSourceC() end
+function Entity:AddAudioSourceC() end
+function Entity:RemoveAudioSourceC() end

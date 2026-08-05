@@ -634,9 +634,13 @@ namespace Surge
         if (width <= 0 || height <= 0)
             return;
 
-        Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
-        if (camera.Data1)
-            camera.Data1->SetViewportSize(width, height);
+        auto view = mRegistry.view<CameraComponent>();
+        for(auto entity : view)
+        {
+            auto& cameraComponent = view.get<CameraComponent>(entity);
+            if(!cameraComponent.FixedAspectRatio)
+                cameraComponent.Camera.SetViewportSize(width, height);
+        }
     }
 
     Entity Scene::GetEntityByName(const String& name)

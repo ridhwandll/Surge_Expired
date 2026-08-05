@@ -141,7 +141,6 @@ namespace Surge
         if(mIsFullscreen)
         {
             ImGuiViewport* viewport = ImGui::GetMainViewport();
-
             ImGui::SetNextWindowPos(viewport->Pos);
             ImGui::SetNextWindowSize(viewport->Size);
             ImGui::SetNextWindowViewport(viewport->ID);
@@ -160,29 +159,57 @@ namespace Surge
             Editor* editor = static_cast<Editor*>(Core::GetClient());
             bool isPlaying = editor->IsPlaying();
 
-            auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
-            auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
-            auto viewportOffset = ImGui::GetWindowPos();
+            // Aspect Ratio
+            static int currentAspectMode = 0;
+            constexpr const char* aspectRatios[] = { "Free Aspect", "16:9 Landscape", "9:16 Portrait", "21:9 Cinematic", "4:3 Classic" };
 
-            glm::vec2 vMin = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
-            glm::vec2 vMax = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
+            ImVec2 availableSpace = ImGui::GetContentRegionAvail();
+            float targetAspect = 0.0f;
 
-            ImVec2 mainWindowPos = ImGui::GetMainViewport()->Pos;
-            vMin.x -= mainWindowPos.x;
-            vMin.y -= mainWindowPos.y;
-            vMax.x -= mainWindowPos.x;
-            vMax.y -= mainWindowPos.y;
-            Core::GetRenderer()->GetUIManager().SetViewportBounds(vMin.x, vMin.y, vMax.x - vMin.x, vMax.y - vMin.y);
+            if(currentAspectMode == 1) targetAspect = 16.0f / 9.0f;
+            else if(currentAspectMode == 2) targetAspect = 9.0f / 16.0f;
+            else if(currentAspectMode == 3) targetAspect = 21.0f / 9.0f;
+            else if(currentAspectMode == 4) targetAspect = 4.0f / 3.0f;
+
+            float renderWidth = availableSpace.x;
+            float renderHeight = availableSpace.y;
+
+            if(targetAspect > 0.0f)
+            {
+                renderWidth = availableSpace.x;
+                renderHeight = renderWidth / targetAspect;
+
+                // If it exceeds the available height, fit height instead
+                if(renderHeight > availableSpace.y)
+                {
+                    renderHeight = availableSpace.y;
+                    renderWidth = renderHeight * targetAspect;
+                }
+            }
+            float offsetX = (availableSpace.x - renderWidth) * 0.5f;
+            float offsetY = (availableSpace.y - renderHeight) * 0.5f;
+
+            mViewportSize = { renderWidth, renderHeight };
+            mIsViewportHovered = ImGui::IsWindowHovered();
 
             if(!mIsFullscreen)
                 mPreviousDockID = ImGui::GetWindowDockID();
 
-            mIsViewportHovered = ImGui::IsWindowHovered();
-            mViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
-            ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
-            ImVec2 viewportBoundsMin = ImGui::GetCursorScreenPos();
+            // ImGui Cursor setup
+            ImVec2 cursorStartPos = ImGui::GetCursorPos();
+            ImGui::SetCursorPos({ cursorStartPos.x + offsetX, cursorStartPos.y + offsetY });
 
-            ImGui::Image(mTexID, { mViewportSize.x, mViewportSize.y });
+            ImVec2 viewportBoundsMin = ImGui::GetCursorScreenPos();
+            ImVec2 mainWindowPos = ImGui::GetMainViewport()->Pos;
+            float uiBoundsX = viewportBoundsMin.x - mainWindowPos.x;
+            float uiBoundsY = viewportBoundsMin.y - mainWindowPos.y;
+            Core::GetRenderer()->GetUIManager().SetViewportBounds(uiBoundsX, uiBoundsY, renderWidth, renderHeight);
+
+            if(!mIsFullscreen)
+                mPreviousDockID = ImGui::GetWindowDockID();
+
+            ImTextureID mTexID = Core::GetRenderer()->GetFinalImageImGuiID();
+            ImGui::Image(mTexID, { renderWidth, renderHeight });
 
             if(ImGui::BeginDragDropTarget())
             {
@@ -224,28 +251,49 @@ namespace Surge
                             Log<Severity::Warn>("[ViewportPanel] Failed to load dropped asset in viewport!");
                             break;
                     }
-
                 }
                 ImGui::EndDragDropTarget();
             }
 
+            // Overlays
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
-            ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
+            float padding = 3.0f;
+
+            // Aspect Ratio Dropdown
+            if(!isPlaying)
+            {
+                ImGui::SetCursorPos(ImVec2(cursorStartPos.x + offsetX + padding, cursorStartPos.y + offsetY + padding));
+                ImGui::SetNextItemWidth(140.0f);
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 200));
+                if(ImGui::BeginCombo("##AspectCombo", aspectRatios[currentAspectMode]))
+                {
+                    for(int i = 0; i < 5; i++)
+                    {
+                        bool isSelected = (currentAspectMode == i);
+                        if(ImGui::Selectable(aspectRatios[i], isSelected))
+                            currentAspectMode = i;
+                        if(isSelected) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopStyleColor();
+            }
 
             // Scene Name
             const char* displayText = isPlaying ? "RUNTIME" : mSceneName.c_str();
             ImGui::PushFont(boldFont);
             ImDrawList* drawList = ImGui::GetWindowDrawList();
-            float padding = 5.0f;
             float textHeight = ImGui::GetTextLineHeight();
             float textWidth = ImGui::CalcTextSize(displayText).x;
-            ImVec2 bgMax = ImVec2(cursorScreenPos.x + mViewportSize.x - 10.0f, cursorScreenPos.y + 10.0f + textHeight + (padding * 2.0f));
-            ImVec2 bgMin = ImVec2(bgMax.x - textWidth - (padding * 2.0f), cursorScreenPos.y + 10.0f);
+
+            ImVec2 bgMax = ImVec2(viewportBoundsMin.x + renderWidth - padding, viewportBoundsMin.y + padding + textHeight + (padding * 2.0f));
+            ImVec2 bgMin = ImVec2(bgMax.x - textWidth - (padding * 2.0f), viewportBoundsMin.y + padding);
+
             drawList->AddRectFilled(bgMin, bgMax, IM_COL32(15, 15, 15, 200), 4.0f);
             drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), displayText);
             ImGui::PopFont();
 
-            // GIZMOS
+            // Gizmos
             if(!isPlaying)
             {
                 Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
@@ -255,8 +303,9 @@ namespace Surge
                 glm::mat4 cameraView = camera.GetViewMatrix();
                 glm::mat4 cameraProjection = camera.GetProjectionMatrix();
                 cameraProjection[1][1] *= -1;
-                ImGuizmo::SetRect(viewportBoundsMin.x, viewportBoundsMin.y, mViewportSize.x, mViewportSize.y);
-                //ImGuizmo::DrawGrid(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), glm::value_ptr(glm::mat4(1.0f)), 16);
+
+                // Set Gizmo bounds tightly to the pillarboxed area!
+                ImGuizmo::SetRect(viewportBoundsMin.x, viewportBoundsMin.y, renderWidth, renderHeight);
 
                 if(selectedEntity && mGizmoType > 0)
                 {
@@ -286,7 +335,6 @@ namespace Surge
                             Entity parentEntity((entt::entity)rel.Parent, app->GetCurrentScene().Raw());
                             glm::mat4 parentWorld = parentEntity.GetComponent<TransformComponent>().GetTransform();
 
-                            // Local = Inverse(ParentWorld) * World
                             transform = glm::inverse(parentWorld) * transform;
                         }
 

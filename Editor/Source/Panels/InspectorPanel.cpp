@@ -438,9 +438,14 @@ namespace Surge
                 }
                 ImGui::PopItemWidth();
 
-                float aspectRatio = camera.GetAspectRatio();
-                if(ImGuiAux::TProperty<float>("Aspect Ratio", &aspectRatio))
-                    camera.SetAspectRatio(aspectRatio);
+                ImGuiAux::TProperty<bool>("Fixed Aspect Ratio", &component.FixedAspectRatio);
+
+                if(component.FixedAspectRatio)
+                {
+                    glm::vec2 aspectRatio = camera.GetAspectRatio();
+                    if(ImGuiAux::TProperty<glm::vec2>("Aspect Ratio", &aspectRatio))
+                        camera.SetAspectRatio(aspectRatio);
+                }
 
                 if(camera.GetProjectionType() == RuntimeCamera::ProjectionType::Perspective)
                 {
@@ -709,7 +714,7 @@ namespace Surge
                     ImGuiAux::TString("ERROR", "Invalid setup: Change Rigidbody to STATIC or KINEMATIC!");
                     ImGui::PopStyleColor();
                 }
-                                                 });
+            });
         }
 
         if(entity.HasComponent<ScriptComponent>())

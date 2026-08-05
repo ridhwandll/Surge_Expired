@@ -37,7 +37,7 @@ namespace Surge
     };
 
     template <typename T>
-    FORCEINLINE T* MakeClient()
+    T* MakeClient()
     {
         static_assert(std::is_base_of_v<Client, T>, "Class MUST derive from Surge::Client");
         T* client = new T();

@@ -395,8 +395,6 @@ namespace Surge
     void Editor::RenderEditorSettings()
     {
         ImGui::Begin("Editor Settings");
-        if (ImGuiAux::Button("Save Scene (F2)")) { mAssetManager->Save(mActiveScene->GetID()); }
-
         ImGui::Checkbox("Show Axes", &mShowAxes);
         ImGui::End();
     }

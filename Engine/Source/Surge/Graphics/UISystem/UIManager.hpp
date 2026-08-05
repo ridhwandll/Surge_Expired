@@ -50,23 +50,20 @@ namespace Surge::UI
         // @return            glm::vec2: UI coordinates
         glm::vec2 ScreenToUI(float screenX, float screenY)
         {
-            float localX = screenX - mViewportOffset.x;
-            float localY = screenY - mViewportOffset.y;
-
-            float normalizedX = localX / mViewportSize.x;
-            float normalizedY = localY / mViewportSize.y;
+            const float localX = screenX - mViewportOffset.x;
+            const float localY = screenY - mViewportOffset.y;
+            const float normalizedX = localX / mViewportSize.x;
+            const float normalizedY = localY / mViewportSize.y;
 
             return { normalizedX * mTargetResolution.x, normalizedY * mTargetResolution.y };
         }
 
         // ExtractRenderData
-        // Extracts render data from the UI hierarchy for rendering
+        // Extracts render data from the UI hierarchy into the Frameblackboard for rendering
         // @param blackboard: The frame blackboard containing render information
-        // @param showUI:     Whether to display the UI
         void ExtractRenderData(FrameBlackboard& blackboard)
         {
             SURGE_PROFILE_FUNC("Surgte::UI::Manager::ExtractRenderData");
-            //Log<Severity::Trace>("RootWidget: {}", mRootWidget ? "Valid" : "nullptr");
             if (!blackboard.ShowUI)
                 return;
 

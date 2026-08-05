@@ -33,15 +33,12 @@ namespace Surge::ScriptBinding
                                                    sol::meta_function::to_string, [](Entity& e) {
                                                        if(!static_cast<bool>(e)) return String("Entity (Invalid/Null)");
                                                        if(e.HasComponent<NameComponent>()) return String("Entity (") + e.GetComponent<NameComponent>().Name + ")";
-                                                       return String("Entity (Unnamed)"); },
+                                                       return String("Entity (Unnamed)");
+                                                   },
                                                    sol::meta_function::equal_to, [](Entity& a, Entity& b) { return a == b; });
 
         entityType["IsValid"] = [](const Entity& e) { return static_cast<bool>(e); };
-        entityType["Destroy"] = [](Entity& e) {
-            if(e)
-                e.GetScene()->DestroyEntity(e);
-            };
-
+        entityType["Destroy"] = [](Entity& e) { if(e) e.GetScene()->DestroyEntity(e); };
         entityType["FindEntityByName"] = [](Entity& e, const String& targetName) -> Entity { return e.GetScene()->GetEntityByName(targetName); };
 
         BindComponentToEntity<NameComponent>(entityType, "NameC");
@@ -90,6 +87,13 @@ namespace Surge::ScriptBinding
                      "TOP", TextVerticalAlignment::TOP,
                      "CENTER", TextVerticalAlignment::CENTER,
                      "BOTTOM", TextVerticalAlignment::BOTTOM
+        );
+
+        lua.new_enum("AttenuationModel",
+                     "NONE", AttenuationModel::NONE,
+                     "INVERSE_DISTANCE", AttenuationModel::INVERSE_DISTANCE,
+                     "LINEAR_DISTANCE", AttenuationModel::LINEAR_DISTANCE,
+                     "EXPONENTIAL_DISTANCE", AttenuationModel::EXPONENTIAL_DISTANCE
         );
 
         // COMPONENTS
@@ -284,6 +288,7 @@ namespace Surge::ScriptBinding
                                         "ScriptAsset", BIND_PROP(UICanvasComponent, ScriptAsset),
                                         STRICT_READ(UICanvasComponent));
 
+        // AUDIO
         lua.new_usertype<AudioSourceComponent>("AudioSourceComponent", sol::no_constructor,
                                         "Active", BIND_PROP(AudioSourceComponent, Active),
                                         "PlayOnAwake", BIND_PROP(AudioSourceComponent, PlayOnAwake),
@@ -297,7 +302,6 @@ namespace Surge::ScriptBinding
                                                 c.Volume = v;
                                                 if(c.RuntimeID) Core::GetAudioEngine()->SetVolume(c.RuntimeID, v);
                                             }),
-
                                         "Pitch", sol::property(
                                             [](AudioSourceComponent& c) { return c.Pitch; },
                                             [](AudioSourceComponent& c, float v) {
@@ -311,21 +315,24 @@ namespace Surge::ScriptBinding
                                                 c.Loop = v;
                                                 if(c.RuntimeID) Core::GetAudioEngine()->SetLooping(c.RuntimeID, v);
                                             }),
-
+                                        "Attenuation", sol::property(
+                                            [](AudioSourceComponent& c) { return c.Attenuation; },
+                                            [](AudioSourceComponent& c, AttenuationModel a) {
+                                                c.Attenuation = a;
+                                                if(c.RuntimeID) Core::GetAudioEngine()->SetAttenuationModel(c.RuntimeID, a);
+                                            }),
                                         "MinDistance", sol::property(
                                             [](AudioSourceComponent& c) { return c.MinDistance; },
                                             [](AudioSourceComponent& c, float v) {
                                                 c.MinDistance = v;
                                                 if(c.RuntimeID) Core::GetAudioEngine()->SetMinDistance(c.RuntimeID, v);
                                             }),
-
                                         "MaxDistance", sol::property(
                                             [](AudioSourceComponent& c) { return c.MaxDistance; },
                                             [](AudioSourceComponent& c, float v) {
                                                 c.MaxDistance = v;
                                                 if(c.RuntimeID) Core::GetAudioEngine()->SetMaxDistance(c.RuntimeID, v);
                                             }),
-
                                         "Play", [](AudioSourceComponent& ac) {
                                             if(ac.RuntimeID)
                                             {

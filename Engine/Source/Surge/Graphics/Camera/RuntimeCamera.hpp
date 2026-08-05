@@ -41,8 +41,8 @@ namespace Surge
             RecalculateProjection();
         }
 
-        float GetAspectRatio() const { return mAspectRatio; }
-        void SetAspectRatio(float aspectRatio)
+        glm::vec2 GetAspectRatio() const { return mAspectRatio; }
+        void SetAspectRatio(glm::vec2 aspectRatio)
         {
             mAspectRatio = aspectRatio;
             RecalculateProjection();
@@ -50,7 +50,10 @@ namespace Surge
 
         void SetViewportSize(float width, float height)
         {
-            mAspectRatio = width / height;
+            if(height == 0.0f)
+                return;
+
+            mAspectRatio = glm::vec2(width, height);
             RecalculateProjection();
         }
 
@@ -104,12 +107,14 @@ namespace Surge
     private:
         void RecalculateProjection()
         {
+            const float aspectRatio = mAspectRatio.x / mAspectRatio.y;
+
             if (mProjectionType == ProjectionType::Perspective)
-                mProjection = glm::perspective(mPerspectiveFOV, mAspectRatio, mPerspectiveNear, mPerspectiveFar);
+                mProjection = glm::perspective(mPerspectiveFOV, aspectRatio, mPerspectiveNear, mPerspectiveFar);
             else
             {
-                float orthoLeft = -mOrthographicSize * mAspectRatio * 0.5f;
-                float orthoRight = mOrthographicSize * mAspectRatio * 0.5f;
+                float orthoLeft = -mOrthographicSize * aspectRatio * 0.5f;
+                float orthoRight = mOrthographicSize * aspectRatio * 0.5f;
                 float orthoBottom = -mOrthographicSize * 0.5f;
                 float orthoTop = mOrthographicSize * 0.5f;
                 mProjection = glm::ortho(orthoLeft, orthoRight, orthoBottom, orthoTop, mOrthographicNear, mOrthographicFar);
@@ -125,7 +130,7 @@ namespace Surge
 
         float mOrthographicSize = 10.0f;
         float mOrthographicNear = -1.0f, mOrthographicFar = 1.0f;
-        float mAspectRatio = 0.0f;
+        glm::vec2 mAspectRatio = glm::vec2(16.0f, 9.0f);
     };
 
 } // namespace Surge
