@@ -225,6 +225,8 @@ namespace Surge
 
         JPH::Vec3 globalGravity(0.0f, -9.81f, 0.0f);
         mPhysicsSystem->SetGravity(globalGravity);
+
+        mPhysicsSystem->SetContactListener(&mContactListener);
     }
 
     void Physics::Update(float deltaTime)
@@ -308,6 +310,7 @@ namespace Surge
         settings.mAngularDamping = rb.AngularDamping;
         settings.mFriction = rb.Friction;
         settings.mRestitution = rb.Bounciness;
+        settings.mUserData = static_cast<uint64_t>(entity.Raw());
 
         if(motionType == JPH::EMotionType::Dynamic)
         {

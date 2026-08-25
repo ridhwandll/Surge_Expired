@@ -40,18 +40,6 @@ namespace Surge
     {
         mIsRunning = true;
 
-        for (const auto& [entity, rigidbody] : mRegistry.view<RigidbodyComponent>().each())
-            OnColliderAdded(mRegistry, entity);
-
-        mRegistry.on_construct<RigidbodyComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<BoxColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<SphereColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<CapsuleColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<CylinderColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<ConvexColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
-        mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
-
         // Refresh the asset references from the asset manager to ensure it's loaded and valid
         for(const auto& [entity, script] : mRegistry.view<ScriptComponent>().each())
         {
@@ -63,6 +51,18 @@ namespace Surge
             if (canvas.ScriptAsset)
                 canvas.ScriptAsset = Core::GetAssetManager()->Load<Script>(canvas.ScriptAsset->GetID());
         }
+
+        for(const auto& [entity, rigidbody] : mRegistry.view<RigidbodyComponent>().each())
+            OnColliderAdded(mRegistry, entity);
+
+        mRegistry.on_construct<RigidbodyComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<BoxColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<SphereColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<CapsuleColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<CylinderColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<ConvexColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
+        mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
         Physics* physics = Core::GetPhysics();
         physics->OptimizeBroadPhase();
@@ -755,6 +755,34 @@ namespace Surge
                     }
                 }
             }
+
+            // Handle Physics Collisions
+            auto collisions = Core::GetPhysics()->GetContactListener().FlushEvents();
+            for(const auto& event : collisions)
+            {
+                Entity entA(static_cast<entt::entity>(event.EnttIDA), this);
+                Entity entB(static_cast<entt::entity>(event.EnttIDB), this);
+
+                if(!mRegistry.valid(entA) || !mRegistry.valid(entB))
+                    continue;
+
+                // Fire for Entity A
+                if(entA.HasComponent<ScriptComponent>())
+                {
+                    auto& scriptC = entA.GetComponent<ScriptComponent>();
+                    if (scriptC.ScriptAsset)
+                        scriptC.ScriptAsset.As<Script>()->ExecuteOnCollisionEnter(entA, entB);
+                }
+
+                // Fire for Entity B
+                if(entB.HasComponent<ScriptComponent>())
+                {
+                    auto& scriptC = entB.GetComponent<ScriptComponent>();
+                    if(scriptC.ScriptAsset)
+                        scriptC.ScriptAsset.As<Script>()->ExecuteOnCollisionEnter(entB, entA);
+                }
+            }
+
         }
     }
 

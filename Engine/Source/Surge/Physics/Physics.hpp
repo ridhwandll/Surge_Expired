@@ -6,6 +6,8 @@
 #include <Jolt/Physics/Collision/Shape/Shape.h>
 #include <glm/ext/vector_float3.hpp>
 
+#include "ContactListener.hpp"
+
 namespace JPH
 {
     class PhysicsSystem;
@@ -49,6 +51,8 @@ namespace Surge
 
         void GetDebugStats(int& outActiveBodies, int& outTotalBodies);
 
+        ContactListener& GetContactListener() { return mContactListener; }
+
         JPH::PhysicsSystem* Get() { return mPhysicsSystem; }
         JPH::DebugRenderer* GetDebugRenderer() { return mDebugRenderer; }
     private:
@@ -56,6 +60,7 @@ namespace Surge
         JPH::JobSystemThreadPool* mJobSystem;
         JPH::TempAllocatorImpl* mTempAllocator;
         JPH::DebugRenderer* mDebugRenderer;
+        ContactListener mContactListener;
 
         float mAccumulatedTime = 0.0f;
 

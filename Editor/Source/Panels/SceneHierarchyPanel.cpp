@@ -64,7 +64,8 @@ namespace Surge
 
                 // Search Bar
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(addButtonLabel).x - 20.0f); // 20.0f is padding + scroll bar width (approx.)
-                ImGui::InputTextWithHint("##Search", "Search Entities...", sSearchBuffer, 256);
+
+                ImGui::InputTextWithHint("##Search", std::format("Search in Total {} Entities...", mSceneContext->GetRegistry().alive()).c_str(), sSearchBuffer, 256);
 
                 ImGui::SameLine();
 

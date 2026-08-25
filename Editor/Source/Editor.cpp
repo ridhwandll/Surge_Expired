@@ -396,6 +396,14 @@ namespace Surge
     {
         ImGui::Begin("Editor Settings");
         ImGui::Checkbox("Show Axes", &mShowAxes);
+
+        if (ImGui::Button("Toggle Debug Render"))
+        {
+            if(mRuntimeScene)
+                mRuntimeScene->SetRenderDebug(!mRuntimeScene->IsRenderDebug());
+            else
+                mActiveScene->SetRenderDebug(!mActiveScene->IsRenderDebug());
+        }
         ImGui::End();
     }
 
@@ -460,7 +468,7 @@ namespace Surge
         mPanelManager.GetPanel<ViewportPanel>()->OnSceneContextChanged();
         mActiveScene = std::move(scene);
         mActiveScene->SetSelectedEntity({});
-
+        mActiveScene->SetRenderDebug(true);
         //mAssetImporter.ScanAndCookAll();
     }
 

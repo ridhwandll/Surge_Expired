@@ -7,6 +7,9 @@
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/Audio/AudioEngine.hpp"
 #include "BindingUtils.hpp"
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+#include "../ScriptAsset.hpp"
 
 namespace Surge::ScriptBinding
 {
@@ -40,6 +43,23 @@ namespace Surge::ScriptBinding
         entityType["IsValid"] = [](const Entity& e) { return static_cast<bool>(e); };
         entityType["Destroy"] = [](Entity& e) { if(e) e.GetScene()->DestroyEntity(e); };
         entityType["FindEntityByName"] = [](Entity& e, const String& targetName) -> Entity { return e.GetScene()->GetEntityByName(targetName); };
+        entityType["CreateEntity"] = [](Entity& e, const String& name) -> Entity {
+
+            Entity outEntity = {};
+            if(Scene* scene = e.GetScene())
+                scene->CreateEntity(outEntity, name);
+
+            if (!outEntity)
+                Log<Severity::Warn>("ECSBindings: Cannot create entity. Parent entity has no valid Scene reference!");
+
+            return outEntity;
+        };
+        entityType["SetParent"] = [](Entity& child, Entity& parent) {
+            if(child && parent)
+                child.GetScene()->SetParent(child, parent);
+            else
+                Log<Severity::Warn>("ECSBindings: Cannot set parent. Invalid child or parent entity.");
+        };
 
         BindComponentToEntity<NameComponent>(entityType, "NameC");
         BindComponentToEntity<TransformComponent>(entityType, "TransformC");
@@ -139,6 +159,21 @@ namespace Surge::ScriptBinding
         lua.new_usertype<MeshComponent>("MeshComponent", sol::no_constructor,
                                         "Active", BIND_PROP(MeshComponent, Active),
                                         "DropShadow", BIND_PROP(MeshComponent, DropShadow),
+                                        "SetMesh", [](MeshComponent& mc, const String& meshAssetPath)
+                                        {
+                                            AssetManager* am = Core::GetAssetManager();
+                                            AssetID id = am->GetIDFromPath(meshAssetPath);
+                                            if(id)
+                                            {
+                                                Ref<Mesh> mesh = am->Load<Mesh>(id);
+                                                if(mesh)
+                                                    mc.MeshAsset = mesh;
+                                                else
+                                                    Log<Severity::Warn>("[ECSBindings.cpp] Lua: MeshComponent: Failed to load mesh at path {}", meshAssetPath);
+                                            }
+                                            else
+                                                Log<Severity::Warn>("[ECSBindings.cpp] Lua: MeshComponent: Failed to load mesh at path {}", meshAssetPath);
+                                        },
                                         STRICT_READ(MeshComponent));
 
         lua.new_usertype<LightComponent>("LightComponent", sol::no_constructor,
@@ -266,6 +301,21 @@ namespace Surge::ScriptBinding
         lua.new_usertype<ScriptComponent>("ScriptComponent", sol::no_constructor,
                                           "Active", BIND_PROP(ScriptComponent, Active),
                                           "ScriptAsset", BIND_PROP(ScriptComponent, ScriptAsset),
+                                          "SetScript", [](ScriptComponent& sc, const String& scriptAssetPath)
+                                          {
+                                              AssetManager* am = Core::GetAssetManager();
+                                              AssetID id = am->GetIDFromPath(scriptAssetPath);
+                                              if(id)
+                                              {
+                                                  Ref<Script> script = am->Load<Script>(id);
+                                                  if(script)
+                                                      sc.ScriptAsset = script;
+                                                  else
+                                                      Log<Severity::Warn>("[ECSBindings.cpp] Lua: ScriptComponent: Failed to load script at path {}", scriptAssetPath);
+                                              }
+                                              else
+                                                  Log<Severity::Warn>("[ECSBindings.cpp] Lua: ScriptComponent: Failed to load script at path {}", scriptAssetPath);
+                                          },
                                           STRICT_READ(ScriptComponent));
 
         lua.new_usertype<TextComponent>("TextComponent", sol::no_constructor,

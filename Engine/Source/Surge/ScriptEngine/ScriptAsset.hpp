@@ -21,6 +21,7 @@ namespace Surge
         void ExecuteOnCreate(Entity e);
         void ExecuteOnUpdate(Entity e);
         void ExecuteOnDestroy(Entity e);
+        void ExecuteOnCollisionEnter(Entity e, Entity other);
 
         static Ref<Script> Create(Vector<Byte>&& bytecode);
     private:
@@ -30,6 +31,8 @@ namespace Surge
         sol::protected_function mOnCreate;
         sol::protected_function mOnUpdate;
         sol::protected_function mOnDestroy;
+
+        sol::protected_function mOnCollisionEnter;
 
         friend class ScriptSerializer;
     };

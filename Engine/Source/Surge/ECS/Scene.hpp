@@ -48,6 +48,7 @@ namespace Surge
         void OnResize(float width, float height);
 
         void SetRenderDebug(bool renderDebug) { mRenderDebug = renderDebug; }
+        bool IsRenderDebug() const { return mRenderDebug; }
         void SetRunning(bool isRunning) { mIsRunning = isRunning; }
         bool IsRunning() const { return mIsRunning; }
 
@@ -140,7 +141,7 @@ namespace Surge
             return mScene;
         }
 
-        operator bool() const { return mEnttHandle != entt::null; }
+        operator bool() const { return (mEnttHandle != entt::null) && (mScene != nullptr); }
         operator entt::entity() const { return mEnttHandle; }
         bool operator==(const Entity& other) const { return mEnttHandle == other.mEnttHandle && mScene == other.mScene; }
         bool operator!=(const Entity& other) const { return !(*this == other); }

@@ -27,6 +27,7 @@ namespace Surge
             mOnCreate = mEnv["OnCreate"];
             mOnUpdate = mEnv["OnUpdate"];
             mOnDestroy = mEnv["OnDestroy"];
+            mOnCollisionEnter = mEnv["OnCollisionEnter"];
         }
         else
         {
@@ -72,6 +73,19 @@ namespace Surge
             {
                 sol::error err = destroyResult;
                 Log<Severity::Error>("Lua OnDestroy Error: {}", err.what());
+            }
+        }
+    }
+
+    void Script::ExecuteOnCollisionEnter(Entity e, Entity other)
+    {
+        if (mOnCollisionEnter.valid())
+        {
+            auto collisionResult = mOnCollisionEnter(std::move(e), std::move(other));
+            if (!collisionResult.valid())
+            {
+                sol::error err = collisionResult;
+                Log<Severity::Error>("Lua OnCollisionEnter Error: {}", err.what());
             }
         }
     }

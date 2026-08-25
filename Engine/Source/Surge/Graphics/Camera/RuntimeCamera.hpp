@@ -50,7 +50,7 @@ namespace Surge
 
         void SetViewportSize(float width, float height)
         {
-            if(height == 0.0f)
+            if(width <= 0.0f || height <= 0.0f)
                 return;
 
             mAspectRatio = glm::vec2(width, height);

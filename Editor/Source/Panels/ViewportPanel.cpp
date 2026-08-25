@@ -339,7 +339,10 @@ namespace Surge
                         }
 
                         glm::vec3 translation, rotation, scale;
+
                         Math::DecomposeTransform(transform, translation, rotation, scale);
+                        if (translation.x < 0)
+                            Log<Severity::Info>("Translation X: ", translation.x, " Y: ", translation.y, " Z: ", translation.z);
 
                         glm::vec3 deltaRotation = glm::degrees(rotation) - transformComponent.Rotation;
                         transformComponent.Position = translation;
