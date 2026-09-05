@@ -11,23 +11,26 @@ namespace Surge
         : mBytecode(std::move(bytecode))
     {}
 
-    void Script::CreateEnvironment()
+    void Script::CreateEnvironment(sol::environment* outEnv, sol::protected_function* outOnCreate,
+                           sol::protected_function* outOnUpdate,
+                           sol::protected_function* outOnDestroy,
+                           sol::protected_function* outOnCollisionEnter)
     {
         SG_ASSERT(!mBytecode.empty(), "Script bytecode is empty. Cannot create environment!");
 
         ScriptEngine* scriptEngine = Core::GetScriptEngine();
         sol::state_view* luaState = static_cast<sol::state_view*>(scriptEngine->GetSOLState());
         // TODO: move this to ScriptEngine and make it a function that returns a sol::environment thingy
-        mEnv = sol::environment(*luaState, sol::create, luaState->globals());
+        *outEnv = sol::environment(*luaState, sol::create, luaState->globals());
         std::string_view bytecodeView(reinterpret_cast<const char*>(mBytecode.data()), mBytecode.size());
-        auto result = luaState->safe_script(bytecodeView, mEnv, sol::script_pass_on_error);
+        auto result = luaState->safe_script(bytecodeView, *outEnv, sol::script_pass_on_error);
 
         if(result.valid())
         {
-            mOnCreate = mEnv["OnCreate"];
-            mOnUpdate = mEnv["OnUpdate"];
-            mOnDestroy = mEnv["OnDestroy"];
-            mOnCollisionEnter = mEnv["OnCollisionEnter"];
+            *outOnCreate = (*outEnv)["OnCreate"];
+            *outOnUpdate = (*outEnv)["OnUpdate"];
+            *outOnDestroy = (*outEnv)["OnDestroy"];
+            *outOnCollisionEnter = (*outEnv)["OnCollisionEnter"];
         }
         else
         {
@@ -36,12 +39,12 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnCreate(Entity e)
+    void Script::ExecuteOnCreate(Entity e, sol::protected_function& func)
     {
-        if(mOnCreate.valid())
+        if(func.valid())
         {
             // We Use std::move() to force sol2 to copy the Entity into Lua's memory instead of capturing a reference to the local stack variable
-            auto createResult = mOnCreate(std::move(e));
+            auto createResult = func(std::move(e));
             if(!createResult.valid())
             {
                 sol::error err = createResult;
@@ -50,12 +53,12 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnUpdate(Entity e)
+    void Script::ExecuteOnUpdate(Entity e, sol::protected_function& func)
     {
-        if(mOnUpdate.valid())
+        if(func.valid())
         {
             float dt = Core::GetClock().GetSeconds();
-            auto updateResult = mOnUpdate(std::move(e), dt);
+            auto updateResult = func(std::move(e), dt);
             if(!updateResult.valid())
             {
                 sol::error err = updateResult;
@@ -64,11 +67,11 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnDestroy(Entity e)
+    void Script::ExecuteOnDestroy(Entity e, sol::protected_function& func)
     {
-        if(mOnDestroy.valid())
+        if(func.valid())
         {
-            auto destroyResult = mOnDestroy(std::move(e));
+            auto destroyResult = func(std::move(e));
             if(!destroyResult.valid())
             {
                 sol::error err = destroyResult;
@@ -77,11 +80,11 @@ namespace Surge
         }
     }
 
-    void Script::ExecuteOnCollisionEnter(Entity e, Entity other)
+    void Script::ExecuteOnCollisionEnter(Entity e, Entity other, sol::protected_function& func)
     {
-        if (mOnCollisionEnter.valid())
+        if (func.valid())
         {
-            auto collisionResult = mOnCollisionEnter(std::move(e), std::move(other));
+            auto collisionResult = func(std::move(e), std::move(other));
             if (!collisionResult.valid())
             {
                 sol::error err = collisionResult;

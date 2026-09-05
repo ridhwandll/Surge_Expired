@@ -2,7 +2,8 @@
 #include "Physics.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/ECS/Scene.hpp"
-#include "Surge/ECS/Components.hpp"
+#include "Surge/ECS/Components/Components.hpp"
+
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Asset/AssetManager.hpp"

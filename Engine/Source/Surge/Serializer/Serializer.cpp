@@ -3,17 +3,32 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+
 #include "Surge/ECS/Scene.hpp"
-#include "Surge/ECS/Components.hpp"
+#include "Surge/ECS/Components/Components.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
+
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
+
 #include "Surge/Audio/Audio.hpp"
+
 #include "Surge/Graphics/HighLevel/Font.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
+
 #include "Surge/Utility/Filesystem.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <json/json.hpp>
+
+//! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
+#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
+                                ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent, ::Surge::RelationshipComponent, \
+                                ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
+                                ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
+                                ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
+                                ::Surge::ScriptComponent, ::Surge::TextComponent, ::Surge::UICanvasComponent, \
+                                ::Surge::AudioListenerComponent, ::Surge::AudioSourceComponent
 
 // https://github.com/nlohmann/json#arbitrary-types-conversions
 namespace glm

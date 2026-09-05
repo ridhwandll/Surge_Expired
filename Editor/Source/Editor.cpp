@@ -1,10 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include <Surge/Surge.hpp>
 #include "Editor.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Time/Clock.hpp"
+#include "Surge/Core/Input/Input.hpp"
+
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Physics/Physics.hpp"
+
+#include "Surge/Utility/Platform.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 
 #include "Utility/ImGuiAux.hpp"
 #include "Panels/ViewportPanel.hpp"
@@ -21,7 +26,6 @@
 #include "Asset/Cookers/FontCooker.hpp"
 #include "Asset/Cookers/AudioCooker.hpp"
 
-#include "Surge/Physics/Physics.hpp"
 
 namespace Surge
 {

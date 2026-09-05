@@ -1,7 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/SceneHierarchyPanel.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/ECS/Components.hpp"
+
+#include "Surge/ECS/Components/Components.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
+
 #include "Utility/ImGuiAux.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"

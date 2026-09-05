@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/ECS/Components.hpp"
+#include "Surge/ECS/Components/Components.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
 
 // SurgeReflect - Component Register
 

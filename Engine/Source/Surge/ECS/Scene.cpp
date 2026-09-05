@@ -1,6 +1,8 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/ECS/Scene.hpp"
-#include "Surge/ECS/Components.hpp"
+#include "Surge/ECS/Components/Components.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
+
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
@@ -13,8 +15,8 @@
 #include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
 #include <regex>
-#include "../Audio/AudioEngine.hpp"
-#include "../Audio/Audio.hpp"
+#include "Surge/Audio/AudioEngine.hpp"
+#include "Surge/Audio/Audio.hpp"
 
 namespace Surge
 {
@@ -722,12 +724,12 @@ namespace Surge
                     Entity entityObj = { entityID, this };
                     if(!scriptComp.IsInstantiated)
                     {
-                        script->CreateEnvironment();
-                        script->ExecuteOnCreate(entityObj);
+                        script->CreateEnvironment(&scriptComp.Env, &scriptComp.OnCreate, &scriptComp.OnUpdate, &scriptComp.OnDestroy, &scriptComp.OnCollisionEnter);
+                        script->ExecuteOnCreate(entityObj, scriptComp.OnCreate);
                         scriptComp.IsInstantiated = true;
                     }
                     else
-                        script->ExecuteOnUpdate(entityObj);
+                        script->ExecuteOnUpdate(entityObj, scriptComp.OnUpdate);
                 }
             }
             {
@@ -746,12 +748,12 @@ namespace Surge
                     {
                         if(!uiComp.IsInstantiated)
                         {
-                            script->CreateEnvironment();
-                            script->ExecuteOnCreate(entityObj);
+                            script->CreateEnvironment(&uiComp.Env, &uiComp.OnCreate, &uiComp.OnUpdate, &uiComp.OnDestroy, &uiComp.OnCollisionEnter);
+                            script->ExecuteOnCreate(entityObj, uiComp.OnCreate);
                             uiComp.IsInstantiated = true;
                         }
                         else if(uiComp.IsInstantiated)
-                            script->ExecuteOnUpdate(entityObj);
+                            script->ExecuteOnUpdate(entityObj, uiComp.OnUpdate);
                     }
                 }
             }
@@ -771,7 +773,7 @@ namespace Surge
                 {
                     auto& scriptC = entA.GetComponent<ScriptComponent>();
                     if (scriptC.ScriptAsset)
-                        scriptC.ScriptAsset.As<Script>()->ExecuteOnCollisionEnter(entA, entB);
+                        scriptC.ScriptAsset.As<Script>()->ExecuteOnCollisionEnter(entA, entB, scriptC.OnCollisionEnter);
                 }
 
                 // Fire for Entity B
@@ -779,7 +781,7 @@ namespace Surge
                 {
                     auto& scriptC = entB.GetComponent<ScriptComponent>();
                     if(scriptC.ScriptAsset)
-                        scriptC.ScriptAsset.As<Script>()->ExecuteOnCollisionEnter(entB, entA);
+                        scriptC.ScriptAsset.As<Script>()->ExecuteOnCollisionEnter(entB, entA, scriptC.OnCollisionEnter);
                 }
             }
 
@@ -887,7 +889,7 @@ namespace Surge
         ScriptComponent& comp = e.GetComponent<ScriptComponent>();
         if(comp.IsInstantiated)
         {
-            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e);
+            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e, comp.OnDestroy);
             comp.IsInstantiated = false;
         }
     }
@@ -897,7 +899,7 @@ namespace Surge
         UICanvasComponent& comp = e.GetComponent<UICanvasComponent>();
         if(comp.IsInstantiated)
         {
-            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e);
+            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e, comp.OnDestroy);
             comp.IsInstantiated = false;
         }
     }

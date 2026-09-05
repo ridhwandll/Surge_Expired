@@ -1,10 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "InspectorPanel.hpp"
-#include "Surge/Graphics/HighLevel/Mesh.hpp"
-#include "Surge/Asset/AssetManager.hpp"
-#include "Surge/ECS/Components.hpp"
 #include "Surge/Core/Core.hpp"
+
+#include "Surge/ECS/Components/Components.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
+
+#include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/Font.hpp"
+
+#include "Surge/Asset/AssetManager.hpp"
+
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
 #include "Surge/Audio/Audio.hpp"
 
@@ -378,20 +383,21 @@ namespace Surge
 
     void InspectorPanel::DrawComponents(Entity& entity)
     {
-        if(entity.HasComponent<NameComponent>())
-        {
-            NameComponent& component = entity.GetComponent<NameComponent>();
+        // All Entity must have IDComponent and NameComponent, so we can safely assume they exist
 
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
-            ImGui::PushItemWidth(-1);
-            ImGui::InputText("##nA@Me", &component.Name);
-            ImGui::PopItemWidth();
-            ImGui::PopStyleVar();
+        // IDComponent
+        ImGui::TextDisabled("ID: %llu", entity.GetComponent<IDComponent>().ID.Get());
 
-            ImGui::Dummy(ImVec2(0, 4));
-            ImGui::Separator();
-            ImGui::Dummy(ImVec2(0, 4));
-        }
+        // NameComponent
+        NameComponent& component = entity.GetComponent<NameComponent>();
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
+        ImGui::PushItemWidth(-1);
+        ImGui::InputText("##nA@Me", &component.Name);
+        ImGui::PopItemWidth();
+        ImGui::PopStyleVar();
+        ImGui::Dummy(ImVec2(0, 4));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(0, 4));
 
         if(entity.HasComponent<TransformComponent>())
         {

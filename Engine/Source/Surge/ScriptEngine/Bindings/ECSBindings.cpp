@@ -2,14 +2,15 @@
 #include "ECSBindings.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/ScriptEngine/Lua.hpp"
-#include "Surge/ECS/Components.hpp"
+#include "Surge/ECS/Components/Components.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/Audio/AudioEngine.hpp"
 #include "BindingUtils.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "../ScriptAsset.hpp"
+#include "Surge/ScriptEngine/ScriptAsset.hpp"
 
 namespace Surge::ScriptBinding
 {
@@ -61,6 +62,7 @@ namespace Surge::ScriptBinding
                 Log<Severity::Warn>("ECSBindings: Cannot set parent. Invalid child or parent entity.");
         };
 
+        //BindComponentToEntity<IDComponent>(entityType, "IDC");
         BindComponentToEntity<NameComponent>(entityType, "NameC");
         BindComponentToEntity<TransformComponent>(entityType, "TransformC");
         BindComponentToEntity<SpriteRendererComponent>(entityType, "SpriteRendererC");
@@ -117,6 +119,12 @@ namespace Surge::ScriptBinding
         );
 
         // COMPONENTS
+        // Fkass lua doesnt have any concept for unsigned 64 bit int
+        //lua.new_usertype<IDComponent>("IDComponent", sol::no_constructor,
+        //                              "Get", [](IDComponent& id) -> uint64_t { return id.ID.Get(); },
+        //                               STRICT_READ(IDComponent)
+        //);
+
         lua.new_usertype<NameComponent>("NameComponent", sol::no_constructor,
                                         "Name", BIND_PROP(NameComponent, Name),
                                         STRICT_READ(NameComponent)
@@ -156,6 +164,22 @@ namespace Surge::ScriptBinding
                                           "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio),
                                           STRICT_READ(CameraComponent));
 
+        // Bind the Material Asset
+        auto materialType = lua.new_usertype<Material>("Material", sol::no_constructor,
+                                                       "MarkDirty", &Material::MarkDirty,
+
+                                                       // TODO: Texture Binding
+                                                       "SetFloat", [](Material& m, const String& name, float val) { m.Set<float>(name, val); },
+                                                       "GetFloat", [](Material& m, const String& name) -> float { return m.Get<float>(name); },
+                                                       "SetInt", [](Material& m, const String& name, int val) { m.Set<int>(name, val); },
+                                                       "GetInt", [](Material& m, const String& name) -> int { return m.Get<int>(name); },
+                                                       "SetVec2", [](Material& m, const String& name, const glm::vec2& val) { m.Set<glm::vec2>(name, val); },
+                                                       "GetVec2", [](Material& m, const String& name) -> glm::vec2 { return m.Get<glm::vec2>(name); },
+                                                       "SetVec3", [](Material& m, const String& name, const glm::vec3& val) { m.Set<glm::vec3>(name, val); },
+                                                       "GetVec3", [](Material& m, const String& name) -> glm::vec3 { return m.Get<glm::vec3>(name); },
+                                                       "SetVec4", [](Material& m, const String& name, const glm::vec4& val) { m.Set<glm::vec4>(name, val); },
+                                                       "GetVec4", [](Material& m, const String& name) -> glm::vec4 { return m.Get<glm::vec4>(name); }
+        );
         lua.new_usertype<MeshComponent>("MeshComponent", sol::no_constructor,
                                         "Active", BIND_PROP(MeshComponent, Active),
                                         "DropShadow", BIND_PROP(MeshComponent, DropShadow),
@@ -173,6 +197,67 @@ namespace Surge::ScriptBinding
                                             }
                                             else
                                                 Log<Severity::Warn>("[ECSBindings.cpp] Lua: MeshComponent: Failed to load mesh at path {}", meshAssetPath);
+                                        },
+                                        "GetMaterial", [](MeshComponent& mc, Uint index) -> Material* {
+                                            if(mc.MeshAsset)
+                                            {
+                                                Ref<Mesh> mesh = mc.MeshAsset.As<Mesh>();
+                                                if(mesh)
+                                                    return mesh->GetMaterialAtIndex(index).Raw();
+                                            }
+                                            Log<Severity::Warn>("[ECSBindings.cpp] Lua: Tried to get material on a MeshComponent that has no valid MeshAsset!");
+                                            return nullptr;
+                                        },
+
+                                        "SetMaterialOverride", sol::overload(
+                                            // Overload 1: Load from a file path string
+                                            [](MeshComponent& mc, Uint index, const String& materialPath) {
+                                                if(mc.MeshAsset)
+                                                {
+                                                    Ref<Mesh> mesh = mc.MeshAsset.As<Mesh>();
+                                                    if(mesh)
+                                                    {
+                                                        AssetManager* am = Core::GetAssetManager();
+                                                        AssetID id = am->GetIDFromPath(materialPath);
+                                                        if(id)
+                                                        {
+                                                            Ref<Material> mat = am->Load<Material>(id);
+                                                            if(mat)
+                                                            {
+                                                                mesh->SetMaterialOverride(index, mat);
+                                                                return;
+                                                            }
+                                                        }
+                                                        Log<Severity::Warn>("[ECSBindings.cpp] Lua: Failed to load material override at path {}", materialPath);
+                                                    }
+                                                }
+                                            },
+                                            // Overload 2: Pass an existing Material pointer directly
+                                            [](MeshComponent& mc, Uint index, Material* mat) {
+                                                if(mc.MeshAsset && mat)
+                                                {
+                                                    Ref<Mesh> mesh = mc.MeshAsset.As<Mesh>();
+                                                    if(mesh)
+                                                        mesh->SetMaterialOverride(index, Ref<Material>(mat));
+                                                }
+                                            }
+                                        ),
+                                        "ClearMaterialOverride", [](MeshComponent& mc, Uint index) {
+                                            if(mc.MeshAsset)
+                                            {
+                                                Ref<Mesh> mesh = mc.MeshAsset.As<Mesh>();
+                                                if(mesh)
+                                                    mesh->ClearMaterialOverride(index);
+                                            }
+                                        },
+                                        "HasOverride", [](MeshComponent& mc, Uint index) -> bool {
+                                            if(mc.MeshAsset)
+                                            {
+                                                Ref<Mesh> mesh = mc.MeshAsset.As<Mesh>();
+                                                if(mesh)
+                                                    return mesh->HasOverride(index);
+                                            }
+                                            return false;
                                         },
                                         STRICT_READ(MeshComponent));
 

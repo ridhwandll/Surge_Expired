@@ -3,7 +3,7 @@
 
 namespace Surge
 {
-    JPH::ValidateResult ContactListener::OnContactValidate(const JPH::Body& inBody1, const JPH::Body& inBody2, JPH::RVec3Arg inBaseOffset, const JPH::CollideShapeResult& inCollisionResult)
+    JPH::ValidateResult ContactListener::OnContactValidate(const JPH::Body& /*inBody1*/, const JPH::Body& /*inBody2*/, JPH::RVec3Arg /*inBaseOffset*/, const JPH::CollideShapeResult& /*inCollisionResult*/)
     {
         // Accept all collisions by default
         return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;

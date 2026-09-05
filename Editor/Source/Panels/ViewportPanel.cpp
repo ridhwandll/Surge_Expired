@@ -4,7 +4,7 @@
 #include "Surge/Core/Input/Input.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/ECS/Components.hpp"
+#include "Surge/ECS/Components/Components.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "SurgeMath/Math.hpp"
 #include "Editor.hpp"

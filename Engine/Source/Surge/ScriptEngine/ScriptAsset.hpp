@@ -17,23 +17,19 @@ namespace Surge
         void SetBytecode(Vector<Byte>&& code) { mBytecode = std::move(code); }
         const Vector<Byte>& GetBytecode() const { return mBytecode; }
 
-        void CreateEnvironment();
-        void ExecuteOnCreate(Entity e);
-        void ExecuteOnUpdate(Entity e);
-        void ExecuteOnDestroy(Entity e);
-        void ExecuteOnCollisionEnter(Entity e, Entity other);
+        void CreateEnvironment(sol::environment* outEnv, sol::protected_function* outOnCreate,
+                                                         sol::protected_function* outOnUpdate,
+                                                         sol::protected_function* outOnDestroy,
+                                                         sol::protected_function* outOnCollisionEnter);
+
+        void ExecuteOnCreate(Entity e, sol::protected_function& func);
+        void ExecuteOnUpdate(Entity e, sol::protected_function& func);
+        void ExecuteOnDestroy(Entity e, sol::protected_function& func);
+        void ExecuteOnCollisionEnter(Entity e, Entity other, sol::protected_function& func);
 
         static Ref<Script> Create(Vector<Byte>&& bytecode);
     private:
         Vector<Byte> mBytecode;
-
-        sol::environment mEnv;
-        sol::protected_function mOnCreate;
-        sol::protected_function mOnUpdate;
-        sol::protected_function mOnDestroy;
-
-        sol::protected_function mOnCollisionEnter;
-
         friend class ScriptSerializer;
     };
 }

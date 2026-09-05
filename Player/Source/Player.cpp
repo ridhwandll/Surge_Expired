@@ -1,8 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include <Surge/Surge.hpp>
 #include "Player.hpp"
+#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/UISystem/UIManager.hpp"
+#include "Surge/Serializer/Serializer.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

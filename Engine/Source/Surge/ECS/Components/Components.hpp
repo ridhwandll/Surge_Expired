@@ -247,13 +247,7 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
-    struct ScriptComponent
-    {
-        bool Active = true;
-        Ref<Asset> ScriptAsset = nullptr;
-        bool IsInstantiated = false;
-        SURGE_REFLECTION_ENABLE;
-    };
+    // ScriptComponent is moved to ScriptComponent.hpp
 
     struct TextComponent
     {
@@ -277,16 +271,6 @@ namespace Surge
         glm::vec4 ShadowColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
         Ref<Asset> FontAsset = nullptr;
-
-        SURGE_REFLECTION_ENABLE;
-    };
-
-    struct UICanvasComponent
-    {
-        bool Active = true;
-        bool ShowCanvas = true;
-        Ref<Asset> ScriptAsset = nullptr;
-        bool IsInstantiated = false;
 
         SURGE_REFLECTION_ENABLE;
     };
@@ -321,12 +305,3 @@ namespace Surge
     };
 
 } // namespace Surge
-
-//! NOTE: ALL THE SERIALIZABLE COMPONENTS MUST BE REGISTERED HERE, ADD BY SEPARATING VIA A COMMA (',') WHEN YOU ADD A NEW COMPONENT
-#define SERIALIZABLE_COMPONENTS ::Surge::IDComponent,        ::Surge::NameComponent,          ::Surge::TransformComponent,      \
-                                ::Surge::CameraComponent,    ::Surge::SpriteRendererComponent, ::Surge::MeshComponent, ::Surge::RelationshipComponent, \
-                                ::Surge::LightComponent,     ::Surge::EnvironmentComponent, \
-                                ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
-                                ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
-                                ::Surge::ScriptComponent, ::Surge::TextComponent, ::Surge::UICanvasComponent, \
-                                ::Surge::AudioListenerComponent, ::Surge::AudioSourceComponent
