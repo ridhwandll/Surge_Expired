@@ -38,10 +38,6 @@ namespace Surge
         GraphicsRHI* mRHI;
         FrameContext mCurrentFrameCtx;
 
-        // UI Orthographic Projection UBO
-        BufferHandle mUIFrameUBOs[RHISettings::FRAMES_IN_FLIGHT];
-        DescriptorSetHandle mUIFrameDescriptorSet;
-
         // Pipelines (Depth Disabled)
         PipelineHandle mUIQuadPipeline;
         PipelineHandle mUITextPipeline;

@@ -16,6 +16,13 @@ namespace Surge
 
         // Jolt calls this from background threads
         std::lock_guard<std::mutex> lock(mMutex);
+
+        // Prevent duplicate events for the same pair in the same frame
+        for(const auto& event : mCollisionQueue)
+        {
+            if((event.EnttIDA == e1 && event.EnttIDB == e2) || (event.EnttIDA == e2 && event.EnttIDB == e1))
+                return;
+        }
         mCollisionQueue.push_back({ e1, e2 });
     }
 

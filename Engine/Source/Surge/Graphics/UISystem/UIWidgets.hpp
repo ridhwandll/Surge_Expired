@@ -50,6 +50,15 @@ namespace Surge::UI
     *   };
     */
 
+    enum class WidgetType
+    {
+        BASE_WIDGET,
+        IMAGE,
+        TEXT,
+        BUTTON,
+        IMAGE_BUTTON,
+    };
+
     class Widget : public RefCounted
     {
     public:
@@ -126,6 +135,7 @@ namespace Surge::UI
             mParent = nullptr;
         }
 
+        virtual WidgetType GetType() const { return WidgetType::BASE_WIDGET; }
         virtual void OnMouseEnter() { mIsHovered = true; if(mOnHoverEnter) mOnHoverEnter->Invoke(); }
         virtual void OnMouseExit() { mIsHovered = false; mIsPressed = false; if(mOnHoverExit) mOnHoverExit->Invoke(); }
         virtual void OnMouseDown() { mIsPressed = true; }
@@ -156,6 +166,7 @@ namespace Surge::UI
         Image(ImageHandle textureId = ImageHandle::Invalid())
             : mTextureID(textureId) {}
 
+        virtual WidgetType GetType() const override { return WidgetType::IMAGE; }
         virtual void GenerateDrawCommands(FrameBlackboard& blackboard) override
         {
             glm::vec2 globalPos, globalSize;
@@ -185,6 +196,7 @@ namespace Surge::UI
     public:
         Text(const String& text, AssetID fontAsset);
 
+        virtual WidgetType GetType() const override { return WidgetType::TEXT; }
         virtual void GenerateDrawCommands(FrameBlackboard& blackboard) override;
 
         void SetText(const String& text) { mText = text; }
@@ -279,7 +291,7 @@ namespace Surge::UI
             mTextWidget->SetPivot(0.0f, 0.0f);
             mTextWidget->SetTextVAlignment(alignment);
         }
-
+        virtual WidgetType GetType() const override { return WidgetType::BUTTON; }
         virtual void GenerateDrawCommands(FrameBlackboard& blackboard) override
         {
             if(mIsPressed)      mColor = PressedColor;
@@ -309,6 +321,7 @@ namespace Surge::UI
             SetSize(200.0f, 50.0f);
         }
 
+        virtual WidgetType GetType() const  override{ return WidgetType::IMAGE_BUTTON; }
         virtual void GenerateDrawCommands(FrameBlackboard& blackboard) override
         {
             if(mIsPressed)      mColor = PressedColor;

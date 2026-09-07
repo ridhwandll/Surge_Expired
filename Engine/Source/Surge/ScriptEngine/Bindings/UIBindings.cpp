@@ -27,14 +27,32 @@ namespace Surge::ScriptBinding
     class LuaEventCallback : public UI::IEventCallback
     {
     public:
-        LuaEventCallback(sol::protected_function func)
-            : mFunc(std::move(func)) {}
+        LuaEventCallback(sol::protected_function func, UI::Widget* self)
+            : mFunc(std::move(func)), mSelf(self) {}
 
         void Invoke() override
         {
             if(mFunc.valid())
             {
-                auto result = mFunc();
+                sol::protected_function_result result;
+                switch(mSelf->GetType())
+                {
+                    case UI::WidgetType::BUTTON:
+                        result = mFunc(static_cast<UI::Button*>(mSelf));
+                        break;
+                    case UI::WidgetType::IMAGE:
+                        result = mFunc(static_cast<UI::Image*>(mSelf));
+                        break;
+                    case UI::WidgetType::TEXT:
+                        result = mFunc(static_cast<UI::Text*>(mSelf));
+                        break;
+                    case UI::WidgetType::IMAGE_BUTTON:
+                        result = mFunc(static_cast<UI::ImageButton*>(mSelf));
+                        break;
+                    default:
+                        result = mFunc(mSelf);
+                        break;
+                }
                 if(!result.valid())
                 {
                     sol::error err = result;
@@ -44,6 +62,7 @@ namespace Surge::ScriptBinding
         }
     private:
         sol::protected_function mFunc;
+        UI::Widget* mSelf;
     };
 
     void BindUIWidgets(void* luaState)
@@ -61,9 +80,9 @@ namespace Surge::ScriptBinding
                                          if(child)
                                              parent.AddChild(Ref<UI::Widget>(child));
                                      },
-                                     "OnClick",      [](UI::Widget& w, sol::protected_function f) { w.SetOnClick(Ref<LuaEventCallback>::Create(f)); },
-                                     "OnHoverEnter", [](UI::Widget& w, sol::protected_function f) { w.SetOnHoverEnter(Ref<LuaEventCallback>::Create(f)); },
-                                     "OnHoverExit",  [](UI::Widget& w, sol::protected_function f) { w.SetOnHoverExit(Ref<LuaEventCallback>::Create(f)); },
+                                     "OnClick",      [](UI::Widget& w, sol::protected_function f) { w.SetOnClick(Ref<LuaEventCallback>::Create(f, &w)); },
+                                     "OnHoverEnter", [](UI::Widget& w, sol::protected_function f) { w.SetOnHoverEnter(Ref<LuaEventCallback>::Create(f, &w)); },
+                                     "OnHoverExit",  [](UI::Widget& w, sol::protected_function f) { w.SetOnHoverExit(Ref<LuaEventCallback>::Create(f, &w)); },
                                      "Anchor", sol::property(
                                          [](UI::Widget& w) -> glm::vec2 { return w.GetAnchor(); },
                                          [](UI::Widget& w, const glm::vec2& val) { w.SetAnchor(val.x, val.y); }
@@ -114,7 +133,7 @@ namespace Surge::ScriptBinding
                                    }),
                                    sol::base_classes, sol::bases<UI::Widget>(),
                                    "Text", sol::property(
-                                       [](UI::Text& t) -> String& { return t.GetTextBuffer(); },
+                                       [](UI::Text& t) -> const String& { return t.GetTextBuffer(); },
                                        [](UI::Text& t, const String& val) { t.SetText(val); }
                                    ),
                                    "FontSize", sol::property(
@@ -161,7 +180,11 @@ namespace Surge::ScriptBinding
                                      sol::base_classes, sol::bases<UI::Widget, UI::Image>(),
                                      "NormalColor", BIND_PROP(UI::Button, NormalColor),
                                      "HoverColor", BIND_PROP(UI::Button, HoverColor),
-                                     "PressedColor", BIND_PROP(UI::Button, PressedColor)
+                                     "PressedColor", BIND_PROP(UI::Button, PressedColor),
+                                     // HOW?
+                                     "GetText", [](UI::Button& btn) -> UI::Text* {
+                                         return btn.GetTextWidget().get();
+                                     }
         );
     }
 }

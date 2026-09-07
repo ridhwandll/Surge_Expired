@@ -270,7 +270,13 @@ namespace Surge
 
         if(!Filesystem::ReadTextFile(registryPath, fileContents))
         {
-            Log<Severity::Warn>("[AssetManager] Failed to open '{}'", registryPath);
+            Log<Severity::Warn>("[AssetManager] Failed to open {}", registryPath);
+            return false;
+        }
+
+        if (fileContents.empty())
+        {
+            Log<Severity::Warn>("[AssetManager] Registry file is empty: {}\nIs this intentional?", registryPath);
             return false;
         }
 

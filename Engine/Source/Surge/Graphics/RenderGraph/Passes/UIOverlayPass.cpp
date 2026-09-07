@@ -69,17 +69,6 @@ namespace Surge
         mCurrentQuadBatch.Reset();
         mCurrentQuadBatch.VertexData.resize(MAX_UI_QUADS_PER_BATCH * 4);
 
-        // Frame UBO (Orthographic Matrix)
-        BufferDesc uboDesc = {};
-        uboDesc.Size = sizeof(FrameUBO);
-        uboDesc.Usage = BufferUsage::UNIFORM;
-        uboDesc.HostVisible = true;
-        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
-        {
-            uboDesc.DebugName = std::format("UIFrameUBO Frame: {}", i);
-            mUIFrameUBOs[i] = mRHI->CreateBuffer(uboDesc);
-        }
-
         // UI Quad Pipeline (Depth testing explicitly DISABLED)
         PipelineDesc pd = {};
         pd.Shader_ = Core::GetRenderer()->GetShaderManager().Get("UIQuad.glsl");
@@ -101,23 +90,17 @@ namespace Surge
         textPd.DebugName = "UIOverlay_Text";
         mUITextPipeline = mRHI->CreatePipeline(textPd);
 
-        // Descriptor Sets
-        mUIFrameDescriptorSet = mRHI->CreateDescriptorSet(mUIQuadPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "UIOverlayFrame [Set0]");
-        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
-        {
-            DescriptorWrite write = {};
-            write.Binding = 0;
-            write.Type = DescriptorType::UNIFORM_BUFFER;
-            write.Buffer = mUIFrameUBOs[i];
-            write.BufferOffset = 0;
-            write.BufferRange = sizeof(FrameUBO);
-            mRHI->UpdateDescriptorSet(mUIFrameDescriptorSet, &write, 1, i);
-        }
-
         mTexDescriptorSets.resize(MAX_UI_QUAD_BATCHES);
         for(Uint i = 0; i < MAX_UI_QUAD_BATCHES; i++)
         {
-            mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(mUIQuadPipeline, DescriptorSetSlot::ONE, DescriptorUpdateFrequency::DYNAMIC, std::format("UIOverlay_TexSet_{}", i).c_str());
+            /*
+            Because both shaders(UIQuad.glsl and UIText.glsl) declare the exact same descriptor type (COMBINED_IMAGE_SAMPLER), the same array size (16), the
+            same binding slot (set = 0), and the same stage visibility (Fragment), the resulting VkDescriptorSetLayout for this set is 100% binary compatible between
+            the two pipelines. According to the Vulkan specification, if two pipelines share an identically defined descriptor set layout at set index N
+            a descriptor set allocated from that layout can be bound to either pipeline using vkCmdBindDescriptorSets without validation errors or GPU faults
+            */
+
+            mTexDescriptorSets[i] = mRHI->CreateDescriptorSet(mUITextPipeline/* Or mUIQuadPipeline */, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, std::format("UIOverlay_TexSet_{}", i).c_str());
             for(Uint frame = 0; frame < RHISettings::FRAMES_IN_FLIGHT; frame++)
             {
                 for(Uint slot = 0; slot < MAX_TEX_SLOTS_PER_BATCH; slot++)
@@ -149,9 +132,7 @@ namespace Surge
 
         // Orthographic Matrix
         glm::vec2 size = { blackboard.ScreenWidth, blackboard.ScreenHeight };
-        struct UIFrameUBO { glm::mat4 ViewProjection; } uiUboData;
-        uiUboData.ViewProjection = glm::ortho(0.0f, size.x, 0.0f, size.y, -1.0f, 1.0f);
-        mRHI->UploadBuffer(mUIFrameUBOs[ctx.FrameIndex], &uiUboData, sizeof(FrameUBO), 0);
+        glm::mat4 viewProjection = glm::ortho(0.0f, size.x, 0.0f, size.y, -1.0f, 1.0f);
 
         mQuadBatchCount = 0;
         mTotalQuadVertexCount = 0;
@@ -203,14 +184,14 @@ namespace Surge
             if(mQuadBatchCount > 0)
             {
                 mRHI->CmdBindPipeline(ctx, mUIQuadPipeline);
-                mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mUIFrameDescriptorSet, DescriptorSetSlot::ZERO);
+                mRHI->CmdPushConstants(ctx, mUIQuadPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(glm::mat4), &viewProjection);
                 mRHI->CmdBindVertexBuffer(ctx, mQuadVB[ctx.FrameIndex], 0);
                 mRHI->CmdBindIndexBuffer(ctx, mQuadIB, 0);
 
                 for(Uint i = 0; i < mQuadBatchCount; i++)
                 {
                     const Renderer2DPass::QuadDrawCmd& cmd = mQuadDrawCommands[i];
-                    mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
+                    mRHI->CmdBindDescriptorSet(ctx, mUIQuadPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ZERO);
                     mRHI->CmdDrawIndexed(ctx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
                 }
             }
@@ -223,7 +204,7 @@ namespace Surge
             SURGE_PROFILE_FUNC("UI TEXT");
             Uint textBatchStartIndex = mQuadBatchCount;
 
-            struct TextPushConstants { float PxRange; float pad[2]; };
+            struct TextPushConstants { glm::mat4 ViewProjection; float PxRange; float pad[2]; };
             std::array<TextPushConstants, MAX_UI_QUAD_BATCHES> textBatchParams;
             TextPushConstants currentTextParams = {};
 
@@ -280,6 +261,7 @@ namespace Surge
                     };
 
                 auto buildTextQuads = [&](glm::vec2 posOffset, float zOffset, Uint packedColor) {
+                    currentTextParams.ViewProjection = viewProjection;
                     currentTextParams.PxRange = txt.FontAsset->GetPxRange();
                     textBatchParams[mQuadBatchCount] = currentTextParams;
                     Uint lineIndex = 0;
@@ -391,7 +373,6 @@ namespace Surge
             if(mQuadBatchCount > textBatchStartIndex)
             {
                 mRHI->CmdBindPipeline(ctx, mUITextPipeline);
-                mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mUIFrameDescriptorSet, DescriptorSetSlot::ZERO);
                 mRHI->CmdBindVertexBuffer(ctx, mQuadVB[ctx.FrameIndex], 0);
                 mRHI->CmdBindIndexBuffer(ctx, mQuadIB, 0);
 
@@ -401,7 +382,7 @@ namespace Surge
                     mRHI->CmdPushConstants(ctx, mUITextPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(TextPushConstants), &params);
 
                     const Renderer2DPass::QuadDrawCmd& cmd = mQuadDrawCommands[i];
-                    mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ONE);
+                    mRHI->CmdBindDescriptorSet(ctx, mUITextPipeline, mTexDescriptorSets[i], DescriptorSetSlot::ZERO);
                     mRHI->CmdDrawIndexed(ctx, cmd.QuadCount * 6, 1, 0, (int32_t)cmd.VertexOffset, 0);
                 }
             }
@@ -458,16 +439,12 @@ namespace Surge
     {
         mRHI->DestroyPipeline(mUIQuadPipeline);
         mRHI->DestroyPipeline(mUITextPipeline);
-        mRHI->DestroyDescriptorSet(mUIFrameDescriptorSet);
 
         for(Uint i = 0; i < MAX_UI_QUAD_BATCHES; i++)
             mRHI->DestroyDescriptorSet(mTexDescriptorSets[i]);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
-        {
             mRHI->DestroyBuffer(mQuadVB[i]);
-            mRHI->DestroyBuffer(mUIFrameUBOs[i]);
-        }
 
         mRHI->DestroyBuffer(mQuadIB);
         mRHI->DestroyFramebuffer(blackBoard.UIOverlayFramebuffer);

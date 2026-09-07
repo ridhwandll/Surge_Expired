@@ -6,11 +6,9 @@ layout(location = 1) in uint inColor;
 layout(location = 2) in vec2 inUV;
 layout(location = 3) in uint inTextureIndex;
 
-layout(set = 0, binding = 0) uniform FrameUBO
+layout(push_constant) uniform PushConstants
 {
-    mat4 ViewProjection;
-    vec2 ScreenSize;
-    vec2 _pad;
+    mat4 ViewProjection; //OrthographicMatrix
 } uFrame;
 
 layout(location = 0) flat out uint outColor;
@@ -28,7 +26,7 @@ void main()
 //SURGE:[Shader: Fragment]
 #version 450
 
-layout(set = 1, binding = 0) uniform sampler2D uTextures[16];
+layout(set = 0, binding = 0) uniform sampler2D uTextures[16];
 
 layout(location = 0) flat in uint inColor;
 layout(location = 1) in vec2 inUV;

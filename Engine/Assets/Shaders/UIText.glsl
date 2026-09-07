@@ -6,9 +6,11 @@ layout(location = 1) in uint inColor;
 layout(location = 2) in vec2 inUV;
 layout(location = 3) in uint inTextureIndex;
 
-layout(set = 0, binding = 0) uniform FrameUBO
+layout(push_constant) uniform PushConstants
 {
-    mat4 ViewProjection;
+    mat4 ViewProjection; //OrthographicMatrix
+    float PxRange;
+    float pad[2];
 } uFrame;
 
 layout(location = 0) flat out uint outColor;
@@ -31,12 +33,13 @@ layout(location = 0) flat in uint inColor;
 layout(location = 1) in vec2 inUV;
 layout(location = 2) flat in uint inTextureIndex;
 
-layout(set = 1, binding = 0) uniform sampler2D uTextures[16];
+layout(set = 0, binding = 0) uniform sampler2D uTextures[16];
 
 layout(location = 0) out vec4 o_Color;
 
 layout(push_constant) uniform TextParams
 {
+    mat4 ViewProjection; //OrthographicMatrix
     float PxRange;
     float pad[2];
 } u_Params;
