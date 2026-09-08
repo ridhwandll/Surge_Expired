@@ -23,7 +23,7 @@ namespace Surge::ScriptBinding
 
         // Property getter (e.g. entity.TransformC)
         entityType[componentName] = sol::property([](Entity& e) -> T* {
-            if(e.HasComponent<T>())
+            if(e && e.HasComponent<T>())
                 return &e.GetComponent<T>();
             return nullptr;
          });
@@ -43,6 +43,7 @@ namespace Surge::ScriptBinding
 
         entityType["IsValid"] = [](const Entity& e) { return static_cast<bool>(e); };
         entityType["Destroy"] = [](Entity& e) { if(e) e.GetScene()->DestroyEntity(e); };
+        entityType["DestroyImmediate"] = [](Entity& e) { if(e) e.GetScene()->DestroyEntityImmediate(e); };
         entityType["FindEntityByName"] = [](Entity& e, const String& targetName) -> Entity { return e.GetScene()->GetEntityByName(targetName); };
         entityType["CreateEntity"] = [](Entity& e, const String& name) -> Entity {
 

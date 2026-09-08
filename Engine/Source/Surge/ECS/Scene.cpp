@@ -85,6 +85,31 @@ namespace Surge
         mIsRunning = false;
     }
 
+    void Scene::DestroyEntityImmediate(Entity entity)
+    {
+        if(sSelectedEntity == entity)
+            sSelectedEntity = Entity(entt::null, nullptr);
+
+        if(entity.HasComponent<ScriptComponent>())
+            OnScriptDestroyed(mRegistry, entity.Raw());
+
+        auto& rel = entity.GetComponent<RelationshipComponent>();
+
+        entt::entity currentChild = (entt::entity)rel.FirstChild;
+        while(currentChild != entt::null)
+        {
+            Entity child(currentChild, this);
+            entt::entity nextChild = (entt::entity)child.GetComponent<RelationshipComponent>().NextSibling;
+
+            // (Every child will loop back to the top of this function and fire its own script callback)
+            DestroyEntityImmediate(child);
+            currentChild = nextChild;
+        }
+
+        SetParent(entity, Entity {});
+        mRegistry.destroy(entity.Raw());
+    }
+
     void Scene::UpdateAudio()
     {
         SURGE_PROFILE_FUNC("Scene::UpdateAudio");
@@ -319,13 +344,13 @@ namespace Surge
                         float theta1 = (float)i / segments * 2.0f * pi;
                         float theta2 = (float)(i + 1) / segments * 2.0f * pi;
 
-                        // --- MIN DISTANCE (GREEN CIRCLE) ---
+                        // Min distance (green circle)
                         glm::vec3 minP0 = center + glm::vec3(std::cos(theta1) * audioSrc.MinDistance, 0.0f, std::sin(theta1) * audioSrc.MinDistance);
                         glm::vec3 minP1 = center + glm::vec3(std::cos(theta2) * audioSrc.MinDistance, 0.0f, std::sin(theta2) * audioSrc.MinDistance);
 
                         renderer->SubmitLine(minP0, minP1, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 
-                        // --- MAX DISTANCE (RED CIRCLE) ---
+                        // Max distance (Red circle)
                         glm::vec3 maxP0 = center + glm::vec3(std::cos(theta1) * audioSrc.MaxDistance, 0.0f, std::sin(theta1) * audioSrc.MaxDistance);
                         glm::vec3 maxP1 = center + glm::vec3(std::cos(theta2) * audioSrc.MaxDistance, 0.0f, std::sin(theta2) * audioSrc.MaxDistance);
 
@@ -337,6 +362,22 @@ namespace Surge
         renderer->EndFrame();
     }
 
+    void Scene::ProcessPendingEntityDestructions()
+    {
+        if(mEntitiesToDestroy.empty())
+            return;
+
+        // Copy and clear to allow safe re-entrant destruction if needed
+        Vector<entt::entity> toDestroy = std::move(mEntitiesToDestroy);
+        mEntitiesToDestroy.clear();
+
+        for(entt::entity raw : toDestroy)
+        {
+            if(mRegistry.valid(raw))
+                DestroyEntityImmediate(Entity(raw, this));
+        }
+    }
+
     void Scene::Update(EditorCamera& camera)
     {
         SURGE_PROFILE_FUNC("Scene::Update(Editor)");
@@ -346,6 +387,7 @@ namespace Surge
         UpdateScripts();
         UpdateTransforms();
         UpdateRendering(camera.GetViewMatrix(), camera.GetProjectionMatrix(), camera.GetNearAndFarPlane());
+        ProcessPendingEntityDestructions();
     }
 
     void Scene::Update()
@@ -361,6 +403,8 @@ namespace Surge
         Pair<RuntimeCamera*, glm::mat4> camera = GetMainCameraEntity();
         if(camera.Data1)
             UpdateRendering(glm::inverse(camera.Data2), camera.Data1->GetProjectionMatrix(), { camera.Data1->GetPerspectiveNearClip(), camera.Data1->GetPerspectiveFarClip() });
+
+        ProcessPendingEntityDestructions();
     }
 
     template <typename T>
@@ -485,27 +529,17 @@ namespace Surge
 
     void Scene::DestroyEntity(Entity entity)
     {
-        if(!entity)
+        if(!entity || !mRegistry.valid(entity.Raw()))
             return;
 
-        if(entity.HasComponent<ScriptComponent>())
-            OnScriptDestroyed(mRegistry, entity.Raw());
-
-        auto& rel = entity.GetComponent<RelationshipComponent>();
-
-        entt::entity currentChild = (entt::entity)rel.FirstChild;
-        while(currentChild != entt::null)
+        // Prevent duplicate entries in the destruction queue
+        entt::entity raw = entity.Raw();
+        for(entt::entity queued : mEntitiesToDestroy)
         {
-            Entity child(currentChild, this);
-            entt::entity nextChild = (entt::entity)child.GetComponent<RelationshipComponent>().NextSibling;
-
-            // (Every child will loop back to the top of this function and fire its own script callback)
-            DestroyEntity(child);
-            currentChild = nextChild;
+            if(queued == raw)
+                return;
         }
-
-        SetParent(entity, Entity {});
-        mRegistry.destroy(entity.Raw());
+        mEntitiesToDestroy.push_back(raw);
     }
 
     Entity Scene::DuplicateEntity(Entity entity)
@@ -713,9 +747,15 @@ namespace Surge
         if(mIsRunning)
         {
             {
+                // Copy to local buffer to avoid issues with scripts adding/removing entities during execution
                 auto view = mRegistry.view<ScriptComponent>();
-                for(auto entityID : view)
+                Vector<entt::entity> scriptEntities(view.begin(), view.end());
+
+                for(auto entityID : scriptEntities)
                 {
+                    if (!mRegistry.valid(entityID))
+                        continue;
+
                     auto& scriptComp = view.get<ScriptComponent>(entityID);
                     if(!scriptComp.ScriptAsset || !scriptComp.Active)
                         continue;
@@ -734,8 +774,13 @@ namespace Surge
             }
             {
                 auto view = mRegistry.view<UICanvasComponent>();
-                for(auto entityID : view)
+                Vector<entt::entity> uiCanvases(view.begin(), view.end());
+
+                for(auto entityID : uiCanvases)
                 {
+                    if(!mRegistry.valid(entityID))
+                        continue;
+
                     auto& uiComp = view.get<UICanvasComponent>(entityID);
                     if(!uiComp.ScriptAsset || !uiComp.Active)
                         continue;

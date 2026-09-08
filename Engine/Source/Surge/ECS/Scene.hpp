@@ -3,6 +3,7 @@
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Core/Memory.hpp"
 #include "Surge/Core/UUID.hpp"
+#include "Surge/Core/Vector.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Asset/Asset.hpp"
@@ -39,6 +40,7 @@ namespace Surge
         void CreateEntityEmpty(Entity& outEntity, const String& name);
         void CreateEntityWithID(Entity& outEntity, const UUID& id, const String& name = "New Entity");
         void DestroyEntity(Entity entity);
+        void DestroyEntityImmediate(Entity entity);
         void SetParent(Entity entity, Entity newParent);
         Entity DuplicateEntity(Entity entity);
 
@@ -64,6 +66,7 @@ namespace Surge
         void UpdatePhysics();
         void UpdateAudio();
         void UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar);
+        void ProcessPendingEntityDestructions();
 
     private:
         void AddStartupEntities();
@@ -78,6 +81,7 @@ namespace Surge
         bool mRenderDebug = false;
         bool mIsRunning = false;
         entt::registry mRegistry;
+        Vector<entt::entity> mEntitiesToDestroy;
     };
 
     //
@@ -141,7 +145,10 @@ namespace Surge
             return mScene;
         }
 
-        operator bool() const { return (mEnttHandle != entt::null) && (mScene != nullptr); }
+        operator bool() const
+        {
+            return mEnttHandle != entt::null && mScene != nullptr && mScene->GetRegistry().valid(mEnttHandle);
+        }
         operator entt::entity() const { return mEnttHandle; }
         bool operator==(const Entity& other) const { return mEnttHandle == other.mEnttHandle && mScene == other.mScene; }
         bool operator!=(const Entity& other) const { return !(*this == other); }
