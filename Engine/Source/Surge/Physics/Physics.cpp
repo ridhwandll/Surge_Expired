@@ -232,22 +232,25 @@ namespace Surge
 
     void Physics::Update(float deltaTime)
     {
-        if(!mPhysicsSystem)
-            return;
+        float frameTime = std::min(deltaTime, 0.25f); // Prevent the "Spiral of Death": clamp spike delta times (e.g., loading freezes, OS pauses)
+        mAccumulatedTime += frameTime;
 
-        const int collisionSteps = 1;
-        const float cFixedTimeStep = 1.0f / 60.0f;
-
-        float frameDeltaTime = deltaTime;
-        if(frameDeltaTime > 0.25f)
-            frameDeltaTime = 0.25f;
-
-        mAccumulatedTime += frameDeltaTime;
-        while(mAccumulatedTime >= cFixedTimeStep)
+        while(mAccumulatedTime >= FIXED_TIMESTEP)
         {
-            mPhysicsSystem->Update(cFixedTimeStep, collisionSteps, mTempAllocator, mJobSystem);
-            mAccumulatedTime -= cFixedTimeStep;
+            for(auto& [id, data] : mBodies)
+            {
+                if(!data.Active)
+                    continue;
+
+                data.PreviousPosition = GetPosition(id);
+                data.PreviousRotation = GetRotationQuat(id);
+            }
+
+            mPhysicsSystem->Update(FIXED_TIMESTEP, COLLISION_SUBSTEPS, mTempAllocator, mJobSystem);
+            mAccumulatedTime -= FIXED_TIMESTEP;
         }
+
+        mInterpolationAlpha = mAccumulatedTime / FIXED_TIMESTEP;
     }
 
     void Physics::Shutdown()
@@ -333,6 +336,11 @@ namespace Surge
 
         rb.RuntimeBodyID = body->GetID().GetIndexAndSequenceNumber();
         bodyInterface.AddBody(JPH::BodyID(rb.RuntimeBodyID), JPH::EActivation::Activate);
+
+        BodyRuntimeData& data = mBodies[rb.RuntimeBodyID];
+        data.PreviousPosition = glm::vec3(joltPosition.GetX(), joltPosition.GetY(), joltPosition.GetZ());
+        data.PreviousRotation = glm::quat(joltRotation.GetW(), joltRotation.GetX(), joltRotation.GetY(), joltRotation.GetZ());
+        data.Active = true;
     }
 
     void Physics::DestroyRigidbody(Entity entity)
@@ -346,6 +354,7 @@ namespace Surge
         bodyInterface.RemoveBody(JPH::BodyID(rb.RuntimeBodyID));
         bodyInterface.DestroyBody(JPH::BodyID(rb.RuntimeBodyID));
 
+        mBodies.erase(rb.RuntimeBodyID);
         rb.RuntimeBodyID = JPH::BodyID().GetIndexAndSequenceNumber();
     }
 
@@ -367,6 +376,42 @@ namespace Surge
         const JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
         JPH::Quat joltRotation = bodyInterface.GetRotation(JPH::BodyID(rbID));
         return glm::degrees(glm::eulerAngles(glm::quat(joltRotation.GetW(), joltRotation.GetX(), joltRotation.GetY(), joltRotation.GetZ())));
+    }
+
+    glm::vec3 Physics::GetInterpolatedPosition(RigidBodyID rbID) const
+    {
+        auto it = mBodies.find(rbID);
+        if(it == mBodies.end())
+            return GetPosition(rbID); // untracked body (shouldn't normally happen)
+
+        return glm::mix(it->second.PreviousPosition, GetPosition(rbID), mInterpolationAlpha);
+    }
+
+    glm::vec3 Physics::GetInterpolatedRotation(RigidBodyID rbID) const
+    {
+        auto it = mBodies.find(rbID);
+        if(it == mBodies.end())
+            return GetRotation(rbID); // untracked body (shouldn't normally happen)
+
+        glm::quat current = GetRotationQuat(rbID);
+        glm::quat blended = glm::slerp(it->second.PreviousRotation, current, mInterpolationAlpha);
+        return glm::degrees(glm::eulerAngles(blended));
+    }
+
+    void Physics::Teleport(RigidBodyID rbID, const glm::vec3& position, const glm::vec3& rotationEuler)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Vec3 joltPos(position.x, position.y, position.z);
+        JPH::Quat joltRot = GlmToJolt(rotationEuler);
+
+        bodyInterface.SetPositionAndRotation(JPH::BodyID(rbID), joltPos, joltRot, JPH::EActivation::Activate);
+
+        auto it = mBodies.find(rbID);
+        if(it != mBodies.end())
+        {
+            it->second.PreviousPosition = position;
+            it->second.PreviousRotation = glm::quat(glm::radians(rotationEuler));
+        }
     }
 
     JPH::ShapeRefC Physics::CreateShape(Entity entity)
@@ -629,6 +674,13 @@ namespace Surge
     {
         outTotalBodies = mPhysicsSystem->GetNumBodies();
         outActiveBodies = mPhysicsSystem->GetNumActiveBodies(JPH::EBodyType::RigidBody);
+    }
+
+    glm::quat Physics::GetRotationQuat(RigidBodyID rbID) const
+    {
+        const JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        JPH::Quat q = bodyInterface.GetRotation(JPH::BodyID(rbID));
+        return glm::quat(q.GetW(), q.GetX(), q.GetY(), q.GetZ());
     }
 
 }  // namespace Surge

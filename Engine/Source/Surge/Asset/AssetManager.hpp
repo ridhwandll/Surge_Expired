@@ -105,7 +105,9 @@ namespace Surge
             // FAST PATH
             if(isCached && !shouldReload)
             {
-                SG_ASSERT(cacheIt->second->GetAssetType() == T::GetStaticType(), "[AssetManager] Load: Cached asset type mismatch!");
+                if (cacheIt->second->GetAssetType() != T::GetStaticType())
+                    return nullptr;
+
                 return cacheIt->second.As<T>();
             }
 

@@ -175,6 +175,7 @@ namespace Surge
         RigidbodyType Type = RigidbodyType::DYNAMIC;
         float Mass = 1.0f;
 
+        bool Interpolate = true;
         bool UseGravity = true;
         bool IsSensor = false;
         bool ContinuousCollision = false;
@@ -187,6 +188,10 @@ namespace Surge
         float AngularDamping = 0.05f;
         float Friction = 0.2f;
         float Bounciness = 0.0f;
+
+        //NotSerialized (For interpolation in runtime)
+        glm::vec3 PreviousPosition = { 0.0f, 0.0f, 0.0f };
+        glm::vec3 PreviousRotation = { 0.0f, 0.0f, 0.0f };
 
         SURGE_REFLECTION_ENABLE;
     };
@@ -244,6 +249,10 @@ namespace Surge
         bool Active = true;
         glm::vec3 LocalOffset = { 0.0f, 0.0f, 0.0f };
         glm::vec3 LocalRotation = { 0.0f, 0.0f, 0.0f };
+
+        // Internal usage, not serialized
+        bool ShowCollider = false;
+
         SURGE_REFLECTION_ENABLE;
     };
 

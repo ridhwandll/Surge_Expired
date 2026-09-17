@@ -3,7 +3,12 @@ include(${CMAKE_SOURCE_DIR}/scripts/CMakeUtils.cmake)
 set(INCLUDE_DIRS Source)
 file(GLOB_RECURSE SOURCE_FILES Source/*.cpp Source/*.hpp)
 
-add_executable(Player ${SOURCE_FILES})
+if(WIN32)
+    add_executable(Player WIN32 ${SOURCE_FILES})
+else()
+    add_executable(Player ${SOURCE_FILES})
+endif()
+
 target_link_libraries(Player PRIVATE Surge)
 target_include_directories(Player PRIVATE ${INCLUDE_DIRS})
 
@@ -11,9 +16,11 @@ GroupSourcesByFolder(Player)
 set_property(TARGET Player PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_target_properties(Player PROPERTIES FOLDER App)
 
+if(WIN32)
 add_custom_command(TARGET Player POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Binaries/shaderc_shared.dll"
         $<TARGET_FILE_DIR:Player>
     COMMENT "Copying shaderc_shared.dll to Player.exe directory..."
 )
+endif()

@@ -87,9 +87,10 @@ namespace Surge
 
 } // namespace Surge
 
-#ifndef SURGE_PLATFORM_ANDROID
 // Entry point
-int main()
+
+#ifdef SURGE_PLATFORM_WINDOWS
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
     Surge::ClientOptions clientOptions;
     clientOptions.EnableImGui = false;

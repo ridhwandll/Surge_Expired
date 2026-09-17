@@ -625,6 +625,7 @@ namespace Surge
                     ImGuiAux::TProperty<float>("Mass", &component.Mass);
 
                 ImGuiAux::TSperator("Collision Settings");
+                ImGuiAux::TProperty<bool>("Interpolate", &component.Interpolate);
                 ImGuiAux::TProperty<bool>("Use Gravity", &component.UseGravity);
                 ImGuiAux::TProperty<bool>("Is Sensor", &component.IsSensor);
                 ImGuiAux::TProperty<bool>("Continuous Collision (CCD)", &component.ContinuousCollision);
@@ -711,8 +712,8 @@ namespace Surge
                         ImGuiAux::TProperty<glm::vec3>("Local Offset", &component.LocalOffset);
                         ImGuiAux::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation);
                     }
-                    ImGuiAux::TSperator("Notice");
-                    ImGuiAux::TString("Info", "Mesh Colliders are generated implicitly from the mesh. Visualization is not supported, pray and hope that it works :)");
+                    ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+                    ImGuiAux::TString("Info", "Mesh Colliders are generated implicitly from the mesh and might be very expensive to visualize, turn it OFF after visualization!");
                 }
                 else
                 {

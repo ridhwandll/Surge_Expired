@@ -277,7 +277,7 @@ namespace Surge
             }
 
             // No Collider showing for MeshColliderComponent
-            if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent>(sSelectedEntity))
+            if(mRegistry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent, MeshColliderComponent>(sSelectedEntity))
             {
                 bool showCollider = false;
                 if(sSelectedEntity.HasComponent<BoxColliderComponent>())
@@ -290,6 +290,8 @@ namespace Surge
                     showCollider = sSelectedEntity.GetComponent<CylinderColliderComponent>().ShowCollider;
                 else if(sSelectedEntity.HasComponent<ConvexColliderComponent>())
                     showCollider = sSelectedEntity.GetComponent<ConvexColliderComponent>().ShowCollider;
+                else if(sSelectedEntity.HasComponent<MeshColliderComponent>())
+                    showCollider = sSelectedEntity.GetComponent<MeshColliderComponent>().ShowCollider;
 
                 if(showCollider)
                 {
@@ -837,19 +839,28 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::UpdatePhysics");
 
-        if(mIsRunning)
-        {
-            Physics* physics = Core::GetPhysics();
-            auto view = mRegistry.view<TransformComponent, RigidbodyComponent>();
-            for(auto [entity, transformComp, rb] : view.each())
-            {
-                if(physics->IsInValid(rb.RuntimeBodyID) || !physics->IsActive(rb.RuntimeBodyID) || !rb.Active)
-                    continue;
+        if(!mIsRunning)
+            return;
 
+        Physics* physics = Core::GetPhysics();
+        auto view = mRegistry.view<TransformComponent, RigidbodyComponent>();
+        for(auto [entity, transformComp, rb] : view.each())
+        {
+            if(physics->IsInValid(rb.RuntimeBodyID) || !physics->IsActive(rb.RuntimeBodyID) || !rb.Active)
+                continue;
+
+            if (rb.Interpolate)
+            {
+                transformComp.Position = physics->GetInterpolatedPosition(rb.RuntimeBodyID);
+                transformComp.Rotation = physics->GetInterpolatedRotation(rb.RuntimeBodyID);
+            }
+            else
+            {
                 transformComp.Position = physics->GetPosition(rb.RuntimeBodyID);
                 transformComp.Rotation = physics->GetRotation(rb.RuntimeBodyID);
-                transformComp.MarkDirty(); // Fucking fuck ass MarkDirty funciton, I forogt to add this and spent 30mins debugging why my Physics system is not updating
             }
+
+            transformComp.MarkDirty();
         }
     }
 

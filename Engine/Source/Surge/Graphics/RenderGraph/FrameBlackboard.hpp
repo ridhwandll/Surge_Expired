@@ -174,7 +174,7 @@ namespace Surge
         // Screen Space options
         glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
         float OutlineThickness = 1.1f;
-        bool EnableFXAA;
+        bool EnableFXAA = true;
         VignetteGrainConfig VignetteGrain;
 
         // CMD lists

@@ -22,6 +22,7 @@ namespace Surge
         virtual void OnUpdate() override;
         virtual void OnEvent(Event& e) override;
         virtual void OnShutdown() override;
+        virtual Ref<Scene> GetRuntimeScene() const override { return mRuntimeScene ? mRuntimeScene : mActiveScene; }
 
         bool IsPlaying() const { return (bool)mRuntimeScene; }
         void ShowTitlebar(bool show) { mShowTitlebar = show; }

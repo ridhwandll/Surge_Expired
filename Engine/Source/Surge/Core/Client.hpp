@@ -25,6 +25,8 @@ namespace Surge
         virtual void OnEvent(Event& e) { (void)e; };
         virtual void OnShutdown() {};
 
+        virtual Ref<Scene> GetRuntimeScene() const { return mActiveScene; }
+
         void SetOptions(const ClientOptions& appCreateInfo) { mClientOptions = appCreateInfo; }
         const ClientOptions& GetClientOptions() const { return mClientOptions; }
 

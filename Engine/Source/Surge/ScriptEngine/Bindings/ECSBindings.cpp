@@ -11,6 +11,13 @@
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/Audio/Audio.hpp"
+
+// TODO: REMOVE following includes
+#include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Utility/Platform.hpp"
+
+
 
 namespace Surge::ScriptBinding
 {
@@ -165,7 +172,7 @@ namespace Surge::ScriptBinding
                                           "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio),
                                           STRICT_READ(CameraComponent));
 
-        // Bind the Material Asset
+        // Material Asset
         auto materialType = lua.new_usertype<Material>("Material", sol::no_constructor,
                                                        "MarkDirty", &Material::MarkDirty,
 
@@ -289,6 +296,8 @@ namespace Surge::ScriptBinding
                                              "Active", BIND_PROP(RigidbodyComponent, Active),
                                              "Type", BIND_PROP(RigidbodyComponent, Type),
                                              "Mass", BIND_PROP(RigidbodyComponent, Mass),
+                                             "Interpolate", BIND_PROP(RigidbodyComponent, Interpolate),
+                                             "UseGravity", BIND_PROP(RigidbodyComponent, UseGravity),
                                              "IsSensor", BIND_PROP(RigidbodyComponent, IsSensor),
                                              "ContinuousCollision", BIND_PROP(RigidbodyComponent, ContinuousCollision),
                                              "FreezeRotationX", BIND_PROP(RigidbodyComponent, FreezeRotationX),
@@ -486,7 +495,30 @@ namespace Surge::ScriptBinding
                                             }
                                             else
                                                 Log<Severity::Warn>("ECSBindings: AudioSourceComponent is not initialized. Cannot stop audio!");
-                                        }
+                                        },
+                                        "SetAudioClip", [](AudioSourceComponent& ac, const String& audioAssetPath) {
+                                            AssetManager* am = Core::GetAssetManager();
+                                            AssetID id = am->GetIDFromPath(audioAssetPath);
+                                            if(id)
+                                            {
+                                                Ref<Audio> clip = am->Load<Audio>(id);
+                                                if(clip)
+                                                    ac.AudioClip = clip;
+                                                else
+                                                    Log<Severity::Warn>("[ECSBindings.cpp] Lua: AudioSourceComponent: Failed to load audio at path {}", audioAssetPath);
+                                            }
+                                            else
+                                                Log<Severity::Warn>("[ECSBindings.cpp] Lua: AudioSourceComponent: Failed to load audio at path {}", audioAssetPath);
+                                        },
+                                        STRICT_READ(AudioSourceComponent)
         );
+
+        //TODO: MOVE to Renderer Binding
+        sol::table renderer = lua["Renderer"].get_or_create<sol::table>();
+        renderer.set_function("DrawLine", [](const glm::vec3& point0, const glm::vec3& point1, const glm::vec4& color) { Core::GetRenderer()->SubmitLine(point0, point1, color); });
+
+        // TODO: MOVE to Application Binding
+        sol::table application = lua["Application"].get_or_create<sol::table>();
+        application.set_function("RequestExit", []() { return Platform::RequestExit(); });
     }
 }

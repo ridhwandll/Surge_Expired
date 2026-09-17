@@ -74,6 +74,7 @@ namespace Surge
                 cgltf_accessor* normalAccessor = nullptr;
                 cgltf_accessor* tangentAccessor = nullptr;
                 cgltf_accessor* texcoordAccessor = nullptr;
+                [[maybe_unused]] cgltf_accessor* colorAccessor = nullptr;
 
                 for(size_t a = 0; a < prim.attributes_count; a++)
                 {
@@ -83,10 +84,12 @@ namespace Surge
                         case cgltf_attribute_type_position: posAccessor = attr.data; break;
                         case cgltf_attribute_type_normal: normalAccessor = attr.data; break;
                         case cgltf_attribute_type_tangent: tangentAccessor = attr.data; break;
+                        case cgltf_attribute_type_color: colorAccessor = attr.data; break;
                         case cgltf_attribute_type_texcoord:
                             if(attr.index == 0) texcoordAccessor = attr.data;
                             break;
-                        default: break;
+                        default:
+                            break;
                     }
                 }
 
@@ -124,6 +127,19 @@ namespace Surge
                     if(texcoordAccessor)
                         cgltf_accessor_read_float(texcoordAccessor, i, &v.TexCoord.x, 2);
 
+                    // Vertex Color, once used it for AO
+                    //if(colorAccessor)
+                    //{
+                    //    float col[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+                    //    cgltf_accessor_read_float(colorAccessor, i, col, (colorAccessor->type == cgltf_type_vec3) ? 3 : 4);
+                    //    v.Color = glm::packUnorm4x8(glm::vec4(col[0], col[1], col[2], col[3]));
+                    //}
+                    //else
+                    //{
+                    //    // Default 1.0 AO / White tint
+                    //    v.Color = 0xFFFFFFFF;
+                    //}
+
                     submesh.BoundingBox.Min = glm::min(v.Position, submesh.BoundingBox.Min);
                     submesh.BoundingBox.Max = glm::max(v.Position, submesh.BoundingBox.Max);
                 }
@@ -135,6 +151,7 @@ namespace Surge
                         (Uint)cgltf_accessor_read_index(prim.indices, i + 1),
                         (Uint)cgltf_accessor_read_index(prim.indices, i + 2) });
                 }
+
                 vertexCount += submesh.VertexCount;
                 indexCount += submesh.IndexCount;
             }

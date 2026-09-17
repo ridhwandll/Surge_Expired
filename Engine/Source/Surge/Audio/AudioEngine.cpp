@@ -111,7 +111,7 @@ namespace Surge
 
         if(result != MA_SUCCESS)
         {
-            Log<Severity::Error>("Failed to initialize audio file: %s", filepath.c_str());
+            Log<Severity::Error>("Failed to initialize audio file: {}", filepath);
             delete sound;
             return nullptr;
         }

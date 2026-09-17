@@ -5,11 +5,13 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
 #include "Surge/Core/Profiler.hpp"
+#include "Surge/Core/FrameCapper.hpp"
 
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/ScriptEngine/ScriptEngine.hpp"
+#include "Surge/Audio/AudioEngine.hpp"
 #include "SurgeReflect/SurgeReflectRegistry.hpp"
 
 #ifdef SURGE_PLATFORM_WINDOWS
@@ -17,7 +19,6 @@
 #elif defined(SURGE_PLATFORM_ANDROID)
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #endif
-#include "../Audio/AudioEngine.hpp"
 
 
 #define ENV_VAR_KEY "SURGE_DIR"
@@ -102,9 +103,13 @@ namespace Surge::Core
 
     void Run()
     {
+        FrameCapper frameCapper(144); // Target 144 FPS
         while (sCoreData.Running)
         {
             SURGE_PROFILE_FRAME("Core::Frame");
+
+            frameCapper.BeginFrame();
+
             sCoreData.SurgeClock.Update();
             sCoreData.SurgeWindow->Update();
 
@@ -121,6 +126,8 @@ namespace Surge::Core
 
                 sCoreData.FrameEndCallbacks.clear();
             }
+
+            frameCapper.EndFrameAndCap();
         }
     }
 
@@ -138,11 +145,11 @@ namespace Surge::Core
         sCoreData.SurgeScriptEngine->Shutdown();
         delete sCoreData.SurgeScriptEngine;
 
-        sCoreData.SurgeAudioEngine->Shutdown();
-        delete sCoreData.SurgeAudioEngine;
-
         sCoreData.SurgeAssetManager->Shutdown();
         delete sCoreData.SurgeAssetManager;
+
+        sCoreData.SurgeAudioEngine->Shutdown();
+        delete sCoreData.SurgeAudioEngine;
 
         sCoreData.SurgePhysics->Shutdown();
         delete sCoreData.SurgePhysics;
