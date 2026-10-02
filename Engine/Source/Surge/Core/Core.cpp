@@ -36,6 +36,7 @@ namespace Surge::Core
         ScriptEngine* SurgeScriptEngine = nullptr;
         AudioEngine* SurgeAudioEngine = nullptr;
 
+        float FrameCap = 144.0f; // 0.0f = uncapped
         bool Running = false;
         Vector<std::function<void()>> FrameEndCallbacks;
     };
@@ -103,7 +104,7 @@ namespace Surge::Core
 
     void Run()
     {
-        FrameCapper frameCapper(144); // Target 144 FPS
+        FrameCapper frameCapper(sCoreData.FrameCap);
         while (sCoreData.Running)
         {
             SURGE_PROFILE_FRAME("Core::Frame");
@@ -177,5 +178,6 @@ namespace Surge::Core
     AudioEngine* GetAudioEngine() { return sCoreData.SurgeAudioEngine; }
     Client* GetClient() { return sCoreData.SurgeClient; }
     Clock& GetClock() { return sCoreData.SurgeClock; }
+    void SetFrameCap(float fps) { sCoreData.FrameCap = fps; }
 
 } // namespace Surge::Core

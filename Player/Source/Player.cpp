@@ -49,6 +49,7 @@ namespace Surge
         mActiveScene->OnResize(static_cast<float>(size.x), static_cast<float>(size.y));
         //mRenderer->AddImGuiRenderCallback([this]() { OnImGuiRender(); });
         mActiveScene->OnRuntimeStart();
+        Resize(INITIAL_WIDTH, INITIAL_HEIGHT);
     }
 
     void Player::OnUpdate()
@@ -86,22 +87,3 @@ namespace Surge
     }
 
 } // namespace Surge
-
-// Entry point
-
-#ifdef SURGE_PLATFORM_WINDOWS
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
-{
-    Surge::ClientOptions clientOptions;
-    clientOptions.EnableImGui = false;
-    clientOptions.RenderFinalImageToSwapchian = true;
-    clientOptions.WindowDescription = { 1280, 720, "Runtime", Surge::WindowFlags::DEFAULT };
-
-    Surge::Player* app = Surge::MakeClient<Surge::Player>();
-    app->SetOptions(clientOptions);
-
-    Surge::Core::Initialize(app);
-    Surge::Core::Run();
-    Surge::Core::Shutdown();
-}
-#endif

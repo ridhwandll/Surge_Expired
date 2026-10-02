@@ -1,11 +1,13 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-// Android entry point – replaces the desktop main() when building for Android.
+// Android entry point
+
 #ifdef SURGE_PLATFORM_ANDROID
 
 #include <game-activity/native_app_glue/android_native_app_glue.h>
-#include <Surge/Surge.hpp>
+
 #include "Player.hpp"
 #include "Surge/Platform/Android/AndroidApp.hpp"
+#include "Surge/Core/Core.hpp"
 
 namespace Surge::Android
 {

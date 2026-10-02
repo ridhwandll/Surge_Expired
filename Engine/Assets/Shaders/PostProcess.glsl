@@ -8,20 +8,15 @@ layout(location = 2) out vec2 outUV_S;
 layout(location = 3) out vec2 outUV_E;
 layout(location = 4) out vec2 outUV_W;
 
-struct VignetteGrainConfig
-{
-    float Intensity;
-    float Softness;
-    float Grain;
-    float _Pad;
-};
 layout(push_constant) uniform PushConstants
 {
     vec4 ColorThickness;
     vec2 ScreenResolution;
-    VignetteGrainConfig VignetteGrain;
-    vec2 CameraNearFar;
+    float VignetteIntensity;
+    float VignetteSoftness;
+    float Grain;
     int EnableFXAA;
+    vec2 CameraNearFar;
 } pc;
 
 void main()
@@ -53,20 +48,15 @@ layout(binding = 0, set = 0) uniform sampler2D sceneColor;
 layout(binding = 1, set = 0) uniform sampler2D outlineMask;
 layout(binding = 2, set = 0) uniform sampler2D sceneDepth;
 
-struct VignetteGrainConfig
-{
-    float Intensity;
-    float Softness;
-    float Grain;
-    float _Pad;
-};
 layout(push_constant) uniform PushConstants
 {
     vec4 ColorThickness;
     vec2 ScreenResolution;
-    VignetteGrainConfig VignetteGrain;
-    vec2 CameraNearFar;
+    float VignetteIntensity;
+    float VignetteSoftness;
+    float Grain;
     int EnableFXAA;
+    vec2 CameraNearFar;
 } pc;
 
 // FXAA
@@ -134,19 +124,19 @@ float ComputeVignette()
     float dist = length(d); // Max distance at extreme corners is ~0.707
 
     float radius = 0.5;
-    float innerBoundary = radius - (pc.VignetteGrain.Softness * 0.4);
-    float outerBoundary = radius + (pc.VignetteGrain.Softness * 0.4);
+    float innerBoundary = radius - (pc.VignetteSoftness * 0.4);
+    float outerBoundary = radius + (pc.VignetteSoftness * 0.4);
 
     float vignetteResponse = smoothstep(innerBoundary, outerBoundary, dist);
     vignetteResponse = 1.0 - vignetteResponse;
-    return mix(1.0, vignetteResponse, pc.VignetteGrain.Intensity);
+    return mix(1.0, vignetteResponse, pc.VignetteIntensity);
 }
 
 // Film grain
 float FilmGrain()
 {
     float noise = fract(sin(dot(inUV, vec2(12.9898, 78.233))) * 43758.5453);
-    return (noise - 0.5) * pc.VignetteGrain.Grain;
+    return (noise - 0.5) * pc.Grain;
 }
 
 vec3 ACESFilmic(vec3 x)

@@ -227,8 +227,6 @@ function Quat:Slerp(b, t) end
 ---@operator mul(Mat4): Mat4
 ---@operator mul(Vec4): Vec4
 local Mat4 = {}
----@return Mat4
-function Mat4.Identity() end
 ---@param v Vec3
 ---@return Mat4
 function Mat4:Translate(v) end
@@ -276,14 +274,28 @@ function Math.Vec3.new(x, y, z) end
 ---@return Vec4
 function Math.Vec4.new(x, y, z, w) end
 
+--- Constructs a matrix. No args for a zero matrix, or a single number for
+--- a diagonal matrix (e.g. Math.Mat4.new(1.0) for identity).
+---@overload fun(): Mat4
+---@overload fun(diagonal: number): Mat4
+function Math.Mat4.new() end
+
+--- Returns the identity matrix.
+---@return Mat4
+function Math.Mat4.Identity() end
+
 ---@param dir Vec3
 ---@param up Vec3
 ---@return Quat
 function Math.Quat.LookRotation(dir, up) end
 
----@param euler Vec3
----@return Quat
-function Math.Quat.FromEuler(euler) end
+--- Constructs a quaternion. Called with no args for identity, (x,y,z,w) raw
+--- components, or a single Vec3 of euler angles (radians) to build a
+--- rotation quaternion from.
+---@overload fun(): Quat
+---@overload fun(x: number, y: number, z: number, w: number): Quat
+---@overload fun(euler: Vec3): Quat
+function Math.Quat.new() end
 
 ---@param t number
 ---@return number
@@ -487,9 +499,73 @@ UIButton = {}
 ---@return UIButton
 function UIButton.new(text, fontRelPath, textureRelPath) end
 
+--- Gets the button's internal text widget.
+---@return UIText
+function UIButton:GetText() end
+
+-- ==============================================================================
+-- RENDERER & APPLICATION
+-- ==============================================================================
+
+---@class Renderer
+Renderer = {}
+
+--- Submits a single debug line to be drawn this frame.
+---@param point0 Vec3
+---@param point1 Vec3
+---@param color Vec4
+function Renderer.DrawLine(point0, point1, color) end
+
+--- Submits a single quad to be drawn this frame
+---@param Position Vec3
+---@param Rotation Vec3
+---@param Scale Vec3
+---@param color Vec4
+function Renderer.DrawQuad(Position, Rotation, Scale, color) end
+
+---@class Application
+Application = {}
+
+--- Requests the application to close.
+function Application.RequestExit() end
+
 -- ==============================================================================
 -- ECS COMPONENTS
 -- ==============================================================================
+
+---@class Material
+local Material = {}
+function Material:MarkDirty() end
+---@param name string
+---@param val number
+function Material:SetFloat(name, val) end
+---@param name string
+---@return number
+function Material:GetFloat(name) end
+---@param name string
+---@param val number
+function Material:SetInt(name, val) end
+---@param name string
+---@return number
+function Material:GetInt(name) end
+---@param name string
+---@param val Vec2
+function Material:SetVec2(name, val) end
+---@param name string
+---@return Vec2
+function Material:GetVec2(name) end
+---@param name string
+---@param val Vec3
+function Material:SetVec3(name, val) end
+---@param name string
+---@return Vec3
+function Material:GetVec3(name) end
+---@param name string
+---@param val Vec4
+function Material:SetVec4(name, val) end
+---@param name string
+---@return Vec4
+function Material:GetVec4(name) end
 
 ---@class NameComponent
 ---@field Name string
@@ -510,19 +586,40 @@ function TransformComponent:ScaleBy(multi) end
 function TransformComponent:MarkDirty() end
 
 ---@class SpriteRendererComponent
+---@field Active boolean
 ---@field Color Vec4
 local SpriteRendererComponent = {}
 
 ---@class CameraComponent
+---@field Active boolean
 ---@field Primary boolean
 ---@field FixedAspectRatio boolean
 local CameraComponent = {}
 
 ---@class MeshComponent
+---@field Active boolean
 ---@field DropShadow boolean
 local MeshComponent = {}
+--- Loads and assigns a mesh asset from a project-relative path.
+---@param meshAssetPath string
+function MeshComponent:SetMesh(meshAssetPath) end
+--- Gets the material at the given submesh index (from the base mesh asset).
+---@param index number
+---@return Material
+function MeshComponent:GetMaterial(index) end
+--- Overrides the material at the given submesh index. Accepts either a
+--- project-relative path to a material asset, or an existing Material.
+---@param index number
+---@param materialPathOrMaterial string|Material
+function MeshComponent:SetMaterialOverride(index, materialPathOrMaterial) end
+---@param index number
+function MeshComponent:ClearMaterialOverride(index) end
+---@param index number
+---@return boolean
+function MeshComponent:HasOverride(index) end
 
 ---@class LightComponent
+---@field Active boolean
 ---@field Color Vec3
 ---@field Intensity number
 ---@field Radius number
@@ -531,6 +628,7 @@ local MeshComponent = {}
 local LightComponent = {}
 
 ---@class EnvironmentComponent
+---@field Active boolean
 ---@field Elevation number
 ---@field Azimuth number
 ---@field Turbidity number
@@ -543,8 +641,11 @@ local LightComponent = {}
 local EnvironmentComponent = {}
 
 ---@class RigidbodyComponent
+---@field Active boolean
 ---@field Type number
 ---@field Mass number
+---@field Interpolate boolean
+---@field UseGravity boolean
 ---@field IsSensor boolean
 ---@field ContinuousCollision boolean
 ---@field FreezeRotationX boolean
@@ -573,43 +674,54 @@ function RigidbodyComponent:SetAngularVelocity(vel) end
 function RigidbodyComponent:GetAngularVelocity() end
 
 ---@class BoxColliderComponent
+---@field Active boolean
 ---@field ShowCollider boolean
 ---@field HalfExtents Vec3
 local BoxColliderComponent = {}
 
 ---@class SphereColliderComponent
+---@field Active boolean
 ---@field ShowCollider boolean
 ---@field Radius number
 local SphereColliderComponent = {}
 
 ---@class CapsuleColliderComponent
+---@field Active boolean
 ---@field ShowCollider boolean
 ---@field Height number
 ---@field Radius number
 local CapsuleColliderComponent = {}
 
 ---@class CylinderColliderComponent
+---@field Active boolean
 ---@field ShowCollider boolean
 ---@field Height number
 ---@field Radius number
 local CylinderColliderComponent = {}
 
 ---@class ConvexColliderComponent
+---@field Active boolean
 ---@field ShowCollider boolean
 ---@field LocalOffset Vec3
 ---@field LocalRotation Vec3
 local ConvexColliderComponent = {}
 
 ---@class MeshColliderComponent
+---@field Active boolean
 ---@field LocalOffset Vec3
 ---@field LocalRotation Vec3
 local MeshColliderComponent = {}
 
 ---@class ScriptComponent
+---@field Active boolean
 ---@field ScriptAsset number
 local ScriptComponent = {}
+--- Loads and assigns a script asset from a project-relative path.
+---@param scriptAssetPath string
+function ScriptComponent:SetScript(scriptAssetPath) end
 
 ---@class TextComponent
+---@field Active boolean
 ---@field Text string
 ---@field Color Vec4
 ---@field MaxWidth number
@@ -623,6 +735,7 @@ local ScriptComponent = {}
 local TextComponent = {}
 
 ---@class UICanvasComponent
+---@field Active boolean
 ---@field ShowCanvas boolean
 ---@field ScriptAsset number
 local UICanvasComponent = {}
@@ -635,12 +748,20 @@ local UICanvasComponent = {}
 ---@field PlayOnAwake boolean
 ---@field IsSpatialized boolean
 ---@field IsStreaming boolean
+---@field IsPlaying boolean Read-only.
+---@field IsInitialized boolean Read-only.
 ---@field MinDistance number
 ---@field MaxDistance number
----@field Attenuation number
+---@field Attenuation number AttenuationModel enum value.
 local AudioSourceComponent = {}
 function AudioSourceComponent:Play() end
 function AudioSourceComponent:Stop() end
+--- Seeks the audio to given time (seconds)
+---@param time number
+function AudioSourceComponent:Seek(time) end
+--- Loads and assigns an audio clip from a project-relative path.
+---@param audioAssetPath string
+function AudioSourceComponent:SetAudioClip(audioAssetPath) end
 
 -- ==============================================================================
 -- ECS ENTITY
@@ -664,6 +785,7 @@ function AudioSourceComponent:Stop() end
 ---@field ScriptC ScriptComponent|nil
 ---@field TextC TextComponent|nil
 ---@field UICanvasC UICanvasComponent|nil
+---@field AudioSourceC AudioSourceComponent|nil
 local Entity = {}
 
 ---@return boolean
@@ -672,81 +794,130 @@ function Entity:IsValid() end
 ---@return number
 function Entity:GetID() end
 
+--- Marks the entity for deferred destruction (end of frame).
 function Entity:Destroy() end
+
+--- Destroys the entity immediately.
+function Entity:DestroyImmediate() end
 
 ---@param targetName string
 ---@return Entity
 function Entity:FindEntityByName(targetName) end
 
+--- Creates a new child entity in this entity's scene.
+---@param name string
+---@return Entity
+function Entity:CreateEntity(name) end
+
+--- Reparents this entity under the given parent entity.
+---@param parent Entity
+function Entity:SetParent(parent) end
+
 -- Generated Has/Add/Remove/GetOrAdd functions
+---@return boolean
 function Entity:HasNameC() end
+---@return NameComponent
 function Entity:AddNameC() end
 function Entity:RemoveNameC() end
 
+---@return boolean
 function Entity:HasTransformC() end
+---@return TransformComponent
 function Entity:AddTransformC() end
 function Entity:RemoveTransformC() end
 
+---@return boolean
 function Entity:HasSpriteRendererC() end
+---@return SpriteRendererComponent
 function Entity:AddSpriteRendererC() end
 function Entity:RemoveSpriteRendererC() end
 
+---@return boolean
 function Entity:HasCameraC() end
+---@return CameraComponent
 function Entity:AddCameraC() end
 function Entity:RemoveCameraC() end
 
+---@return boolean
 function Entity:HasMeshC() end
+---@return MeshComponent
 function Entity:AddMeshC() end
 function Entity:RemoveMeshC() end
 
+---@return boolean
 function Entity:HasLightC() end
+---@return LightComponent
 function Entity:AddLightC() end
 function Entity:RemoveLightC() end
 
+---@return boolean
 function Entity:HasEnvironmentC() end
+---@return EnvironmentComponent
 function Entity:AddEnvironmentC() end
 function Entity:RemoveEnvironmentC() end
 
+---@return boolean
 function Entity:HasRigidbodyC() end
+---@return RigidbodyComponent
 function Entity:AddRigidbodyC() end
 function Entity:RemoveRigidbodyC() end
 
+---@return boolean
 function Entity:HasBoxColliderC() end
+---@return BoxColliderComponent
 function Entity:AddBoxColliderC() end
 function Entity:RemoveBoxColliderC() end
 
+---@return boolean
 function Entity:HasSphereColliderC() end
+---@return SphereColliderComponent
 function Entity:AddSphereColliderC() end
 function Entity:RemoveSphereColliderC() end
 
+---@return boolean
 function Entity:HasCapsuleColliderC() end
+---@return CapsuleColliderComponent
 function Entity:AddCapsuleColliderC() end
 function Entity:RemoveCapsuleColliderC() end
 
+---@return boolean
 function Entity:HasCylinderColliderC() end
+---@return CylinderColliderComponent
 function Entity:AddCylinderColliderC() end
 function Entity:RemoveCylinderColliderC() end
 
+---@return boolean
 function Entity:HasConvexColliderC() end
+---@return ConvexColliderComponent
 function Entity:AddConvexColliderC() end
 function Entity:RemoveConvexColliderC() end
 
+---@return boolean
 function Entity:HasMeshColliderC() end
+---@return MeshColliderComponent
 function Entity:AddMeshColliderC() end
 function Entity:RemoveMeshColliderC() end
 
+---@return boolean
 function Entity:HasScriptC() end
+---@return ScriptComponent
 function Entity:AddScriptC() end
 function Entity:RemoveScriptC() end
 
+---@return boolean
 function Entity:HasTextC() end
+---@return TextComponent
 function Entity:AddTextC() end
 function Entity:RemoveTextC() end
 
+---@return boolean
 function Entity:HasUICanvasC() end
+---@return UICanvasComponent
 function Entity:AddUICanvasC() end
 function Entity:RemoveUICanvasC() end
 
+---@return boolean
 function Entity:HasAudioSourceC() end
+---@return AudioSourceComponent
 function Entity:AddAudioSourceC() end
 function Entity:RemoveAudioSourceC() end

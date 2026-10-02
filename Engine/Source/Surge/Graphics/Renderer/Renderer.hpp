@@ -74,8 +74,8 @@ namespace Surge
             return mRHI->GetImGuiImage(mGraph.GetBlackboard().FinalImage);
         }
 
-        void SetOutlineColor(glm::vec3 outlineColor) { mGraph.GetBlackboard().OutlineColor = outlineColor; }
-        void SetOutlineThickness(float outlineThickness) { mGraph.GetBlackboard().OutlineThickness = outlineThickness; }
+        void SetOutlineColor(glm::vec3 outlineColor) { mGraph.GetBlackboard().PostProcessSettings_.OutlineColor = outlineColor; }
+        void SetOutlineThickness(float outlineThickness) { mGraph.GetBlackboard().PostProcessSettings_.OutlineThickness = outlineThickness; }
 
         ShaderManager& GetShaderManager() { return mShaderManager; }
         SamplerHandle GetDefaultSampler() const { return mGraph.GetBlackboard().DefaultSampler; }

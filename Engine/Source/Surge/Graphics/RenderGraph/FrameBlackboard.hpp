@@ -58,12 +58,14 @@ namespace Surge
         glm::vec3 GroundAmbient { 0.12f, 0.11f, 0.10f };
     };
 
-    struct VignetteGrainConfig
+    struct PostProcessSettings
     {
-        float Intensity = 0.0f;
-        float Softness = 0.25f;
+        bool EnableFXAA = true;
+        glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
+        float OutlineThickness = 1.1f;
+        float VignetteIntensity = 0.0f;
+        float VignetteSoftness = 0.25f;
         float Grain = 0.0f;
-        float _Padding = 0.0f;
     };
 
     // CPU-side submit commands
@@ -172,10 +174,7 @@ namespace Surge
         Environnment Env;
 
         // Screen Space options
-        glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
-        float OutlineThickness = 1.1f;
-        bool EnableFXAA = true;
-        VignetteGrainConfig VignetteGrain;
+        PostProcessSettings PostProcessSettings_;
 
         // CMD lists
         Vector<MeshSubmitCmd> MeshList;

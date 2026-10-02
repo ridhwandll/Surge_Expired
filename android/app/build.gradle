@@ -2,6 +2,33 @@ plugins {
     id 'com.android.application'
 }
 
+// Export Panel contract
+// The editor's Export Panel invokes Gradle with these -P properties (all optional, so building from Android Studio keeps working with the defaults below):
+//   -PsurgeAppName, -PsurgeApplicationId, -PsurgeVersionName, -PsurgeVersionCode, -PsurgeMinSdk
+// Signing secrets are passed through environment variables, never on the command line:
+//   SURGE_KEYSTORE_PATH, SURGE_KEYSTORE_PASS, SURGE_KEY_ALIAS, SURGE_KEY_PASS
+
+def surgeProp = { String name, String fallback ->
+    project.hasProperty(name) ? project.property(name).toString() : fallback
+}
+
+def surgeAppName = surgeProp('surgeAppName', 'Surge Player')
+def surgeApplicationId = surgeProp('surgeApplicationId', 'com.ridt.surgeplayer')
+def surgeVersionName = surgeProp('surgeVersionName', '1.0')
+def surgeVersionCode = surgeProp('surgeVersionCode', '1').toInteger()
+def surgeMinSdk = surgeProp('surgeMinSdk', '29').toInteger()
+def surgeOrientation = surgeProp('surgeOrientation', 'landscape') // android:screenOrientation value
+def surgeImmersive = surgeProp('surgeImmersive', 'true')
+def surgeCutout = surgeProp('surgeCutout', 'true')
+def surgeKeepScreenOn = surgeProp('surgeKeepScreenOn', 'true')
+def surgeExitOnBack = surgeProp('surgeExitOnBack', 'true')
+
+if (surgeMinSdk < 29) {
+    throw new GradleException("minSdk $surgeMinSdk is not supported: Android 10 (API 29) is required for Vulkan 1.1")
+}
+
+def surgeKeystorePath = System.getenv('SURGE_KEYSTORE_PATH')
+
 android {
     namespace = 'com.surgetechnologies.surgeplayer'
     compileSdk 33
@@ -9,12 +36,22 @@ android {
     ndkVersion = "27.3.13750724"
 
     defaultConfig {
-        applicationId = "com.surgetechnologies.surgeplayer"
-        minSdk 29 //Android 10 is must as we need Vulkan 1.1
+        applicationId = surgeApplicationId
+        minSdk surgeMinSdk //Android 10 is must as we need Vulkan 1.1
         targetSdk = 33
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = surgeVersionCode
+        versionName = surgeVersionName
+        resValue "string", "app_name", surgeAppName
 
+        // Manifest-level setting
+        manifestPlaceholders = [surgeOrientation: surgeOrientation]
+
+        // Runtime settings read by SurgeActivity
+        resValue "bool", "surge_immersive", surgeImmersive
+        resValue "bool", "surge_use_cutout", surgeCutout
+        resValue "bool", "surge_keep_screen_on", surgeKeepScreenOn
+        resValue "bool", "surge_exit_on_back", surgeExitOnBack
+        
         ndk {
             abiFilters += ["arm64-v8a"]
         }
@@ -37,6 +74,18 @@ android {
         }
     }
 
+    signingConfigs {
+        // Populated when the editor exports with a keystore
+        surgeRelease {
+            if (surgeKeystorePath) {
+                storeFile file(surgeKeystorePath)
+                storePassword System.getenv('SURGE_KEYSTORE_PASS')
+                keyAlias System.getenv('SURGE_KEY_ALIAS')
+                keyPassword System.getenv('SURGE_KEY_PASS')
+            }
+        }
+    }
+
     buildTypes {
         debug {
             debuggable = true
@@ -54,20 +103,23 @@ android {
             debuggable = false
             jniDebuggable = false
             minifyEnabled = true
-
+            ndk {
+                debugSymbolLevel 'NONE'
+            }
+            packaging {
+                jniLibs {
+                    keepDebugSymbols.clear()
+                    excludes += ['**/libVkLayer_khronos_validation.so']
+                }
+            }
             externalNativeBuild {
                 cmake {
                     cppFlags += "-O3 -ffast-math -flto"
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
-            signingConfig signingConfigs.debug
-        }
-    }
-
-    packagingOptions {
-        jniLibs {
-            keepDebugSymbols += ['**/*.so']
+            // Editor export -> real keystore; Android Studio / local runs -> debug key as before
+            signingConfig surgeKeystorePath ? signingConfigs.surgeRelease : signingConfigs.debug
         }
     }
 

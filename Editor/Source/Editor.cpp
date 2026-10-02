@@ -401,6 +401,10 @@ namespace Surge
         ImGui::Begin("Editor Settings");
         ImGui::Checkbox("Show Axes", &mShowAxes);
 
+        static float mFrameCap = 144.0f;
+        if(ImGui::DragFloat("Cap FPS", &mFrameCap, 20.0f, 0.0f, 1000.0f))
+            Core::SetFrameCap(mFrameCap);
+
         if (ImGui::Button("Toggle Debug Render"))
         {
             if(mRuntimeScene)

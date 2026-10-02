@@ -82,16 +82,20 @@ namespace Surge
         {
             glm::vec4 ColorThickness;
             glm::vec2 ScreenResolution;
-            VignetteGrainConfig VignetteGrain;
-            glm::vec2 CameraNearFar;
+            float VignetteIntensity;
+            float VignetteSoftness;
+            float Grain;
             int EnableFXAA;
+            glm::vec2 CameraNearFar;
         };
         PostProcessPushConstants pc = {};
-        pc.ColorThickness = glm::vec4(blackBoard.OutlineColor,  blackBoard.OutlineThickness);
+        pc.ColorThickness = glm::vec4(blackBoard.PostProcessSettings_.OutlineColor, blackBoard.PostProcessSettings_.OutlineThickness);
         pc.ScreenResolution = glm::vec2(static_cast<float>(ctx.Width), static_cast<float>(ctx.Height));
-        pc.VignetteGrain = blackBoard.VignetteGrain;
+        pc.VignetteIntensity = blackBoard.PostProcessSettings_.VignetteIntensity;
+        pc.VignetteSoftness = blackBoard.PostProcessSettings_.VignetteSoftness;
+        pc.Grain = blackBoard.PostProcessSettings_.Grain;
         pc.CameraNearFar = blackBoard.CameraNearFarPlane;
-        pc.EnableFXAA = blackBoard.EnableFXAA;
+        pc.EnableFXAA = blackBoard.PostProcessSettings_.EnableFXAA;
         mRHI->CmdPushConstants(ctx, mFullscreenPipeline, ShaderType::FRAGMENT | ShaderType::VERTEX, 0, sizeof(PostProcessPushConstants), &pc);
         mRHI->CmdDraw(ctx, 3, 1, 0, 0);
     }
@@ -109,12 +113,13 @@ namespace Surge
         ImGui::Separator();
         ImGui::PopFont();
 
-        ImGui::Checkbox("Enable FXAA", &blackBoard.EnableFXAA);
+        ImGui::Checkbox("Enable FXAA", &blackBoard.PostProcessSettings_.EnableFXAA);
         ImGui::TextUnformatted("Enabling FXAA on mobile is not recommended!");
 
-        ImGui::SliderFloat("Vignette Intensity", &blackBoard.VignetteGrain.Intensity, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Vignette Softness", &blackBoard.VignetteGrain.Softness, 0.01f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Grain Intensity", &blackBoard.VignetteGrain.Grain, 0.0f, 0.15f, "%.3f");
+
+        ImGui::SliderFloat("Vignette Intensity", &blackBoard.PostProcessSettings_.VignetteIntensity, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Vignette Softness", &blackBoard.PostProcessSettings_.VignetteSoftness, 0.01f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Grain Intensity", &blackBoard.PostProcessSettings_.Grain, 0.0f, 0.15f, "%.3f");
     }
 
     void PostProcessPass::Shutdown(FrameBlackboard& blackBoard)

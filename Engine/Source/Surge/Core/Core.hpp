@@ -18,7 +18,7 @@ namespace Surge
         void Initialize(Client* application);
         void Run();
         void Shutdown();
-
+        void SetFrameCap(float fps);
         void AddFrameEndCallback(const std::function<void()>& func); // FrameEndCallbacks are a way to accomplish some task at the very end of a frame
 
         Window* GetWindow();

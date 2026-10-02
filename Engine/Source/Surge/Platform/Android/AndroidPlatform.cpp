@@ -24,6 +24,11 @@ namespace Surge
         //Empty for now
     }
 
+    void Platform::OpenFolderInExplorer(const String& path)
+    {
+        // What is this supposed to do on Android? We don't have a file explorer to open
+    }
+
     void Platform::OpenInExplorer(const String&)
     {
         // Tf is this supposed to do on Android? We don't have a file explorer to open
@@ -60,6 +65,16 @@ namespace Surge
         if (window)
             return window->GetSize();
         return {0.0f, 0.0f};
+    }
+
+    bool Platform::SetEnvVariableForCurrentProcess(const String& key, const String& value)
+    {
+        return setenv(key.c_str(), value.c_str(), 1) == 0;
+    }
+
+    String Platform::GetEnvVariableForCurrentProcess(const String& key)
+    {
+        return "";
     }
 
     bool Platform::SetEnvVariable(const String& key, const String& value)

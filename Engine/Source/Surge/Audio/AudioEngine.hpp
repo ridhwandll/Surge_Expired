@@ -29,5 +29,6 @@ namespace Surge
         void SetListenerPosition(float x, float y, float z);
         void SetPosition(float x, float y, float z, AudioID audioId);
         void PlayOneShot(const Ref<Audio>& audioAsset);
+        void SeekTo(AudioID audioId, float seconds);
     };
 }

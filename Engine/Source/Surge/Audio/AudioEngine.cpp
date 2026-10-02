@@ -204,4 +204,19 @@ namespace Surge
         ma_engine_play_sound(sAudioEngine, audioAsset->GetFilepath().c_str(), NULL);
     }
 
+    void AudioEngine::SeekTo(AudioID audioId, float seconds)
+    {
+        SG_ASSERT(audioId, "AudioID is NULL!");
+        ma_sound* sound = (ma_sound*)audioId;
+        ma_uint32 sampleRate;
+        ma_result result = ma_sound_get_data_format(sound, NULL, NULL, &sampleRate, NULL, 0);
+
+        if(result == MA_SUCCESS)
+        {
+            ma_uint64 frameIndex = static_cast<ma_uint64>(seconds * sampleRate);
+            ma_sound_seek_to_pcm_frame(sound, frameIndex);
+        }
+        else
+            Log<Severity::Warn>("[AudioEngine::SeekTo] Failed to query data format. Cannot seek!");
+    }
 }

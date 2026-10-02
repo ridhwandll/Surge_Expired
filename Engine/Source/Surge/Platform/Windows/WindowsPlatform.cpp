@@ -43,6 +43,33 @@ namespace Surge
         return resultantPath;
     }
 
+    void Platform::OpenFolderInExplorer(const String& path)
+    {
+        int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), (int)path.size(), NULL, 0);
+        if(sizeNeeded <= 0)
+            return;
+
+        std::wstring wpath(sizeNeeded, 0);
+        MultiByteToWideChar(CP_UTF8, 0, path.c_str(), (int)path.size(), &wpath[0], sizeNeeded);
+
+        for(auto& ch : wpath)
+        {
+            if(ch == L'/')
+                ch = L'\\';
+        }
+
+        HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+        bool shouldUninitialize = SUCCEEDED(hr);
+        if(FAILED(hr) && hr != RPC_E_CHANGED_MODE)
+            return;
+
+        ShellExecuteW(NULL, L"open", wpath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+
+        if(shouldUninitialize)
+            CoUninitialize();
+    }
+
     void Platform::OpenInExplorer(const String& path)
     {
         int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), (int)path.size(), NULL, 0);
@@ -113,6 +140,24 @@ namespace Surge
         return glm::vec2(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
     }
 
+    bool Platform::SetEnvVariableForCurrentProcess(const String& key, const String& value)
+    {
+        return SetEnvironmentVariableA(key.c_str(), value.c_str()) != 0;
+    }
+
+    String Platform::GetEnvVariableForCurrentProcess(const String& key)
+    {
+        DWORD size = GetEnvironmentVariableA(key.c_str(), NULL, 0);
+        if(size == 0)
+            return ""; // Doesn't exist or is empty
+
+        String result;
+        result.resize(size - 1); // size includes the null terminator
+        GetEnvironmentVariableA(key.c_str(), &result[0], size);
+
+        return result;
+    }
+
     bool Platform::SetEnvVariable(const String& key, const String& value)
     {
         HKEY hKey;
@@ -151,25 +196,23 @@ namespace Surge
     String Platform::GetEnvVariable(const String& key)
     {
         HKEY hKey;
-        LPCSTR keyPath = "Environment";
-        DWORD createdNewKey;
-        LSTATUS lOpenStatus = RegCreateKeyExA(HKEY_CURRENT_USER, keyPath, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &createdNewKey);
-        if (lOpenStatus == ERROR_SUCCESS)
+        if(RegOpenKeyExA(HKEY_CURRENT_USER, "Environment", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
         {
-            DWORD valueType;
-            char* data = new char[512];
-            DWORD dataSize = 512;
-            LSTATUS status = RegGetValueA(hKey, NULL, key.c_str(), RRF_RT_ANY, &valueType, (PVOID)data, &dataSize);
-            RegCloseKey(hKey);
+            DWORD dataSize = 0;
 
-            if (status == ERROR_SUCCESS)
+            if(RegGetValueA(hKey, NULL, key.c_str(), RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, NULL, NULL, &dataSize) == ERROR_SUCCESS)
             {
-                String result(data);
-                delete[] data;
-                return result;
-            }
-        }
+                String result;
+                result.resize(dataSize - 1); // Make room (dataSize includes null terminator)
 
+                if(RegGetValueA(hKey, NULL, key.c_str(), RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, NULL, &result[0], &dataSize) == ERROR_SUCCESS)
+                {
+                    RegCloseKey(hKey);
+                    return result;
+                }
+            }
+            RegCloseKey(hKey);
+        }
         return "";
     }
 

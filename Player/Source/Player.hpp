@@ -3,6 +3,10 @@
 #include "Surge/Core/Client.hpp"
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Surge/Asset/AssetManager.hpp"
+
+#define INITIAL_WIDTH 1280
+#define INITIAL_HEIGHT 720
 
 namespace Surge
 {

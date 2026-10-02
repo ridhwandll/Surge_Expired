@@ -12,7 +12,7 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
 #include "Surge/Audio/Audio.hpp"
-
+#include <glm/glm.hpp>
 // TODO: REMOVE following includes
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Utility/Platform.hpp"
@@ -487,6 +487,12 @@ namespace Surge::ScriptBinding
                                             else
                                                 Log<Severity::Warn>("ECSBindings: AudioSourceComponent is not initialized. Cannot play audio!");
                                         },
+                                        "Seek", [](AudioSourceComponent& ac, float seconds) {
+                                            if(ac.RuntimeID)
+                                                Core::GetAudioEngine()->SeekTo(ac.RuntimeID, seconds);
+                                            else
+                                                Log<Severity::Warn>("ECSBindings.cpp: [AudioSourceComponent] AudioSourceComponent is not initialized. Cannot seek!");
+                                        },
                                         "Stop", [](AudioSourceComponent& ac) {
                                             if(ac.RuntimeID)
                                             {
@@ -516,6 +522,11 @@ namespace Surge::ScriptBinding
         //TODO: MOVE to Renderer Binding
         sol::table renderer = lua["Renderer"].get_or_create<sol::table>();
         renderer.set_function("DrawLine", [](const glm::vec3& point0, const glm::vec3& point1, const glm::vec4& color) { Core::GetRenderer()->SubmitLine(point0, point1, color); });
+        renderer.set_function("DrawQuad", [](const glm::vec3& pos, const glm::vec3& rot, const glm::vec3& scale, const glm::vec4& color)
+                              {
+                                  glm::mat4 transform = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(glm::quat(glm::radians(rot))) * glm::scale(glm::mat4(1.0f), scale);
+                                  Core::GetRenderer()->SubmitQuad(transform, color);
+                              });
 
         // TODO: MOVE to Application Binding
         sol::table application = lua["Application"].get_or_create<sol::table>();

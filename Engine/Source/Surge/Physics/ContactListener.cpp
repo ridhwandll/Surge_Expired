@@ -9,7 +9,7 @@ namespace Surge
         return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
     }
 
-    void ContactListener::OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2, const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings)
+    void ContactListener::OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2, const JPH::ContactManifold& /*inManifold*/, JPH::ContactSettings& /*ioSettings*/)
     {
         uint64_t e1 = static_cast<uint64_t>(inBody1.GetUserData());
         uint64_t e2 = static_cast<uint64_t>(inBody2.GetUserData());
