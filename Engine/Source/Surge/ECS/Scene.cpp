@@ -11,6 +11,7 @@
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
+#include "Surge/Graphics/UISystem/UILayout.hpp"
 
 #include "Jolt/Physics/Body/BodyManager.h"
 #include "Jolt/Physics/PhysicsSystem.h"
@@ -775,32 +776,47 @@ namespace Surge
                 }
             }
             {
+                UI::Manager& uiManager = Core::GetRenderer()->GetUIManager();
                 auto view = mRegistry.view<UICanvasComponent>();
                 Vector<entt::entity> uiCanvases(view.begin(), view.end());
 
                 for(auto entityID : uiCanvases)
                 {
-                    if(!mRegistry.valid(entityID))
+                    if(!mRegistry.valid(entityID) || !mRegistry.all_of<UICanvasComponent>(entityID))
                         continue;
 
-                    auto& uiComp = view.get<UICanvasComponent>(entityID);
-                    if(!uiComp.ScriptAsset || !uiComp.Active)
-                        continue;
-
-                    Core::GetRenderer()->ShowUI(uiComp.ShowCanvas); // (Rid) This should be here?
-
-                    Ref<Script> script = uiComp.ScriptAsset.As<Script>();
+                    auto& uiComp = mRegistry.get<UICanvasComponent>(entityID);
                     Entity entityObj = { entityID, this };
-                    if(uiComp.ShowCanvas)
+
+                    // Each canvas is its own entry in the UI Manager, ShowCanvas/Active only hide this canvas (used to toggle the whole UI)
+                    uiComp.RuntimeCanvasID = entityObj.GetComponent<IDComponent>().ID.Get();
+                    const Ref<UILayout> layout = uiComp.Layout ? uiComp.Layout.As<UILayout>() : nullptr;
+                    uiManager.SetCanvasProperties(uiComp.RuntimeCanvasID, uiComp.SortOrder, layout ? layout->Scaler : UI::CanvasScaler(), uiComp.Active && uiComp.ShowCanvas);
+
+                    if(!uiComp.Active || !uiComp.ShowCanvas)
+                        continue;
+
+                    if(!uiComp.IsInstantiated)
                     {
-                        if(!uiComp.IsInstantiated)
+                        // Layout first, so OnCreate can already find its widgets
+                        if(layout)
+                            uiManager.SetCanvasLayoutRoot(uiComp.RuntimeCanvasID, layout->Instantiate());
+
+                        if(uiComp.ScriptAsset)
                         {
+                            Ref<Script> script = uiComp.ScriptAsset.As<Script>();
                             script->CreateEnvironment(&uiComp.Env, &uiComp.OnCreate, &uiComp.OnUpdate, &uiComp.OnDestroy, &uiComp.OnCollisionEnter);
+                            uiManager.BeginCanvasScript(uiComp.RuntimeCanvasID);
                             script->ExecuteOnCreate(entityObj, uiComp.OnCreate);
-                            uiComp.IsInstantiated = true;
+                            uiManager.EndCanvasScript();
                         }
-                        else if(uiComp.IsInstantiated)
-                            script->ExecuteOnUpdate(entityObj, uiComp.OnUpdate);
+                        uiComp.IsInstantiated = true;
+                    }
+                    else if(uiComp.ScriptAsset)
+                    {
+                        uiManager.BeginCanvasScript(uiComp.RuntimeCanvasID);
+                        uiComp.ScriptAsset.As<Script>()->ExecuteOnUpdate(entityObj, uiComp.OnUpdate);
+                        uiManager.EndCanvasScript();
                     }
                 }
             }
@@ -953,10 +969,23 @@ namespace Surge
     {
         Entity e(entity, this);
         UICanvasComponent& comp = e.GetComponent<UICanvasComponent>();
+        UI::Manager& uiManager = Core::GetRenderer()->GetUIManager();
         if(comp.IsInstantiated)
         {
-            comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e, comp.OnDestroy);
+            if(comp.ScriptAsset)
+            {
+                uiManager.BeginCanvasScript(comp.RuntimeCanvasID); // SetUIRoot(nil) in OnDestroy must target this canvas
+                comp.ScriptAsset.As<Script>()->ExecuteOnDestroy(e, comp.OnDestroy);
+                uiManager.EndCanvasScript();
+            }
             comp.IsInstantiated = false;
+        }
+
+        // Without this the UI of a stopped scene stayed on screen (and its Lua callbacks stayed clickable)
+        if(comp.RuntimeCanvasID != 0)
+        {
+            uiManager.RemoveCanvas(comp.RuntimeCanvasID);
+            comp.RuntimeCanvasID = 0;
         }
     }
 

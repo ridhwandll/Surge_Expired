@@ -16,6 +16,8 @@
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
 #include "ContentBrowserPanel.hpp"
+#include "UIEditorPanel.hpp"
+#include "Surge/Graphics/UISystem/UILayout.hpp"
 #include "Utility/ImGuiAux.hpp"
 
 #include <imgui.h>
@@ -775,8 +777,32 @@ namespace Surge
         if(entity.HasComponent<UICanvasComponent>())
         {
             UICanvasComponent& component = entity.GetComponent<UICanvasComponent>();
-            DrawComponent<UICanvasComponent>(entity, "UI Canvas Component", [&component]() {
+            DrawComponent<UICanvasComponent>(entity, "UI Canvas Component", [&component, &entity]() {
                 ImGuiAux::TProperty<bool>("Show Canvas", &component.ShowCanvas);
+                ImGuiAux::TProperty<int>("Sort Order", &component.SortOrder, -1000.0f, 1000.0f);
+                DrawAssetDropSlot<UILayout>("Layout", component.Layout, AssetType::UI_LAYOUT, "Drop UI LAYOUT");
+
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+                UIEditorPanel* uiEditor = static_cast<Editor*>(Core::GetClient())->GetPanelManager().GetPanel<UIEditorPanel>();
+                if(component.Layout)
+                {
+                    if(ImGui::Button("Edit Layout", ImVec2(-FLT_MIN, 0.0f)))
+                        uiEditor->OpenLayout(component.Layout->GetID());
+                }
+                else if(ImGui::Button("Create New Layout", ImVec2(-FLT_MIN, 0.0f)))
+                {
+                    // Assets/UI/<EntityName>.sui, assigned and opened in the UI Editor right away
+                    AssetManager* am = Core::GetAssetManager();
+                    const String name = entity.HasComponent<NameComponent>() ? entity.GetComponent<NameComponent>().Name : String("UICanvas");
+                    const AssetID layoutID = UIEditorPanel::CreateLayoutAsset(std::filesystem::path(am->GetAssetsDirectory()) / "UI", name);
+                    if(layoutID)
+                    {
+                        component.Layout = am->Load<UILayout>(layoutID);
+                        uiEditor->OpenLayout(layoutID);
+                    }
+                }
+
                 DrawAssetDropSlot<Script>("Script", component.ScriptAsset, AssetType::SCRIPT, "Drop UI SCRIPT");
             });
         }

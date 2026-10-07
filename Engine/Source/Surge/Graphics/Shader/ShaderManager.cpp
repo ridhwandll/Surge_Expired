@@ -9,10 +9,10 @@ namespace Surge
         // TODO: Cache shader
     }
 
-    void ShaderManager::Load(const String& shaderName)
+    void ShaderManager::Load(const String& shaderName, ShaderType types)
     {
         mShaders.emplace_back(Shader());
-        mShaders.back().Load(std::format("{0}/{1}", mBaseShaderPath, shaderName), ShaderType::VERTEX | ShaderType::FRAGMENT);
+        mShaders.back().Load(std::format("{0}/{1}", mBaseShaderPath, shaderName), types);
     }
 
     void ShaderManager::Shutdown()

@@ -38,9 +38,9 @@ namespace Surge
         return entry;
     }
 
-    void VulkanDescriptorSet::Bind(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkDescriptorSet setHandle, DescriptorSetSlot slot)
+    void VulkanDescriptorSet::Bind(VkCommandBuffer cmd, VkPipelineBindPoint bindPoint, VkPipelineLayout pipelineLayout, VkDescriptorSet setHandle, DescriptorSetSlot slot)
     {
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (Uint)slot, 1, &setHandle, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, bindPoint, pipelineLayout, (Uint)slot, 1, &setHandle, 0, nullptr);
     }
 
     void VulkanDescriptorSet::Update(const VulkanRHI& rhi, DescriptorSetEntry& entry, const DescriptorWrite* writes, Uint writeCount, Uint frameIndex)
@@ -76,11 +76,12 @@ namespace Surge
                     const ImageEntry* tex = rhi.mTexturePool.Get(w.Texture);
                     SG_ASSERT(tex, "UpdateDescriptorSet: invalid TextureHandle at slot");
 
+                    // Storage images have no sampler
                     const SamplerEntry* smp = rhi.mSamplerPool.Get(w.Sampler);
-                    SG_ASSERT(smp, "UpdateDescriptorSet: invalid SamplerHandle at slot");
+                    SG_ASSERT(smp || w.Type == DescriptorType::STORAGE_TEXTURE, "UpdateDescriptorSet: invalid SamplerHandle at slot");
 
                     VkDescriptorImageInfo img = {};
-                    img.sampler = smp->Sampler;
+                    img.sampler = smp ? smp->Sampler : VK_NULL_HANDLE;
                     img.imageView = tex->View;
                     img.imageLayout = (w.Type == DescriptorType::STORAGE_TEXTURE) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                     imageInfos.push_back(img);

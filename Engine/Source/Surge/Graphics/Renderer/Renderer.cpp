@@ -11,6 +11,8 @@
 #include "Surge/Graphics/RenderGraph/Passes/SkyPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/ShadowPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/UIOverlayPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/AmbientOcclusionPass.hpp"
+#include "Surge/Graphics/RenderGraph/Passes/BloomPass.hpp"
 
 #include "Surge/Graphics/UISystem/UIManager.hpp"
 
@@ -29,14 +31,18 @@ namespace Surge
         mShaderManager.Load("Renderer2D.glsl");
         mShaderManager.Load("Renderer2DLine.glsl");
         mShaderManager.Load("Renderer2DText.glsl");
-        mShaderManager.Load("UIQuad.glsl");
-        mShaderManager.Load("UIText.glsl");
+        mShaderManager.Load("UI.glsl");
         mShaderManager.Load("Renderer3D.glsl");
         mShaderManager.Load("PostProcess.glsl");
         mShaderManager.Load("OutlineMask.glsl");
         mShaderManager.Load("PreethamSky.glsl");
         mShaderManager.Load("Shadow.glsl");
         mShaderManager.Load("Present.glsl");
+        mShaderManager.Load("AOLinearDepth.glsl");
+        mShaderManager.Load("GTAO.glsl");
+        mShaderManager.Load("AOBlur.glsl");
+        mShaderManager.Load("Bloom.glsl");
+        mShaderManager.Load("BloomCompute.glsl", ShaderType::COMPUTE);
 
         mRHI = CreateScope<GraphicsRHI>();
         mRHI->Initialize(Core::GetWindow());
@@ -66,6 +72,26 @@ namespace Surge
             samplerDesc.WrapV = WrapMode::CLAMP;
             blackBoard.TextSampler = mRHI->CreateSampler(samplerDesc);
         }
+        {
+            SamplerDesc samplerDesc = {};
+            samplerDesc.DebugName = "PointClampSampler";
+            samplerDesc.Min = FilterMode::NEAREST;
+            samplerDesc.Mag = FilterMode::NEAREST;
+            samplerDesc.Mip = MipmapMode::NEAREST;
+            samplerDesc.WrapU = WrapMode::CLAMP;
+            samplerDesc.WrapV = WrapMode::CLAMP;
+            blackBoard.PointClampSampler = mRHI->CreateSampler(samplerDesc);
+        }
+        {
+            SamplerDesc samplerDesc = {};
+            samplerDesc.DebugName = "LinearClampSampler";
+            samplerDesc.Min = FilterMode::LINEAR;
+            samplerDesc.Mag = FilterMode::LINEAR;
+            samplerDesc.Mip = MipmapMode::NEAREST;
+            samplerDesc.WrapU = WrapMode::CLAMP;
+            samplerDesc.WrapV = WrapMode::CLAMP;
+            blackBoard.LinearClampSampler = mRHI->CreateSampler(samplerDesc);
+        }
 
         Byte whitePixel[] = { 255, 255, 255, 255 };
         ImageDesc texDesc = {};
@@ -93,6 +119,8 @@ namespace Surge
         mGraph.AddPass<GeometryPass>();
         mGraph.AddPass<SkyPass>();
         mGraph.AddPass<Renderer2DPass>();
+        mGraph.AddPass<AmbientOcclusionPass>(); // After GeometryPass (needs MainPassDepthImage), before PostProcessPass (consumes AOImage)
+        mGraph.AddPass<BloomPass>();            // After GeometryPass (needs MainPassColorImage), before PostProcessPass (consumes BloomImage)
         mGraph.AddPass<PostProcessPass>();
         mGraph.AddPass<UIOverlayPass>();
         mGraph.AddPass<SwapchainPass>();
@@ -215,6 +243,8 @@ namespace Surge
 
         mRHI->DestroySampler(blackBoard.DefaultSampler);
         mRHI->DestroySampler(blackBoard.TextSampler);
+        mRHI->DestroySampler(blackBoard.PointClampSampler);
+        mRHI->DestroySampler(blackBoard.LinearClampSampler);
         mRHI->Shutdown();
     }
 

@@ -7,6 +7,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/UISystem/UIManager.hpp"
 #include "Surge/Graphics/UISystem/UIWidgets.hpp"
+#include "Surge/ECS/Components/ScriptComponent.hpp"
 #include "BindingUtils.hpp"
 
 namespace sol
@@ -24,6 +25,23 @@ namespace sol
 
 namespace Surge::ScriptBinding
 {
+    // Lua only sees the static type it was given, hand out the concrete type so e.g. button.NormalColor works on a FindWidget() result
+    static sol::object ToTypedLuaObject(sol::state_view lua, UI::Widget* widget)
+    {
+        if(!widget)
+            return sol::make_object(lua, sol::lua_nil);
+
+        switch(widget->GetType())
+        {
+            case UI::WidgetType::BUTTON:       return sol::make_object(lua, Ref<UI::Button>(static_cast<UI::Button*>(widget)));
+            case UI::WidgetType::IMAGE:        return sol::make_object(lua, Ref<UI::Image>(static_cast<UI::Image*>(widget)));
+            case UI::WidgetType::TEXT:         return sol::make_object(lua, Ref<UI::Text>(static_cast<UI::Text*>(widget)));
+            case UI::WidgetType::IMAGE_BUTTON: return sol::make_object(lua, Ref<UI::ImageButton>(static_cast<UI::ImageButton*>(widget)));
+            case UI::WidgetType::BASE_WIDGET:  break;
+        }
+        return sol::make_object(lua, Ref<UI::Widget>(widget));
+    }
+
     class LuaEventCallback : public UI::IEventCallback
     {
     public:
@@ -34,25 +52,7 @@ namespace Surge::ScriptBinding
         {
             if(mFunc.valid())
             {
-                sol::protected_function_result result;
-                switch(mSelf->GetType())
-                {
-                    case UI::WidgetType::BUTTON:
-                        result = mFunc(static_cast<UI::Button*>(mSelf));
-                        break;
-                    case UI::WidgetType::IMAGE:
-                        result = mFunc(static_cast<UI::Image*>(mSelf));
-                        break;
-                    case UI::WidgetType::TEXT:
-                        result = mFunc(static_cast<UI::Text*>(mSelf));
-                        break;
-                    case UI::WidgetType::IMAGE_BUTTON:
-                        result = mFunc(static_cast<UI::ImageButton*>(mSelf));
-                        break;
-                    default:
-                        result = mFunc(mSelf);
-                        break;
-                }
+                sol::protected_function_result result = mFunc(ToTypedLuaObject(mFunc.lua_state(), mSelf));
                 if(!result.valid())
                 {
                     sol::error err = result;
@@ -69,9 +69,19 @@ namespace Surge::ScriptBinding
     {
         sol::state_view& lua = *static_cast<sol::state_view*>(luaState);
 
+        // Attaches to the UICanvasComponent whose script is running (or a global canvas when called from a regular script)
         lua.set_function("SetUIRoot", [](UI::Widget* root) {
             UI::Manager & uiManager = Core::GetRenderer()->GetUIManager();
             root ? uiManager.SetRoot(Ref<UI::Widget>(root)) : uiManager.ClearRoot();
+        });
+
+        // entity.UICanvasC:FindWidget("PlayButton") -> typed widget (UIButton/UIText/...) from the canvas layout or script root, nil if not found
+        sol::usertype<UICanvasComponent> canvasType = lua["UICanvasComponent"];
+        canvasType.set_function("FindWidget", [](UICanvasComponent& canvas, const String& name, sol::this_state s) -> sol::object {
+            UI::Widget* widget = canvas.RuntimeCanvasID ? Core::GetRenderer()->GetUIManager().FindWidget(canvas.RuntimeCanvasID, name) : nullptr;
+            if(!widget)
+                Log<Severity::Warn>("[UIBindings.cpp] Lua: UICanvasComponent:FindWidget: No widget named '{}'", name);
+            return ToTypedLuaObject(s, widget);
         });
 
         //sol::factories enables this in Lua: `local widget = UIWidget.new()`
@@ -80,6 +90,33 @@ namespace Surge::ScriptBinding
                                          if(child)
                                              parent.AddChild(Ref<UI::Widget>(child));
                                      },
+                                     "RemoveChild", [](UI::Widget& parent, UI::Widget* child) {
+                                         if(child)
+                                             parent.RemoveChild(child);
+                                     },
+                                     "FindChild", [](UI::Widget& parent, const String& name, sol::this_state s) -> sol::object {
+                                         return ToTypedLuaObject(s, parent.FindChild(name, true));
+                                     },
+                                     "Name", sol::property(
+                                         [](UI::Widget& w) -> String { return w.GetName(); },
+                                         [](UI::Widget& w, const String& val) { w.SetName(val); }
+                                     ),
+                                     "Visible", sol::property(
+                                         [](UI::Widget& w) -> bool { return w.IsVisible(); },
+                                         [](UI::Widget& w, bool val) { w.SetVisible(val); }
+                                     ),
+                                     "Interactable", sol::property(
+                                         [](UI::Widget& w) -> bool { return w.IsInteractable(); },
+                                         [](UI::Widget& w, bool val) { w.SetInteractable(val); }
+                                     ),
+                                     "AnchorMin", sol::property(
+                                         [](UI::Widget& w) -> glm::vec2 { return w.GetAnchorMin(); },
+                                         [](UI::Widget& w, const glm::vec2& val) { w.SetAnchorMin(val.x, val.y); }
+                                     ),
+                                     "AnchorMax", sol::property(
+                                         [](UI::Widget& w) -> glm::vec2 { return w.GetAnchorMax(); },
+                                         [](UI::Widget& w, const glm::vec2& val) { w.SetAnchorMax(val.x, val.y); }
+                                     ),
                                      "OnClick",      [](UI::Widget& w, sol::protected_function f) { w.SetOnClick(Ref<LuaEventCallback>::Create(f, &w)); },
                                      "OnHoverEnter", [](UI::Widget& w, sol::protected_function f) { w.SetOnHoverEnter(Ref<LuaEventCallback>::Create(f, &w)); },
                                      "OnHoverExit",  [](UI::Widget& w, sol::protected_function f) { w.SetOnHoverExit(Ref<LuaEventCallback>::Create(f, &w)); },
@@ -109,14 +146,14 @@ namespace Surge::ScriptBinding
                                     sol::factories([](const String& textureRelPath) {
                                         AssetManager* am = Core::GetAssetManager();
                                         AssetID id = am->GetIDFromPath(textureRelPath);
-                                        ImageHandle handle = ImageHandle::Invalid();
+                                        Ref<UI::Image> image = Ref<UI::Image>::Create();
                                         if(id)
                                         {
                                             Ref<Texture2D> texture = am->Load<Texture2D>(id);
-                                            if(texture) handle = texture->GetRHIImage();
+                                            if(texture) image->SetTexture(texture->GetRHIImage(), texture);
                                             else        Log<Severity::Warn>("[UIBindings.cpp] Lua: UIImage: Failed to load texture at path {}", textureRelPath);
                                         }
-                                        return Ref<UI::Image>::Create(handle);
+                                        return image;
                                     }),
                                     sol::base_classes, sol::bases<UI::Widget>()
         );
@@ -147,6 +184,10 @@ namespace Surge::ScriptBinding
                                    "TextVAlignment", sol::property(
                                        [](UI::Text& t) -> TextVerticalAlignment { return t.GetTextVAlignment(); },
                                        [](UI::Text& t, TextVerticalAlignment val) { t.SetTextVAlignment(val); }
+                                   ),
+                                   "WordWrap", sol::property(
+                                       [](UI::Text& t) -> bool { return t.GetWordWrap(); },
+                                       [](UI::Text& t, bool val) { t.SetWordWrap(val); }
                                    )
         );
 
@@ -181,10 +222,28 @@ namespace Surge::ScriptBinding
                                      "NormalColor", BIND_PROP(UI::Button, NormalColor),
                                      "HoverColor", BIND_PROP(UI::Button, HoverColor),
                                      "PressedColor", BIND_PROP(UI::Button, PressedColor),
-                                     // HOW?
                                      "GetText", [](UI::Button& btn) -> UI::Text* {
                                          return btn.GetTextWidget().get();
                                      }
+        );
+
+        lua.new_usertype<UI::ImageButton>("UIImageButton",
+                                          sol::factories([](const String& textureRelPath) {
+                                              AssetManager* am = Core::GetAssetManager();
+                                              Ref<UI::ImageButton> button = Ref<UI::ImageButton>::Create();
+                                              AssetID id = am->GetIDFromPath(textureRelPath);
+                                              if(id)
+                                              {
+                                                  Ref<Texture2D> texture = am->Load<Texture2D>(id);
+                                                  if(texture) button->SetTexture(texture->GetRHIImage(), texture);
+                                                  else        Log<Severity::Warn>("[UIBindings.cpp] Lua: UIImageButton: Failed to load texture at path {}", textureRelPath);
+                                              }
+                                              return button;
+                                          }),
+                                          sol::base_classes, sol::bases<UI::Widget, UI::Image>(),
+                                          "NormalColor", BIND_PROP(UI::ImageButton, NormalColor),
+                                          "HoverColor", BIND_PROP(UI::ImageButton, HoverColor),
+                                          "PressedColor", BIND_PROP(UI::ImageButton, PressedColor)
         );
     }
 }

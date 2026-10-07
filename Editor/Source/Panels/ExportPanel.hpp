@@ -1,14 +1,17 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Panels/IPanel.hpp"
+#include "Surge/Core/Scope.hpp"
 
 namespace Surge
 {
+    class ExportManager;
+
     class ExportPanel : public IPanel
     {
     public:
-        ExportPanel() = default;
-        virtual ~ExportPanel() override = default;
+        ExportPanel();
+        virtual ~ExportPanel() override;
 
         virtual void Init(void* panelInitArgs) override;
         virtual void OnEvent(Event& e) override;
@@ -17,11 +20,11 @@ namespace Surge
 
     public:
         static PanelCode GetStaticCode() { return PanelCode::Export; }
-    private:
-        void BuildWindows();
-        void BuildAndroid();
+
     private:
         PanelCode mCode;
+        Scope<ExportManager> mManager;
+        float mDisplayProgress = 0.0f; // Eases towards the real progress
     };
 
 } // namespace Surge

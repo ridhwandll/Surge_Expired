@@ -430,6 +430,7 @@ namespace Surge::ScriptBinding
         lua.new_usertype<UICanvasComponent>("UICanvasComponent", sol::no_constructor,
                                         "Active", BIND_PROP(UICanvasComponent, Active),
                                         "ShowCanvas", BIND_PROP(UICanvasComponent, ShowCanvas),
+                                        "SortOrder", BIND_PROP(UICanvasComponent, SortOrder),
                                         "ScriptAsset", BIND_PROP(UICanvasComponent, ScriptAsset),
                                         STRICT_READ(UICanvasComponent));
 

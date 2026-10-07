@@ -56,11 +56,20 @@ namespace Surge
                 VkBool32 supportsPresent;
                 vkGetPhysicalDeviceSurfaceSupportKHR(mGPU, i, surface, &supportsPresent);
 
-                // Find a queue family which supports graphics and presentation
-                if ((queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && supportsPresent)
+                // Find a queue family which supports graphics and presentation, prefer one that also supports compute
+                // (Vulkan guarantees a graphics+compute family exists, in practice it is always the first graphics family)
+                const VkQueueFlags flags = queueFamilyProperties[i].queueFlags;
+                if ((flags & VK_QUEUE_GRAPHICS_BIT) && supportsPresent)
                 {
-                    mGraphicsQueueIndex = i;
-                    break;
+                    const bool supportsCompute = (flags & VK_QUEUE_COMPUTE_BIT) != 0;
+                    if (mGraphicsQueueIndex < 0 || (supportsCompute && !mSupportsCompute))
+                    {
+                        mGraphicsQueueIndex = i;
+                        mSupportsCompute = supportsCompute;
+                    }
+
+                    if (mSupportsCompute)
+                        break;
                 }
             }
         }

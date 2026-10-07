@@ -12,6 +12,7 @@
 
 #include "Editor.hpp"
 #include "MaterialEditorPanel.hpp"
+#include "UIEditorPanel.hpp"
 #include "Utility/ImGuiAux.hpp"
 #include "Asset/SourceWriters/MaterialSourceWriter.hpp"
 #include "Asset/SourceWriters/ScriptSourceWriter.hpp"
@@ -330,6 +331,11 @@ namespace Surge
                                             Editor* editor = (Editor*)Core::GetClient();
                                             editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->SetSelectedMaterial(mAssetManager->Load<Material>(item.Id));
                                         }
+                                        else if(item.AssetType_ == AssetType::UI_LAYOUT)
+                                        {
+                                            Editor* editor = (Editor*)Core::GetClient();
+                                            editor->GetPanelManager().GetPanel<UIEditorPanel>()->OpenLayout(item.Id);
+                                        }
                                         else
                                             Log<Severity::Info>("[ContentBrowser] Double-clicked asset: {}", item.Filename);
                                     }
@@ -587,6 +593,17 @@ namespace Surge
                             mSelectedPath = newFilePath;
                             StartRename(newFilePath);
 
+                            mNeedsCacheRefresh = true;
+                        }
+
+                        if(ImGuiAux::StyledMenuItem("UI Layout"))
+                        {
+                            const AssetID newLayout = UIEditorPanel::CreateLayoutAsset(mCurrentDirectory);
+                            if(newLayout)
+                            {
+                                mSelectedPath = mCurrentDirectory / Filesystem::GetFilenameWithExt(mAssetManager->GetMetadata(newLayout).RelativePath);
+                                StartRename(mSelectedPath);
+                            }
                             mNeedsCacheRefresh = true;
                         }
 

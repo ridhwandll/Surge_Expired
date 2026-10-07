@@ -15,6 +15,7 @@
 #include "Surge/Graphics/HighLevel/Font.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
+#include "Surge/Graphics/UISystem/UILayout.hpp"
 
 #include "Surge/Utility/Filesystem.hpp"
 
@@ -119,6 +120,8 @@ namespace Surge
                     out[name] = *reinterpret_cast<const bool*>(source);
                 else if (type.EqualTo<float>())
                     out[name] = *reinterpret_cast<const float*>(source);
+                else if (type.EqualTo<int>())
+                    out[name] = *reinterpret_cast<const int*>(source);
                 else if (type.EqualTo<UUID>() || type.EqualTo<AssetID>())
                     out[name] = *reinterpret_cast<const uint64_t*>(source);
                 else if (type.EqualTo<String>())
@@ -243,6 +246,8 @@ namespace Surge
                 *reinterpret_cast<bool*>(dest) = inJson.value(name, false);
             else if(type.EqualTo<float>())
                 *reinterpret_cast<float*>(dest) = inJson.value(name, 0.0f);
+            else if(type.EqualTo<int>())
+                *reinterpret_cast<int*>(dest) = inJson.value(name, 0);
             else if(type.EqualTo<UUID>() || type.EqualTo<AssetID>())
                 *reinterpret_cast<uint64_t*>(dest) = inJson.value(name, 0ULL);
             else if(type.EqualTo<String>())
@@ -299,6 +304,8 @@ namespace Surge
                         *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Script>(assetID);
                     if (metadata.Type == AssetType::AUDIO)
                         *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<Audio>(assetID);
+                    if (metadata.Type == AssetType::UI_LAYOUT)
+                        *reinterpret_cast<Ref<Asset>*>(dest) = am->Load<UILayout>(assetID);
                 }
                 else
                 {
@@ -382,6 +389,53 @@ namespace Surge
                 }
             }
         }
+    }
+
+    template <typename XComponent>
+    static void RemoveComponentIfMissing(const nlohmann::json& j, Entity& e)
+    {
+        if constexpr(std::is_same_v<XComponent, IDComponent> || std::is_same_v<XComponent, RelationshipComponent>)
+            return;
+        else if(e.HasComponent<XComponent>() && !j.contains(SurgeReflect::GetReflection<XComponent>()->GetName()))
+            e.RemoveComponent<XComponent>();
+    }
+
+    template <typename... Components>
+    FORCEINLINE void RemoveComponentsIfMissing(const nlohmann::json& j, Entity& e)
+    {
+        (RemoveComponentIfMissing<Components>(j, e), ...);
+    }
+
+    String Serializer::SerializeEntity(Entity entity)
+    {
+        SG_ASSERT_NOMSG(entity);
+        nlohmann::json out = nlohmann::json::object();
+        SerializeComponents<SERIALIZABLE_COMPONENTS>(out, entity);
+        out.erase(SurgeReflect::GetReflection<RelationshipComponent>()->GetName()); // Links are entt handles, meaningless outside this registry
+        return out.dump();
+    }
+
+    bool Serializer::DeserializeEntity(const String& data, Entity entity)
+    {
+        SG_ASSERT_NOMSG(entity);
+        nlohmann::json in = nlohmann::json::parse(data, nullptr, false);
+        if(in.is_discarded())
+        {
+            Log<Severity::Error>("[Serializer] DeserializeEntity: Corrupt or invalid entity data");
+            return false;
+        }
+
+        const UUID id = entity.GetComponent<IDComponent>().ID;
+        RemoveComponentsIfMissing<SERIALIZABLE_COMPONENTS>(in, entity);
+        DeserializeComponents<SERIALIZABLE_COMPONENTS>(in, entity);
+        entity.GetComponent<IDComponent>().ID = id;
+
+        if(entity.HasComponent<TransformComponent>())
+            entity.GetComponent<TransformComponent>().MarkDirty();
+        if(entity.HasComponent<ConvexColliderComponent>())
+            entity.GetComponent<ConvexColliderComponent>().IsDirty = true;
+
+        return true;
     }
 #pragma endregion
 

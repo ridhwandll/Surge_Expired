@@ -8,6 +8,8 @@
 #include "Bindings/LogBinding.hpp"
 #include "Bindings/ECSBindings.hpp"
 #include "Bindings/UIBindings.hpp"
+#include "Surge/Core/Core.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {
@@ -73,8 +75,16 @@ namespace Surge
     void ScriptEngine::Shutdown()
     {
         SG_ASSERT(sLua, "ScriptEngine not initialized or already shutdown!");
+
+        // UI widgets can hold Lua callbacks (sol references), they must be released while the Lua state is still alive
+        Core::GetRenderer()->GetUIManager().ClearCanvases();
+
+        // sLua is a non owning view, the state itself has to be closed explicitly. Closing runs __gc on every userdata still
+        // held by Lua (widgets, textures, fonts...) so their GPU resources are released before the Renderer shuts down
+        lua_State* L = sLua->lua_state();
         delete sLua;
         sLua = nullptr;
+        lua_close(L);
     }
 
     static int BytecodeWriter(lua_State*, const void* p, size_t sz, void* ud)

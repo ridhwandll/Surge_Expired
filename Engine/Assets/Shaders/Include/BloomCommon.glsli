@@ -1,0 +1,159 @@
+// Shared by Bloom.glsl (fragment path) and BloomCompute.glsl (compute path), keep both paths pixel identical
+// Expects the including shader to declare its sampler bindings, include this file after them
+
+layout(push_constant) uniform PushConstants
+{
+    vec4 Threshold;       // x: threshold, y: threshold - knee, z: 2 * knee, w: 0.25 / knee
+    vec2 SourceTexelSize; // 1.0 / resolution of the texture being filtered
+    vec2 OutputTexelSize; // 1.0 / resolution of the target mip
+    float Scatter;
+    float ClampValue;
+    int Mode;
+    int Flags;
+} uBloom;
+
+const int BLOOM_MODE_PREFILTER = 0;  // Scene color -> mip 0 (anti flicker + threshold)
+const int BLOOM_MODE_DOWNSAMPLE = 1; // Mip N -> Mip N + 1
+const int BLOOM_MODE_UPSAMPLE = 2;   // Lower res chain + same res downsample mip -> upsample chain
+
+const int BLOOM_FLAG_HQ_FILTER = 1;
+const int BLOOM_FLAG_ANTI_FLICKER = 2;
+
+float BloomLuminance(vec3 color)
+{
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// Scene color can contain NaN/Inf from broken materials, one bad pixel would otherwise spread over the whole screen
+vec3 SanitizeSample(vec3 color)
+{
+    if (any(isnan(color)) || any(isinf(color)))
+        return vec3(0.0);
+
+    return min(max(color, vec3(0.0)), vec3(uBloom.ClampValue));
+}
+
+vec3 SampleColor(sampler2D tex, vec2 uv, bool sanitize)
+{
+    vec3 color = textureLod(tex, uv, 0.0).rgb;
+    return sanitize ? SanitizeSample(color) : color;
+}
+
+// Quadratic soft knee threshold (Unity / Hazel)
+vec3 ApplyThreshold(vec3 color)
+{
+    float brightness = max(color.r, max(color.g, color.b));
+    float softness = clamp(brightness - uBloom.Threshold.y, 0.0, uBloom.Threshold.z);
+    softness = softness * softness * uBloom.Threshold.w;
+    float contribution = max(brightness - uBloom.Threshold.x, softness) / max(brightness, 1e-4);
+    return color * contribution;
+}
+
+float KarisWeight(vec3 color)
+{
+    return 1.0 / (1.0 + BloomLuminance(color));
+}
+
+// 13 tap downsample (Jimenez 2014, CoD: Advanced Warfare), 5 overlapping 2x2 boxes, removes the aliasing a plain box downsample has
+//  A . B . C
+//  . D . E .
+//  F . G . H
+//  . I . J .
+//  K . L . M
+vec3 Downsample13(sampler2D tex, vec2 uv, vec2 texel, bool karis, bool sanitize)
+{
+    vec3 a = SampleColor(tex, uv + texel * vec2(-2.0, -2.0), sanitize);
+    vec3 b = SampleColor(tex, uv + texel * vec2( 0.0, -2.0), sanitize);
+    vec3 c = SampleColor(tex, uv + texel * vec2( 2.0, -2.0), sanitize);
+    vec3 d = SampleColor(tex, uv + texel * vec2(-1.0, -1.0), sanitize);
+    vec3 e = SampleColor(tex, uv + texel * vec2( 1.0, -1.0), sanitize);
+    vec3 f = SampleColor(tex, uv + texel * vec2(-2.0,  0.0), sanitize);
+    vec3 g = SampleColor(tex, uv, sanitize);
+    vec3 h = SampleColor(tex, uv + texel * vec2( 2.0,  0.0), sanitize);
+    vec3 i = SampleColor(tex, uv + texel * vec2(-1.0,  1.0), sanitize);
+    vec3 j = SampleColor(tex, uv + texel * vec2( 1.0,  1.0), sanitize);
+    vec3 k = SampleColor(tex, uv + texel * vec2(-2.0,  2.0), sanitize);
+    vec3 l = SampleColor(tex, uv + texel * vec2( 0.0,  2.0), sanitize);
+    vec3 m = SampleColor(tex, uv + texel * vec2( 2.0,  2.0), sanitize);
+
+    vec3 center      = (d + e + i + j) * 0.25;
+    vec3 topLeft     = (a + b + f + g) * 0.25;
+    vec3 topRight    = (b + c + g + h) * 0.25;
+    vec3 bottomLeft  = (f + g + k + l) * 0.25;
+    vec3 bottomRight = (g + h + l + m) * 0.25;
+
+    if (!karis)
+        return center * 0.5 + (topLeft + topRight + bottomLeft + bottomRight) * 0.125;
+
+    // Karis average: weight each box by 1 / (1 + luma) so a single very bright texel cannot dominate (no flickering fireflies)
+    float wCenter      = 0.5   * KarisWeight(center);
+    float wTopLeft     = 0.125 * KarisWeight(topLeft);
+    float wTopRight    = 0.125 * KarisWeight(topRight);
+    float wBottomLeft  = 0.125 * KarisWeight(bottomLeft);
+    float wBottomRight = 0.125 * KarisWeight(bottomRight);
+
+    vec3 sum = center * wCenter + topLeft * wTopLeft + topRight * wTopRight + bottomLeft * wBottomLeft + bottomRight * wBottomRight;
+    return sum / (wCenter + wTopLeft + wTopRight + wBottomLeft + wBottomRight);
+}
+
+// ARM dual filter downsample (Bjorge 2015, "Bandwidth-Efficient Rendering"), 5 bilinear taps
+vec3 DownsampleDual(sampler2D tex, vec2 uv, vec2 texel, bool sanitize)
+{
+    vec3 sum = SampleColor(tex, uv, sanitize) * 4.0;
+    sum += SampleColor(tex, uv + texel * vec2(-1.0, -1.0), sanitize);
+    sum += SampleColor(tex, uv + texel * vec2( 1.0, -1.0), sanitize);
+    sum += SampleColor(tex, uv + texel * vec2(-1.0,  1.0), sanitize);
+    sum += SampleColor(tex, uv + texel * vec2( 1.0,  1.0), sanitize);
+    return sum * 0.125;
+}
+
+// 9 tap tent filter (3x3 bilinear taps), texel is the lower res source texel
+vec3 UpsampleTent9(sampler2D tex, vec2 uv, vec2 texel)
+{
+    vec3 sum = SampleColor(tex, uv, false) * 4.0;
+    sum += (SampleColor(tex, uv + texel * vec2( 0.0, -1.0), false) +
+            SampleColor(tex, uv + texel * vec2(-1.0,  0.0), false) +
+            SampleColor(tex, uv + texel * vec2( 1.0,  0.0), false) +
+            SampleColor(tex, uv + texel * vec2( 0.0,  1.0), false)) * 2.0;
+    sum += SampleColor(tex, uv + texel * vec2(-1.0, -1.0), false) +
+           SampleColor(tex, uv + texel * vec2( 1.0, -1.0), false) +
+           SampleColor(tex, uv + texel * vec2(-1.0,  1.0), false) +
+           SampleColor(tex, uv + texel * vec2( 1.0,  1.0), false);
+    return sum * (1.0 / 16.0);
+}
+
+// ARM dual filter upsample, 8 bilinear taps
+vec3 UpsampleDual(sampler2D tex, vec2 uv, vec2 texel)
+{
+    vec3 sum = SampleColor(tex, uv + texel * vec2(-1.0,  0.0), false);
+    sum += SampleColor(tex, uv + texel * vec2( 1.0,  0.0), false);
+    sum += SampleColor(tex, uv + texel * vec2( 0.0, -1.0), false);
+    sum += SampleColor(tex, uv + texel * vec2( 0.0,  1.0), false);
+    sum += SampleColor(tex, uv + texel * vec2(-0.5, -0.5), false) * 2.0;
+    sum += SampleColor(tex, uv + texel * vec2( 0.5, -0.5), false) * 2.0;
+    sum += SampleColor(tex, uv + texel * vec2(-0.5,  0.5), false) * 2.0;
+    sum += SampleColor(tex, uv + texel * vec2( 0.5,  0.5), false) * 2.0;
+    return sum * (1.0 / 12.0);
+}
+
+// source  : texture being down/up sampled
+// highRes : same resolution downsample mip, only used by BLOOM_MODE_UPSAMPLE
+vec3 BloomFilter(sampler2D source, sampler2D highRes, vec2 uv)
+{
+    bool highQuality = (uBloom.Flags & BLOOM_FLAG_HQ_FILTER) != 0;
+    vec2 texel = uBloom.SourceTexelSize;
+
+    if (uBloom.Mode == BLOOM_MODE_PREFILTER)
+    {
+        bool antiFlicker = (uBloom.Flags & BLOOM_FLAG_ANTI_FLICKER) != 0;
+        vec3 color = highQuality ? Downsample13(source, uv, texel, antiFlicker, true) : DownsampleDual(source, uv, texel, true);
+        return ApplyThreshold(color);
+    }
+
+    if (uBloom.Mode == BLOOM_MODE_DOWNSAMPLE)
+        return highQuality ? Downsample13(source, uv, texel, false, false) : DownsampleDual(source, uv, texel, false);
+
+    vec3 lowRes = highQuality ? UpsampleTent9(source, uv, texel) : UpsampleDual(source, uv, texel);
+    vec3 sameRes = textureLod(highRes, uv, 0.0).rgb;
+    return mix(sameRes, lowRes, uBloom.Scatter);
+}

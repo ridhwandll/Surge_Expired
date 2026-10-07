@@ -21,6 +21,7 @@ namespace Surge
         void OnSceneContextChanged() { SetSceneName(); }
         const glm::vec2& GetViewportSize() const { return mViewportSize; }
         bool IsViewportHovered() const { return mIsViewportHovered; }
+        bool IsFocusedOrHovered() const { return mIsViewportFocused || mIsViewportHovered; }
     public:
         static PanelCode GetStaticCode() { return PanelCode::Viewport; }
 
@@ -32,6 +33,7 @@ namespace Surge
         int mGizmoType = -1;
         bool mGizmoInUse = false;
         bool mIsViewportHovered = false;
+        bool mIsViewportFocused = false;
 
         bool mIsFullscreen = false;
         bool mRestoreScreenPosBeforeFullscreen = false;

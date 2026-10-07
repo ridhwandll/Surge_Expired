@@ -52,6 +52,7 @@ namespace Surge
         ImageHandle CreateImage(const ImageDesc& desc);
         void DestroyImage(ImageHandle h);
         void ResizeImage(ImageHandle h, Uint width, Uint height);
+        void RecreateImage(ImageHandle h, const ImageDesc& desc); // Keeps the handle stable, content is undefined afterwards
         uint64_t GetImageSize(ImageHandle h) const;
         const ImageDesc& GetDesc(ImageHandle h) const;
 
@@ -61,6 +62,8 @@ namespace Surge
         const FramebufferDesc& GetDesc(FramebufferHandle h) const;
 
         PipelineHandle CreatePipeline(const PipelineDesc& desc);
+        PipelineHandle CreateComputePipeline(const ComputePipelineDesc& desc);
+        bool SupportsCompute() const { return mDevice.SupportsCompute(); }
         void DestroyPipeline(PipelineHandle h);
 
         SamplerHandle CreateSampler(const SamplerDesc& desc);
@@ -73,6 +76,7 @@ namespace Surge
         // Commands
         void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance);
         void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance);
+        void CmdDispatch(const FrameContext& ctx, Uint groupCountX, Uint groupCountY, Uint groupCountZ); // Must be recorded outside of a renderpass
 
         void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
         void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0);
@@ -141,6 +145,16 @@ namespace Surge
         Vector<const char*> GetRequiredInstanceLayers();
 
         void FlushDeletionQueue(Uint frameIndex);
+
+        // Which slot's deletion queue may free a resource destroyed right now
+        // While recording: the current slot, its fence also covers this frame's commands
+        // Between frames (game/Lua update, frame end callbacks): the current index already points at the NEXT slot, which is flushed at the very next
+        // BeginFrame while the frame that was just submitted may still use the resource, so the last submitted slot is used instead
+        Uint GetDeletionQueueIndex() const
+        {
+            const Uint current = mFrame.GetCurrentFrameIndex();
+            return mIsRecording ? current : (current + RHISettings::FRAMES_IN_FLIGHT - 1) % RHISettings::FRAMES_IN_FLIGHT;
+        }
     private:
         RHIStats mStats;
 
@@ -180,6 +194,7 @@ namespace Surge
         };
         std::array<DeferredDeletes, RHISettings::FRAMES_IN_FLIGHT> mDeletionQueues;
         bool mIsShuttingDown = false;
+        bool mIsRecording = false;
 
         friend class VulkanPipeline;
         friend class VulkanImage;

@@ -35,9 +35,12 @@ namespace Surge
     {
         VkPipeline Pipeline = VK_NULL_HANDLE;
         VkPipelineLayout Layout = VK_NULL_HANDLE;
+        VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-        //  Guaranteed minimum is 4 VkDescriptorSetLayout per pipeline, guaranteed to be able to simultaneously use sets 0 through 3 across all Vulkan 1.1 compliant hardware         
-        VkDescriptorSetLayout DescSetLayouts[4];
+        // Vulkan 1.1
+        #define GURANTEED_MIN_DESCRIPTOR_SET_LAYOUTS_PER_PIPELINE 4
+
+        VkDescriptorSetLayout DescSetLayouts[GURANTEED_MIN_DESCRIPTOR_SET_LAYOUTS_PER_PIPELINE];
         Uint DescSetLayoutsCount = 0;
 
         PipelineDesc Desc = {};

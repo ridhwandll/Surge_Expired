@@ -3,6 +3,7 @@
 #include "Surge/Core/String.hpp"
 #include <mutex>
 #include <format>
+#include <ctime>
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/log.h>
@@ -33,7 +34,22 @@ namespace Surge
         Fatal
     };
 
-    static std::mutex sLogMutex;
+    // Optional observer for every log line (e.g. the Editor Console). Invoked under the log lock from whichever thread logged, it must not call Log()
+    using LogSinkFn = void (*)(Severity severity, const String& message, const std::tm& localTime, void* userData);
+    struct LogSink
+    {
+        LogSinkFn Callback = nullptr;
+        void* UserData = nullptr;
+    };
+
+    inline std::mutex sLogMutex; // inline: one mutex for the whole program, not one per translation unit
+    inline LogSink sLogSink;
+
+    inline void SetLogSink(LogSinkFn callback, void* userData)
+    {
+        std::lock_guard<std::mutex> lock(sLogMutex);
+        sLogSink = { callback, userData };
+    }
 
     template <Severity severity = Severity::Trace, typename... Args>
     void Log(const std::string& fmtMsg, Args&&... args)
@@ -82,5 +98,8 @@ namespace Surge
         std::fwrite(LogColor::Reset, 1, strlen(LogColor::Reset), stdout);
         std::fputc('\n', stdout);
 #endif
+
+        if(sLogSink.Callback)
+            sLogSink.Callback(severity, message, ltm, sLogSink.UserData);
     }
 } // namespace Surge

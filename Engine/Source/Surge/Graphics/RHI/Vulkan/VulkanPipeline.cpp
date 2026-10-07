@@ -12,6 +12,7 @@ namespace Surge
         switch(format)
         {
             case Surge::ImageFormat::R8_UNORM:
+            case Surge::ImageFormat::R32_SFLOAT:
                 return true;
             case Surge::ImageFormat::RGBA8_SRGB:
             case Surge::ImageFormat::RGBA8_UNORM:
@@ -59,7 +60,7 @@ namespace Surge
         VkDevice device = rhi.GetDevice();
 
         const ShaderReflectionData& shaderReflection = desc.Shader_.GetReflectionData();
-        Vector<VkPushConstantRange> pushRanges = CreatePushConstantRanges(shaderReflection);
+        Vector<VkPushConstantRange> pushRanges = CreatePushConstantRanges(shaderReflection, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
         Vector<VkDescriptorSetLayout> descriptorSetLayouts = CreateDescriptorSetLayouts(device, shaderReflection);
 
         entry.DescSetLayoutsCount = descriptorSetLayouts.size();
@@ -108,7 +109,7 @@ namespace Surge
             }
             else if (spirv.Type == ShaderType::COMPUTE)
             {
-                SG_ASSERT_INTERNAL("Compute shader is not supported in VulkanPipeline yet");
+                SG_ASSERT_INTERNAL("Compute shaders must be created with VulkanPipeline::CreateCompute (GraphicsRHI::CreateComputePipeline)");
             }
         }
 
@@ -262,6 +263,63 @@ namespace Surge
         return entry;
     }
 
+    PipelineEntry VulkanPipeline::CreateCompute(VulkanRHI& rhi, const ComputePipelineDesc& desc)
+    {
+        PipelineEntry entry = {};
+        entry.BindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+        entry.Desc.DebugName = desc.DebugName;
+        entry.Desc.Shader_ = desc.Shader_;
+
+        VkDevice device = rhi.GetDevice();
+
+        const ShaderReflectionData& shaderReflection = desc.Shader_.GetReflectionData();
+        Vector<VkPushConstantRange> pushRanges = CreatePushConstantRanges(shaderReflection, VK_SHADER_STAGE_COMPUTE_BIT);
+        Vector<VkDescriptorSetLayout> descriptorSetLayouts = CreateDescriptorSetLayouts(device, shaderReflection);
+
+        entry.DescSetLayoutsCount = descriptorSetLayouts.size();
+        for(Uint i = 0; i < descriptorSetLayouts.size(); i++)
+            entry.DescSetLayouts[i] = descriptorSetLayouts[i];
+
+        VkPipelineLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = entry.DescSetLayoutsCount;
+        layoutInfo.pSetLayouts = entry.DescSetLayouts;
+        layoutInfo.pushConstantRangeCount = pushRanges.size();
+        layoutInfo.pPushConstantRanges = pushRanges.data();
+        VK_CALL(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &entry.Layout));
+
+        const SPIRVHandle* computeSPIRV = nullptr;
+        for (const SPIRVHandle& spirv : desc.Shader_.GetSPIRVs())
+        {
+            if (spirv.Type == ShaderType::COMPUTE)
+                computeSPIRV = &spirv;
+        }
+        SG_ASSERT(computeSPIRV, "VulkanPipeline::CreateCompute: Shader has no compute stage! Load it with ShaderType::COMPUTE");
+
+        VkShaderModuleCreateInfo moduleInfo = {};
+        moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        moduleInfo.codeSize = computeSPIRV->SPIRV.size() * sizeof(Uint);
+        moduleInfo.pCode = computeSPIRV->SPIRV.data();
+        VkShaderModule computeModule = VK_NULL_HANDLE;
+        VK_CALL(vkCreateShaderModule(device, &moduleInfo, nullptr, &computeModule));
+
+        VkComputePipelineCreateInfo pipelineInfo = {};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        pipelineInfo.stage.module = computeModule;
+        pipelineInfo.stage.pName = "main";
+        pipelineInfo.layout = entry.Layout;
+        VK_CALL(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &entry.Pipeline));
+
+        vkDestroyShaderModule(device, computeModule, nullptr);
+
+        SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)entry.Layout, (desc.DebugName + String(" [Compute Pipeline Layout]")));
+        SET_VK_DEBUG_NAME(rhi, VK_OBJECT_TYPE_PIPELINE, (uint64_t)entry.Pipeline, (desc.DebugName + String(" [Compute Pipeline]")));
+
+        return entry;
+    }
+
     void VulkanPipeline::Destroy(VulkanRHI& rhi, PipelineEntry& entry)
     {
         VkDevice device = rhi.GetDevice();
@@ -392,7 +450,7 @@ namespace Surge
         return descriptorSetLayouts;
     }
 
-    Surge::Vector<VkPushConstantRange> VulkanPipeline::CreatePushConstantRanges(const ShaderReflectionData& reflectedData)
+    Surge::Vector<VkPushConstantRange> VulkanPipeline::CreatePushConstantRanges(const ShaderReflectionData& reflectedData, VkShaderStageFlags stages)
     {
         const Vector<ShaderPushConstant>& pushConstants = reflectedData.GetPushConstantBuffers();
         // TODO: Remove this hardcoded 1 and make it dynamic based on the number of push constant buffers in the shader
@@ -403,14 +461,13 @@ namespace Surge
         for(size_t i = 0; i < 1; ++i)
         {
             const ShaderPushConstant& pushConstant = pushConstants[i];
-            SG_ASSERT(!(pushConstant.ShaderStages & ShaderType::COMPUTE), "Compute shader is not supported in VulkanPipeline yet!");
 
             //if (pushConstant.ShaderStages & ShaderType::VERTEX)
             //	pushRanges[i].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
             //if (pushConstant.ShaderStages & ShaderType::FRAGMENT)
             //	pushRanges[i].stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 
-            pushRanges[i].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            pushRanges[i].stageFlags = stages;
             pushRanges[i].offset = 0;
             pushRanges[i].size = pushConstant.Size;
         }

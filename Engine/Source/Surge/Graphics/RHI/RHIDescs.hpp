@@ -13,6 +13,7 @@ namespace Surge
         String RHIVersion;
         String VendorName;
         Uint DrawCalls = 0;
+        Uint DispatchCalls = 0;
 
         uint64_t AllocationCount;
         uint64_t UsedGPUMemory;
@@ -21,6 +22,7 @@ namespace Surge
         void Reset()
         {
             DrawCalls = 0;
+            DispatchCalls = 0;
         }
     };
 
@@ -35,6 +37,7 @@ namespace Surge
     enum class ImageFormat
     {
         R8_UNORM,
+        R32_SFLOAT,
         RGBA8_SRGB,
         RGBA8_UNORM,
         BGRA8_SRGB,
@@ -233,6 +236,13 @@ namespace Surge
         String DebugName = "";
     };
 
+    struct ComputePipelineDesc
+    {
+        // Descriptor set layouts and push constant range are reflected from the shader, push constants are COMPUTE stage only
+        Shader Shader_;
+        String DebugName = "";
+    };
+
     enum class FilterMode { NEAREST, LINEAR };
     enum class WrapMode { REPEAT, CLAMP, MIRRORED_REPEAT };
     enum class MipmapMode { NEAREST, LINEAR };
@@ -257,7 +267,7 @@ namespace Surge
     enum class DescriptorType : Uint
     {
         TEXTURE,         // combined image + sampler
-        STORAGE_TEXTURE, // read/write image
+        STORAGE_TEXTURE, // read/write image (Sampler is ignored, must be in GENERAL layout i.e. ImageUsage::STORAGE)
         UNIFORM_BUFFER,  // small read-only buffer
         STORAGE_BUFFER,  // large read/write buffer
         SAMPLER,         // separate sampler

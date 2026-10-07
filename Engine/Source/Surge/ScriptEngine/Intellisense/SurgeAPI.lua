@@ -441,23 +441,39 @@ function Math.HexToRGB(hex) end
 -- UI SYSTEM
 -- ==============================================================================
 
---- Sets the root widget for the UI Manager. Pass nil to clear.
+--- Sets the root widget of the UI built in code. Pass nil to clear.
+--- Called from a UICanvasComponent script it attaches to that canvas (drawn above its layout), otherwise to a global canvas.
 ---@param root UIWidget|nil
 function SetUIRoot(root) end
 
+--- Rect transform (UI units, scaled by the canvas): AnchorMin/AnchorMax are normalized points in the parent rect,
+--- equal = point anchor, different = stretch with the parent on that axis (Size is then added to the stretched size).
 ---@class UIWidget
----@field Anchor Vec2
+---@field Name string
+---@field Visible boolean Hidden widgets (and their children) are not drawn and receive no input
+---@field Interactable boolean Receives clicks/hover (set automatically by OnClick/OnHoverEnter/OnHoverExit)
+---@field Anchor Vec2 Point anchor (sets AnchorMin and AnchorMax)
+---@field AnchorMin Vec2
+---@field AnchorMax Vec2
 ---@field Pivot Vec2
 ---@field Offset Vec2
 ---@field Size Vec2
 ---@field Color Vec4
 UIWidget = {}
 
---- Creates a new UIWidget.
+--- Creates a new UIWidget (empty container).
 ---@return UIWidget
 function UIWidget.new() end
+--- Adds (or re-parents) a child. Adding the same child twice does nothing.
 ---@param child UIWidget
 function UIWidget:AddChild(child) end
+---@param child UIWidget
+function UIWidget:RemoveChild(child) end
+--- Finds a descendant by name (depth first), returns the concrete type (UIButton, UIText...) or nil.
+---@param name string
+---@return UIWidget|UIButton|UIText|UIImage|UIImageButton|nil
+function UIWidget:FindChild(name) end
+--- callback(self) receives the clicked widget
 ---@param callback function
 function UIWidget:OnClick(callback) end
 ---@param callback function
@@ -473,11 +489,14 @@ UIImage = {}
 ---@return UIImage
 function UIImage.new(textureRelPath) end
 
+--- Text is aligned inside its rect. The default Size of (0, 0) aligns it around the anchor point,
+--- a non zero width enables word wrapping at that width.
 ---@class UIText : UIWidget
 ---@field Text string
 ---@field FontSize number
 ---@field TextAlignment number
 ---@field TextVAlignment number
+---@field WordWrap boolean
 UIText = {}
 
 --- Creates a new UIText.
@@ -502,6 +521,17 @@ function UIButton.new(text, fontRelPath, textureRelPath) end
 --- Gets the button's internal text widget.
 ---@return UIText
 function UIButton:GetText() end
+
+---@class UIImageButton : UIImage
+---@field NormalColor Vec4
+---@field HoverColor Vec4
+---@field PressedColor Vec4
+UIImageButton = {}
+
+--- Creates a new UIImageButton.
+---@param textureRelPath string
+---@return UIImageButton
+function UIImageButton.new(textureRelPath) end
 
 -- ==============================================================================
 -- RENDERER & APPLICATION
@@ -737,8 +767,15 @@ local TextComponent = {}
 ---@class UICanvasComponent
 ---@field Active boolean
 ---@field ShowCanvas boolean
+---@field SortOrder integer Higher draws on top and receives input first
 ---@field ScriptAsset number
 local UICanvasComponent = {}
+
+--- Finds a widget of this canvas by name (UI Layout made in the UI Editor, or the SetUIRoot tree), returns the concrete type or nil.
+--- Example: entity.UICanvasC:FindWidget("PlayButton"):OnClick(function(self) Log(self.Name) end)
+---@param name string
+---@return UIWidget|UIButton|UIText|UIImage|UIImageButton|nil
+function UICanvasComponent:FindWidget(name) end
 
 ---@class AudioSourceComponent
 ---@field Active boolean

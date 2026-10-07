@@ -15,7 +15,8 @@ namespace Surge
         void Initialize(const String& baseShaderPath);
 
         // Shader name in baseShaderPath directory, with extension, e.g. "Renderer3D.glsl"
-        void Load(const String& shaderName);
+        // types must match the //SURGE:[Shader: X] stages present in the file, e.g. ShaderType::COMPUTE for compute shaders
+        void Load(const String& shaderName, ShaderType types = ShaderType::VERTEX | ShaderType::FRAGMENT);
         void Shutdown();
 
         const Shader& Get(const String& shaderName) const; //Name with extension

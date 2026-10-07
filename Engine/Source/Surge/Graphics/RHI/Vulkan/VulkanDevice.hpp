@@ -29,6 +29,7 @@ namespace Surge
         VkQueue GetQueue() const { return mQueue; }
         VmaAllocator GetAllocator() const { return mVmaAllocator; }
         int32_t GetQueueIndex() const { return mGraphicsQueueIndex; }
+        bool SupportsCompute() const { return mSupportsCompute; } // Compute dispatches are recorded on the graphics queue
         
         operator VkDevice() const { return mDevice; }
     private:
@@ -39,6 +40,7 @@ namespace Surge
         VkPhysicalDevice mGPU = VK_NULL_HANDLE;
         VkQueue mQueue = VK_NULL_HANDLE;
         int32_t mGraphicsQueueIndex = -1;
+        bool mSupportsCompute = false;
 
         VmaAllocator mVmaAllocator = VK_NULL_HANDLE;
         GPUMemoryStats mGPUMemoryStats;

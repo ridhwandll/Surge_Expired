@@ -161,4 +161,121 @@ namespace Surge
         return OutputOf(commandLine, result);
     }
 
+#if defined(SURGE_PLATFORM_WINDOWS)
+    static std::wstring Utf8ToWide(const String& str)
+    {
+        if(str.empty())
+            return {};
+
+        const int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.size()), nullptr, 0);
+        std::wstring result(static_cast<size_t>(size), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.size()), result.data(), size);
+        return result;
+    }
+#endif
+
+    int Process::Run([[maybe_unused]] const String& commandLine, [[maybe_unused]] const String& workDir, [[maybe_unused]] OutputCallback onOutput,
+                     [[maybe_unused]] void* userData, [[maybe_unused]] const std::atomic<bool>* cancel)
+    {
+#if defined(SURGE_PLATFORM_WINDOWS)
+        SECURITY_ATTRIBUTES securityAttributes = {};
+        securityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+        securityAttributes.bInheritHandle = TRUE;
+
+        HANDLE readPipe = nullptr;
+        HANDLE writePipe = nullptr;
+        if(!CreatePipe(&readPipe, &writePipe, &securityAttributes, 64 * 1024))
+        {
+            SURGE_GET_WIN32_LAST_ERROR
+            return -1;
+        }
+        SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0); // Only the write end goes to the child
+
+        // stdin is NUL, so nothing in the tree can block waiting for input
+        HANDLE nullInput = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &securityAttributes, OPEN_EXISTING, 0, nullptr);
+
+        STARTUPINFOW startupInfo = {};
+        startupInfo.cb = sizeof(STARTUPINFOW);
+        startupInfo.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+        startupInfo.wShowWindow = SW_HIDE;
+        startupInfo.hStdInput = nullInput;
+        startupInfo.hStdOutput = writePipe;
+        startupInfo.hStdError = writePipe;
+
+        // /S: cmd strips only the outer quote pair, the command itself is passed through untouched
+        std::wstring command = L"cmd.exe /S /C \"" + Utf8ToWide(commandLine) + L"\"";
+        const std::wstring directory = Utf8ToWide(workDir);
+
+        HANDLE job = CreateJobObjectW(nullptr, nullptr);
+        PROCESS_INFORMATION processInfo = {};
+        const BOOL started = CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr,
+                                            directory.empty() ? nullptr : directory.c_str(), &startupInfo, &processInfo);
+
+        CloseHandle(writePipe); // The children hold their own copies now
+        if(nullInput != INVALID_HANDLE_VALUE)
+            CloseHandle(nullInput);
+
+        if(!started)
+        {
+            SURGE_GET_WIN32_LAST_ERROR
+            CloseHandle(readPipe);
+            if(job)
+                CloseHandle(job);
+            return -1;
+        }
+
+        if(job && !AssignProcessToJobObject(job, processInfo.hProcess))
+        {
+            CloseHandle(job);
+            job = nullptr;
+        }
+        ResumeThread(processInfo.hThread);
+        CloseHandle(processInfo.hThread);
+
+        char buffer[4096];
+        auto drain = [&]() {
+            DWORD available = 0;
+            while(PeekNamedPipe(readPipe, nullptr, 0, nullptr, &available, nullptr) && available > 0)
+            {
+                DWORD bytesRead = 0;
+                if(!ReadFile(readPipe, buffer, available < sizeof(buffer) ? available : static_cast<DWORD>(sizeof(buffer)), &bytesRead, nullptr) || bytesRead == 0)
+                    break;
+                if(onOutput)
+                    onOutput(buffer, bytesRead, userData);
+            }
+        };
+
+        // Polls the process instead of reading until EOF: long-lived grandchildren (Gradle daemon, adb server) inherit the
+        // write end and would keep the pipe open forever
+        bool cancelled = false;
+        while(WaitForSingleObject(processInfo.hProcess, 50) == WAIT_TIMEOUT)
+        {
+            drain();
+            if(cancel && cancel->load())
+            {
+                if(job)
+                    TerminateJobObject(job, 1);
+                else
+                    TerminateProcess(processInfo.hProcess, 1);
+                WaitForSingleObject(processInfo.hProcess, INFINITE);
+                cancelled = true;
+                break;
+            }
+        }
+        drain();
+
+        DWORD exitCode = 0;
+        const BOOL gotExitCode = GetExitCodeProcess(processInfo.hProcess, &exitCode);
+        CloseHandle(processInfo.hProcess);
+        CloseHandle(readPipe);
+        if(job)
+            CloseHandle(job); // No KILL_ON_JOB_CLOSE: daemons the tool started intentionally outlive it
+
+        return (cancelled || !gotExitCode) ? -1 : static_cast<int>(exitCode);
+#else
+        Log<Severity::Error>("[Process] Process::Run is not supported on this platform");
+        return -1;
+#endif
+    }
+
 } // namespace Surge

@@ -44,6 +44,49 @@ namespace Surge
     }
 
 #ifdef SURGE_PLATFORM_WINDOWS
+    // Resolves #include "File.glsli" relative to the directory of the shader being compiled
+    // Shaders using it need: #extension GL_GOOGLE_include_directive : require
+    // Includes are resolved at compile time on Windows, Android only ever sees the flattened SPIR-V
+    class ShaderIncluder : public shaderc::CompileOptions::IncluderInterface
+    {
+    public:
+        explicit ShaderIncluder(String baseDirectory)
+            : mBaseDirectory(std::move(baseDirectory)) {}
+
+        shaderc_include_result* GetInclude(const char* requestedSource, shaderc_include_type /*type*/, const char* /*requestingSource*/, size_t /*includeDepth*/) override
+        {
+            IncludeData* data = new IncludeData();
+            data->SourceName = std::format("{0}/{1}", mBaseDirectory, requestedSource);
+            if (!Filesystem::ReadTextFile(data->SourceName, data->Content))
+            {
+                // shaderc convention: empty source_name signals failure, content holds the error message
+                data->Content = std::format("Cannot open include file '{0}'", data->SourceName);
+                data->SourceName.clear();
+            }
+
+            data->Result.source_name = data->SourceName.c_str();
+            data->Result.source_name_length = data->SourceName.size();
+            data->Result.content = data->Content.c_str();
+            data->Result.content_length = data->Content.size();
+            data->Result.user_data = data;
+            return &data->Result;
+        }
+
+        void ReleaseInclude(shaderc_include_result* data) override
+        {
+            delete static_cast<IncludeData*>(data->user_data);
+        }
+
+    private:
+        struct IncludeData
+        {
+            shaderc_include_result Result = {};
+            String SourceName;
+            String Content;
+        };
+        String mBaseDirectory;
+    };
+
     static shaderc_shader_kind ShadercShaderKindFromSurgeShaderType(const ShaderType& type)
     {
         switch (type)
@@ -66,6 +109,7 @@ namespace Surge
         shaderc::Compiler compiler;
         shaderc::CompileOptions options;
         options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
+        options.SetIncluder(std::make_unique<ShaderIncluder>(Filesystem::GetParentPath(mPath).string()));
         // NOTE(Rid - AC3R) If we enable optimization, it removes the name :kekCry:
         //options.SetOptimizationLevel(shaderc_optimization_level_performance);
         //options.SetGenerateDebugInfo();

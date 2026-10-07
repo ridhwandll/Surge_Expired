@@ -17,6 +17,14 @@ layout(push_constant) uniform PushConstants
     float Grain;
     int EnableFXAA;
     vec2 CameraNearFar;
+    vec4 DepthParams; // x: P[2][2], y: P[3][2], z: 1 = perspective / 0 = orthographic
+    vec2 AOResolution;
+    int AOMode;       // 0 = off, 1 = on, 2 = AO only (debug)
+    float _pad0;
+    vec4 BloomTint;   // rgb: tint * intensity
+    vec2 BloomTexelSize;
+    int BloomMode;    // 0 = off, 1 = bilinear, 2 = 9 tap tent
+    float _pad1;
 } pc;
 
 void main()
@@ -47,6 +55,9 @@ layout(location = 0) out vec4 outColor;
 layout(binding = 0, set = 0) uniform sampler2D sceneColor;
 layout(binding = 1, set = 0) uniform sampler2D outlineMask;
 layout(binding = 2, set = 0) uniform sampler2D sceneDepth;
+layout(binding = 3, set = 0) uniform sampler2D aoTexture;     // R8, AO resolution
+layout(binding = 4, set = 0) uniform sampler2D aoLinearDepth; // R32F, AO resolution
+layout(binding = 5, set = 0) uniform sampler2D bloomTexture;  // Half res, top of the bloom upsample chain
 
 layout(push_constant) uniform PushConstants
 {
@@ -57,6 +68,14 @@ layout(push_constant) uniform PushConstants
     float Grain;
     int EnableFXAA;
     vec2 CameraNearFar;
+    vec4 DepthParams; // x: P[2][2], y: P[3][2], z: 1 = perspective / 0 = orthographic
+    vec2 AOResolution;
+    int AOMode;       // 0 = off, 1 = on, 2 = AO only (debug)
+    float _pad0;
+    vec4 BloomTint;   // rgb: tint * intensity
+    vec2 BloomTexelSize;
+    int BloomMode;    // 0 = off, 1 = bilinear, 2 = 9 tap tent
+    float _pad1;
 } pc;
 
 // FXAA
@@ -139,6 +158,67 @@ float FilmGrain()
     return (noise - 0.5) * pc.Grain;
 }
 
+float LinearizeDepth(float d)
+{
+    if (pc.DepthParams.z > 0.5)
+        return pc.DepthParams.y / (d + pc.DepthParams.x);
+
+    return (pc.DepthParams.y - d) / pc.DepthParams.x;
+}
+
+// Joint bilateral upsample of the (possibly half res) AO buffer: 2 gathers, weights the 4 nearest AO texels
+// by bilinear position and by how close their depth is to this pixel's depth, so AO does not leak across silhouettes
+float SampleAmbientOcclusion()
+{
+    float rawDepth = texture(sceneDepth, inUV).r;
+    if (rawDepth >= 1.0)
+        return 1.0; // Sky
+
+    float depth = LinearizeDepth(rawDepth);
+    vec4 aoQuad = textureGather(aoTexture, inUV, 0);
+    vec4 depthQuad = textureGather(aoLinearDepth, inUV, 0);
+
+    // Gather order: (-,+) (+,+) (+,-) (-,-)
+    vec2 f = fract(inUV * pc.AOResolution - 0.5);
+    vec4 bilinear = vec4((1.0 - f.x) * f.y, f.x * f.y, f.x * (1.0 - f.y), (1.0 - f.x) * (1.0 - f.y));
+
+    vec4 relativeDelta = abs(depthQuad - depth) / max(depth, 1e-3);
+    vec4 weights = bilinear * exp2(-relativeDelta * relativeDelta * 1024.0);
+    float totalWeight = dot(weights, vec4(1.0));
+
+    if (totalWeight < 1e-4)
+    {
+        // No texel on this surface (thin feature at a depth edge), take the closest one in depth
+        float best = relativeDelta.x;
+        float ao = aoQuad.x;
+        if (relativeDelta.y < best) { best = relativeDelta.y; ao = aoQuad.y; }
+        if (relativeDelta.z < best) { best = relativeDelta.z; ao = aoQuad.z; }
+        if (relativeDelta.w < best) { ao = aoQuad.w; }
+        return ao;
+    }
+
+    return dot(aoQuad, weights) / totalWeight;
+}
+
+vec3 SampleBloom()
+{
+    if (pc.BloomMode == 1)
+        return textureLod(bloomTexture, inUV, 0.0).rgb;
+
+    // 9 tap tent while upscaling half res -> full res, hides the bilinear diamond pattern on strong highlights
+    vec2 t = pc.BloomTexelSize;
+    vec3 sum = textureLod(bloomTexture, inUV, 0.0).rgb * 4.0;
+    sum += (textureLod(bloomTexture, inUV + vec2( 0.0, -t.y), 0.0).rgb +
+            textureLod(bloomTexture, inUV + vec2(-t.x,  0.0), 0.0).rgb +
+            textureLod(bloomTexture, inUV + vec2( t.x,  0.0), 0.0).rgb +
+            textureLod(bloomTexture, inUV + vec2( 0.0,  t.y), 0.0).rgb) * 2.0;
+    sum += textureLod(bloomTexture, inUV + vec2(-t.x, -t.y), 0.0).rgb +
+           textureLod(bloomTexture, inUV + vec2( t.x, -t.y), 0.0).rgb +
+           textureLod(bloomTexture, inUV + vec2(-t.x,  t.y), 0.0).rgb +
+           textureLod(bloomTexture, inUV + vec2( t.x,  t.y), 0.0).rgb;
+    return sum * (1.0 / 16.0);
+}
+
 vec3 ACESFilmic(vec3 x)
 {
     float a = 2.51;
@@ -162,6 +242,20 @@ void main()
         HDRColor = CalculateFXAA(sceneColor, inUV, texel).rgb;
     else
         HDRColor = texture(sceneColor, inUV).rgb;
+
+    if (pc.AOMode != 0)
+    {
+        float ao = SampleAmbientOcclusion();
+        if (pc.AOMode == 2)
+        {
+            outColor = vec4(vec3(ao), 1.0);
+            return;
+        }
+        HDRColor *= ao; // Applied in linear HDR, before tonemapping
+    }
+
+    if (pc.BloomMode != 0)
+        HDRColor += SampleBloom() * pc.BloomTint.rgb; // After AO, emitted glow should not be occluded
 
     vec3 LDRColor = ACESFilmic(HDRColor);
 

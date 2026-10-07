@@ -28,12 +28,14 @@ namespace Surge
 
         void SetSelectedEntity(Entity& e) { mSelectedEntity = e; }
         Entity& GetSelectedEntity() { return mSelectedEntity; }
+        bool IsFocusedOrHovered() const { return mHierarchyFocused || mHierarchyHovered; }
 
     private:
         void DrawEntityNode(Entity& e);
 
     private:
         bool mHierarchyHovered = false;
+        bool mHierarchyFocused = false;
         PanelCode mCode;
         Scene* mSceneContext;
         Entity mSelectedEntity; // TODO: Make It a vector when we allow multiple selection

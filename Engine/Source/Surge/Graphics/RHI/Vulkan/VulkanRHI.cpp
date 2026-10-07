@@ -127,7 +127,7 @@ namespace Surge
         mDescriptorSetPool.ForEachAlive([&](const DescriptorSetHandle& h, DescriptorSetEntry&) { DestroyDescriptorSet(h); LOG_FORGOT_DELETE("You forgot to destroy a descriptor layout manually!", h); });
         mSamplerPool.ForEachAlive([&](const SamplerHandle& h, SamplerEntry&){ DestroySampler(h); LOG_FORGOT_DELETE("You forgot to destroy a sampler manually!", h); });
         mFramebufferPool.ForEachAlive([&]([[maybe_unused]] const FramebufferHandle& h, FramebufferEntry& entry) { VulkanFramebuffer::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a framebuffer manually!", h); });
-        mTexturePool.ForEachAlive([&]([[maybe_unused]] const ImageHandle& h, ImageEntry& entry) { VulkanImage::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a texture manually!", h); });
+        mTexturePool.ForEachAlive([&]([[maybe_unused]] const ImageHandle& h, ImageEntry& entry) { LOG_FORGOT_DELETE(std::format("You forgot to destroy a texture manually! ({})", entry.Desc.DebugName), h); VulkanImage::Destroy(*this, entry); });
         mBufferPool.ForEachAlive([&]([[maybe_unused]] const BufferHandle& h, BufferEntry& entry) { VulkanBuffer::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a buffer manually!", h); });
         mPipelinePool.ForEachAlive([&]([[maybe_unused]] const PipelineHandle& h, PipelineEntry& entry) { VulkanPipeline::Destroy(*this, entry); LOG_FORGOT_DELETE("You forgot to destroy a pipeline manually!", h); });
 
@@ -191,6 +191,7 @@ namespace Surge
 
         vkResetFences(device, 1, &frame.Fence);
         vkResetCommandPool(device, frame.CmdPool, 0);
+        mIsRecording = true;
 
         // Reset descriptor pool
         VK_CALL(vkResetDescriptorPool(mDevice, mVkDescriptorPools[outCtx.FrameIndex], 0));
@@ -235,6 +236,7 @@ namespace Surge
 
         // Advance SLOT index (completely independent of swapchain image index)
         mFrame.AdvanceFrame();
+        mIsRecording = false;
     }
 
     void VulkanRHI::Resize()
@@ -284,7 +286,7 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("VulkanRHI::DestroyBuffer: Size: {0} bytes", entry->Desc.Size));
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Buffers.push_back(std::move(*entry));
+        mDeletionQueues[GetDeletionQueueIndex()].Buffers.push_back(std::move(*entry));
         mBufferPool.Free(buffer);
     }
 
@@ -324,24 +326,34 @@ namespace Surge
         if(entry->Desc.GenerateImGuiID && mImGuiContext.IsInitialized())
             mImGuiContext.DestroyImage(entry->ImGuiID);
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
+        mDeletionQueues[GetDeletionQueueIndex()].Images.push_back(std::move(*entry));
         mTexturePool.Free(h);
     }
 
     void VulkanRHI::ResizeImage(ImageHandle h, Uint width, Uint height)
     {
-        ImageEntry* entry = mTexturePool.Get(h);
+        const ImageEntry* entry = mTexturePool.Get(h);
         if (!entry)
             return;
-
-        if (entry->Desc.GenerateImGuiID && mImGuiContext.IsInitialized())
-            DestroyImGuiImage(h);
 
         ImageDesc desc = entry->Desc;
         desc.Width = width;
         desc.Height = height;
+        RecreateImage(h, desc);
+    }
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Images.push_back(std::move(*entry));
+    void VulkanRHI::RecreateImage(ImageHandle h, const ImageDesc& desc)
+    {
+        ImageEntry* entry = mTexturePool.Get(h);
+        if (!entry)
+            return;
+
+        SG_ASSERT(!desc.InitialData && !desc.MipUploads, "RecreateImage: initial data uploads are not supported, the image content is undefined after recreation");
+
+        if (entry->Desc.GenerateImGuiID && mImGuiContext.IsInitialized())
+            DestroyImGuiImage(h);
+
+        mDeletionQueues[GetDeletionQueueIndex()].Images.push_back(std::move(*entry));
 
         *entry = VulkanImage::Create(*this, desc);
         if (desc.GenerateImGuiID && mImGuiContext.IsInitialized())
@@ -370,7 +382,7 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying framebuffer with handle index {0} and generation {1}", h.Index, h.Generation));
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Framebuffers.push_back(std::move(*entry));
+        mDeletionQueues[GetDeletionQueueIndex()].Framebuffers.push_back(std::move(*entry));
         mFramebufferPool.Free(h);
     }
 
@@ -442,6 +454,13 @@ namespace Surge
         return mPipelinePool.Allocate(std::move(entry));
     }
 
+    PipelineHandle VulkanRHI::CreateComputePipeline(const ComputePipelineDesc& desc)
+    {
+        SG_ASSERT(mDevice.SupportsCompute(), "CreateComputePipeline: the selected queue does not support compute!");
+        PipelineEntry entry = VulkanPipeline::CreateCompute(*this, desc);
+        return mPipelinePool.Allocate(std::move(entry));
+    }
+
     void VulkanRHI::DestroyPipeline(PipelineHandle h)
     {
         PipelineEntry* entry = mPipelinePool.Get(h);
@@ -450,7 +469,7 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying pipeline with handle index {0} and generation {1}", h.Index, h.Generation));
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Pipelines.push_back(std::move(*entry));
+        mDeletionQueues[GetDeletionQueueIndex()].Pipelines.push_back(std::move(*entry));
         mPipelinePool.Free(h);
     }
 
@@ -494,7 +513,7 @@ namespace Surge
 
         VK_RHI_LOG(Log<Severity::Info>("Destroying sampler with handle index {0} and generation {1}", h.Index, h.Generation));
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].Samplers.push_back(std::move(*entry));
+        mDeletionQueues[GetDeletionQueueIndex()].Samplers.push_back(std::move(*entry));
         mSamplerPool.Free(h);
     }
 
@@ -508,7 +527,7 @@ namespace Surge
 
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         Uint setToBind = (setEntry->Frequency == DescriptorUpdateFrequency::DYNAMIC) ? ctx.FrameIndex : 0;
-        VulkanDescriptorSet::Bind(cmd, entry->Layout, setEntry->Sets[setToBind], slot);
+        VulkanDescriptorSet::Bind(cmd, entry->BindPoint, entry->Layout, setEntry->Sets[setToBind], slot);
     }
 
     DescriptorSetHandle VulkanRHI::CreateDescriptorSet(PipelineHandle pipelineHandle, DescriptorSetSlot slot, DescriptorUpdateFrequency frequency, const char* debugName /*= nullptr*/)
@@ -533,7 +552,7 @@ namespace Surge
         if(!entry)
             return;
 
-        mDeletionQueues[mFrame.GetCurrentFrameIndex()].DescriptorSets.push_back(std::move(*entry));
+        mDeletionQueues[GetDeletionQueueIndex()].DescriptorSets.push_back(std::move(*entry));
         mDescriptorSetPool.Free(h);
     }
 
@@ -542,6 +561,13 @@ namespace Surge
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         vkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
         mStats.DrawCalls++;
+    }
+
+    void VulkanRHI::CmdDispatch(const FrameContext& ctx, Uint groupCountX, Uint groupCountY, Uint groupCountZ)
+    {
+        VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+        vkCmdDispatch(cmd, groupCountX, groupCountY, groupCountZ);
+        mStats.DispatchCalls++;
     }
 
     void VulkanRHI::CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance)
@@ -575,7 +601,7 @@ namespace Surge
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         PipelineEntry* entry = mPipelinePool.Get(h);
         SG_ASSERT(entry, "CmdBindPipeline: invalid handle");
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, entry->Pipeline);
+        vkCmdBindPipeline(cmd, entry->BindPoint, entry->Pipeline);
     }
 
     void VulkanRHI::CmdPushConstants(const FrameContext& ctx, PipelineHandle h, ShaderType shaderStage, Uint offset, Uint size, const void* data)
@@ -861,6 +887,7 @@ namespace Surge
         ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
         ImGui::Text("%s", mStats.RHIVersion.c_str());
         ImGui::Text("Draw call(s): %i", mStats.DrawCalls);
+        ImGui::Text("Dispatch call(s): %i", mStats.DispatchCalls);
         ImGui::Text("Frames in Flight: %d", RHISettings::FRAMES_IN_FLIGHT);
 
         // We need to call GetStats() here to update the memory stats before displaying them
@@ -911,7 +938,7 @@ namespace Surge
                     if (ImGui::TreeNode(pipeText.c_str()))
                     {
                         ImGui::Text("Debug Name: %s", entry.Desc.DebugName.c_str());
-                        ImGui::Text("Target: %s", entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer");
+                        ImGui::Text("Target: %s", entry.BindPoint == VK_PIPELINE_BIND_POINT_COMPUTE ? "Compute" : (entry.Desc.TargetSwapchain ? "Swapchain" : "Framebuffer"));
                         ImGui::Text("Shader: %s", entry.Desc.Shader_.GetName().c_str());
                         ImGui::TreePop();
                     }

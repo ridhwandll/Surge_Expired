@@ -28,7 +28,8 @@ namespace Surge
         SCENE,
         SCRIPT,
         FONT,
-        AUDIO
+        AUDIO,
+        UI_LAYOUT
     };
 
     inline constexpr auto sAssetTypeArray = std::array {
@@ -39,7 +40,8 @@ namespace Surge
         AssetType::SCENE,
         AssetType::SCRIPT,
         AssetType::FONT,
-        AssetType::AUDIO
+        AssetType::AUDIO,
+        AssetType::UI_LAYOUT
     };
 
     inline AssetType AssetTypeFromString(const char* str)
@@ -52,6 +54,7 @@ namespace Surge
         if(strcmp(str, "SCRIPT") == 0) return AssetType::SCRIPT;
         if(strcmp(str, "FONT") == 0) return AssetType::FONT;
         if(strcmp(str, "AUDIO") == 0) return AssetType::AUDIO;
+        if(strcmp(str, "UI_LAYOUT") == 0) return AssetType::UI_LAYOUT;
         return AssetType::NONE;
     }
 
@@ -64,6 +67,7 @@ namespace Surge
         if(strcmp(str, ".lua") == 0) return AssetType::SCRIPT;
         if(strcmp(str, ".ttf") == 0 || strcmp(str, ".otf") == 0) return AssetType::FONT;
         if(strcmp(str, ".wav") == 0 || strcmp(str, ".mp3") == 0 || strcmp(str, ".ogg") == 0) return AssetType::AUDIO;
+        if(strcmp(str, ".sui") == 0) return AssetType::UI_LAYOUT;
         return AssetType::NONE;
     }
 
@@ -75,6 +79,7 @@ namespace Surge
             case AssetType::SCENE: return ".srg";
             case AssetType::SCRIPT: return ".lua";
             case AssetType::FONT: return ".ttf";
+            case AssetType::UI_LAYOUT: return ".sui";
             default:
                 SG_ASSERT_INTERNAL("GetExtensionFromAssetType: Invalid asset type");
                 return "";

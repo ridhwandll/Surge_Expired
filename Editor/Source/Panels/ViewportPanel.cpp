@@ -9,6 +9,7 @@
 #include "SurgeMath/Math.hpp"
 #include "Editor.hpp"
 #include "ContentBrowserPanel.hpp"
+#include "UIEditorPanel.hpp"
 
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -59,15 +60,8 @@ namespace Surge
         dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
 
             // Hit F to Focus
-            if(keyEvent.GetKeyCode() == Key::F)
-            {
-                const Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
-                if(selectedEntity)
-                {
-                    const TransformComponent& transform = selectedEntity.GetComponent<TransformComponent>();
-                    mEditorCam->Focus(transform.Position);
-                }
-            }
+            if(keyEvent.GetKeyCode() == Key::F && mSceneHierarchy->GetSelectedEntity())
+                (static_cast<Editor*>(Core::GetClient()))->GetCamera().Focus(mSceneHierarchy->GetSelectedEntity().GetComponent<TransformComponent>().GetTransform()[3]);
 
             if(!Input::IsMouseButtonPressed(Mouse::ButtonRight))
             {
@@ -191,6 +185,7 @@ namespace Surge
 
             mViewportSize = { renderWidth, renderHeight };
             mIsViewportHovered = ImGui::IsWindowHovered();
+            mIsViewportFocused = ImGui::IsWindowFocused();
 
             if(!mIsFullscreen)
                 mPreviousDockID = ImGui::GetWindowDockID();
@@ -222,14 +217,19 @@ namespace Surge
 
                     switch(metadata.Type)
                     {
+                        case AssetType::UI_LAYOUT:
+                            static_cast<Editor*>(Core::GetClient())->GetPanelManager().GetPanel<UIEditorPanel>()->OpenLayout(droppedAssetID);
+                            break;
                         case AssetType::SCENE:
                         {
                             Ref<Scene> droppedScene = assetManager->Load<Scene>(droppedAssetID);
                             if(droppedScene)
                             {
                                 auto* editor = static_cast<Editor*>(Core::GetClient());
-                                editor->LoadScene(std::move(droppedScene));
-                                SetSceneName();
+                                editor->ConfirmDiscardChanges("Open another scene", [this, editor, droppedScene]() mutable {
+                                    editor->LoadScene(std::move(droppedScene));
+                                    SetSceneName();
+                                });
                             }
                             break;
                         }
@@ -243,7 +243,7 @@ namespace Surge
                                 Entity newEntity;
                                 currentScene->CreateEntity(newEntity, "Mesh");
                                 newEntity.AddComponent<MeshComponent>().MeshAsset = droppedMesh;
-                                mSceneHierarchy->SetSelectedEntity(newEntity);
+                                editor->OnEntityCreated(newEntity);
                             }
                             break;
                         }
@@ -254,6 +254,11 @@ namespace Surge
                 }
                 ImGui::EndDragDropTarget();
             }
+
+            // UI Editor: outlines/handles + widget editing on top of the rendered layout (submitted before the overlays so they keep the hover)
+            bool uiEditingActive = false;
+            if(!isPlaying)
+                uiEditingActive = editor->GetPanelManager().GetPanel<UIEditorPanel>()->OnViewportGUI(viewportBoundsMin, ImVec2(renderWidth, renderHeight));
 
             // Overlays
             ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
@@ -279,8 +284,9 @@ namespace Surge
                 ImGui::PopStyleColor();
             }
 
-            // Scene Name
-            const char* displayText = isPlaying ? "RUNTIME" : mSceneName.c_str();
+            // Scene Name (* = unsaved changes)
+            const String sceneLabel = isPlaying ? String("RUNTIME") : (editor->GetHistory().IsDirty() ? mSceneName + " *" : mSceneName);
+            const char* displayText = sceneLabel.c_str();
             ImGui::PushFont(boldFont);
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             float textHeight = ImGui::GetTextLineHeight();
@@ -294,7 +300,7 @@ namespace Surge
             ImGui::PopFont();
 
             // Gizmos
-            if(!isPlaying)
+            if(!isPlaying && !uiEditingActive)
             {
                 Entity& selectedEntity = mSceneHierarchy->GetSelectedEntity();
                 Editor* app = static_cast<Editor*>(Core::GetClient());
@@ -341,8 +347,6 @@ namespace Surge
                         glm::vec3 translation, rotation, scale;
 
                         Math::DecomposeTransform(transform, translation, rotation, scale);
-                        if (translation.x < 0)
-                            Log<Severity::Info>("Translation X: ", translation.x, " Y: ", translation.y, " Z: ", translation.z);
 
                         glm::vec3 deltaRotation = glm::degrees(rotation) - transformComponent.Rotation;
                         transformComponent.Position = translation;
@@ -358,6 +362,7 @@ namespace Surge
         else
         {
             mIsViewportHovered = false;
+            mIsViewportFocused = false;
             mViewportSize = { 0.0f, 0.0f };
         }
 

@@ -40,6 +40,7 @@ namespace Surge
         ImageHandle CreateImage(const ImageDesc& desc) { return mBackendRHI.CreateImage(desc); }
         void DestroyImage(ImageHandle texture) { mBackendRHI.DestroyImage(texture); }
         void ResizeImage(ImageHandle h, Uint newWidth, Uint newHeight) { mBackendRHI.ResizeImage(h, newWidth, newHeight); }
+        void RecreateImage(ImageHandle h, const ImageDesc& desc) { mBackendRHI.RecreateImage(h, desc); } // Same handle, new size/format/usage, content undefined
         uint64_t GetImageSize(ImageHandle h) const { return mBackendRHI.GetImageSize(h); }
         const ImageDesc& GetDesc(ImageHandle h) const { return mBackendRHI.GetDesc(h); }
 
@@ -51,6 +52,8 @@ namespace Surge
 
         // Pipeline
         PipelineHandle CreatePipeline(const PipelineDesc& desc) { return mBackendRHI.CreatePipeline(desc); }
+        PipelineHandle CreateComputePipeline(const ComputePipelineDesc& desc) { return mBackendRHI.CreateComputePipeline(desc); }
+        bool SupportsCompute() const { return mBackendRHI.SupportsCompute(); }
         void DestroyPipeline(PipelineHandle h) { mBackendRHI.DestroyPipeline(h); }
 
         // Samplers
@@ -65,6 +68,10 @@ namespace Surge
         // Commands
         void CmdDrawIndexed(const FrameContext& ctx, Uint indexCount, Uint instanceCount, Uint firstIndex, int32_t vertexOffset, Uint firstInstance) { mBackendRHI.CmdDrawIndexed(ctx, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance); }
         void CmdDraw(const FrameContext& ctx, Uint vertexCount, Uint instanceCount, Uint firstVertex, Uint firstInstance) { mBackendRHI.CmdDraw(ctx, vertexCount, instanceCount, firstVertex, firstInstance); }
+
+        // Compute: record outside of a renderpass. Storage writes need the image in ImageUsage::STORAGE (GENERAL), reads in ImageUsage::SAMPLED
+        // Push constants for compute pipelines use ShaderType::COMPUTE
+        void CmdDispatch(const FrameContext& ctx, Uint groupCountX, Uint groupCountY, Uint groupCountZ = 1) { mBackendRHI.CmdDispatch(ctx, groupCountX, groupCountY, groupCountZ); }
 
         void CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindVertexBuffer(ctx, h, offset); }
         void CmdBindIndexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset = 0) { mBackendRHI.CmdBindIndexBuffer(ctx, h, offset); }

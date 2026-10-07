@@ -6,7 +6,7 @@ namespace Surge
 {
    /*
     * PostProcessPass:
-    * Reads : Blackboard.MainPassColorImage, BlackBoard.MainPassDepthImage, BlackBoard.OutlineMask
+    * Reads : Blackboard.MainPassColorImage, BlackBoard.MainPassDepthImage, BlackBoard.OutlineMask, BlackBoard.AOImage, BlackBoard.AOLinearDepth, BlackBoard.BloomImage
     * Writes: Blackboard.FinalImage
     */
 

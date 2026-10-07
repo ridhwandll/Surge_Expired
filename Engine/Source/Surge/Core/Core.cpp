@@ -143,11 +143,12 @@ namespace Surge::Core
         sCoreData.SurgeClient->OnShutdown();
         delete sCoreData.SurgeClient;
         
-        sCoreData.SurgeScriptEngine->Shutdown();
-        delete sCoreData.SurgeScriptEngine;
-
+        // Assets before scripts: cached scenes hold Lua references (script environments) that must be released while the Lua state is alive
         sCoreData.SurgeAssetManager->Shutdown();
         delete sCoreData.SurgeAssetManager;
+
+        sCoreData.SurgeScriptEngine->Shutdown();
+        delete sCoreData.SurgeScriptEngine;
 
         sCoreData.SurgeAudioEngine->Shutdown();
         delete sCoreData.SurgeAudioEngine;

@@ -16,6 +16,7 @@ namespace Surge::ScriptBinding
         log["Debug"] = [](const String& m) { Log<Severity::Debug>("Lua: {}", m); };
         log["Warn"] = [](const String& m) { Log<Severity::Warn>("Lua: {}", m); };
         log["Error"] = [](const String& m) { Log<Severity::Error>("Lua: {}", m); };
+        log["Fatal"] = [](const String& m) { Log<Severity::Fatal>("Lua: {}", m); };
     }
 }
 

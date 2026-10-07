@@ -10,7 +10,10 @@ namespace Surge
         Inspector,
         ContentBrowser,
         MaterialEditor,
-        Export
+        Export,
+        UIEditor,
+        Console,
+        History
     };
 
     constexpr const char* PanelCodeToString(PanelCode code)
@@ -23,6 +26,9 @@ namespace Surge
             case PanelCode::ContentBrowser: return "ContentBrowser & AssetRegistry";
             case PanelCode::MaterialEditor: return "MaterialEditor";
             case PanelCode::Export: return "Export";
+            case PanelCode::UIEditor: return "UI Editor";
+            case PanelCode::Console: return "Console";
+            case PanelCode::History: return "History";
         }
         return nullptr;
     }

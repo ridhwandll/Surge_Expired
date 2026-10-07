@@ -10,6 +10,8 @@ namespace Surge
     {
         SHADOW,
         MAIN_SCENE,
+        AMBIENT_OCCLUSION,
+        BLOOM,
         OUTLINE_MASK,
         POST_PROCESS,
         UI_OVERLAY,

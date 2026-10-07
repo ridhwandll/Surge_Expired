@@ -237,7 +237,7 @@ namespace Surge
 
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
@@ -275,7 +275,7 @@ namespace Surge
 
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             break;
 
         case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:

@@ -6,6 +6,7 @@
 #include "Surge/ECS/Components/ScriptComponent.hpp"
 
 #include "Utility/ImGuiAux.hpp"
+#include "Editor.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
@@ -26,25 +27,9 @@ namespace Surge
         mSelectedEntity = {};
     }
 
-    void SceneHierarchyPanel::OnEvent(Event& e)
+    void SceneHierarchyPanel::OnEvent(Event&)
     {
-        if(!mSelectedEntity || !mSceneContext)
-            return;
-
-        EventDispatcher dispatcher(e);
-        dispatcher.Dispatch<KeyPressedEvent>([&](KeyPressedEvent& keyEvent) {
-            if(keyEvent.GetKeyCode() == Key::Delete && mHierarchyHovered)
-            {
-                mSceneContext->DestroyEntity(mSelectedEntity);
-                mSelectedEntity = {};
-            }
-            if(keyEvent.GetKeyCode() == Key::ScrollLock)
-            {
-                Entity e = mSceneContext->DuplicateEntity(mSelectedEntity);
-                if(e) // Might be null if mSelectedEntity has a parent
-                    mSelectedEntity = e;
-            }
-        });
+        // Delete/Duplicate/Copy/Paste shortcuts live in Editor::HandleShortcuts (they go through the undo history)
     }
 
     void SceneHierarchyPanel::Render(bool* show)
@@ -55,9 +40,13 @@ namespace Surge
         ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
+        mHierarchyFocused = false;
+        mHierarchyHovered = false;
         if(ImGui::Begin(PanelCodeToString(mCode), show))
         {
+            Editor* editor = static_cast<Editor*>(Core::GetClient());
             mHierarchyHovered = ImGui::IsWindowHovered();
+            mHierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 
@@ -81,10 +70,19 @@ namespace Surge
             ImGui::Spacing();
 
             // Unified Popup Context (Handles both the ADD button and right-clicking empty space)
+            // Every item below creates into mSelectedEntity, a changed selection afterwards means "created" (recorded for undo)
+            const Entity selectionBeforeMenu = mSelectedEntity;
             ImGuiAux::StyledPopupVars::Push();
             if(ImGui::BeginPopup("AddEntityContext") || ImGui::BeginPopupContextWindow("HierarchySpace", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
             {
                 ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+
+                if(editor->HasEntityInClipboard() && !editor->IsPlaying())
+                {
+                    if(ImGuiAux::StyledMenuItem("Paste", "Ctrl+V"))
+                        Core::AddFrameEndCallback([editor]() { editor->PasteEntity(); });
+                    ImGuiAux::StyledSeparator();
+                }
 
                 if(ImGuiAux::StyledMenuItem("Empty Entity"))
                     mSceneContext->CreateEntity(mSelectedEntity, "Entity");
@@ -180,9 +178,10 @@ namespace Surge
                 ImGuiAux::EndStyledPopup();
             }
             else
-            {
                 ImGuiAux::StyledPopupVars::Pop();
-            }
+
+            if(mSelectedEntity && mSelectedEntity != selectionBeforeMenu)
+                editor->OnEntityCreated(mSelectedEntity);
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
@@ -246,7 +245,7 @@ namespace Surge
                     {
                         entt::entity droppedEntityID = *(const entt::entity*)payload->Data;
                         Entity dropped(droppedEntityID, mSceneContext);
-                        mSceneContext->SetParent(dropped, Entity {});
+                        editor->ReparentEntity(dropped, Entity {});
                     }
                     ImGui::EndDragDropTarget();
                 }
@@ -289,9 +288,7 @@ namespace Surge
             ImGui::PopStyleColor(4);
         }
         else
-        {
             opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(e.Raw()))), flags, "%s", name.c_str());
-        }
 
         if(ImGui::BeginDragDropSource())
         {
@@ -304,27 +301,9 @@ namespace Surge
         {
             if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_ENTITY_PAYLOAD))
             {
-                entt::entity droppedEntityID = *(const entt::entity*)payload->Data;
-
-                // Cyclic Parenting Protection
-                bool isDescendant = false;
-                entt::entity currentCheck = e.Raw();
-                while(currentCheck != entt::null)
-                {
-                    if(currentCheck == droppedEntityID)
-                    {
-                        isDescendant = true;
-                        break;
-                    }
-                    currentCheck = (entt::entity)mSceneContext->GetRegistry().get<RelationshipComponent>(currentCheck).Parent;
-                }
-                if(!isDescendant && droppedEntityID != e.Raw())
-                {
-                    Entity dropped(droppedEntityID, mSceneContext);
-                    mSceneContext->SetParent(dropped, e);
-                }
-                else if(isDescendant)
-                    Log<Severity::Warn>("Cannot parent an entity to its own descendant!");
+                // Cyclic parenting protection happens in there
+                Entity dropped(*(const entt::entity*)payload->Data, mSceneContext);
+                static_cast<Editor*>(Core::GetClient())->ReparentEntity(dropped, e);
             }
             ImGui::EndDragDropTarget();
         }
@@ -347,28 +326,29 @@ namespace Surge
             ImGui::PopFont();
             ImGuiAux::StyledSeparator();
 
+            Editor* editor = static_cast<Editor*>(Core::GetClient());
             if(rel.Parent != entt::null)
             {
                 if(ImGuiAux::StyledMenuItem("Unparent"))
-                    mSceneContext->SetParent(e, Entity {});
+                    editor->ReparentEntity(e, Entity {});
                 ImGuiAux::StyledSeparator();
             }
 
-            if(ImGuiAux::StyledMenuItem("Duplicate", "ScrollLock"))
+            // Creating entities while the registry is being iterated is not safe, these run at the end of the frame
+            if(ImGuiAux::StyledMenuItem("Copy", "Ctrl+C"))
+                editor->CopyEntity(e);
+            if(ImGuiAux::StyledMenuItem("Paste", "Ctrl+V", nullptr, editor->HasEntityInClipboard() && !editor->IsPlaying()))
             {
-                Entity clone = mSceneContext->DuplicateEntity(e);
-                if(clone)
-                    mSelectedEntity = clone;
+                Entity target = e;
+                Core::AddFrameEndCallback([editor, target]() {
+                    editor->SelectEntity(target); // Pastes right after the clicked entity
+                    editor->PasteEntity();
+                });
             }
+            if(ImGuiAux::StyledMenuItem("Duplicate", "Ctrl+D"))
+                Core::AddFrameEndCallback([editor, e]() { editor->DuplicateEntity(e); });
             if(ImGuiAux::StyledMenuItem("Delete", "Del"))
-            {
-                if(mSelectedEntity == e)
-                {
-                    mSelectedEntity = {};
-                    mSceneContext->SetSelectedEntity(mSelectedEntity);
-                }
-                Core::AddFrameEndCallback([this, e]() { mSceneContext->DestroyEntity(e); });
-            }
+                editor->DeleteEntity(e); // Only queues the destruction
             ImGuiAux::EndStyledPopup();
         }
 
