@@ -44,15 +44,21 @@ namespace Surge
         Uint GetHeight() const { return mDimensions.Height; }
         bool IsFramePacingActive() const { return mFramePacingActive; }
 
+        // Quarter turns (clockwise) the passes drawing into the swapchain rotate their output by, see Create()
+        Uint GetRotation() const;
+        bool IsTransformOutdated(const VulkanRHI& rhi) const; // The display rotated since the swapchain was created
+
     private:
         void Create(const VulkanRHI& rhi, Uint width, Uint height);
         void Destroy(const VulkanRHI& rhi);
 
         static VkSurfaceFormatKHR SelectSurfaceFormat(VkPhysicalDevice gpu, VkSurfaceKHR surface);
         static VkPresentModeKHR SelectPresentMode(VkPhysicalDevice gpu, VkSurfaceKHR surface);
+        static VkSurfaceTransformFlagBitsKHR SelectPreTransform(const VkSurfaceCapabilitiesKHR& surfaceProperties);
 
         VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
         SwapchainDimensions mDimensions = {};
+        VkSurfaceTransformFlagBitsKHR mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
         Vector<SwapchainFrame> mFrames;
         bool mFramePacingActive = false;
     };

@@ -700,6 +700,15 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 4.0f));
         ImGui::BeginChild("##FolderTree", ImVec2(Settings().FolderTreeWidth, bodyHeight), ImGuiChildFlags_AlwaysUseWindowPadding);
         ImGui::PopStyleVar();
+
+        // Shadow tint
+        {
+            const ImVec2 treePos = ImGui::GetWindowPos();
+            const ImVec2 treeSize = ImGui::GetWindowSize();
+            const ImU32 shadowLeft = IM_COL32(0, 0, 0, 10);
+            const ImU32 shadowRight = IM_COL32(0, 0, 0, 200);
+            ImGui::GetWindowDrawList()->AddRectFilledMultiColor(treePos, ImVec2(treePos.x + treeSize.x, treePos.y + treeSize.y), shadowLeft, shadowRight, shadowRight, shadowLeft);
+        }
         DrawFolderTree();
         ImGui::EndChild();
 
@@ -2401,12 +2410,12 @@ namespace Surge
 
             if(type == AssetType::SCENE)
             {
-                if(mAssetManager->Create<Scene>(relative, Filesystem::GetFilenameWithoutExt(path)))
+                if(mAssetManager->Create<Scene>(relative, Filesystem::GetFilenameWithoutExt(path), Core::GetSceneContext()))
                     created = path;
             }
             else if(type == AssetType::MATERIAL)
             {
-                if(Ref<Material> material = mAssetManager->Create<Material>(relative, path.stem().string()))
+                if(Ref<Material> material = mAssetManager->Create<Material>(relative, *Core::GetRenderer(), path.stem().string()))
                 {
                     MaterialSourceWriter::Write(material, path.generic_string());
                     created = path;

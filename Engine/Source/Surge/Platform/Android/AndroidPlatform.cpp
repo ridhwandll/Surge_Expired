@@ -7,6 +7,8 @@
 #include "Surge/Platform/Android/AndroidWindow.hpp"
 #include <android/log.h>
 #include <dlfcn.h>
+#include <sys/resource.h>
+#include <sys/system_properties.h>
 #include <cstdlib>
 #include <unistd.h>
 #include <algorithm>
@@ -15,6 +17,21 @@
 
 namespace Surge
 {
+    // AThermal_* is API 30, minSdk is 29: resolved from libandroid.so at runtime
+    struct ThermalApi
+    {
+        using AcquireFn = void* (*)();
+        using ReleaseFn = void (*)(void*);
+        using GetStatusFn = int (*)(void*);
+
+        void* Library = nullptr;
+        void* Manager = nullptr;
+        ReleaseFn Release = nullptr;
+        GetStatusFn GetStatus = nullptr;
+        bool Resolved = false;
+    };
+    static ThermalApi sThermal;
+
     void Platform::Initialize()
     {
         //Empty for now
@@ -22,7 +39,61 @@ namespace Surge
 
     void Platform::Shutdown()
     {
-        //Empty for now
+        if(sThermal.Manager && sThermal.Release)
+            sThermal.Release(sThermal.Manager);
+        if(sThermal.Library)
+            dlclose(sThermal.Library);
+        sThermal = {};
+    }
+
+    int Platform::GetThermalStatus()
+    {
+        if(!sThermal.Resolved)
+        {
+            sThermal.Resolved = true;
+            sThermal.Library = dlopen("libandroid.so", RTLD_NOW | RTLD_LOCAL);
+            if(sThermal.Library)
+            {
+                const auto acquire = reinterpret_cast<ThermalApi::AcquireFn>(dlsym(sThermal.Library, "AThermal_acquireManager"));
+                sThermal.Release = reinterpret_cast<ThermalApi::ReleaseFn>(dlsym(sThermal.Library, "AThermal_releaseManager"));
+                sThermal.GetStatus = reinterpret_cast<ThermalApi::GetStatusFn>(dlsym(sThermal.Library, "AThermal_getCurrentThermalStatus"));
+                if(acquire && sThermal.GetStatus)
+                    sThermal.Manager = acquire();
+            }
+        }
+
+        if(!sThermal.Manager)
+            return -1;
+
+        const int status = sThermal.GetStatus(sThermal.Manager);
+        return status >= 0 && status <= 6 ? status : -1; // ATHERMAL_STATUS_ERROR = -1
+    }
+
+    String Platform::GetCPUName()
+    {
+        const auto property = [](const char* name) {
+            char value[PROP_VALUE_MAX] = {};
+            return __system_property_get(name, value) > 0 ? String(value) : String();
+        };
+
+        // Android 12+ names the SoC ("QTI" + "SM6115"), older versions only have the board platform
+        const String model = property("ro.soc.model");
+        if(!model.empty())
+        {
+            const String manufacturer = property("ro.soc.manufacturer");
+            return manufacturer.empty() ? model : manufacturer + " " + model;
+        }
+        return property("ro.board.platform");
+    }
+
+    double Platform::GetProcessCPUSeconds()
+    {
+        rusage usage = {};
+        if(getrusage(RUSAGE_SELF, &usage) != 0)
+            return -1.0;
+
+        const auto seconds = [](const timeval& time) { return static_cast<double>(time.tv_sec) + static_cast<double>(time.tv_usec) * 1e-6; };
+        return seconds(usage.ru_utime) + seconds(usage.ru_stime);
     }
 
     void Platform::OpenFolderInExplorer(const String& path)

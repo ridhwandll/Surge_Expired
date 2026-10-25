@@ -2,6 +2,7 @@
 #pragma once
 #include "Panels/IPanel.hpp"
 #include "Panels/SceneHierarchyPanel.hpp"
+#include "Panels/RendererSettingsInspector.hpp"
 
 namespace Surge
 {
@@ -30,5 +31,8 @@ namespace Surge
 
         bool mUniformScale = false;  // Transform: scale axes change together
         String mAddComponentSearch;
+
+        // (Rid) Inspector file getting big so I started splitting it up
+        RendererSettingsInspector mRendererSettings;
     };
 } // namespace Surge

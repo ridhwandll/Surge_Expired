@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
+#include "Surge/Graphics/RenderGraph/RenderSettings.hpp" // ParticleSettings
 #include <glm/glm.hpp>
 
 namespace Surge
@@ -20,19 +21,6 @@ namespace Surge
         DISTANCE,      // Back to front per view (ParticlePass), alpha blended smoke
         OLDEST_FIRST,  // Oldest drawn first (newest on top)
         YOUNGEST_FIRST // Youngest drawn first
-    };
-
-    // Global particle budget of a frame, edited in the Editor's Renderer panel like Lighting
-    struct ParticleSettings
-    {
-        static constexpr float MIN_EMISSION_QUALITY = 0.1f;
-
-#ifdef SURGE_PLATFORM_ANDROID
-        Uint MaxParticles = 8192;
-#else
-        Uint MaxParticles = 131072;
-#endif
-        float EmissionQuality = 1.0f; // Scales every emission rate and burst count (0.1 - 1)
     };
 
     // Written by the scene each frame, shown by ParticlePass::OnImGuiRender

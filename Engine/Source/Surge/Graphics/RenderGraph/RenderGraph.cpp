@@ -1,19 +1,22 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "RenderGraph.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Core/Profiler.hpp"
 
 namespace Surge
 {
-    void RenderGraph::Setup(GraphicsRHI* rhi)
+    void RenderGraph::Setup(const RenderGraphContext& context)
     {
-        mRHI = rhi;
-        mImGuiEnabled = Core::GetClient()->GetClientOptions().EnableImGui;
+        mContext = context;
+        mRHI = context.RHI;
+        mImGuiEnabled = context.ImGuiEnabled;
 
         // Producers must be registered before consumers so blackboard handles are valid
         for(auto& pass : mPasses)
-            pass->Setup(rhi, mBlackboard);
+        {
+            pass->mContext = context;
+            pass->Setup(mRHI, mBlackboard);
+        }
     }
 
     void RenderGraph::Compile()
@@ -21,7 +24,6 @@ namespace Surge
         SCOPED_TIMER("RenderGraph::Compile");
         mCompiledGraph = {};
 
-        ExecutionGroup outlineGroup = { .Name = "OutlineMask", .Type = PassGroup::OUTLINE_MASK, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
         ExecutionGroup shadowGroup = { .Name = "Shadow", .Type = PassGroup::SHADOW, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = true, .IsSwapchain = false };
         ExecutionGroup mainGroup = { .Name = "MainScene", .Type = PassGroup::MAIN_SCENE, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = false, .IsSwapchain = false };
         ExecutionGroup aoGroup = { .Name = "AmbientOcclusion", .Type = PassGroup::AMBIENT_OCCLUSION, .Passes = {}, .BarriersBeforeGroup = {}, .Framebuffer {}, .ManagesOwnExecution = true, .IsSwapchain = false };
@@ -38,14 +40,12 @@ namespace Surge
                 case PassGroup::MAIN_SCENE:   mainGroup.Passes.push_back(pass.get());        break;
                 case PassGroup::AMBIENT_OCCLUSION: aoGroup.Passes.push_back(pass.get());     break;
                 case PassGroup::BLOOM:        bloomGroup.Passes.push_back(pass.get());       break;
-                case PassGroup::OUTLINE_MASK: outlineGroup.Passes.push_back(pass.get());     break;
                 case PassGroup::POST_PROCESS: postProcessGroup.Passes.push_back(pass.get()); break;
                 case PassGroup::UI_OVERLAY:   uiOverlayGroup.Passes.push_back(pass.get());   break;
                 case PassGroup::SWAPCHAIN:    swapchainGroup.Passes.push_back(pass.get());   break;
             }
         }
 
-        outlineGroup.Framebuffer = mBlackboard.OutlineFramebuffer;
         postProcessGroup.Framebuffer = mBlackboard.PostProcessFramebuffer;
         uiOverlayGroup.Framebuffer = mBlackboard.UIOverlayFramebuffer;
         mainGroup.Framebuffer = mBlackboard.MainPassFramebuffer;
@@ -54,20 +54,16 @@ namespace Surge
         SortByDependencies(mainGroup.Passes);
         SortByDependencies(aoGroup.Passes);
         SortByDependencies(bloomGroup.Passes);
-        SortByDependencies(outlineGroup.Passes);
         SortByDependencies(postProcessGroup.Passes);
         SortByDependencies(uiOverlayGroup.Passes);
         SortByDependencies(swapchainGroup.Passes);
 
         // Execution order. Passes may move between groups (e.g. PostProcess/UI render straight into the swapchain in the Player),
         // so barriers are derived from the actual order instead of fixed group pairs
-        Vector<ExecutionGroup*> ordered = { &outlineGroup, &shadowGroup, &mainGroup, &aoGroup, &bloomGroup, &postProcessGroup, &uiOverlayGroup, &swapchainGroup };
+        Vector<ExecutionGroup*> ordered = { &shadowGroup, &mainGroup, &aoGroup, &bloomGroup, &postProcessGroup, &uiOverlayGroup, &swapchainGroup };
         DeriveBarriers(ordered);
 
         // Build final groups
-        if(!outlineGroup.Passes.empty())
-            mCompiledGraph.Groups.push_back(std::move(outlineGroup));
-
         if(!shadowGroup.Passes.empty())
             mCompiledGraph.Groups.push_back(std::move(shadowGroup));
 
@@ -95,6 +91,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("RenderGraph::Execute");
 
+        mBlackboard.HasSceneGeometry = false; // GeometryPass::Prepare sets it, stays false when the pass is disabled
         for(auto& pass : mPasses)
         {
             if(pass->IsEnabled() && (mSceneEnabled || pass->GetGroup() == PassGroup::SWAPCHAIN))
@@ -121,17 +118,29 @@ namespace Surge
                     continue;
             }
 
+            if(group.IsSwapchain)
+                mRHI->CmdWaitForSwapchainImage(ctx); // The wait for the display would otherwise count as this group's work
+            mRHI->CmdBeginGPUScope(ctx, group.Name);
             if (!group.ManagesOwnExecution)
                 group.IsSwapchain ? mRHI->CmdBeginSwapchainRenderpass(ctx) : mRHI->CmdBeginRenderPass(ctx, group.Framebuffer);
 
+            // Self managed groups begin a render pass per pass, the others share one: only time their passes where that means something
+            const bool timePasses = group.ManagesOwnExecution || mRHI->SupportsGPUTimingInRenderPass();
             for(RenderPass* pass : group.Passes)
             {
-                if (pass->IsEnabled())
-                    pass->Execute(ctx, mBlackboard);
+                if (!pass->IsEnabled())
+                    continue;
+
+                if(timePasses)
+                    mRHI->CmdBeginGPUScope(ctx, pass->GetName());
+                pass->Execute(ctx, mBlackboard);
+                if(timePasses)
+                    mRHI->CmdEndGPUScope(ctx);
             }
 
             if(!group.ManagesOwnExecution)
                 group.IsSwapchain ? (mImGuiEnabled ? RenderImGuiCallbacks() : void(), mRHI->CmdEndSwapchainRenderpass(ctx)) : mRHI->CmdEndRenderPass(ctx, group.Framebuffer);
+            mRHI->CmdEndGPUScope(ctx);
         }
     }
 

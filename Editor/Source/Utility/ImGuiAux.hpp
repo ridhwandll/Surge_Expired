@@ -378,7 +378,7 @@ namespace Surge::ImGuiAux
     inline void EndStyledPopup()
     {
         ImGui::EndPopup();
-        StyledPopupVars::Pop();
+        ImGuiAux::StyledPopupVars::Pop();
     }
 
     inline void StyledSeparator()

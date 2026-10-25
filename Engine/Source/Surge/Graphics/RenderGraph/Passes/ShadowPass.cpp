@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ShadowPass.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 
@@ -13,6 +12,7 @@ namespace Surge
     namespace
     {
         constexpr Uint INITIAL_INSTANCE_CAPACITY = 1024;
+        constexpr Uint INITIAL_SKINNED_INSTANCE_CAPACITY = 64;
 
         // (Rid) Every cascade's ortho box is grown by this many texels per side, so the PCF footprint (up to 4 texels for 7x7) and the
         // normal offset never read outside the cascade's region of the atlas (Renderer3D.glsl clamps as well)
@@ -80,7 +80,7 @@ namespace Surge
         mFramebuffer = mRHI->CreateFramebuffer(fbDesc);
 
         PipelineDesc desc = {};
-        desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Shadow.glsl");
+        desc.Shader_ = mContext.Shaders->Get("Shadow.glsl");
         desc.Raster.Topo = Topology::TRIANGLE_LIST;
         desc.Raster.Polygon = PolygonMode::FILL;
         desc.Raster.Cull = CullMode::BACK; // Receivers carry the normal offset, so contact points don't float and single sided casters still cast
@@ -97,10 +97,17 @@ namespace Surge
         desc.DebugName = "ShadowPass";
         mPipeline = mRHI->CreatePipeline(desc);
 
+        desc.Shader_ = mContext.Shaders->Get("ShadowSkinned.glsl");
+        desc.DebugName = "ShadowPassSkinned";
+        mSkinnedPipeline = mRHI->CreatePipeline(desc);
+
         mImageWrites.push_back(blackBoard.ShadowAtlas);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
             EnsureInstanceCapacity(i, INITIAL_INSTANCE_CAPACITY);
+            EnsureSkinnedInstanceCapacity(i, INITIAL_SKINNED_INSTANCE_CAPACITY);
+        }
 
         mInstanceSet = mRHI->CreateDescriptorSet(mPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "ShadowInstances [Set0]");
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
@@ -111,6 +118,22 @@ namespace Surge
             write.Buffer = mInstanceBuffers[i];
             write.BufferRange = sizeof(glm::mat4) * mInstanceCapacity[i];
             mRHI->UpdateDescriptorSet(mInstanceSet, &write, 1, i);
+        }
+
+        mSkinnedInstanceSet = mRHI->CreateDescriptorSet(mSkinnedPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "ShadowSkinnedInstances [Set0]");
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            std::array<DescriptorWrite, 2> writes = {};
+            writes[0].Binding = 0;
+            writes[0].Type = DescriptorType::STORAGE_BUFFER;
+            writes[0].Buffer = mSkinnedInstanceBuffers[i];
+            writes[0].BufferRange = sizeof(SkinnedInstance) * mSkinnedInstanceCapacity[i];
+            writes[1].Binding = 1;
+            writes[1].Type = DescriptorType::STORAGE_BUFFER;
+            writes[1].Buffer = blackBoard.SkinBuffers[i];
+            writes[1].BufferRange = sizeof(SkinMatrix) * blackBoard.SkinBufferCapacity[i];
+            mRHI->UpdateDescriptorSet(mSkinnedInstanceSet, writes.data(), static_cast<Uint>(writes.size()), i);
+            mSkinBufferVersion[i] = blackBoard.SkinBufferVersion[i];
         }
 
         mCasters.reserve(INITIAL_INSTANCE_CAPACITY);
@@ -177,6 +200,52 @@ namespace Surge
         }
     }
 
+    void ShadowPass::EnsureSkinnedInstanceCapacity(Uint frameIndex, Uint instanceCount)
+    {
+        if(instanceCount <= mSkinnedInstanceCapacity[frameIndex] && !mSkinnedInstanceBuffers[frameIndex].IsNull())
+            return;
+
+        Uint capacity = std::max(mSkinnedInstanceCapacity[frameIndex], INITIAL_SKINNED_INSTANCE_CAPACITY);
+        while(capacity < instanceCount)
+            capacity *= 2;
+
+        if(!mSkinnedInstanceBuffers[frameIndex].IsNull())
+            mRHI->DestroyBuffer(mSkinnedInstanceBuffers[frameIndex]); // Deferred, the previous use of this frame slot has already retired
+
+        BufferDesc desc = {};
+        desc.Usage = BufferUsage::STORAGE;
+        desc.HostVisible = true;
+        desc.Size = sizeof(SkinnedInstance) * capacity;
+        desc.DebugName = std::format("ShadowSkinnedInstances Frame: {}", frameIndex);
+        mSkinnedInstanceBuffers[frameIndex] = mRHI->CreateBuffer(desc);
+
+        const bool resized = mSkinnedInstanceCapacity[frameIndex] != 0;
+        mSkinnedInstanceCapacity[frameIndex] = capacity;
+        if(resized)
+        {
+            DescriptorWrite write = {};
+            write.Binding = 0;
+            write.Type = DescriptorType::STORAGE_BUFFER;
+            write.Buffer = mSkinnedInstanceBuffers[frameIndex];
+            write.BufferRange = sizeof(SkinnedInstance) * capacity;
+            mRHI->UpdateDescriptorSet(mSkinnedInstanceSet, &write, 1, frameIndex);
+        }
+    }
+
+    void ShadowPass::UpdateSkinDescriptors(const FrameContext& ctx, const FrameBlackboard& blackBoard)
+    {
+        if(mSkinBufferVersion[ctx.FrameIndex] == blackBoard.SkinBufferVersion[ctx.FrameIndex])
+            return;
+
+        DescriptorWrite write = {};
+        write.Binding = 1;
+        write.Type = DescriptorType::STORAGE_BUFFER;
+        write.Buffer = blackBoard.SkinBuffers[ctx.FrameIndex];
+        write.BufferRange = sizeof(SkinMatrix) * blackBoard.SkinBufferCapacity[ctx.FrameIndex];
+        mRHI->UpdateDescriptorSet(mSkinnedInstanceSet, &write, 1, ctx.FrameIndex);
+        mSkinBufferVersion[ctx.FrameIndex] = blackBoard.SkinBufferVersion[ctx.FrameIndex];
+    }
+
     void ShadowPass::GatherCasters(const FrameBlackboard& blackBoard)
     {
         SURGE_PROFILE_FUNC("ShadowPass::GatherCasters");
@@ -188,20 +257,23 @@ namespace Surge
             if(!cmd.DropShadow)
                 continue;
 
+            const bool skinned = cmd.SkinOffset != INVALID_SKIN_OFFSET;
             const Vector<Submesh>& submeshes = cmd.Mesh_->GetSubmeshes();
             for(Uint i = 0; i < static_cast<Uint>(submeshes.size()); i++)
             {
+                // Skinned: the skin already brings the vertices to model space, one box (the pose's) for every submesh
                 const Submesh& submesh = submeshes[i];
-                const glm::mat4 transform = cmd.Transform * submesh.Transform;
+                const glm::mat4 transform = skinned ? cmd.Transform : cmd.Transform * submesh.Transform;
+                const AABB& bounds = skinned ? cmd.SkinBounds : submesh.BoundingBox;
 
                 // Arvo's method, like Frustum::IntersectsAABB
-                const glm::vec3 localCenter = (submesh.BoundingBox.Min + submesh.BoundingBox.Max) * 0.5f;
-                const glm::vec3 localExtents = (submesh.BoundingBox.Max - submesh.BoundingBox.Min) * 0.5f;
+                const glm::vec3 localCenter = (bounds.Min + bounds.Max) * 0.5f;
+                const glm::vec3 localExtents = (bounds.Max - bounds.Min) * 0.5f;
                 const glm::mat3 basis = glm::mat3(transform);
                 const glm::vec3 center = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
                 const glm::vec3 extents = glm::abs(basis[0]) * localExtents.x + glm::abs(basis[1]) * localExtents.y + glm::abs(basis[2]) * localExtents.z;
 
-                mCasters.push_back({ transform, center, extents, cmd.Mesh_, i });
+                mCasters.push_back({ transform, center, extents, cmd.Mesh_, i, cmd.SkinOffset });
             }
         }
     }
@@ -264,6 +336,7 @@ namespace Surge
             upVector = glm::vec3(0.0f, 0.0f, 1.0f);
 
         mInstanceData.clear();
+        mSkinnedInstanceData.clear();
         float lastSplitDist = 0.0f;
         for(Uint cascade = 0; cascade < cascadeCount; cascade++)
         {
@@ -306,7 +379,7 @@ namespace Surge
                 if(!IntersectsBox(casterFrustum, caster.Center, caster.Extents))
                     continue;
 
-                mDrawItems.push_back({ caster.Mesh_, caster.SubmeshIndex, i });
+                mDrawItems.push_back({ caster.Mesh_, caster.SubmeshIndex, i, caster.SkinOffset != INVALID_SKIN_OFFSET });
                 const float casterNear = glm::dot(depthAxis, caster.Center) + depthOffset - glm::dot(glm::abs(depthAxis), caster.Extents);
                 nearestCaster = std::min(nearestCaster, casterNear);
             }
@@ -333,21 +406,35 @@ namespace Surge
 
             std::sort(mDrawItems.begin(), mDrawItems.end(), [](const ShadowDrawItem& a, const ShadowDrawItem& b)
             {
+                if(a.Skinned != b.Skinned) return b.Skinned;
                 if(a.Mesh_ != b.Mesh_) return a.Mesh_ < b.Mesh_;
                 return a.SubmeshIndex < b.SubmeshIndex;
             });
 
             Vector<ShadowDraw>& draws = mCascadeDraws[cascade];
+            Vector<ShadowDraw>& skinnedDraws = mCascadeSkinnedDraws[cascade];
             draws.clear();
+            skinnedDraws.clear();
             for(const ShadowDrawItem& item : mDrawItems)
             {
-                const Uint instanceIndex = static_cast<Uint>(mInstanceData.size());
-                mInstanceData.push_back(mCasters[item.CasterIndex].Transform);
-
-                if(!draws.empty() && draws.back().Mesh_ == item.Mesh_ && draws.back().SubmeshIndex == item.SubmeshIndex)
-                    draws.back().InstanceCount++;
+                const Caster& caster = mCasters[item.CasterIndex];
+                Vector<ShadowDraw>& target = item.Skinned ? skinnedDraws : draws;
+                Uint instanceIndex;
+                if(item.Skinned)
+                {
+                    instanceIndex = static_cast<Uint>(mSkinnedInstanceData.size());
+                    mSkinnedInstanceData.push_back({ caster.Transform, caster.SkinOffset, {} });
+                }
                 else
-                    draws.push_back({ item.Mesh_, item.SubmeshIndex, instanceIndex, 1 });
+                {
+                    instanceIndex = static_cast<Uint>(mInstanceData.size());
+                    mInstanceData.push_back(caster.Transform);
+                }
+
+                if(!target.empty() && target.back().Mesh_ == item.Mesh_ && target.back().SubmeshIndex == item.SubmeshIndex)
+                    target.back().InstanceCount++;
+                else
+                    target.push_back({ item.Mesh_, item.SubmeshIndex, instanceIndex, 1 });
             }
             mCascadeVisible[cascade] = static_cast<Uint>(mDrawItems.size());
         }
@@ -408,6 +495,13 @@ namespace Surge
                 mRHI->UploadBuffer(mInstanceBuffers[ctx.FrameIndex], mInstanceData.data(), static_cast<Uint>(sizeof(glm::mat4) * mInstanceData.size()), 0);
                 mActiveCascades = cascadeCount;
             }
+            if(!mSkinnedInstanceData.empty())
+            {
+                UpdateSkinDescriptors(ctx, blackBoard);
+                EnsureSkinnedInstanceCapacity(ctx.FrameIndex, static_cast<Uint>(mSkinnedInstanceData.size()));
+                mRHI->UploadBuffer(mSkinnedInstanceBuffers[ctx.FrameIndex], mSkinnedInstanceData.data(), static_cast<Uint>(sizeof(SkinnedInstance) * mSkinnedInstanceData.size()), 0);
+                mActiveCascades = cascadeCount;
+            }
         }
 
         // Disabled shadows still upload Enabled = 0, so the sun is drawn unshadowed
@@ -422,21 +516,26 @@ namespace Surge
 
         // One render pass for the whole atlas: a single clear + store, an empty cascade stays cleared so it never shadows anything
         mRHI->CmdBeginRenderPass(ctx, mFramebuffer);
-        mRHI->CmdBindPipeline(ctx, mPipeline);
-        mRHI->CmdBindDescriptorSet(ctx, mPipeline, mInstanceSet, DescriptorSetSlot::ZERO);
-
         const ShadowSettings& settings = blackBoard.ShadowSettings_;
-        mRHI->CmdSetDepthBias(ctx, settings.DepthBiasConstant, settings.DepthBiasClamp, settings.DepthBiasSlope);
 
+        int boundPipeline = -1; // 0 = static, 1 = skinned
         const Mesh* boundMesh = nullptr;
-        for(Uint cascade = 0; cascade < mActiveCascades; cascade++)
+        const auto drawList = [&](Uint cascade, const Vector<ShadowDraw>& draws, bool skinned)
         {
-            const Vector<ShadowDraw>& draws = mCascadeDraws[cascade];
             if(draws.empty())
-                continue;
+                return;
 
-            mRHI->CmdSetViewport(ctx, cascade * mResolution, 0, mResolution, mResolution);
-            mRHI->CmdPushConstants(ctx, mPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(glm::mat4), &mLightViewProjections[cascade]);
+            const PipelineHandle pipeline = skinned ? mSkinnedPipeline : mPipeline;
+            if(boundPipeline != static_cast<int>(skinned))
+            {
+                const DescriptorSetHandle set = skinned ? mSkinnedInstanceSet : mInstanceSet;
+                // Set 0 differs between the static and the skinned pipeline: rebound with every switch
+                mRHI->CmdBindPipeline(ctx, pipeline);
+                mRHI->CmdBindDescriptorSet(ctx, pipeline, set, DescriptorSetSlot::ZERO);
+                mRHI->CmdSetDepthBias(ctx, settings.DepthBiasConstant, settings.DepthBiasClamp, settings.DepthBiasSlope);
+                boundPipeline = static_cast<int>(skinned);
+            }
+            mRHI->CmdPushConstants(ctx, pipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(glm::mat4), &mLightViewProjections[cascade]);
 
             for(const ShadowDraw& draw : draws)
             {
@@ -450,6 +549,16 @@ namespace Surge
                 const Submesh& submesh = draw.Mesh_->GetSubmeshes()[draw.SubmeshIndex];
                 mRHI->CmdDrawIndexed(ctx, submesh.IndexCount, draw.InstanceCount, submesh.BaseIndex, submesh.BaseVertex, draw.FirstInstance);
             }
+        };
+
+        for(Uint cascade = 0; cascade < mActiveCascades; cascade++)
+        {
+            if(mCascadeDraws[cascade].empty() && mCascadeSkinnedDraws[cascade].empty())
+                continue;
+
+            mRHI->CmdSetViewport(ctx, cascade * mResolution, 0, mResolution, mResolution);
+            drawList(cascade, mCascadeDraws[cascade], false);
+            drawList(cascade, mCascadeSkinnedDraws[cascade], true);
         }
         mRHI->CmdEndRenderPass(ctx, mFramebuffer);
     }
@@ -475,9 +584,14 @@ namespace Surge
         mRHI->DestroyFramebuffer(mFramebuffer);
         mRHI->DestroyImage(blackBoard.ShadowAtlas);
         mRHI->DestroyPipeline(mPipeline);
+        mRHI->DestroyPipeline(mSkinnedPipeline);
 
         mRHI->DestroyDescriptorSet(mInstanceSet);
+        mRHI->DestroyDescriptorSet(mSkinnedInstanceSet);
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
             mRHI->DestroyBuffer(mInstanceBuffers[i]);
+            mRHI->DestroyBuffer(mSkinnedInstanceBuffers[i]);
+        }
     }
 }

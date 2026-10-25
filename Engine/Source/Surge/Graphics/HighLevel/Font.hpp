@@ -7,6 +7,9 @@
 
 namespace Surge
 {
+    class Renderer;
+    class GraphicsRHI;
+
     struct FontGlyph
     {
         Uint UnicodeID;
@@ -30,7 +33,7 @@ namespace Surge
     class Font final : public Asset
     {
     public:
-        Font(FontSpecification&& spec);
+        Font(Renderer& renderer, FontSpecification&& spec);
         ~Font();
         SURGE_ASSET_TYPE(AssetType::FONT);
 
@@ -46,9 +49,18 @@ namespace Surge
             return it != mSpecification.Kerning.end() ? it->second : 0.0f;
         }
 
-        static Ref<Font> Create(FontSpecification&& spec);
+        static Ref<Font> Create(Renderer& renderer, FontSpecification&& spec);
     private:
         ImageHandle mAtlasImageHandle;
+        GraphicsRHI* mRHI;
         FontSpecification mSpecification;
     };
+
+    // Engine UI font (Roboto SemiCondensed Bold, ASCII): cooked by the Editor at startup (FontCooker::CookEngineFontIfOutdated), committed,
+    // shipped by every export. UI text created without a font uses it (Renderer::GetEngineFont), so does the performance overlay
+    namespace EngineFont
+    {
+        constexpr const char* SOURCE_PATH = "Engine/Assets/Fonts/Roboto_SemiCondensed-Bold.ttf";
+        constexpr const char* COOKED_PATH = "Engine/Assets/Fonts/Cooked/EngineUI.sFONT";
+    }
 }

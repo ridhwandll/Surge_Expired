@@ -7,7 +7,6 @@
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/PostProcessPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SwapchainPass.hpp"
-#include "Surge/Graphics/RenderGraph/Passes/OutlinePass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/SkyPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/ShadowPass.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/UIOverlayPass.hpp"
@@ -16,17 +15,35 @@
 #include "Surge/Graphics/RenderGraph/Passes/ParticlePass.hpp"
 
 #include "Surge/Graphics/UISystem/UIManager.hpp"
+#include "Surge/Asset/Serializer/Font/FontBinaryFormat.hpp"
 #include "Surge/Core/Input/Input.hpp"
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
 
 namespace Surge
 {
-    void Renderer::Initialize()
+    static constexpr Uint INITIAL_SKIN_MATRIX_CAPACITY = 256; // 12 KB per frame in flight, grows on demand
+
+    // Appends a palette to a blackboard's skin matrices, INVALID_SKIN_OFFSET past the frame's budget
+    static Uint PushPalette(FrameBlackboard& blackBoard, const SkinMatrix* palette, Uint paletteSize)
+    {
+        const size_t used = blackBoard.SkinMatrices.size();
+        if(paletteSize == 0 || used + paletteSize > blackBoard.Animation.MaxSkinMatrices)
+        {
+            blackBoard.AnimationStatistics.OverBudget++;
+            return INVALID_SKIN_OFFSET;
+        }
+
+        blackBoard.SkinMatrices.insert(blackBoard.SkinMatrices.end(), palette, palette + paletteSize); // Capacity is kept across frames
+        return static_cast<Uint>(used);
+    }
+
+    void Renderer::Initialize(Window* window, const ClientOptions& clientOptions)
     {
         SURGE_PROFILE_FUNC("Renderer::Initialize()");
 
-        const ClientOptions& clientOptions = Core::GetClient()->GetClientOptions();
+        mWindow = window;
+        mImGuiEnabled = clientOptions.EnableImGui;
         RHISettings::RENDER_TO_SWAPCHAIN = clientOptions.RenderFinalImageToSwapchian;
 
         mShaderManager.Initialize(ENGINE_SHADER_PATH);
@@ -36,7 +53,6 @@ namespace Surge
         mShaderManager.Load("UI.glsl");
         mShaderManager.Load("Renderer3D.glsl");
         mShaderManager.Load("PostProcess.glsl");
-        mShaderManager.Load("OutlineMask.glsl");
         mShaderManager.Load("PreethamSky.glsl");
         mShaderManager.Load("Shadow.glsl");
         mShaderManager.Load("AOLinearDepth.glsl");
@@ -45,9 +61,11 @@ namespace Surge
         mShaderManager.Load("Bloom.glsl");
         mShaderManager.Load("BloomCompute.glsl", ShaderType::COMPUTE);
         mShaderManager.Load("Particle.glsl");
+        mShaderManager.Load("Renderer3DSkinned.glsl");
+        mShaderManager.Load("ShadowSkinned.glsl");
 
         mRHI = CreateScope<GraphicsRHI>();
-        mRHI->Initialize(Core::GetWindow());
+        mRHI->Initialize(window, clientOptions.EnableImGui);
 
         FrameBlackboard& blackBoard = mMainRenderGraph.GetBlackboard();
 
@@ -143,10 +161,11 @@ namespace Surge
         frameUBODesc.Size = sizeof(FrameUBO);
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
+        CreateSkinBuffers(blackBoard, "SkinMatrices");
 
         AddScenePasses(mMainRenderGraph, true);
         mMainRenderGraph.AddPass<SwapchainPass>();
-        mMainRenderGraph.Setup(mRHI.get());
+        mMainRenderGraph.Setup(MakeGraphContext());
         mMainRenderGraph.Compile();
 
         mUIManager.Initialize();
@@ -155,7 +174,6 @@ namespace Surge
     void Renderer::AddScenePasses(RenderGraph& graph, bool withUI)
     {
         graph.AddPass<ShadowPass>();
-        graph.AddPass<OutlinePass>();
         graph.AddPass<GeometryPass>();
         graph.AddPass<SkyPass>();
         graph.AddPass<Renderer2DPass>();
@@ -165,6 +183,18 @@ namespace Surge
         graph.AddPass<PostProcessPass>();
         if(withUI)
             graph.AddPass<UIOverlayPass>();
+    }
+
+    RenderGraphContext Renderer::MakeGraphContext()
+    {
+        RenderGraphContext context;
+        context.RHI = mRHI.get();
+        context.Shaders = &mShaderManager;
+        context.TextSampler = mMainRenderGraph.GetBlackboard().TextSampler;
+        context.WindowSize = mWindow->GetSize();
+        context.ImGuiEnabled = mImGuiEnabled;
+        context.DeferToFrameEnd = &Core::AddFrameEndCallback;
+        return context;
     }
 
     void Renderer::BeginFrame(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar)
@@ -189,7 +219,7 @@ namespace Surge
         }
         else
         {
-            glm::vec2 windowSize = Core::GetWindow()->GetSize();
+            glm::vec2 windowSize = mWindow->GetSize();
             blackBoard.ScreenWidth = windowSize.x; blackBoard.ScreenHeight = windowSize.y;
         }
 
@@ -222,12 +252,36 @@ namespace Surge
         if(!mViews.empty())
             ExecuteViews();
 
+        if(mMainRenderGraph.IsSceneEnabled()) // The Editor only draws the scene through its views
+            UploadSkinMatrices(mMainRenderGraph.GetBlackboard());
+        mRHI->CmdBeginGPUScope(mCurrentFrameCtx, "Main Graph");
         mMainRenderGraph.Execute(mCurrentFrameCtx);
+        mRHI->CmdEndGPUScope(mCurrentFrameCtx);
 
         mRHI->EndFrame(mCurrentFrameCtx); // Stops command buffer recording & presents image to swapchain
+
+        const FrameBlackboard& blackBoard = mMainRenderGraph.GetBlackboard();
+        mLastFrameCounts = { .Meshes = static_cast<Uint>(blackBoard.MeshList.size()), .Lights = static_cast<Uint>(blackBoard.LightList.size()),
+                             .Sprites = static_cast<Uint>(blackBoard.QuadList.size()), .Texts = static_cast<Uint>(blackBoard.TextList.size()),
+                             .UIItems = static_cast<Uint>(blackBoard.UISpriteList.size() + blackBoard.UITextList.size()) };
         mMainRenderGraph.ClearLists();
         mMainRenderGraph.GetBlackboard().HasDirectionalLight = false; // Follows LightList: no sun next frame = no shadow cascades rendered
         mOverlayMark.Set = false;
+    }
+
+    const Ref<Font>& Renderer::GetEngineFont()
+    {
+        if(!mEngineFontLoaded)
+        {
+            mEngineFontLoaded = true;
+            AssetStamp stamp;
+            FontSpecification spec;
+            if(FontBinary::Read(EngineFont::COOKED_PATH, stamp, spec))
+                mEngineFont = Font::Create(*this, std::move(spec));
+            else
+                Log<Severity::Warn>("[Renderer] Engine UI font {} is missing, open the Editor once to cook it", EngineFont::COOKED_PATH);
+        }
+        return mEngineFont;
     }
 
     void Renderer::OnWindowResize(Uint width, Uint height)
@@ -242,6 +296,26 @@ namespace Surge
         mMainRenderGraph.ForceResize(width, height);
     }
 
+    void Renderer::SubmitRenderSettings(const RenderSettings& settings)
+    {
+        if(mHasAppliedSettings && settings == mAppliedSettings)
+            return;
+
+        mAppliedSettings = settings;
+        mHasAppliedSettings = true;
+
+        // Passes compare these with what they built and rebuild their targets themselves (shadow atlas, AO targets, bloom chain)
+        FrameBlackboard& blackBoard = mMainRenderGraph.GetBlackboard();
+        blackBoard.Lighting = settings.Lighting;
+        blackBoard.Particles = settings.Particles;
+        blackBoard.Animation = settings.Animation;
+        blackBoard.ShadowSettings_ = settings.Shadows;
+        blackBoard.AOSettings = settings.AO;
+        blackBoard.Bloom = settings.Bloom;
+        blackBoard.PostProcessSettings_ = settings.PostProcess;
+        SetRenderScale(settings.RenderScale);
+    }
+
     void Renderer::SetRenderScale(float scale)
     {
         FrameBlackboard& blackBoard = mMainRenderGraph.GetBlackboard();
@@ -253,7 +327,7 @@ namespace Surge
 
         glm::uvec2 size = mScreenSize;
         if(size.x == 0 || size.y == 0)
-            size = glm::uvec2(Core::GetWindow()->GetSize());
+            size = glm::uvec2(mWindow->GetSize());
 
         mMainRenderGraph.ForceResize(size.x, size.y);
 
@@ -281,7 +355,7 @@ namespace Surge
 
         // Unused targets shrink to a minimum while the views draw the scene (they still exist: the passes and their ImGui stay valid)
         constexpr Uint minimalSize = 64;
-        const glm::uvec2 size = enabled ? glm::uvec2(Core::GetWindow()->GetSize()) : glm::uvec2(minimalSize);
+        const glm::uvec2 size = enabled ? glm::uvec2(mWindow->GetSize()) : glm::uvec2(minimalSize);
         ForceResize(std::max(size.x, 1u), std::max(size.y, 1u));
     }
 
@@ -293,7 +367,6 @@ namespace Surge
         mOverlayMark.Quads = blackBoard.QuadList.size();
         mOverlayMark.Lines = blackBoard.LineList.size();
         mOverlayMark.Texts = blackBoard.TextList.size();
-        mOverlayMark.Outlines = blackBoard.OutlineList.size();
         mOverlayMark.ParticleEmitters = blackBoard.ParticleEmitterList.size();
         mOverlayMark.ParticleRecords = blackBoard.ParticleList.size();
         mOverlayMark.Set = true;
@@ -326,8 +399,77 @@ namespace Surge
 
     void Renderer::SubmitMesh(const glm::mat4& transform, const Mesh* mesh, bool dropShadow, RenderViewID view)
     {
-        if(FrameBlackboard* blackBoard = FindIsolatedBlackboard(view))
+        FrameBlackboard* blackBoard = FindIsolatedBlackboard(view);
+        if(!blackBoard)
+            return;
+
+        if(!mesh->IsSkinned())
+        {
             blackBoard->MeshList.emplace_back(MeshSubmitCmd { transform, mesh, dropShadow });
+            return;
+        }
+
+        const Vector<SkinMatrix>& palette = mesh->GetRestPalette();
+        const Uint offset = PushPalette(*blackBoard, palette.data(), static_cast<Uint>(palette.size()));
+        if(offset != INVALID_SKIN_OFFSET)
+            blackBoard->MeshList.emplace_back(MeshSubmitCmd { transform, mesh, dropShadow, offset, mesh->GetRestBounds() });
+    }
+
+    Uint Renderer::SubmitSkinnedMesh(const glm::mat4& transform, const Mesh* mesh, bool dropShadow, const SkinMatrix* palette, Uint paletteSize, const AABB& bounds)
+    {
+        FrameBlackboard& blackBoard = mMainRenderGraph.GetBlackboard();
+        SG_ASSERT(mesh->IsSkinned() && paletteSize == mesh->GetSkeleton().GetPaletteSize(), "SubmitSkinnedMesh: the palette doesn't match the mesh's skeleton!");
+
+        const Uint offset = PushPalette(blackBoard, palette, paletteSize);
+        if(offset != INVALID_SKIN_OFFSET)
+            blackBoard.MeshList.emplace_back(MeshSubmitCmd { transform, mesh, dropShadow, offset, bounds });
+        return offset;
+    }
+
+    void Renderer::CreateSkinBuffers(FrameBlackboard& blackBoard, const String& debugName)
+    {
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            BufferDesc desc = {};
+            desc.Usage = BufferUsage::STORAGE;
+            desc.HostVisible = true;
+            desc.Size = sizeof(SkinMatrix) * INITIAL_SKIN_MATRIX_CAPACITY;
+            desc.DebugName = std::format("{} Frame: {}", debugName, i);
+            blackBoard.SkinBuffers[i] = mRHI->CreateBuffer(desc);
+            blackBoard.SkinBufferCapacity[i] = INITIAL_SKIN_MATRIX_CAPACITY;
+        }
+    }
+
+    void Renderer::DestroySkinBuffers(FrameBlackboard& blackBoard)
+    {
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+            mRHI->DestroyBuffer(blackBoard.SkinBuffers[i]);
+    }
+
+    void Renderer::UploadSkinMatrices(FrameBlackboard& blackBoard)
+    {
+        const Uint count = static_cast<Uint>(blackBoard.SkinMatrices.size());
+        if(count == 0)
+            return;
+
+        const Uint frameIndex = mCurrentFrameCtx.FrameIndex;
+        if(count > blackBoard.SkinBufferCapacity[frameIndex])
+        {
+            Uint capacity = blackBoard.SkinBufferCapacity[frameIndex];
+            while(capacity < count)
+                capacity *= 2;
+
+            mRHI->DestroyBuffer(blackBoard.SkinBuffers[frameIndex]); // Deferred, the previous use of this frame slot has already retired
+            BufferDesc desc = {};
+            desc.Usage = BufferUsage::STORAGE;
+            desc.HostVisible = true;
+            desc.Size = sizeof(SkinMatrix) * capacity;
+            desc.DebugName = std::format("SkinMatrices Frame: {}", frameIndex);
+            blackBoard.SkinBuffers[frameIndex] = mRHI->CreateBuffer(desc);
+            blackBoard.SkinBufferCapacity[frameIndex] = capacity;
+            blackBoard.SkinBufferVersion[frameIndex]++; // The passes rewrite this frame's binding in Prepare
+        }
+        mRHI->UploadBuffer(blackBoard.SkinBuffers[frameIndex], blackBoard.SkinMatrices.data(), static_cast<Uint>(sizeof(SkinMatrix) * count), 0);
     }
 
     void Renderer::SubmitLight(const Light& light, RenderViewID view)
@@ -379,6 +521,7 @@ namespace Surge
         blackBoard.ShadowSettings_ = mainBoard.ShadowSettings_;
         blackBoard.Lighting = mainBoard.Lighting;
         blackBoard.Particles = mainBoard.Particles;
+        blackBoard.Animation = mainBoard.Animation;
         blackBoard.PostProcessSettings_ = mainBoard.PostProcessSettings_;
         blackBoard.AOSettings = mainBoard.AOSettings;
         blackBoard.Bloom = mainBoard.Bloom;
@@ -391,9 +534,10 @@ namespace Surge
         frameUBODesc.Size = sizeof(FrameUBO);
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             blackBoard.FrameUBOs[i] = mRHI->CreateBuffer(frameUBODesc);
+        CreateSkinBuffers(blackBoard, desc.DebugName + " SkinMatrices");
 
         AddScenePasses(*view->Graph, desc.ShowUI);
-        view->Graph->Setup(mRHI.get());
+        view->Graph->Setup(MakeGraphContext());
         view->Graph->Compile();
 
         const RenderViewID id = view->ID;
@@ -431,6 +575,7 @@ namespace Surge
         view.Graph->Shutdown(); // RHI destruction is deferred until the GPU is done with the in-flight frames
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mRHI->DestroyBuffer(blackBoard.FrameUBOs[i]);
+        DestroySkinBuffers(blackBoard);
     }
 
     void Renderer::ResizeView(RenderViewID id, Uint width, Uint height)
@@ -566,6 +711,8 @@ namespace Surge
             blackBoard.Lighting = mainBlackBoard.Lighting;
             blackBoard.Particles = mainBlackBoard.Particles;
             blackBoard.ParticleStatistics = mainBlackBoard.ParticleStatistics;
+            blackBoard.Animation = mainBlackBoard.Animation;
+            blackBoard.AnimationStatistics = mainBlackBoard.AnimationStatistics;
             blackBoard.PostProcessSettings_ = mainBlackBoard.PostProcessSettings_;
             blackBoard.AOSettings = mainBlackBoard.AOSettings;
             blackBoard.Bloom = mainBlackBoard.Bloom;
@@ -587,9 +734,9 @@ namespace Surge
                 copyList(blackBoard.QuadList, mainBlackBoard.QuadList, mark.Quads);
                 copyList(blackBoard.LineList, mainBlackBoard.LineList, mark.Lines);
                 copyList(blackBoard.TextList, mainBlackBoard.TextList, mark.Texts);
-                copyList(blackBoard.OutlineList, mainBlackBoard.OutlineList, mark.Outlines);
                 copyList(blackBoard.ParticleEmitterList, mainBlackBoard.ParticleEmitterList, mark.ParticleEmitters);
                 copyList(blackBoard.ParticleList, mainBlackBoard.ParticleList, mark.ParticleRecords);
+                blackBoard.SkinMatrices.assign(mainBlackBoard.SkinMatrices.begin(), mainBlackBoard.SkinMatrices.end()); // Indexed by the copied lists
             }
 
             if(view.Desc.ShowUI)
@@ -602,10 +749,13 @@ namespace Surge
                 blackBoard.UIClipRects.assign(mainBlackBoard.UIClipRects.begin(), mainBlackBoard.UIClipRects.end());
             }
 
+            UploadSkinMatrices(blackBoard);
+            mRHI->CmdBeginGPUScope(mCurrentFrameCtx, view.Desc.DebugName);
             view.Graph->Execute(mCurrentFrameCtx);
 
             // ImGui samples it in the main graph's swapchain pass
             mRHI->CmdTransitionImageLayout(mCurrentFrameCtx, blackBoard.FinalImage, ImageUsage::SAMPLED);
+            mRHI->CmdEndGPUScope(mCurrentFrameCtx);
             view.HasOutput = true;
 
             if(view.Desc.Isolated)
@@ -623,6 +773,7 @@ namespace Surge
         FrameBlackboard& blackBoard = mMainRenderGraph.GetBlackboard();
 
         mUIManager.Shutdown();
+        mEngineFont = nullptr; // After the UI, its texts hold references
 
         mRHI->WaitIdle();
         for(Scope<RenderView>& view : mViews)
@@ -635,6 +786,7 @@ namespace Surge
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
             mRHI->DestroyBuffer(blackBoard.FrameUBOs[i]);
+        DestroySkinBuffers(blackBoard);
 
         mRHI->DestroySampler(blackBoard.DefaultSampler);
         mRHI->DestroySampler(blackBoard.TextSampler);

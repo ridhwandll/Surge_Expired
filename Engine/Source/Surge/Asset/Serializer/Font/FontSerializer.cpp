@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "FontSerializer.hpp"
-#include "Surge/Core/Core.hpp"
+#include "Surge/Asset/AssetContext.hpp"
 #include "FontBinaryFormat.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
@@ -17,7 +17,7 @@ namespace Surge
         Log<Severity::Error>("[FontSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");
         return false;
 #else
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const AssetMetadata& meta = am->GetMetadata(asset->GetID());
         if(HasFlag(meta.Flags, AssetFlags::MEMORY))
             return true;
@@ -37,7 +37,7 @@ namespace Surge
 
     Ref<Asset> FontSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
         SCOPED_TIMER("FontSerializer::Deserialize: {}", sidecarPath);
@@ -49,7 +49,7 @@ namespace Surge
             return nullptr;
         }
 
-        return Font::Create(std::move(spec)).As<Asset>();
+        return Font::Create(*mContext->Renderer_, std::move(spec)).As<Asset>();
     }
 
     void FontSerializer::Shutdown()

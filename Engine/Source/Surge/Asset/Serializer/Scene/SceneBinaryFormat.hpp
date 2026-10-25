@@ -17,7 +17,7 @@ namespace Surge::SceneBinary
     //               its reflected variables in declaration order + the special parts (relationship links as UUIDs, script lists, script fields)
     // Little endian like every cooked format (x64, arm64)
 
-    // VERSION mixed with the hash of the serializable component layout. It is also the SceneCooker version: changing a component re-cooks every scene
+    // VERSION mixed with the hash of the serializable component layout. It is also the SceneCooker version
     Uint GetFormatVersion();
 
     bool Write(const String& path, const AssetStamp& stamp, Scene* scene);

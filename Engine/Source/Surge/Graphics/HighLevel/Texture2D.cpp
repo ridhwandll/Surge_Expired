@@ -1,13 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Texture2D.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge
 {
-    Texture2D::Texture2D(const TextureSpecification& spec)
+    Texture2D::Texture2D(Renderer& renderer, const TextureSpecification& spec)
+        : mRHI(renderer.GetRHI().get())
     {
-        Renderer* renderer = Core::GetRenderer();
         const bool isCompressed = spec.Format == ImageFormat::ASTC4x4_SRGB || spec.Format == ImageFormat::ASTC4x4_UNORM ||
                                   spec.Format == ImageFormat::BC7_SRGB || spec.Format == ImageFormat::BC7_UNORM ||
                                   spec.Format == ImageFormat::ETC2_RGBA8_SRGB || spec.Format == ImageFormat::ETC2_RGBA8_UNORM;
@@ -21,7 +20,7 @@ namespace Surge
         desc.Format = spec.Format;
         desc.DebugName = spec.DebugName;
         desc.GenerateImGuiID = true;
-        desc.Sampler = renderer->GetDefaultSampler();
+        desc.Sampler = renderer.GetDefaultSampler();
         desc.Usage = ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST;
 
         if(spec.GenerateMips && !isCompressed)
@@ -58,16 +57,16 @@ namespace Surge
             desc.DataSize = desc.Width * desc.Height * 4;
         }
 
-        mImageHandle = renderer->GetRHI()->CreateImage(desc);
+        mImageHandle = mRHI->CreateImage(desc);
     }
 
     Texture2D::~Texture2D()
     {
-        Core::GetRenderer()->GetRHI()->DestroyImage(mImageHandle);
+        mRHI->DestroyImage(mImageHandle);
     }
 
-    Ref<Texture2D> Texture2D::Create(const TextureSpecification& spec)
+    Ref<Texture2D> Texture2D::Create(Renderer& renderer, const TextureSpecification& spec)
     {
-        return Ref<Texture2D>::Create(spec);
+        return Ref<Texture2D>::Create(renderer, spec);
     }
 }

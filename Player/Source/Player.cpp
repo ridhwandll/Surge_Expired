@@ -2,6 +2,7 @@
 #include "Player.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
+#include "Surge/Physics/Physics.hpp"
 #include "Surge/Graphics/UISystem/UIManager.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 
@@ -33,12 +34,13 @@ namespace Surge
         Project openedProject;
         openedProject.Load(projectPath);
         mCurrentProject = std::move(openedProject);
+        Core::GetPhysics()->ApplySettings(mCurrentProject.Physics);
         mActiveScene = CreateRuntimeScene(mCurrentProject.StartScene);
         if(!mActiveScene)
         {
             // Keep running with the error in the log instead of crashing on a null scene
             Log<Severity::Error>("[Player] Start scene {} could not be loaded ({}), running an empty scene", mCurrentProject.StartScene.Get(), projectPath.string());
-            mActiveScene = Ref<Scene>::Create("Empty");
+            mActiveScene = Ref<Scene>::Create("Empty", Core::GetSceneContext());
         }
     }
 
@@ -49,7 +51,7 @@ namespace Surge
         if(!source)
             return nullptr;
 
-        Ref<Scene> runtime = Ref<Scene>::Create("Dummy");
+        Ref<Scene> runtime = Ref<Scene>::Create("Dummy", Core::GetSceneContext());
         source->CopyTo(runtime.Raw());
         source.Reset();
         mAssetManager->Unload(sceneID);

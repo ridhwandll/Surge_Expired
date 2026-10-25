@@ -4,6 +4,11 @@
 #include "Surge/Graphics/HighLevel/Material.hpp"
 #include "Surge/Asset/Serializer/AssetStamp.hpp"
 
+namespace Surge
+{
+    struct AssetContext;
+}
+
 namespace Surge::MeshBinary
 {
     //[Header: 32 bytes]
@@ -23,5 +28,5 @@ namespace Surge::MeshBinary
     //    MaterialOverrides          For each override: Uint slotIndex + RawID: Uint64
 
     bool Write(const String& path, const AssetStamp& stamp, const MeshSpecification& spec, const Vector<Ref<Material>>& overrides);
-    bool Read(const String& path, AssetStamp& outstamp, MeshSpecification& outSpec);
+    bool Read(const AssetContext& context, const String& path, AssetStamp& outstamp, MeshSpecification& outSpec); // context creates the transient materials
 }

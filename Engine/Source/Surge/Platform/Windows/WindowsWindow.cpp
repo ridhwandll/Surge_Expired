@@ -111,8 +111,12 @@ namespace Surge
         wc.lpszClassName = "Surge Win32Window";
         wc.hbrBackground = (HBRUSH)GetStockObject(DKGRAY_BRUSH);
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-        wc.hIcon = nullptr;
-        wc.hIconSm = wc.hIcon;
+
+        // Icon resource ID 1 of the executable
+        wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(1));
+        wc.hIconSm = static_cast<HICON>(LoadImage(hInstance, MAKEINTRESOURCE(1), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
+        if(!wc.hIconSm)
+            wc.hIconSm = wc.hIcon;
         wc.cbClsExtra = 0;
 
         RegisterClassEx(&wc);

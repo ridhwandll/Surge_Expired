@@ -21,7 +21,7 @@ namespace Surge
         GraphicsRHI() = default;
         ~GraphicsRHI() = default;
 
-        void Initialize(Window* window = nullptr) { mBackendRHI.Initialize(window); }
+        void Initialize(Window* window, bool enableImGui) { mBackendRHI.Initialize(window, enableImGui); } // enableImGui: ImGui context + GPU timing on by default
         void WaitIdle() { mBackendRHI.WaitIdle(); }
         void Shutdown() { mBackendRHI.Shutdown(); }
 
@@ -32,8 +32,24 @@ namespace Surge
         void OnSurfaceDestroyed() { mBackendRHI.OnSurfaceDestroyed(); }
         void OnSurfaceCreated(Window* window) { mBackendRHI.OnSurfaceCreated(window); }
         bool SetTargetFrameRate(float fps) { return mBackendRHI.SetTargetFrameRate(fps); } // true = the RHI paces presentation itself
+        void SetFramePacingEnabled(bool enabled) { mBackendRHI.SetFramePacingEnabled(enabled); } // Use Core's SetFramePacing, it also drops the CPU cap
         bool IsFormatSupported(ImageFormat format) const { return mBackendRHI.IsFormatSupported(format); }
+        // Quarter turns (clockwise) passes drawing into the swapchain rotate their output by: Android pre-rotation, 0 elsewhere
+        Uint GetSurfaceRotation() const { return mBackendRHI.GetSurfaceRotation(); }
         const RHIStats& GetStats() { return mBackendRHI.GetStats(); }
+
+        // GPU timing: timestamp queries around nested named scopes (the RenderGraph times its groups and passes), read back FRAMES_IN_FLIGHT frames later
+        // SetGPUTimingEnabled is the runtime switch (applies at the next BeginFrame, on by default in the Editor), RHISettings::GPU_TIMING compiles it out
+        void SetGPUTimingEnabled(bool enabled) { mBackendRHI.SetGPUTimingEnabled(enabled); }
+        bool IsGPUTimingEnabled() const { return mBackendRHI.IsGPUTimingEnabled(); }
+        bool SupportsGPUTiming() const { return mBackendRHI.SupportsGPUTiming(); }
+        bool SupportsGPUTimingInRenderPass() const { return mBackendRHI.SupportsGPUTimingInRenderPass(); } // False on tile based GPUs: time whole render passes only
+        const GPUTimings& GetGPUTimings() const { return mBackendRHI.GetGPUTimings(); }
+        void CmdBeginGPUScope([[maybe_unused]] const FrameContext& ctx, [[maybe_unused]] std::string_view name) { if constexpr (RHISettings::GPU_TIMING) mBackendRHI.CmdBeginGPUScope(ctx, name); }
+        void CmdEndGPUScope([[maybe_unused]] const FrameContext& ctx) { if constexpr (RHISettings::GPU_TIMING) mBackendRHI.CmdEndGPUScope(ctx); }
+        // Right before the swapchain render pass (outside of any render pass): times the GPU's wait for the swapchain image on its own, as
+        // GPUTimings::DisplayWaitMilliseconds instead of work. Records nothing while GPU timing is off
+        void CmdWaitForSwapchainImage([[maybe_unused]] const FrameContext& ctx) { if constexpr (RHISettings::GPU_TIMING) mBackendRHI.CmdWaitForSwapchainImage(ctx); }
 
         // Buffer
         BufferHandle CreateBuffer(const BufferDesc& desc) { return mBackendRHI.CreateBuffer(desc); }
@@ -99,7 +115,7 @@ namespace Surge
         void CmdTransitionImageLayout(const FrameContext& ctx, ImageHandle h, ImageUsage newLayout) { mBackendRHI.CmdTransitionImageLayout(ctx, h, newLayout); }
         void CmdSetDepthBias(const FrameContext& ctx, float constantFactor, float clamp, float slopeFactor) { mBackendRHI.CmdSetDepthBias(ctx, constantFactor, clamp, slopeFactor); }
         void CmdSetViewport(const FrameContext& ctx, Uint x, Uint y, Uint width, Uint height) { mBackendRHI.CmdSetViewport(ctx, x, y, width, height); } // Viewport + scissor, inside a render pass (Example: one region of a shadow atlas)
-        void ShowMetricsWindow() { mBackendRHI.ShowPoolDebugImGuiWindow(); }
+        void ShowMetricsWindow(float frameTimeMilliseconds) { mBackendRHI.ShowPoolDebugImGuiWindow(frameTimeMilliseconds); }
 
         ImTextureID AddImGuiImage(ImageHandle h) { return mBackendRHI.AddImGuiImage(h); }
         ImTextureID GetImGuiImage(ImageHandle h) { return mBackendRHI.GetImGuiImage(h); }

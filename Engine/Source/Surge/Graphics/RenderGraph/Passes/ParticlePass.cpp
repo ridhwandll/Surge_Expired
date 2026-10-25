@@ -1,5 +1,4 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/ParticlePass.hpp"
@@ -19,7 +18,7 @@ namespace Surge
         mRHI = rhi;
 
         PipelineDesc desc = {};
-        desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Particle.glsl");
+        desc.Shader_ = mContext.Shaders->Get("Particle.glsl");
         desc.Raster.Cull = CullMode::NONE;
         desc.Depth.TestEnable = true;
         desc.Depth.WriteEnable = false;

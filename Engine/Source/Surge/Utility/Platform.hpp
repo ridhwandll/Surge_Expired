@@ -60,6 +60,17 @@ namespace Surge::Platform
 
     glm::vec4 GetSafeAreaInsets(); // Window pixels (left, top, right, bottom): display cutout, status and navigation bars
 
+    // Device thermal state, Android's AThermalStatus: 0 none, 1 light, 2 moderate, 3 severe, 4 critical, 5 emergency, 6 shutdown.
+    // -1 when unknown (Windows, Android < 11). A binder call on Android: poll it about once a second, never per frame
+    int GetThermalStatus();
+
+    // CPU model as the system reports it ("AMD Ryzen 7 5800H with Radeon Graphics"; Android 12+: "QTI SM6115", older: the board platform).
+    // "" when unknown. Read it once
+    String GetCPUName();
+
+    // CPU time this process has used so far, every thread summed (user + kernel), in seconds. -1 when unknown
+    double GetProcessCPUSeconds();
+
     String GetClipboardText();
     void SetClipboardText(const String& text);
 

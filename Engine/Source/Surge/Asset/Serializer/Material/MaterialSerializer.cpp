@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MaterialSerializer.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Asset/Serializer/Material/MaterialBinaryFormat.hpp"
 
@@ -17,7 +16,7 @@ namespace Surge
         Log<Severity::Error>("[MaterialSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");
         return false;
 #else
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const AssetMetadata& meta = am->GetMetadata(asset->GetID());
 
         Ref<Material> material = asset.As<Material>();
@@ -26,7 +25,7 @@ namespace Surge
         // Just read the stamp
         AssetStamp stamp;
         Ref<Material> tempMat = nullptr;
-        MaterialBinary::Read(sidecarPath, stamp, tempMat);
+        MaterialBinary::Read(*mContext, sidecarPath, stamp, tempMat);
 
         bool result = MaterialBinary::Write(sidecarPath, stamp, material);
         return result;
@@ -35,12 +34,12 @@ namespace Surge
 
     Ref<Asset> MaterialSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
         AssetStamp stamp;
         Ref<Material> material;
-        if(!MaterialBinary::Read(sidecarPath, stamp, material))
+        if(!MaterialBinary::Read(*mContext, sidecarPath, stamp, material))
         {
             Log<Severity::Error>("[MaterialSerializer] Failed to read material binary for asset {}", metadata.RelativePath);
             return nullptr;

@@ -1,5 +1,4 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/Renderer2DPass.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
@@ -47,7 +46,7 @@ namespace Surge
             mCurrentQuadBatch.VertexData.resize(MAX_QUADS_PER_BATCH * 4);
 
             PipelineDesc desc = {};
-            desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Renderer2D.glsl");
+            desc.Shader_ = mContext.Shaders->Get("Renderer2D.glsl");
             desc.Raster.Cull = CullMode::NONE;
             desc.DebugName = "Renderer2D";
             desc.TargetFramebuffer = blackBoard.MainPassFramebuffer;
@@ -94,7 +93,7 @@ namespace Surge
         {
             ////////////////////////////////////// Lines //////////////////////////////////////
             PipelineDesc desc = {};
-            desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Renderer2DLine.glsl");
+            desc.Shader_ = mContext.Shaders->Get("Renderer2DLine.glsl");
             desc.Raster.Cull = CullMode::NONE;
             desc.Raster.Topo = Topology::LINE_LIST;
             desc.Raster.LineWidth = 2.0f;
@@ -113,7 +112,7 @@ namespace Surge
         {
             ////////////////////////////////////// Text //////////////////////////////////////
             PipelineDesc desc = {};
-            desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Renderer2DText.glsl");
+            desc.Shader_ = mContext.Shaders->Get("Renderer2DText.glsl");
             desc.Raster.Cull = CullMode::NONE;
             desc.DebugName = "Renderer2D_Text";
             desc.TargetFramebuffer = blackBoard.MainPassFramebuffer;
@@ -610,7 +609,7 @@ namespace Surge
             write.Type = DescriptorType::TEXTURE;
             write.ArrayIndex = slot;
             write.Texture = mCurrentQuadBatch.Textures[slot];
-            write.Sampler = Core::GetRenderer()->GetTextSampler(); // TODO: DO NOT HARDCODE Text Sampler always, expose Sampler as asset
+            write.Sampler = mContext.TextSampler; // TODO: DO NOT HARDCODE Text Sampler always, expose Sampler as asset
             mRHI->UpdateDescriptorSet(mTexDescriptorSets[batchIndex], &write, 1, ctx.FrameIndex);
         }
 

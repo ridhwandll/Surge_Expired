@@ -143,7 +143,7 @@ function Time.GetTime() end
 function Time.GetUnscaledTime() end
 ---@return integer
 function Time.GetFrameCount() end
---- The fixed physics step (1/60 s), what OnFixedUpdate receives.
+--- The fixed physics step (1 / the project's physics Fixed Rate, 1/60 s by default), what OnFixedUpdate receives.
 ---@return number
 function Time.GetFixedDeltaTime() end
 ---@return number
@@ -180,8 +180,26 @@ Physics = {}
 ---@param origin Vec3
 ---@param direction Vec3 Does not need to be normalized
 ---@param maxDistance number
+---@param layerMask? integer Only bodies on these layers are hit (Physics.GetLayerMask), every layer when omitted
 ---@return RaycastHit|nil
-function Physics.Raycast(origin, direction, maxDistance) end
+function Physics.Raycast(origin, direction, maxDistance, layerMask) end
+--- Index (0-15) of the layer named in the Physics panel, -1 when no layer has that name.
+---@param name string
+---@return integer
+function Physics.GetLayer(name) end
+--- Name of a layer, "" when it is unused.
+---@param layer integer
+---@return string
+function Physics.GetLayerName(layer) end
+--- Raycast mask of the named layers, e.g. Physics.GetLayerMask("Default", "Ground"). Cache it, it does not change at runtime.
+---@param ... string
+---@return integer
+function Physics.GetLayerMask(...) end
+--- Whether the collision matrix lets bodies on these two layers collide.
+---@param layerA integer
+---@param layerB integer
+---@return boolean
+function Physics.ShouldCollide(layerA, layerB) end
 
 --- Persistent save data, survives app restarts (Android internal storage, %APPDATA%/SurgeEngine/<Project> on Windows).
 --- Values: nil, boolean, number, string, Math.Vec2/Vec3/Vec4 and tables of those. Keys: 1-64 of a-z A-Z 0-9 _ - .
@@ -202,6 +220,77 @@ function Storage.Has(key) end
 ---@param key string
 ---@return boolean
 function Storage.Delete(key) end
+
+--- Diagnostics: live performance numbers, the frame pacing profiling switch and the performance overlay (Ctrl+F3, or a two finger
+--- triple tap on a touch screen: Off -> Compact -> Detailed -> Off). Timings are averaged over 0.5 s. Measuring runs only while
+--- something reads it: each GetStats call keeps it (and the GPU timestamps) running for a second, otherwise it costs nothing.
+---@class DiagnosticsGroup
+---@field Name string Render graph group (MainScene, Shadow, PostProcess...)
+---@field Ms number Average GPU milliseconds
+
+---@class DiagnosticsStats
+---@field FPS number
+---@field FrameMs number Frame time: CPU work plus every wait (GPU, swapchain, frame pacing, frame cap)
+---@field FrameMaxMs number
+---@field CPUWorkMs number The frame's own CPU time, without those waits
+---@field CPUWorkMaxMs number
+---@field GPUWorkMs number GPU work (sum of the timed scopes, not the swapchain wait)
+---@field GPUWorkMaxMs number
+---@field GPUCommandBufferMs number Whole GPU command buffer, includes the swapchain wait
+---@field GPUDisplayWaitMs number GPU idle until the display released the swapchain image (vsync), not part of GPUWorkMs
+---@field LastFrameMs number Last frame, not averaged
+---@field LastGPUWorkMs number Last resolved GPU frame, not averaged
+---@field GPUTiming boolean The GPU fields are valid
+---@field TargetMs number 1000 / frame cap (60 Hz when uncapped)
+---@field DrawCalls integer
+---@field Triangles integer Triangles drawn by every pass of the frame (shadow casters count again)
+---@field Meshes integer Submitted meshes (before culling)
+---@field Lights integer
+---@field MaxLights integer
+---@field Sprites integer
+---@field Texts integer
+---@field UIItems integer UI sprites + text blocks
+---@field Particles integer Alive particles
+---@field MaxParticles integer
+---@field Animators integer
+---@field Entities integer Entities in the running scene
+---@field GPUMemoryMB integer
+---@field GPUMemoryBudgetMB integer
+---@field GPUName string
+---@field CPUName string CPU model without vendor marks and clock ("Intel Core i7-10750H", Android 12+: "QTI SM6115"), "" when unknown
+---@field CPUThreads integer Logical CPU cores
+---@field CPUUsage number Percent of every CPU thread the game used over the last second (0-100), -1 until the first second passed
+---@field ScreenWidth integer
+---@field ScreenHeight integer
+---@field RenderWidth integer 3D scene resolution (render scale applied)
+---@field RenderHeight integer
+---@field RenderScale number
+---@field Thermal string None, Light, Moderate, Severe, Critical, Emergency, Shutdown ("" when unknown: Windows, Android < 11)
+---@field Groups DiagnosticsGroup[] Slowest first
+---@field GroupCount integer
+---@class Diagnostics
+Diagnostics = {}
+--- Fills and returns `stats` (a new table without), reuse one table to create no garbage per frame.
+---@param stats table|nil
+---@return DiagnosticsStats
+function Diagnostics.GetStats(stats) end
+--- Profiling switch, on by default. Off presents every frame as soon as it is ready (no frame pacing, no frame cap): the GPU stays
+--- fully loaded, so GPUWorkMs shows the real cost. Paced, phones lower the GPU clock until the work fills the frame interval.
+---@param enabled boolean
+function Diagnostics.SetFramePacing(enabled) end
+---@return boolean
+function Diagnostics.IsFramePacingEnabled() end
+--- Off -> Compact -> Detailed -> Off. Bind it to a button where there is no keyboard.
+function Diagnostics.ToggleOverlay() end
+---@param mode string "Off" | "Compact" | "Detailed"
+function Diagnostics.SetOverlay(mode) end
+---@return string "Off" | "Compact" | "Detailed"
+function Diagnostics.GetOverlay() end
+--- Ctrl+F3 and the two finger triple tap, on by default. Lock them in a shipped game, ToggleOverlay/SetOverlay keep working.
+---@param enabled boolean
+function Diagnostics.SetHotkeyEnabled(enabled) end
+---@return boolean
+function Diagnostics.IsHotkeyEnabled() end
 
 -- ==============================================================================
 -- LOGGING
@@ -417,6 +506,32 @@ RigidbodyType = {
 LightType = {
     DIRECTIONAL = 0,
     POINT = 1
+}
+
+RenderProfile = {
+    DESKTOP = 0,
+    MOBILE = 1
+}
+
+ShadowQuality = {
+    LOW = 0,
+    MEDIUM = 1,
+    HIGH = 2,
+    ULTRA = 3
+}
+
+AOQuality = {
+    LOW = 0,
+    MEDIUM = 1,
+    HIGH = 2,
+    ULTRA = 3
+}
+
+BloomQuality = {
+    LOW = 0,
+    MEDIUM = 1,
+    HIGH = 2,
+    ULTRA = 3
 }
 
 TextAlignment = {
@@ -1336,9 +1451,9 @@ function UIImage.new(textureRelPath) end
 ---@field Overflow UITextOverflow WRAP, TRUNCATE ("..."), NO_WRAP
 UIText = {}
 
---- Creates a new UIText.
+--- Creates a new UIText. Without a font (or with ""), it uses the engine UI font (Roboto SemiCondensed Bold, ASCII).
 ---@param text string
----@param fontRelPath string
+---@param fontRelPath string|nil
 ---@return UIText
 function UIText.new(text, fontRelPath) end
 
@@ -1738,9 +1853,102 @@ local LightComponent = {}
 ---@field GroundAmbient Vec3
 local EnvironmentComponent = {}
 
+---@class ShadowSettings
+---@field Enable boolean
+---@field Quality number Read-only, ShadowQuality. Use ApplyQualityPreset() to change it.
+---@field CascadeCount integer 1 - 3, every cascade draws its casters again
+---@field Resolution integer Per cascade: 512, 1024, 2048 or 4096
+---@field FilterSize integer Tent PCF width: 3, 5 or 7
+---@field DitheredBlend boolean
+---@field Distance number View distance the cascades cover
+---@field FadeRange number Fraction of Distance over which shadows fade out
+---@field CascadeSplitLambda number 0 = uniform splits, 1 = logarithmic
+---@field CascadeBlend number
+---@field ShowCascades boolean Debug tint, not saved
+---@field NormalBias number
+---@field DepthBiasConstant number
+---@field DepthBiasClamp number
+---@field DepthBiasSlope number
+local ShadowSettings = {}
+-- Sets Quality and the knobs it drives (cascades, resolution, filter, dithered blend)
+---@param quality number ShadowQuality
+function ShadowSettings:ApplyQualityPreset(quality) end
+
+---@class AmbientOcclusionSettings
+---@field Enable boolean
+---@field Quality number Read-only, AOQuality. Use ApplyQualityPreset() to change it.
+---@field ResolutionScale number 0.25 - 1, AO target size relative to the scene
+---@field SliceCount integer
+---@field StepsPerSlice integer
+---@field BlurRadius integer 0 = no blur
+---@field AccurateNormals boolean
+---@field Radius number World space
+---@field Intensity number
+---@field FalloffRange number
+---@field MaxDistance number
+---@field BlurSharpness number
+local AmbientOcclusionSettings = {}
+-- Sets Quality and the knobs it drives (resolution, slices, steps, blur, normals)
+---@param quality number AOQuality
+function AmbientOcclusionSettings:ApplyQualityPreset(quality) end
+
+---@class BloomSettings
+---@field Enable boolean
+---@field Quality number Read-only, BloomQuality. Use ApplyQualityPreset() to change it.
+---@field UseCompute boolean
+---@field MipCount integer 2 - 8
+---@field HighQualityFilter boolean
+---@field AntiFlicker boolean
+---@field HighQualityComposite boolean
+---@field Threshold number Linear HDR brightness where bloom starts
+---@field Knee number
+---@field Intensity number 0 skips bloom entirely
+---@field Scatter number
+---@field ClampValue number
+---@field Tint Vec3
+local BloomSettings = {}
+-- Sets Quality and the knobs it drives (compute path, mip count, filters)
+---@param quality number BloomQuality
+function BloomSettings:ApplyQualityPreset(quality) end
+
+---@class PostProcessSettings
+---@field VignetteIntensity number
+---@field VignetteSoftness number
+---@field Grain number
+---@field ShowAOOnly boolean Debug view, not saved
+local PostProcessSettings = {}
+
+-- One profile of a RendererSettingsComponent. Nested settings are references: profile.Bloom.Intensity = 2 edits the component,
+-- the Renderer applies the change the next frame
+---@class RenderSettings
+---@field RenderScale number 0.5 - 1, resolution of the 3D scene (UI and post-processing stay at full resolution)
+---@field MaxLights integer
+---@field MaxParticles integer
+---@field EmissionQuality number 0.1 - 1
+---@field MaxSkinMatrices integer
+---@field Shadows ShadowSettings
+---@field AO AmbientOcclusionSettings
+---@field Bloom BloomSettings
+---@field PostProcess PostProcessSettings
+local RenderSettings = {}
+
+-- Render settings of the scene, one profile per platform (Android: Mobile, Windows: Desktop). The first active one in the scene is used
+---@class RendererSettingsComponent
+---@field Active boolean
+---@field Desktop RenderSettings
+---@field Mobile RenderSettings
+local RendererSettingsComponent = {}
+-- The profile this platform renders with (in the Editor: the one being previewed). Use it for in-game graphics options
+---@return RenderSettings
+function RendererSettingsComponent:GetCurrentProfile() end
+-- Puts a profile back to the engine defaults of that platform
+---@param profile number RenderProfile
+function RendererSettingsComponent:ResetProfile(profile) end
+
 ---@class RigidbodyComponent
 ---@field Active boolean
 ---@field Type number
+---@field Layer integer Physics layer (0-15, Physics.GetLayer), takes effect immediately
 ---@field Mass number
 ---@field Interpolate boolean
 ---@field UseGravity boolean
@@ -1901,6 +2109,59 @@ function AudioSourceComponent:Seek(time) end
 ---@param audioAssetPath string
 function AudioSourceComponent:SetAudioClip(audioAssetPath) end
 
+--- Plays the animation clips of the entity's mesh (a glTF with a skin or animated nodes). Needs a MeshC on the same entity.
+--- Clips come from the mesh itself and from up to 4 clip sources set in the Inspector (other animated meshes with the same joint names).
+---   local anim = Self.AnimatorC
+---   anim:Play("Run", 0.2) -- crossfade over 0.2 s
+---@class AnimatorComponent
+---@field Active boolean Inactive animators show the rest pose.
+---@field Clip string Clip played when the scene starts (PlayOnAwake), empty = the rest pose until Play().
+---@field PlayOnAwake boolean
+---@field Loop boolean Applies to the playing clips.
+---@field Speed number Playback speed, negative plays backwards.
+---@field AnimateOffscreen boolean false: outside the camera only the time advances (saves CPU on phones).
+---@field Paused boolean
+---@field CurrentClip string Read-only. Name of the playing clip, empty when none.
+local AnimatorComponent = {}
+--- Plays a clip by name, crossfading from the current one over fadeSeconds (0 or nil = instant). Playing the clip that already
+--- plays does nothing. Returns false when the animator has no clip with that name.
+---@param clip string
+---@param fadeSeconds number|nil
+---@return boolean
+function AnimatorComponent:Play(clip, fadeSeconds) end
+--- Stops every clip, back to the rest pose.
+function AnimatorComponent:Stop() end
+--- True while a clip plays (a non looping clip stops at its end). With a name: true only if that clip plays.
+---@param clip string|nil
+---@return boolean
+function AnimatorComponent:IsPlaying(clip) end
+---@param clip string
+---@return boolean
+function AnimatorComponent:HasClip(clip) end
+--- Seconds into the playing clip.
+---@return number
+function AnimatorComponent:GetTime() end
+---@param seconds number
+function AnimatorComponent:SetTime(seconds) end
+--- Length in seconds of a clip (the playing one without a name), 0 if unknown.
+---@param clip string|nil
+---@return number
+function AnimatorComponent:GetDuration(clip) end
+---@return string[]
+function AnimatorComponent:GetClipNames() end
+--- Index of a joint (skeleton node) by name, -1 when not found. Available once the animator updated (from the first OnUpdate on),
+--- look it up once and keep the index:
+---   if hand == nil or hand < 0 then hand = anim:FindJoint("mixamorig:RightHand") end
+---@param name string
+---@return integer
+function AnimatorComponent:FindJoint(name) end
+--- World position and rotation (degrees) of a joint in this frame's pose, nil before the first pose. joint: an index from FindJoint or a name.
+---   local position, rotation = anim:GetJointWorldTransform(hand)
+---@param joint integer|string
+---@return Vec3|nil position
+---@return Vec3|nil rotation
+function AnimatorComponent:GetJointWorldTransform(joint) end
+
 --- Plays a particle effect asset (.spfx, made in the Editor's Particle Editor).
 ---@class ParticleSystemComponent
 ---@field Active boolean Inactive systems are neither simulated nor drawn.
@@ -1956,6 +2217,7 @@ function Particles.Play(effectAssetPath, position, rotation) end
 ---@field MeshC MeshComponent|nil
 ---@field LightC LightComponent|nil
 ---@field EnvironmentC EnvironmentComponent|nil
+---@field RendererSettingsC RendererSettingsComponent|nil
 ---@field RigidbodyC RigidbodyComponent|nil
 ---@field BoxColliderC BoxColliderComponent|nil
 ---@field SphereColliderC SphereColliderComponent|nil
@@ -1968,6 +2230,7 @@ function Particles.Play(effectAssetPath, position, rotation) end
 ---@field UICanvasC UICanvasComponent|nil
 ---@field AudioSourceC AudioSourceComponent|nil
 ---@field ParticleSystemC ParticleSystemComponent|nil
+---@field AnimatorC AnimatorComponent|nil
 local Entity = {}
 
 ---@return boolean
@@ -2053,6 +2316,12 @@ function Entity:AddEnvironmentC() end
 function Entity:RemoveEnvironmentC() end
 
 ---@return boolean
+function Entity:HasRendererSettingsC() end
+---@return RendererSettingsComponent
+function Entity:AddRendererSettingsC() end
+function Entity:RemoveRendererSettingsC() end
+
+---@return boolean
 function Entity:HasRigidbodyC() end
 ---@return RigidbodyComponent
 function Entity:AddRigidbodyC() end
@@ -2123,3 +2392,9 @@ function Entity:HasParticleSystemC() end
 ---@return ParticleSystemComponent
 function Entity:AddParticleSystemC() end
 function Entity:RemoveParticleSystemC() end
+
+---@return boolean
+function Entity:HasAnimatorC() end
+---@return AnimatorComponent
+function Entity:AddAnimatorC() end
+function Entity:RemoveAnimatorC() end

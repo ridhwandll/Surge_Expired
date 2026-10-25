@@ -1,5 +1,4 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDebugger.hpp"
@@ -56,7 +55,7 @@ namespace Surge
         VkDevice device = rhi.GetDevice();
         VkPhysicalDevice gpu = rhi.GetGPU();
 
-        void* window = Core::GetWindow()->GetNativeWindowHandle();
+        void* window = rhi.GetNativeWindowHandle();
 
         SG_ASSERT(!mInitialized, "ImGuiLayer::Init called twice");
         SG_ASSERT(swapchainRenderPass != VK_NULL_HANDLE, "ImGuiLayer: swapchainRenderPass is null, must be created before ImGui init");

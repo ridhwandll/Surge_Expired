@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "SkyPass.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include <glm/gtc/type_ptr.hpp>
 
@@ -11,7 +10,7 @@ namespace Surge
         mRHI = rhi;
 
         PipelineDesc skyDesc = {};
-        skyDesc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("PreethamSky.glsl");
+        skyDesc.Shader_ = mContext.Shaders->Get("PreethamSky.glsl");
         skyDesc.TargetFramebuffer = blackBoard.MainPassFramebuffer;
         skyDesc.Raster.Cull = CullMode::NONE;
         skyDesc.Depth.TestEnable = true;

@@ -25,6 +25,7 @@
 #include "Panels/UIEditorPanel.hpp"
 #include "Panels/ConsolePanel.hpp"
 #include "Panels/HistoryPanel.hpp"
+#include "Panels/PhysicsPanel.hpp"
 #include "Panels/AssetRegistryPanel.hpp"
 #include "Panels/RendererPanel.hpp"
 #include "Panels/ParticleEditorPanel.hpp"
@@ -46,6 +47,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <iostream>
 
 
 namespace Surge
@@ -97,11 +99,10 @@ namespace Surge
     void Editor::OnInitialize()
     {
         // Dummy Scene to render the project browser ImGui. We can probably find a better way to do this later, but for now it works and doesn't cause any issues
-        mActiveScene = Ref<Scene>::Create("Dummy");
+        mActiveScene = Ref<Scene>::Create("Dummy", Core::GetSceneContext());
 
         mAssetManager = Core::GetAssetManager();
         mRenderer = Core::GetRenderer();
-        mRenderer->SetOutlineThickness(1);
 
         mFrameCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
 
@@ -142,9 +143,12 @@ namespace Surge
         mPanelManager.PushPanel<AssetRegistryPanel>();
         mPanelManager.PushPanel<RendererPanel>();
         mPanelManager.PushPanel<ParticleEditorPanel>();
+        mPanelManager.PushPanel<PhysicsPanel>();
         Core::GetWindow()->SetFileDropEnabled(true); // Files dropped from Explorer are imported by the Content Browser
 
         auto& allPanels = mPanelManager.GetAllPanels();
+        allPanels[PanelCode::Export].Show = false;
+        allPanels[PanelCode::History].Show = false;
         allPanels[PanelCode::ContentBrowser].Show = false;
         allPanels[PanelCode::AssetRegistry].Show = false;
         allPanels[PanelCode::Console].Show = false;
@@ -236,22 +240,6 @@ namespace Surge
             // Every panel had its chance to modify the selected entity, an interaction that just ended becomes an undo step
             if(!IsPlaying())
                 mHistory.TrackSelection(GetSelectedEntity(), ImGui::IsAnyItemActive() || ImGui::IsMouseDown(ImGuiMouseButton_Left));
-
-            ImGui::Begin("Physics Stats");
-
-            Surge::Physics* physics = Core::GetPhysics();
-            if(physics)
-            {
-                int total = 0;
-                int active = 0;
-                physics->GetDebugStats(active, total);
-
-                ImGui::Text("Total Bodies: %d", total);
-                ImGui::Text("Active Bodies: %d", active);
-                ImGui::Text("Sleeping Bodies: %d", total - active);
-            }
-
-            ImGui::End();
         }
         else
         {
@@ -317,7 +305,7 @@ namespace Surge
         Core::GetScriptEngine()->ResetSession(); // Modules and _G start fresh, edited scripts are required again
         Core::SetTimeScale(1.0f);                // A script may have left slow motion on in the last session
 
-        mRuntimeScene = Ref<Scene>::Create("RuntimeDummy");
+        mRuntimeScene = Ref<Scene>::Create("RuntimeDummy", Core::GetSceneContext());
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSceneContext(mRuntimeScene.Raw());
         mViewports.OnSceneContextChanged();
 
@@ -363,7 +351,7 @@ namespace Surge
         mRuntimeScene->OnRuntimeEnd();
         mRuntimeScene->SetRunning(false);
 
-        Ref<Scene> next = Ref<Scene>::Create("Dummy");
+        Ref<Scene> next = Ref<Scene>::Create("Dummy", Core::GetSceneContext());
         source->CopyTo(next.Raw());
         mRuntimeScene = next;
         mRenderer->GetUIManager().ClearCanvases();
@@ -416,7 +404,6 @@ namespace Surge
             mRetiredScene = std::move(previous);
 
         mActiveScene = std::move(scene);
-        mActiveScene->SetSelectedEntity({});
         mHistory.SetScene(mActiveScene.Raw());
         mViewports.OnSceneContextChanged();
         mActiveScene->OnResize(mGameResolution.x, mGameResolution.y);
@@ -465,7 +452,6 @@ namespace Surge
     void Editor::SelectEntity(Entity entity)
     {
         mPanelManager.GetPanel<SceneHierarchyPanel>()->SetSelectedEntity(entity);
-        GetContextScene()->SetSelectedEntity(entity);
     }
 
     void Editor::SelectEntityByUUID(UUID id)
@@ -624,6 +610,7 @@ namespace Surge
     {
         mCurrentProject = project;
         mProjectFilePath = projectFile;
+        Core::GetPhysics()->ApplySettings(mCurrentProject.Physics);
         mSettingsStore.Load(Filesystem::GetParentPath(projectFile), mSettings);
 
         Core::SetFrameCap(mSettings.FrameCap);
@@ -678,7 +665,7 @@ namespace Surge
             for(int i = 1; Filesystem::Exists(Path(mAssetManager->GetAssetsDirectory()) / relativePath); i++)
                 relativePath = std::format("Scenes/NewScene ({}){}", i, extension);
 
-            Ref<Scene> scene = mAssetManager->Create<Scene>(relativePath, Filesystem::GetFilenameWithoutExt(relativePath));
+            Ref<Scene> scene = mAssetManager->Create<Scene>(relativePath, Filesystem::GetFilenameWithoutExt(relativePath), Core::GetSceneContext());
             if(!scene)
                 return;
 
@@ -723,7 +710,7 @@ namespace Surge
         }
 
         Filesystem::CreateOrEnsureDirectories((Path(mAssetManager->GetAssetsDirectory()) / path).parent_path());
-        Ref<Scene> newScene = mAssetManager->Create<Scene>(path, Filesystem::GetFilenameWithoutExt(path));
+        Ref<Scene> newScene = mAssetManager->Create<Scene>(path, Filesystem::GetFilenameWithoutExt(path), Core::GetSceneContext());
         if(!newScene)
             return;
 
@@ -737,6 +724,12 @@ namespace Surge
         RefreshCameraViewports();
         mPanelManager.GetPanel<ContentBrowserPanel>()->RequestRefresh();
         Log<Severity::Info>("[Editor] Saved scene as: {}", path);
+    }
+
+    void Editor::SaveProject()
+    {
+        if(!mProjectFilePath.empty())
+            mCurrentProject.Save(mProjectFilePath);
     }
 
     void Editor::SetStartScene(AssetID sceneID)
@@ -779,7 +772,7 @@ namespace Surge
         ImGui::DockBuilderDockWindow(PanelCodeToString(PanelCode::SceneHierarchy), left);
         ImGui::DockBuilderDockWindow("Editor Settings", leftBottom);
         ImGui::DockBuilderDockWindow(PanelCodeToString(PanelCode::History), leftBottom);
-        ImGui::DockBuilderDockWindow("Physics Stats", leftBottom);
+        ImGui::DockBuilderDockWindow(PanelCodeToString(PanelCode::Physics), leftBottom);
 
         viewports.DockWindows(center);
         ImGui::DockBuilderDockWindow("Export Project", center);
@@ -1059,6 +1052,7 @@ int main()
 
     Surge::EditorConsole::Install(); // Before Core::Initialize so the Console also shows the engine startup logs
     Surge::ShaderManager::SetCompileHook(&Surge::ShaderCompiler::CompileIfOutdated); // The Renderer loads the engine shaders during Core::Initialize
+    Surge::FontCooker::CookEngineFontIfOutdated(); // Performance overlay + UI text without a font, shipped by every export
 
     Surge::Editor* app = Surge::MakeClient<Surge::Editor>();
     app->SetOptions(clientOptions);

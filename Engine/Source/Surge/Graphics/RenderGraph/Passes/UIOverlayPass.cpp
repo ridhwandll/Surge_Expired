@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "UIOverlayPass.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,7 +14,7 @@ namespace Surge
         SURGE_PROFILE_FUNC("UIOverlayPass::Setup");
         mRHI = rhi;
 
-        glm::uvec2 size = Core::GetWindow()->GetSize();
+        glm::uvec2 size = mContext.WindowSize;
 
         if(!RHISettings::RENDER_TO_SWAPCHAIN)
         {
@@ -70,7 +69,7 @@ namespace Surge
 
         // UI Pipeline, sprites + MSDF text (Depth testing explicitly DISABLED)
         PipelineDesc pd = {};
-        pd.Shader_ = Core::GetRenderer()->GetShaderManager().Get("UI.glsl");
+        pd.Shader_ = mContext.Shaders->Get("UI.glsl");
         pd.DebugName = "UIOverlay";
         pd.Raster.Topo = Topology::TRIANGLE_LIST;
         pd.Raster.Polygon = PolygonMode::FILL;
@@ -145,7 +144,9 @@ namespace Surge
 
         // Orthographic Matrix
         const glm::vec2 size = blackboard.UIResolution.x > 0.0f ? blackboard.UIResolution : glm::vec2(blackboard.ScreenWidth, blackboard.ScreenHeight);
-        const glm::mat4 viewProjection = glm::ortho(0.0f, size.x, 0.0f, size.y, -1.0f, 1.0f);
+        glm::mat4 viewProjection = glm::ortho(0.0f, size.x, 0.0f, size.y, -1.0f, 1.0f);
+        if(const Uint rotation = RHISettings::RENDER_TO_SWAPCHAIN ? mRHI->GetSurfaceRotation() : 0; rotation != 0)
+            viewProjection = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f * static_cast<float>(rotation)), glm::vec3(0.0f, 0.0f, 1.0f)) * viewProjection; // Pre-rotation
 
         mRHI->CmdBindPipeline(ctx, mUIPipeline);
         mRHI->CmdPushConstants(ctx, mUIPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(glm::mat4), &viewProjection);
@@ -401,7 +402,7 @@ namespace Surge
         // Write every slot (unused ones get the white texture): these sets are reused across frames, a stale slot could still reference
         // a texture that was destroyed since, and the whole array is statically used by the shader, so it must stay valid
         std::array<DescriptorWrite, MAX_TEX_SLOTS_PER_BATCH - 1> writes = {};
-        const SamplerHandle sampler = Core::GetRenderer()->GetTextSampler();
+        const SamplerHandle sampler = mContext.TextSampler;
         for(Uint slot = 1; slot < MAX_TEX_SLOTS_PER_BATCH; slot++) // Slot 0 is the white texture, written once in Setup
         {
             const bool used = slot < mCurrentQuadBatch.TextureCount && !mCurrentQuadBatch.Textures[slot].IsNull();
@@ -433,7 +434,7 @@ namespace Surge
 
         constexpr bool resizeFinalImage = false; // We do not own the FinalImage, so we DO NOT Resize it
         const FramebufferHandle framebuffer = blackBoard.UIOverlayFramebuffer;
-        Core::AddFrameEndCallback([this, width, height, framebuffer]() { mRHI->ResizeFramebuffer(framebuffer, width, height, resizeFinalImage); });
+        mContext.DeferToFrameEnd([this, width, height, framebuffer]() { mRHI->ResizeFramebuffer(framebuffer, width, height, resizeFinalImage); });
     }
 
     void UIOverlayPass::RenderStatsViaImGui(FrameBlackboard&) {}

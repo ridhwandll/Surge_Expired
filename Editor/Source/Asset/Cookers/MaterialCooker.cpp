@@ -14,7 +14,7 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String sidecarPath = am->GetSidecarPath(id);
 
-        Ref<Material> material = Material::Create("MaterialCooker::Cook");
+        Ref<Material> material = Material::Create(*Core::GetRenderer(), "MaterialCooker::Cook");
         MaterialSourceWriter::Read(material, sourceAbsPath);
 
         const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());

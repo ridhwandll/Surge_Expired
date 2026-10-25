@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AmbientOcclusionPass.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include <imgui.h>
@@ -46,7 +45,7 @@ namespace Surge
         mSceneDepth = blackBoard.MainPassDepthImage;
         mPointClampSampler = blackBoard.PointClampSampler;
 
-        const glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        const glm::vec2 windowSize = mContext.WindowSize;
         mFullSize = blackBoard.GetSceneSize(static_cast<Uint>(windowSize.x), static_cast<Uint>(windowSize.y)); // Same as the main pass depth
         mAOSize = ComputeAOSize(blackBoard.AOSettings.ResolutionScale);
 
@@ -93,7 +92,7 @@ namespace Surge
         mBlurHFramebuffer = createFramebuffer(mAOBlur, "AOBlurHFramebuffer");
         mBlurVFramebuffer = createFramebuffer(mAO, "AOBlurVFramebuffer");
 
-        ShaderManager& shaderManager = Core::GetRenderer()->GetShaderManager();
+        ShaderManager& shaderManager = *mContext.Shaders;
         PipelineDesc pipelineDesc = {};
         pipelineDesc.Raster.Topo = Topology::TRIANGLE_LIST;
         pipelineDesc.Raster.Polygon = PolygonMode::FILL;
@@ -136,7 +135,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("AmbientOcclusionPass::Execute");
         const AmbientOcclusionSettings& settings = blackBoard.AOSettings;
-        if(!settings.Enable)
+        if(!blackBoard.RunsAO())
             return;
 
         // Resolution scale changed (ImGui/gameplay code), rebuild targets at frame end, this frame still uses the old ones
@@ -144,7 +143,7 @@ namespace Surge
         {
             mRecreatePending = true;
             const float scale = settings.ResolutionScale;
-            Core::AddFrameEndCallback([this, scale]() { RecreateTargets(scale); });
+            mContext.DeferToFrameEnd([this, scale]() { RecreateTargets(scale); });
         }
 
         if(mDescriptorsDirty[ctx.FrameIndex])
@@ -273,7 +272,7 @@ namespace Surge
 
         AmbientOcclusionSettings* settings = &blackBoard.AOSettings;
         const glm::uvec2 sceneSize = blackBoard.GetSceneSize(width, height);
-        Core::AddFrameEndCallback([this, sceneSize, settings]() { mFullSize = sceneSize; RecreateTargets(settings->ResolutionScale); });
+        mContext.DeferToFrameEnd([this, sceneSize, settings]() { mFullSize = sceneSize; RecreateTargets(settings->ResolutionScale); });
     }
 
     void AmbientOcclusionPass::RenderStatsViaImGui(FrameBlackboard& blackBoard)
@@ -283,6 +282,8 @@ namespace Surge
             return;
 
         ImGui::SeparatorText("Ambient Occlusion");
+        if(!blackBoard.RunsAO())
+            ImGui::TextDisabled("Skipped: no 3D geometry this frame");
         ImGui::Text("Resolution: %u x %u", mAOSize.x, mAOSize.y);
         ImGui::Text("Taps per pixel: %d", settings.SliceCount * settings.StepsPerSlice * 2 + (settings.AccurateNormals ? 5 : 1));
     }

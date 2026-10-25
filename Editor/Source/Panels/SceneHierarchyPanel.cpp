@@ -59,7 +59,9 @@ namespace Surge
             { "canvas", [](Entity e) { return e.HasComponent<UICanvasComponent>(); } },
             { "ui", [](Entity e) { return e.HasComponent<UICanvasComponent>(); } },
             { "environment", [](Entity e) { return e.HasComponent<EnvironmentComponent>(); } },
+            { "rendersettings", [](Entity e) { return e.HasComponent<RendererSettingsComponent>(); } },
             { "particles", [](Entity e) { return e.HasComponent<ParticleSystemComponent>(); } },
+            { "animator", [](Entity e) { return e.HasComponent<AnimatorComponent>(); } },
             { "rigidbody", [](Entity e) { return e.HasComponent<RigidbodyComponent>(); } },
             { "collider", [](Entity e) {
                   return e.HasComponent<BoxColliderComponent>() || e.HasComponent<SphereColliderComponent>() || e.HasComponent<CapsuleColliderComponent>() ||
@@ -793,7 +795,6 @@ namespace Surge
     void SceneHierarchyPanel::Select(Entity e, bool reveal)
     {
         mSelectedEntity = e;
-        mSceneContext->SetSelectedEntity(e);
         mRevealSelection = reveal;
     }
 

@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Material.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Texture2D.hpp"
 
@@ -8,10 +7,10 @@
 
 namespace Surge
 {
-    Material::Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName)
+    Material::Material(Renderer& renderer, const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName)
     {
         mShaderName = shader.GetName();
-        Initialize(pipeline, shader, materialBufferName);
+        Initialize(renderer, pipeline, shader, materialBufferName);
     }
 
     Material::~Material()
@@ -88,7 +87,7 @@ namespace Surge
             write.Binding = resource->Binding;
             write.Type = DescriptorType::TEXTURE;
             write.Texture = tex.Data2; // tex.Data2 is always a valid ImageHandle, even if we don't own the texture. If we have a Ref<Texture2D>, we get the ImageHandle from it else we use the Wwhite texture ImageHandle
-            write.Sampler = Core::GetRenderer()->GetDefaultSampler();
+            write.Sampler = mSampler;
             writes.push_back(write);
         }
 
@@ -97,11 +96,10 @@ namespace Surge
         mIsDirty[ctx.FrameIndex] = false;
     }
 
-    Ref<Material> Material::Create(const String& name)
+    Ref<Material> Material::Create(Renderer& renderer, const String& name)
     {
         // TODO: NOT HARDCODE Pipelines and shader names!
-        Renderer* r = Core::GetRenderer();
-        Ref<Material> material = Ref<Material>::Create(r->GetRenderGraphBlackBoard().MaterialPipeline, r->GetShaderManager().Get("Renderer3D.glsl"), "Material");
+        Ref<Material> material = Ref<Material>::Create(renderer, renderer.GetRenderGraphBlackBoard().MaterialPipeline, renderer.GetShaderManager().Get("Renderer3D.glsl"), "Material");
         material->SetName(name);
 
         material->Set<glm::vec3>("Albedo", glm::vec3(0.8f));
@@ -111,10 +109,10 @@ namespace Surge
         return material;
     }
 
-    void Material::Initialize(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName)
+    void Material::Initialize(Renderer& renderer, const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName)
     {
-        Renderer* renderer = Core::GetRenderer();
-        mRHI = renderer->GetRHI().get();
+        mRHI = renderer.GetRHI().get();
+        mSampler = renderer.GetDefaultSampler();
         mReflectedBuffer = shader.GetReflectionData().GetBuffer(materialBufferName);
         mReflectedResources = shader.GetReflectionData().GetResources();
 
@@ -151,7 +149,7 @@ namespace Surge
         }
         MarkDirty();
 
-        mWhiteTexture = renderer->GetWhiteTexture();
+        mWhiteTexture = renderer.GetWhiteTexture();
         SetTexture("AlbedoMap", mWhiteTexture);
         SetTexture("NormalMap", mWhiteTexture);
         SetTexture("RoughnessMetallicMap", mWhiteTexture);

@@ -7,6 +7,7 @@
 #include "Surge/Graphics/Camera/EditorCamera.hpp"
 #include "Surge/Graphics/Camera/RuntimeCamera.hpp"
 #include "Surge/Asset/Asset.hpp"
+#include "Surge/ECS/SceneContext.hpp"
 
 #include <entt.hpp>
 #include <functional>
@@ -24,12 +25,13 @@ namespace Surge
     class Scene final : public Asset
     {
     public:
-        Scene(const String& name);
+        Scene(const String& name, const SceneContext& context);
         ~Scene();
         SURGE_ASSET_TYPE(AssetType::SCENE);
-        static Ref<Scene> Create(const String& name) { return Ref<Scene>::Create(name); }
+        static Ref<Scene> Create(const String& name, const SceneContext& context) { return Ref<Scene>::Create(name, context); }
 
         const String& GetName() { return mName; }
+        const SceneContext& GetContext() const { return mContext; } // The engine systems this scene drives
         void OnRuntimeStart();
         void Update(); // Runtime Update
         // EditorView Update, editorDraw runs after the scene was submitted and before the frame ends (editor-only debug geometry)
@@ -46,9 +48,6 @@ namespace Surge
         void DestroyEntityImmediate(Entity entity);
         void SetParent(Entity entity, Entity newParent);
         Entity DuplicateEntity(Entity entity);
-
-        void SetSelectedEntity(Entity entity);
-        Entity GetSelectedEntity() const;
 
         void OnResize(float width, float height);
 
@@ -76,10 +75,12 @@ namespace Surge
         void DispatchPhysicsEvents();                  // OnCollisionEnter/Exit, OnTriggerEnter/Exit
         void UpdatePhysics();
         void UpdateAudio();
-        void UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar, float particleDeltaTime,
-                             bool cullParticles, const std::function<void(Scene&)>* editorDraw = nullptr);
+        void UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar, float scaledDeltaTime,
+                             bool cull, const std::function<void(Scene&)>* editorDraw = nullptr);
         // Simulates every ParticleSystemComponent, submits the visible ones (right after Renderer::BeginFrame). frustum = null: no culling
         void UpdateParticles(float deltaTime, const Frustum* frustum, bool submit);
+        // Advances + evaluates every AnimatorComponent, the mesh loop submits their poses. frustum = null: no culling
+        void UpdateAnimation(float deltaTime, const Frustum* frustum);
         void ProcessPendingEntityDestructions();
 
     private:
@@ -93,6 +94,7 @@ namespace Surge
 
     private:
         String mName;
+        SceneContext mContext;
         bool mIsRunning = false;
         bool mIsPaused = false;
         Uint mStepFrames = 0;

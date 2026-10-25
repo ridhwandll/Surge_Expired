@@ -23,6 +23,8 @@
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Collision/ObjectLayer.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <Jolt/Physics/Collision/RayCast.h>
@@ -33,6 +35,7 @@
 
 #include <Jolt/Renderer/DebugRenderer.h>
 #include <cstdarg>
+#include <algorithm>
 
 namespace Surge
 {
@@ -137,11 +140,33 @@ namespace Surge
         }
     };
 
+    /*
+        (Rid) Jolt object layers 
+        Let, userlayer = 2
+
+        Make(userlayer, isStatic) =  userlayer * 2 + isStatic
+        isStatic = true
+        userlayer * 2 + isStatic = 2 * 2 + 1 = 5; binary: 0101
+        isStatic = false
+        userlayer * 2 + isStatic = 2 * 2 + 0 = 4; binary: 0100
+        The 1st bit (LSB) is used to determine if the object is static or dynamic, while the remaining bits represent the user-defined layer.
+        This allows for a maximum of 16 user layers (0-15) and distinguishes between static and dynamic objects within those layers.
+
+        IsStatic(objectLayer) = (objectLayer & 1) == 0
+        if objectLayer is 5 (0101), IsStatic(5) = (5 & 1) == 0 => (0101 & 0001) == 0 => 0001 == 0 => false (dynamic)
+        if objectLayer is 4 (0100), IsStatic(4) = (4 & 1) == 0 => (0100 & 0001) == 0 => 0000 == 0 => true (static)
+
+        GetLayer(objectLayer) = objectLayer >> 1
+        if objectLayer is 4 (0100), GetLayer(4) = 4 >> 1 => 0100 >> 1 => 0010 => 2 (userlayer)
+        if objectLayer is 5 (0101), GetLayer(5) = 5 >> 1 => 0101 >> 1 => 0010 => 2 (userlayer)
+    */
     namespace PhysicsLayers
     {
-        static constexpr JPH::ObjectLayer STATIC = 0;
-        static constexpr JPH::ObjectLayer DYNAMIC = 1;
-        static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
+        static constexpr JPH::ObjectLayer NUM_LAYERS = PhysicsSettings::MAX_LAYERS * 2;
+
+        static constexpr JPH::ObjectLayer Make(int userLayer, bool isStatic) { return static_cast<JPH::ObjectLayer>(userLayer * 2 + (isStatic ? 0 : 1)); }
+        static constexpr bool IsStatic(JPH::ObjectLayer objectLayer) { return (objectLayer & 1) == 0; }
+        static constexpr int GetLayer(JPH::ObjectLayer objectLayer) { return objectLayer >> 1; }
     }
 
     namespace BroadPhaseLayers
@@ -154,20 +179,12 @@ namespace Surge
     class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
     {
     public:
-        BPLayerInterfaceImpl()
-        {
-            mObjectToBroadPhase[PhysicsLayers::STATIC] = BroadPhaseLayers::STATIC;
-            mObjectToBroadPhase[PhysicsLayers::DYNAMIC] = BroadPhaseLayers::DYNAMIC;
-        }
         virtual uint32_t GetNumBroadPhaseLayers() const override { return BroadPhaseLayers::NUM_LAYERS; }
         virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
         {
-            // Jolt asserts if we pass an invalid layer, so ensure it's within bounds
             JPH_ASSERT(inLayer < PhysicsLayers::NUM_LAYERS);
-            return mObjectToBroadPhase[inLayer];
+            return PhysicsLayers::IsStatic(inLayer) ? BroadPhaseLayers::STATIC : BroadPhaseLayers::DYNAMIC;
         }
-    private:
-        JPH::BroadPhaseLayer mObjectToBroadPhase[PhysicsLayers::NUM_LAYERS];
     };
 
     class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter
@@ -175,27 +192,35 @@ namespace Surge
     public:
         virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
         {
-            switch(inLayer1)
-            {
-                case PhysicsLayers::STATIC:  return inLayer2 == BroadPhaseLayers::DYNAMIC;
-                case PhysicsLayers::DYNAMIC: return true; // Dynamics collide with everything
-                default: return false;
-            }
+            return !PhysicsLayers::IsStatic(inLayer1) || inLayer2 == BroadPhaseLayers::DYNAMIC;
         }
     };
 
+    // Reads the live settings: collision matrix edits apply to the next broad phase pairs
     class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
     {
     public:
+        explicit ObjectLayerPairFilterImpl(const PhysicsSettings* settings) : mSettings(settings) {}
+
         virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
         {
-            switch(inObject1)
-            {
-                case PhysicsLayers::STATIC:  return inObject2 == PhysicsLayers::DYNAMIC;
-                case PhysicsLayers::DYNAMIC: return true;
-                default: return false;
-            }
+            if(PhysicsLayers::IsStatic(inObject1) && PhysicsLayers::IsStatic(inObject2))
+                return false;
+
+            return mSettings->ShouldCollide(PhysicsLayers::GetLayer(inObject1), PhysicsLayers::GetLayer(inObject2));
         }
+    private:
+        const PhysicsSettings* mSettings;
+    };
+
+    // Raycast layer mask: bit n = user layer n
+    class LayerMaskFilter final : public JPH::ObjectLayerFilter
+    {
+    public:
+        explicit LayerMaskFilter(Uint mask) : mMask(mask) {}
+        virtual bool ShouldCollide(JPH::ObjectLayer inLayer) const override { return (mMask >> PhysicsLayers::GetLayer(inLayer)) & 1u; }
+    private:
+        Uint mMask;
     };
 
     void Physics::Initialize()
@@ -217,7 +242,7 @@ namespace Surge
 
         mBPLayerInterface = new BPLayerInterfaceImpl();
         mObjVsBPLayerFilter = new ObjectVsBroadPhaseLayerFilterImpl();
-        mObjVsObjLayerFilter = new ObjectLayerPairFilterImpl();
+        mObjVsObjLayerFilter = new ObjectLayerPairFilterImpl(&mSettings);
 
         const Uint cMaxBodyPairs = 65536;          // Default: 1024
         const Uint cMaxContactConstraints = 10240; // Default: 1024
@@ -229,10 +254,17 @@ namespace Surge
             *static_cast<ObjectLayerPairFilterImpl*>(mObjVsObjLayerFilter)
         );
 
-        JPH::Vec3 globalGravity(0.0f, -9.81f, 0.0f);
-        mPhysicsSystem->SetGravity(globalGravity);
-
         mPhysicsSystem->SetContactListener(&mContactListener);
+        ApplySettings(mSettings);
+    }
+
+    void Physics::ApplySettings(const PhysicsSettings& settings)
+    {
+        mSettings = settings;
+        mSettings.FixedRate = std::clamp(mSettings.FixedRate, PhysicsSettings::MIN_FIXED_RATE, PhysicsSettings::MAX_FIXED_RATE);
+        mSettings.CollisionSubsteps = std::clamp(mSettings.CollisionSubsteps, 1, PhysicsSettings::MAX_SUBSTEPS);
+        mFixedTimestep = mSettings.GetFixedTimestep();
+        mPhysicsSystem->SetGravity(JPH::Vec3(mSettings.Gravity.x, mSettings.Gravity.y, mSettings.Gravity.z));
     }
 
     void Physics::Update(float deltaTime)
@@ -252,19 +284,19 @@ namespace Surge
         float frameTime = std::min(deltaTime, 0.25f); // Prevent the "Spiral of Death": clamp spike delta times (e.g., loading freezes, OS pauses)
         mAccumulatedTime += frameTime;
 
-        while(mAccumulatedTime >= FIXED_TIMESTEP)
+        while(mAccumulatedTime >= mFixedTimestep)
         {
             Simulate();
-            mAccumulatedTime -= FIXED_TIMESTEP;
+            mAccumulatedTime -= mFixedTimestep;
         }
 
-        mInterpolationAlpha = mAccumulatedTime / FIXED_TIMESTEP;
+        mInterpolationAlpha = mAccumulatedTime / mFixedTimestep;
     }
 
     void Physics::Simulate()
     {
         if(mFixedStepCallback)
-            mFixedStepCallback(FIXED_TIMESTEP); // Scripts first: forces they add apply to this step
+            mFixedStepCallback(mFixedTimestep); // Scripts first: forces they add apply to this step
 
         for(auto& [id, data] : mBodies)
         {
@@ -275,11 +307,12 @@ namespace Surge
             data.PreviousRotation = GetRotationQuat(id);
         }
 
-        mPhysicsSystem->Update(FIXED_TIMESTEP, COLLISION_SUBSTEPS, mTempAllocator, mJobSystem);
+        mPhysicsSystem->Update(mFixedTimestep, mSettings.CollisionSubsteps, mTempAllocator, mJobSystem);
     }
 
     void Physics::Shutdown()
     {
+        mMeshShapes.clear(); // Shapes are Jolt objects: released before Jolt goes away
         delete mPhysicsSystem;
         delete mDebugRenderer;
         delete mJobSystem;
@@ -294,7 +327,7 @@ namespace Surge
         JPH::Factory::sInstance = nullptr;
     }
 
-    bool Physics::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit& outHit) const
+    bool Physics::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit& outHit, Uint layerMask) const
     {
         SURGE_PROFILE_FUNC("Physics::Raycast");
         const float length = glm::length(direction);
@@ -304,7 +337,8 @@ namespace Surge
         const glm::vec3 ray = direction / length * maxDistance;
         const JPH::RRayCast rayCast(JPH::RVec3(origin.x, origin.y, origin.z), JPH::Vec3(ray.x, ray.y, ray.z));
         JPH::RayCastResult result;
-        if(!mPhysicsSystem->GetNarrowPhaseQuery().CastRay(rayCast, result))
+        const LayerMaskFilter layerFilter(layerMask);
+        if(!mPhysicsSystem->GetNarrowPhaseQuery().CastRay(rayCast, result, {}, layerFilter))
             return false;
 
         const JPH::RVec3 point = rayCast.GetPointOnRay(result.mFraction);
@@ -340,18 +374,12 @@ namespace Surge
         auto& rb = entity.GetComponent<RigidbodyComponent>();
 
         JPH::EMotionType motionType = JPH::EMotionType::Dynamic;
-        JPH::ObjectLayer objectLayer = PhysicsLayers::DYNAMIC;
-
         if(rb.Type == RigidbodyType::STATIC)
-        {
             motionType = JPH::EMotionType::Static;
-            objectLayer = PhysicsLayers::STATIC;
-        }
         else if(rb.Type == RigidbodyType::KINEMATIC)
-        {
             motionType = JPH::EMotionType::Kinematic;
-            objectLayer = PhysicsLayers::DYNAMIC;
-        }
+
+        const JPH::ObjectLayer objectLayer = PhysicsLayers::Make(PhysicsSettings::ClampLayer(rb.Layer), motionType == JPH::EMotionType::Static);
 
         // Jolt's body position is the shape's origin (= the entity's), it places the center of mass itself (Body::GetPosition() = COM - R * GetCenterOfMass())
         JPH::Vec3 joltPosition = JPH::Vec3(transform.Position.x, transform.Position.y, transform.Position.z);
@@ -410,6 +438,14 @@ namespace Surge
         rb.RuntimeBodyID = JPH::BodyID().GetIndexAndSequenceNumber();
     }
 
+    void Physics::SetLayer(RigidBodyID rbID, int layer)
+    {
+        JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
+        const JPH::BodyID bodyID(rbID);
+        const bool isStatic = PhysicsLayers::IsStatic(bodyInterface.GetObjectLayer(bodyID));
+        bodyInterface.SetObjectLayer(bodyID, PhysicsLayers::Make(PhysicsSettings::ClampLayer(layer), isStatic));
+    }
+
     bool Physics::IsActive(RigidBodyID rbID) const
     {
         const JPH::BodyInterface& bodyInterface = mPhysicsSystem->GetBodyInterface();
@@ -466,6 +502,176 @@ namespace Surge
         }
     }
 
+    // Where a convex/mesh collider sits relative to its mesh: local rotation, then offset, then the entity's scale (offset included)
+    struct ColliderPlacement
+    {
+        glm::quat Rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 Offset = glm::vec3(0.0f);
+        glm::vec3 Scale = glm::vec3(1.0f);
+
+        glm::vec3 Apply(const glm::vec3& point) const { return (Rotation * point + Offset) * Scale; }
+    };
+
+    // The mesh a convex/mesh collider is built from, null without one
+    static const Mesh* GetColliderMesh(entt::registry& registry, entt::entity entity)
+    {
+        const MeshComponent* meshComp = registry.try_get<MeshComponent>(entity);
+        if(!meshComp || !meshComp->MeshAsset)
+            return nullptr;
+
+        return meshComp->MeshAsset.As<Mesh>().Raw();
+    }
+
+    static JPH::ShapeRefC BuildConvexHull(const Mesh& mesh, const ColliderPlacement& placement, Uint entityID)
+    {
+        const Vector<Vertex>& meshVertices = mesh.GetVertices();
+        if(meshVertices.empty())
+        {
+            Log<Severity::Warn>("[Physics] Entity {} mesh has 0 CPU vertices!", entityID);
+            return nullptr;
+        }
+
+        // (Rid) Same space as the rendered mesh (node transform, like the MeshCollider), then the placement.
+        // Points stay where the mesh is: the hull's center of mass is handled by Jolt, recentering here would move the collider off the mesh
+        Vector<JPH::Vec3> joltVertices;
+        joltVertices.reserve(meshVertices.size());
+        for(const Submesh& submesh : mesh.GetSubmeshes())
+        {
+            const Uint lastVertex = std::min(submesh.BaseVertex + submesh.VertexCount, static_cast<Uint>(meshVertices.size()));
+            for(Uint vIndex = submesh.BaseVertex; vIndex < lastVertex; ++vIndex)
+            {
+                const glm::vec3 p = placement.Apply(mesh.GetRestPosition(submesh, vIndex)); // Skinned meshes: their rest pose
+                joltVertices.emplace_back(JPH::Vec3(p.x, p.y, p.z));
+            }
+        }
+
+        if(joltVertices.empty())
+        {
+            Log<Severity::Warn>("[Physics] Entity {} mesh has no submesh vertices!", entityID);
+            return nullptr;
+        }
+
+        // Compute hull bounds for adaptive convex radius
+        JPH::Vec3 bboxMin = joltVertices[0], bboxMax = joltVertices[0];
+        for(const auto& v : joltVertices)
+        {
+            bboxMin = JPH::Vec3::sMin(bboxMin, v);
+            bboxMax = JPH::Vec3::sMax(bboxMax, v);
+        }
+        float hullDiagonal = (bboxMax - bboxMin).Length();
+        if(hullDiagonal < 1e-4f)
+        {
+            Log<Severity::Warn>("[Physics] Entity {} hull too small ({:.5f}m), fallback!", entityID, hullDiagonal);
+            return nullptr;
+        }
+        float convexRadius = std::clamp(hullDiagonal * 0.01f, 0.0001f, 0.05f);
+
+        JPH::ConvexHullShapeSettings settings(joltVertices.data(), (int)joltVertices.size(), convexRadius);
+        JPH::ShapeSettings::ShapeResult result = settings.Create();
+        if(result.HasError())
+        {
+            Log<Severity::Error>("[Physics] Convex Hull failed: {}", result.GetError().c_str());
+            return nullptr;
+        }
+        return result.Get();
+    }
+
+    static JPH::ShapeRefC BuildTriangleMesh(const Mesh& mesh, const ColliderPlacement& placement, Uint entityID)
+    {
+        const Vector<Vertex>& meshVertices = mesh.GetVertices();
+        const Vector<Index>& meshIndices = mesh.GetIndices();
+        const Vector<Submesh>& submeshes = mesh.GetSubmeshes();
+        if(meshVertices.empty() || meshIndices.empty())
+        {
+            Log<Severity::Warn>("[Physics] Entity {} mesh missing CPU data!", entityID);
+            return nullptr;
+        }
+
+        JPH::VertexList joltVertices;
+        joltVertices.resize(meshVertices.size());
+        for(const Submesh& submesh : submeshes)
+        {
+            for(Uint i = 0; i < submesh.VertexCount; ++i)
+            {
+                const Uint vIndex = submesh.BaseVertex + i;
+                const glm::vec3 p = placement.Apply(mesh.GetRestPosition(submesh, vIndex)); // Submesh node transform (skinned meshes: their rest pose)
+                joltVertices[vIndex] = JPH::Float3(p.x, p.y, p.z);
+            }
+        }
+
+        JPH::IndexedTriangleList joltTriangles;
+        joltTriangles.reserve(meshIndices.size());
+        for(const auto& submesh : submeshes)
+        {
+            Uint startTriangle = submesh.BaseIndex / 3;
+            Uint triangleCount = submesh.IndexCount / 3;
+
+            for(Uint i = 0; i < triangleCount; ++i)
+            {
+                const Index& idx = meshIndices[startTriangle + i];
+                joltTriangles.emplace_back(JPH::IndexedTriangle(
+                    idx.V1 + submesh.BaseVertex,
+                    idx.V2 + submesh.BaseVertex,
+                    idx.V3 + submesh.BaseVertex,
+                    0 // Material Index
+                ));
+            }
+        }
+
+        JPH::MeshShapeSettings settings(joltVertices, joltTriangles);
+        JPH::ShapeSettings::ShapeResult result = settings.Create();
+        if(result.HasError())
+        {
+            Log<Severity::Error>("[Physics] MeshShape failed: {}", result.GetError().c_str());
+            return nullptr;
+        }
+        return result.Get();
+    }
+
+    JPH::ShapeRefC Physics::CreateMeshColliderShape(const Mesh& mesh, MeshShapeType type, const glm::vec3& offset, const glm::vec3& rotationDegrees, const glm::vec3& scale, Uint entityID)
+    {
+        const auto build = [&mesh, type, entityID](const ColliderPlacement& placement) -> JPH::ShapeRefC
+        {
+            return type == MeshShapeType::CONVEX_HULL ? BuildConvexHull(mesh, placement, entityID) : BuildTriangleMesh(mesh, placement, entityID);
+        };
+
+        // Shared shape: the mesh as it is, built once per mesh
+        JPH::ShapeRefC shape;
+        const AssetID meshID = mesh.GetID();
+        if(meshID.IsValid())
+        {
+            CachedMeshShapes& cached = mMeshShapes[meshID.Get()];
+            if(cached.Source != &mesh)
+                cached = CachedMeshShapes { .Source = &mesh, .ConvexHull = nullptr, .TriangleMesh = nullptr };
+
+            JPH::ShapeRefC& slot = (type == MeshShapeType::CONVEX_HULL) ? cached.ConvexHull : cached.TriangleMesh;
+            if(!slot)
+                slot = build(ColliderPlacement());
+
+            shape = slot;
+        }
+        else
+            shape = build(ColliderPlacement()); // Not an asset (built in code): nothing to share it by
+
+        if(!shape)
+            return nullptr;
+
+        // Collider's placement around it
+        const glm::quat rotation = glm::quat(glm::radians(rotationDegrees));
+        if(rotationDegrees != glm::vec3(0.0f) || offset != glm::vec3(0.0f))
+            shape = new JPH::RotatedTranslatedShape(JPH::Vec3(offset.x, offset.y, offset.z), JPH::Quat(rotation.x, rotation.y, rotation.z, rotation.w), shape);
+
+        if(scale != glm::vec3(1.0f))
+        {
+            const JPH::Vec3 joltScale(scale.x, scale.y, scale.z);
+            if(!shape->IsValidScale(joltScale))
+                return build({ .Rotation = rotation, .Offset = offset, .Scale = scale }); // Non-uniform scale on a rotated collider would shear it (or a zero scale)
+
+            shape = new JPH::ScaledShape(shape, joltScale);
+        }
+        return shape;
+    }
+
     JPH::ShapeRefC Physics::CreateShape(Entity entity)
     {
         auto& registry = entity.GetScene()->GetRegistry();
@@ -482,7 +688,6 @@ namespace Surge
             float maxScale = std::max({ absScale.x, absScale.y, absScale.z });
             return new JPH::SphereShape(sphere->Radius * maxScale);
         }
-
         if(auto* capsule = registry.try_get<CapsuleColliderComponent>(entity.Raw()))
         {
             // Radius scales along X/Z plane, Height scales along Y
@@ -512,151 +717,29 @@ namespace Surge
         }
         if(auto* convex = registry.try_get<ConvexColliderComponent>(entity.Raw()))
         {
-            if(!registry.any_of<MeshComponent>(entity.Raw()))
-            {
-                Log<Severity::Warn>("[Physics] Entity {} has ConvexCollider but no MeshComponent!", (Uint)entity);
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            }
-            auto& meshComp = registry.get<MeshComponent>(entity.Raw());
-            if(!meshComp.MeshAsset)
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-
-            Ref<Mesh> mesh = meshComp.MeshAsset.As<Mesh>();
+            const Mesh* mesh = GetColliderMesh(registry, entity.Raw());
             if(!mesh)
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-
-            const Vector<Vertex>& meshVertices = mesh->GetVertices();
-            const Vector<Submesh>& submeshes = mesh->GetSubmeshes();
-            if(meshVertices.empty())
             {
-                Log<Severity::Warn>("[Physics] Entity {} mesh has 0 CPU vertices!", (Uint)entity);
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            }
-
-            // (Rid) Same space as the rendered mesh (node transform, like the MeshCollider), then local rotation, entity scale and the scaled LocalOffset.
-            // Points stay where the mesh is: the hull's center of mass is handled by Jolt, recentering here would move the collider off the mesh
-            glm::quat localRot = glm::quat(glm::radians(convex->LocalRotation));
-            Vector<JPH::Vec3> joltVertices;
-            joltVertices.reserve(meshVertices.size());
-            for(const Submesh& submesh : submeshes)
-            {
-                const Uint lastVertex = std::min(submesh.BaseVertex + submesh.VertexCount, static_cast<Uint>(meshVertices.size()));
-                for(Uint vIndex = submesh.BaseVertex; vIndex < lastVertex; ++vIndex)
-                {
-                    const glm::vec3 nodePos = glm::vec3(submesh.Transform * glm::vec4(meshVertices[vIndex].Position, 1.0f));
-                    const glm::vec3 r = localRot * nodePos + convex->LocalOffset;
-                    joltVertices.emplace_back(JPH::Vec3(r.x * absScale.x, r.y * absScale.y, r.z * absScale.z));
-                }
-            }
-
-            if(joltVertices.empty())
-            {
-                Log<Severity::Warn>("[Physics] Entity {} mesh has no submesh vertices!", (Uint)entity);
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            }
-
-            // Compute hull bounds for adaptive convex radius
-            JPH::Vec3 bboxMin = joltVertices[0], bboxMax = joltVertices[0];
-            for(const auto& v : joltVertices)
-            {
-                bboxMin = JPH::Vec3::sMin(bboxMin, v);
-                bboxMax = JPH::Vec3::sMax(bboxMax, v);
-            }
-            float hullDiagonal = (bboxMax - bboxMin).Length();
-            if(hullDiagonal < 1e-4f)
-            {
-                Log<Severity::Warn>("[Physics] Entity {} hull too small ({:.5f}m), fallback!", (Uint)entity, hullDiagonal);
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            }
-            float convexRadius = std::clamp(hullDiagonal * 0.01f, 0.0001f, 0.05f);
-
-            JPH::ConvexHullShapeSettings settings(joltVertices.data(), (int)joltVertices.size(), convexRadius);
-            JPH::ShapeSettings::ShapeResult result = settings.Create();
-
-            if(result.HasError())
-            {
-                Log<Severity::Error>("[Physics] Convex Hull failed: {}", result.GetError().c_str());
+                Log<Severity::Warn>("[Physics] Entity {} has a ConvexCollider but no mesh!", (Uint)entity);
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
             }
 
             convex->IsDirty = true;
-            return result.Get();
+            JPH::ShapeRefC shape = CreateMeshColliderShape(*mesh, MeshShapeType::CONVEX_HULL, convex->LocalOffset, convex->LocalRotation, absScale, (Uint)entity);
+            if(!shape)
+                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
+            return shape;
         }
         if(auto* meshCol = registry.try_get<MeshColliderComponent>(entity.Raw()))
         {
-            if(!registry.any_of<MeshComponent>(entity.Raw()))
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            auto& meshComp = registry.get<MeshComponent>(entity.Raw());
-            if(!meshComp.MeshAsset)
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-
-            Ref<Mesh> mesh = meshComp.MeshAsset.As<Mesh>();
+            const Mesh* mesh = GetColliderMesh(registry, entity.Raw());
             if(!mesh)
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
 
-            const Vector<Vertex>& meshVertices = mesh->GetVertices();
-            const Vector<Index>& meshIndices = mesh->GetIndices();
-            const Vector<Submesh>& submeshes = mesh->GetSubmeshes();
-            if(meshVertices.empty() || meshIndices.empty())
-            {
-                Log<Severity::Warn>("[Physics] Entity {} mesh missing CPU data!", (Uint)entity);
+            JPH::ShapeRefC shape = CreateMeshColliderShape(*mesh, MeshShapeType::TRIANGLE_MESH, meshCol->LocalOffset, meshCol->LocalRotation, absScale, (Uint)entity);
+            if(!shape)
                 return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            }
-
-            // Rotate + Scale
-            glm::quat localRot = glm::quat(glm::radians(meshCol->LocalRotation));
-            JPH::VertexList joltVertices;
-            joltVertices.resize(meshVertices.size());
-            for(const Submesh& submesh : submeshes)
-            {
-                for(Uint i = 0; i < submesh.VertexCount; ++i)
-                {
-                    Uint vIndex = submesh.BaseVertex + i;
-                    const Vertex& v = meshVertices[vIndex];
-
-                    // Apply the Submesh Node Transform 
-                    glm::vec4 nodePos = submesh.Transform * glm::vec4(v.Position, 1.0f);
-
-                    // Apply Local Rotation
-                    glm::vec3 r = localRot * glm::vec3(nodePos);
-
-                    // Apply Entity Scale and Local Offset
-                    joltVertices[vIndex] = JPH::Float3(
-                        (r.x * absScale.x) + (meshCol->LocalOffset.x * absScale.x),
-                        (r.y * absScale.y) + (meshCol->LocalOffset.y * absScale.y),
-                        (r.z * absScale.z) + (meshCol->LocalOffset.z * absScale.z)
-                    );
-                }
-            }
-
-            JPH::IndexedTriangleList joltTriangles;
-            joltTriangles.reserve(meshIndices.size());
-            for(const auto& submesh : submeshes)
-            {
-                Uint startTriangle = submesh.BaseIndex / 3;
-                Uint triangleCount = submesh.IndexCount / 3;
-
-                for(Uint i = 0; i < triangleCount; ++i)
-                {
-                    const Index& idx = meshIndices[startTriangle + i];
-                    joltTriangles.emplace_back(JPH::IndexedTriangle(
-                        idx.V1 + submesh.BaseVertex,
-                        idx.V2 + submesh.BaseVertex,
-                        idx.V3 + submesh.BaseVertex,
-                        0 // Material Index
-                    ));
-                }
-            }
-
-            JPH::MeshShapeSettings settings(joltVertices, joltTriangles);
-            JPH::ShapeSettings::ShapeResult result = settings.Create();
-            if(result.HasError())
-            {
-                Log<Severity::Error>("[Physics] MeshShape failed: {}", result.GetError().c_str());
-                return new JPH::BoxShape(JPH::Vec3::sReplicate(0.5f));
-            }
-
-            return result.Get();
+            return shape;
         }
         // Default fallback
         Log<Severity::Fatal>("[Physics] CreateShape: THIS SHOULD NOT HAPPEN; Entity {} has no recognized collider component, using default box shape!", (Uint)entity);

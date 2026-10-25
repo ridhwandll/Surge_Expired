@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "UILayoutSerializer.hpp"
 #include "UILayoutBinaryFormat.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <json/json.hpp>
@@ -461,7 +460,7 @@ namespace Surge
         Log<Severity::Error>("[UILayoutSerializer] Serialize is unsupported on Android runtime. APK assets are readonly!");
         return false;
 #else
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const AssetMetadata& metadata = am->GetMetadata(asset->GetID());
         const String absolutePath = am->GetAbsolutePath(metadata.RelativePath);
         const UILayout& layout = *asset.As<UILayout>();
@@ -480,7 +479,7 @@ namespace Surge
 
     Ref<Asset> UILayoutSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
 
         Ref<UILayout> layout = UILayout::Create();
         AssetStamp stamp;

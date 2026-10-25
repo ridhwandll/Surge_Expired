@@ -19,7 +19,7 @@ namespace Surge
     {
         RenderViewDesc desc;
         desc.DebugName = type == ViewportType::SCENE ? std::format("Scene View {}", index) : String("Game View"); // Also names it in the Renderer panel
-        desc.EditorOverlay = type == ViewportType::SCENE; // Selection outline, colliders, axes
+        desc.EditorOverlay = type == ViewportType::SCENE; // Colliders, axes
         desc.ShowUI = type == ViewportType::GAME;
         mView = Core::GetRenderer()->CreateView(desc);
     }

@@ -44,18 +44,22 @@ namespace Surge
         constexpr float ROUNDING = 8.0f;
         constexpr float BUTTON_ROUNDING = 2.0f;
         constexpr float FORM_MAX_WIDTH = 640.0f;
+        constexpr float CARD_SHADOW_END = 0.5f;
 
         namespace Palette
         {
-            constexpr ImVec4 WINDOW_BG = ImVec4(0.05f, 0.05f, 0.05f, 1.0f);
-            constexpr ImVec4 SIDEBAR_BG = ImVec4(0.074f, 0.074f, 0.074f, 1.0f);
-            constexpr ImVec4 CARD = ImVec4(0.09f, 0.09f, 0.09f, 1.0f);
-            constexpr ImVec4 CARD_HOVERED = ImVec4(0.118f, 0.118f, 0.118f, 1.0f);
-            constexpr ImVec4 CARD_SELECTED = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
             constexpr ImVec4 BORDER = ImVec4(0.16f, 0.16f, 0.16f, 1.0f);
+            constexpr ImVec4 WINDOW_BG = ImVec4(0.074f, 0.074f, 0.074f, 1.0f);
+            constexpr ImVec4 SIDEBAR_BG = ImVec4(0.074f, 0.074f, 0.074f, 1.0f);
+
+            constexpr ImVec4 CARD = ImVec4(0.067f, 0.067f, 0.067f, 1.0f);
+            constexpr ImVec4 CARD_HOVERED = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+            constexpr ImVec4 CARD_SELECTED = ImVec4(0.12f, 0.12f, 0.12f, 1.0f);
+
             constexpr ImVec4 CONTROL = ImVec4(0.118f, 0.118f, 0.126f, 1.0f);
             constexpr ImVec4 CONTROL_HOVERED = ImVec4(0.158f, 0.158f, 0.168f, 1.0f);
             constexpr ImVec4 CONTROL_ACTIVE = ImVec4(0.190f, 0.190f, 0.200f, 1.0f);
+
             constexpr ImVec4 TEXT = ImVec4(0.930f, 0.930f, 0.930f, 1.0f);
             constexpr ImVec4 TEXT_MUTED = ImVec4(0.540f, 0.540f, 0.540f, 1.0f);
             constexpr ImVec4 TEXT_FAINT = ImVec4(0.340f, 0.340f, 0.340f, 1.0f);
@@ -64,11 +68,12 @@ namespace Surge
             constexpr ImVec4 ACCENT_HOVERED = ImVec4(1.0f, 0.720f, 0.220f, 1.0f);
             constexpr ImVec4 DANGER = ImVec4(0.920f, 0.340f, 0.320f, 1.0f);
             constexpr ImVec4 SUCCESS = ImVec4(0.420f, 0.800f, 0.470f, 1.0f);
+
         } // namespace Palette
 
         // Whole pixels only: ImGui bakes glyphs at the rounded size and scales the quads to a fractional one, which blurs the text
         constexpr float FONT_TITLE = 28.0f;
-        constexpr float FONT_BRAND = 26.0f;
+        constexpr float FONT_BRAND = 30.0f;
         constexpr float FONT_HEADING = 21.0f;
         constexpr float FONT_NAV = 18.0f;
         constexpr float FONT_NAME = 17.0f;
@@ -91,6 +96,23 @@ namespace Surge
 
         ImFont* RegularFont() { return ImGui::GetIO().Fonts->Fonts[0]; }
         ImFont* BoldFont() { return ImGui::GetIO().Fonts->Fonts[1]; } // VulkanImGui.cpp
+
+        // Rounded tint, strongest (the color's alpha) on the left edge (right edge when fromRight), fading to nothing at endFraction of the width (0..1)
+        void FillShadowRect(ImDrawList* drawList, const ImVec2& min, const ImVec2& max, float rounding, ImU32 color, float endFraction = 1.0f, bool fromRight = false)
+        {
+            const int firstVertex = drawList->VtxBuffer.Size;
+            drawList->AddRectFilled(min, max, color, rounding);
+
+            const float invWidth = 1.0f / std::max((max.x - min.x) * endFraction, 1.0f);
+            for(int i = firstVertex; i < drawList->VtxBuffer.Size; i++)
+            {
+                ImDrawVert& vertex = drawList->VtxBuffer[i];
+                const float distance = fromRight ? max.x - vertex.pos.x : vertex.pos.x - min.x;
+                const float fade = 1.0f - std::clamp(distance * invWidth, 0.0f, 1.0f);
+                const ImU32 alpha = static_cast<ImU32>(static_cast<float>(vertex.col >> IM_COL32_A_SHIFT) * fade);
+                vertex.col = (vertex.col & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT); // The anti-aliased fringe keeps its zero alpha
+            }
+        }
 
         // Pixel rect ImGui draws without anti-aliasing, stays sharp
         void FillRect(ImDrawList* drawList, float x, float y, float width, float height, ImU32 color)
@@ -503,17 +525,20 @@ namespace Surge
         {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 windowPos = ImGui::GetWindowPos();
+            const ImU32 shadowLeft = IM_COL32(0, 0, 0, 10);
+            const ImU32 shadowRight = IM_COL32(0, 0, 0, 200);
+            drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + SIDEBAR_WIDTH, windowPos.y + height), shadowLeft, shadowRight, shadowRight, shadowLeft);
             FillRect(drawList, windowPos.x + SIDEBAR_WIDTH - 1.0f, windowPos.y, 1.0f, height, Col(Palette::BORDER));
 
             // Brand
             ImGuiAux::ShiftCursorX(10.0f);
             ImGui::PushFont(BoldFont(), FONT_BRAND);
-            ImGui::TextColored(Palette::ACCENT, "Surge Engine");
+            ImGui::TextColored(Palette::ACCENT, "SURGE");
             ImGui::PopFont();
             ImGuiAux::ShiftCursorX(10.0f);
             ImGui::PushStyleColor(ImGuiCol_Text, Palette::TEXT_MUTED);
 #ifdef SURGE_DEBUG
-            ImGui::TextUnformatted("Project Hub  |  DEBUG");
+            ImGui::TextUnformatted("Project Hub  DEBUG");
 #else
             ImGui::TextUnformatted("Project Hub");
 #endif
@@ -738,6 +763,9 @@ namespace Surge
                 const ImVec4& background = selected ? Palette::CARD_SELECTED : (hovered ? Palette::CARD_HOVERED : Palette::CARD);
                 drawList->AddRectFilled(min, max, Col(background), ROUNDING);
 
+                const ImU32 shadowColor = selected ? IM_COL32(0, 0, 0, 255) : (hovered ? IM_COL32(30, 30, 30, 255) : IM_COL32(12, 12, 12, 255));
+                FillShadowRect(drawList, min, max, ROUNDING, shadowColor, selected ? 1.0f : CARD_SHADOW_END, selected);
+
                 // Right side: last opened + "..." menu
                 constexpr float moreSize = 28.0f;
                 const float moreX = max.x - 12.0f - moreSize;
@@ -788,7 +816,7 @@ namespace Surge
 
                 const ImVec2 nextRow = ImGui::GetCursorScreenPos();
                 const bool menuOpen = ImGui::IsPopupOpen("##RowContext");
-                if(hovered || selected || menuOpen)
+                if(selected || menuOpen)
                 {
                     const float moreY = min.y + std::floor((ROW_HEIGHT - moreSize) * 0.5f);
                     ImGui::SetCursorScreenPos(ImVec2(moreX, moreY));
@@ -1244,7 +1272,7 @@ namespace Surge
         project.Version = "1.0";
 
         ActivateAssetManager(projectFile);
-        Ref<Scene> startScene = mAssetManager->Create<Scene>(std::format("Scenes/Main{}", GetExtensionFromAssetType(AssetType::SCENE)), "Main");
+        Ref<Scene> startScene = mAssetManager->Create<Scene>(std::format("Scenes/Main{}", GetExtensionFromAssetType(AssetType::SCENE)), "Main", Core::GetSceneContext());
         project.StartScene = startScene->GetID();
         project.Save(projectFile);
 
@@ -1366,8 +1394,9 @@ namespace Surge
         std::error_code error;
         std::filesystem::create_directories(assetsDirectory, error);
 
+        const AssetContext context = mAssetManager->GetContext(); // Set up by Core, stays the same across projects
         mAssetManager->Shutdown();
-        mAssetManager->Initialize(assetsDirectory);
+        mAssetManager->Initialize(assetsDirectory, context);
         static_cast<Editor*>(Core::GetClient())->GetPanelManager().GetPanel<ContentBrowserPanel>()->OnAssetManagerInit();
     }
 

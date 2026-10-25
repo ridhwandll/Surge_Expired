@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Texture2DSerializer.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Graphics/RHI/RHIDescs.hpp"
 #include "Surge/Asset/AssetManager.hpp"
@@ -27,17 +26,17 @@ namespace Surge
 
     Ref<Asset> Texture2DSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const String ktx2Path = am->GetSidecarPath(metadata.ID);
 
         // Null marks the asset MISSING (LoadFromKTX2 logs why), no assert: a bad cooked file must not take the app down
-        Ref<Texture2D> texture = LoadFromKTX2(ktx2Path);
+        Ref<Texture2D> texture = LoadFromKTX2(*mContext->Renderer_, ktx2Path);
         if(!texture)
             return nullptr;
         return texture.As<Asset>();
     }
 
-    Ref<Texture2D> Texture2DSerializer::LoadFromKTX2(const String& ktx2Path)
+    Ref<Texture2D> Texture2DSerializer::LoadFromKTX2(Renderer& renderer, const String& ktx2Path)
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(ktx2Path, fileData))
@@ -46,10 +45,10 @@ namespace Surge
             return {};
         }
 
-        TextureSpecification spec = LoadFromKTX2(fileData, ktx2Path, false);
+        TextureSpecification spec = LoadFromKTX2(renderer.GetRHI().get(), fileData, ktx2Path, false);
         if(spec.Mips.empty())
             return {};
-        return Texture2D::Create(spec);
+        return Texture2D::Create(renderer, spec);
     }
 
     struct TranscodeTarget
@@ -63,11 +62,10 @@ namespace Surge
     // Preferred hardware format per platform, falling back to what the GPU actually supports
     // Android: ASTC 4x4 -> ETC2 RGBA (guaranteed on GLES3-class/Vulkan Android GPUs) -> RGBA32
     // Desktop: BC7 -> RGBA32
-    static const TranscodeTarget& SelectTranscodeTarget()
+    static const TranscodeTarget& SelectTranscodeTarget(GraphicsRHI* rhi)
     {
-        static const TranscodeTarget sTarget = []()
+        static const TranscodeTarget sTarget = [rhi]()
         {
-            Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
             const TranscodeTarget candidates[] = {
 #ifdef SURGE_PLATFORM_ANDROID
                 { basist::transcoder_texture_format::cTFASTC_4x4_RGBA, ImageFormat::ASTC4x4_SRGB, ImageFormat::ASTC4x4_UNORM, true },
@@ -92,7 +90,7 @@ namespace Surge
         return sTarget;
     }
 
-    TextureSpecification Texture2DSerializer::LoadFromKTX2(const Vector<Byte>& ktx2Data, const String& debugStr, bool raw)
+    TextureSpecification Texture2DSerializer::LoadFromKTX2(GraphicsRHI* rhi, const Vector<Byte>& ktx2Data, const String& debugStr, bool raw)
     {
         if(!raw && ktx2Data.size() <= sizeof(AssetStamp))
         {
@@ -119,7 +117,7 @@ namespace Surge
         TextureSpecification spec;
         spec.DebugName = Filesystem::GetFilenameWithExt(debugStr);
 
-        const TranscodeTarget& target = SelectTranscodeTarget();
+        const TranscodeTarget& target = SelectTranscodeTarget(rhi);
         const basist::transcoder_texture_format transcoderFmt = target.Format;
         spec.Format = isSRGB ? target.SRGB : target.UNORM;
         spec.GenerateMips = false;

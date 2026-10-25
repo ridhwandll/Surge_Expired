@@ -24,9 +24,15 @@ namespace Surge
         // Zeroes the next delta, used after the app was suspended so the first frame back does not see the whole pause as dt
         void ResetDelta();
 
+        // Game time scale (0 = frozen, 1 = normal), Core::SetTimeScale: scales the physics step accumulation and the delta time scripts get
+        void SetTimeScale(float scale) { mTimeScale = scale > 0.0f ? scale : 0.0f; }
+        float GetTimeScale() const { return mTimeScale; }
+
     private:
         std::chrono::high_resolution_clock::time_point mStart;
         std::chrono::high_resolution_clock::time_point mThen;
         std::chrono::high_resolution_clock::time_point mNow;
+        float mTimeScale = 1.0f;
     };
+
 } // namespace Surge

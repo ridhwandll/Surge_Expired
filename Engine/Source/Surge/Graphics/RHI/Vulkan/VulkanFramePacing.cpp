@@ -12,8 +12,10 @@ namespace Surge::VulkanFramePacing
 {
 #ifdef SURGE_PLATFORM_ANDROID
     static bool sActive = false;
+    static bool sEnabled = true;
     static float sTargetFPS = 60.0f;
     static uint64_t sRefreshPeriodNS = 0;
+    static constexpr uint64_t MAX_AUTO_SWAP_INTERVAL_NS = 50'000'000; // 20 fps
     static JNIEnv* sEnv = nullptr; // The android_main thread is not attached to the JVM by default, Swappy needs it for Choreographer/display queries
 
     Vector<String> GetRequiredDeviceExtensions(VkPhysicalDevice gpu, const Vector<VkExtensionProperties>& available)
@@ -86,9 +88,10 @@ namespace Surge::VulkanFramePacing
         SetTargetFrameRate(device, swapchain, sTargetFPS);
         Log<Severity::Info>("[FramePacing] Swappy active, display refresh period: {:.2f} ms, target: {} fps", refreshPeriod / 1.0e6, sTargetFPS);
 
-        //TODO (Rid) Look at this again
-        SwappyVk_setMaxAutoSwapIntervalNS(16'666'667);
-        SwappyVk_setAutoSwapInterval(false);
+        // A frame that misses the target would alternate 1 and 2 vsyncs (60/30 judder): Swappy lengthens the interval to the next
+        // even step it can hold (30 fps on 60 Hz, 40 on 120 Hz) and returns to the target once frames fit again. Below 20 fps it stops pacing
+        SwappyVk_setMaxAutoSwapIntervalNS(MAX_AUTO_SWAP_INTERVAL_NS);
+        SwappyVk_setAutoSwapInterval(true);
         SwappyVk_setAutoPipelineMode(false);
         return true;
     }
@@ -114,9 +117,14 @@ namespace Surge::VulkanFramePacing
         return sActive;
     }
 
+    void SetEnabled(bool enabled)
+    {
+        sEnabled = enabled;
+    }
+
     VkResult QueuePresent(VkQueue queue, const VkPresentInfoKHR& presentInfo)
     {
-        return sActive ? SwappyVk_queuePresent(queue, &presentInfo) : vkQueuePresentKHR(queue, &presentInfo);
+        return sActive && sEnabled ? SwappyVk_queuePresent(queue, &presentInfo) : vkQueuePresentKHR(queue, &presentInfo);
     }
 
 #else
@@ -128,6 +136,7 @@ namespace Surge::VulkanFramePacing
     void OnSwapchainDestroyed(VkDevice, VkSwapchainKHR) {}
     void SetTargetFrameRate(VkDevice, VkSwapchainKHR, float) {}
     bool IsActive() { return false; }
+    void SetEnabled(bool) {}
     VkResult QueuePresent(VkQueue queue, const VkPresentInfoKHR& presentInfo) { return vkQueuePresentKHR(queue, &presentInfo); }
 
 #endif

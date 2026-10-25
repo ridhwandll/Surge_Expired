@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AudioSerializer.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Audio/Audio.hpp"
 #include "AudioBinaryFormat.hpp"
@@ -20,7 +19,7 @@ namespace Surge
 
     Ref<Asset> AudioSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
 
         AssetStamp stamp;
         Vector<Byte> encodedData;

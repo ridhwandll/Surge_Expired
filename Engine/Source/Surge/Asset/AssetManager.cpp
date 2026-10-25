@@ -47,8 +47,13 @@ namespace Surge
             serializer->Shutdown();
     }
 
-    void AssetManager::Initialize(const Path& assetDirectory)
+    void AssetManager::Initialize(const Path& assetDirectory, const AssetContext& context)
     {
+        SG_ASSERT(context.AssetManager_ == this, "[AssetManager] The context must point back to this AssetManager!");
+        mContext = context;
+        for(auto& [type, serializer] : mSerializers)
+            serializer->SetContext(&mContext);
+
         sAssetsDirectory = assetDirectory.generic_string();
         DeserializeRegistry();
         Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", sAssetsDirectory, mAssetRegistry.size());

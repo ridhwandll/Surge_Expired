@@ -6,6 +6,7 @@
 namespace Surge
 {
     class ParticleEffect;
+    class AssetManager;
 }
 
 namespace Surge::ParticleEffectBinary
@@ -21,5 +22,5 @@ namespace Surge::ParticleEffectBinary
     inline constexpr Uint VERSION = 1;
 
     bool Write(const String& path, const AssetStamp& stamp, const ParticleEffect& effect);
-    bool Read(const String& path, AssetStamp& outStamp, ParticleEffect& outEffect); // Marks the effect changed (layout), which bakes it
+    bool Read(AssetManager& assetManager, const String& path, AssetStamp& outStamp, ParticleEffect& outEffect); // Marks the effect changed (layout), which bakes it
 }

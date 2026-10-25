@@ -1,5 +1,4 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/RenderGraph/Passes/GeometryPass.hpp"
@@ -9,6 +8,18 @@
 namespace Surge
 {
     static constexpr Uint INITIAL_INSTANCE_CAPACITY = 1024; // 64 KB per frame in flight, grows on demand
+    static constexpr Uint INITIAL_SKINNED_INSTANCE_CAPACITY = 64;
+    static_assert(sizeof(LightUBOData::Lights) / sizeof(Light) == GeometryPass::MAX_LIGHTS, "LightUBOData::Lights must hold GeometryPass::MAX_LIGHTS lights");
+
+    static bool SortDrawItems(const Material* materialA, const Mesh* meshA, Uint submeshA, const Material* materialB, const Mesh* meshB, Uint submeshB)
+    {
+        // Material first (descriptor set binds), then mesh (vertex/index buffer binds), then submesh (instancing runs)
+        if(materialA != materialB)
+            return materialA < materialB;
+        if(meshA != meshB)
+            return meshA < meshB;
+        return submeshA < submeshB;
+    }
 
     void GeometryPass::Setup(GraphicsRHI* rhi, FrameBlackboard& blackBoard)
     {
@@ -17,7 +28,7 @@ namespace Surge
 
         // Offscreen color image (blackBoard.FinalImage)
         // 2D pass will use this image to write
-        const glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        const glm::vec2 windowSize = mContext.WindowSize;
         const glm::uvec2 size = blackBoard.GetSceneSize(static_cast<Uint>(windowSize.x), static_cast<Uint>(windowSize.y));
 
         ImageDesc colorDesc = {};
@@ -64,7 +75,7 @@ namespace Surge
 
         // Create 3D Pipeline
         PipelineDesc desc = {};
-        desc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Renderer3D.glsl");
+        desc.Shader_ = mContext.Shaders->Get("Renderer3D.glsl");
         desc.Raster.Topo = Topology::TRIANGLE_LIST;
         desc.Raster.Polygon = PolygonMode::FILL;
         desc.Raster.Cull = CullMode::BACK;
@@ -79,9 +90,15 @@ namespace Surge
 
         m3DPipeline = mRHI->CreatePipeline(desc);
 
-        // Create Lights Storagebuffer
+        // Same state, skinned vertex layout. Its material (set 1) and shadow (set 2) layouts are identical to Renderer3D.glsl's
+        // (same fragment include), so the materials' sets and mShadowMapDescriptorSet bind with this pipeline too
+        desc.Shader_ = mContext.Shaders->Get("Renderer3DSkinned.glsl");
+        desc.DebugName = "Renderer3DSkinned";
+        m3DSkinnedPipeline = mRHI->CreatePipeline(desc);
+
+        // Create Lights UBO
         BufferDesc gpuLightDesc = {};
-        gpuLightDesc.Usage = BufferUsage::STORAGE;
+        gpuLightDesc.Usage = BufferUsage::UNIFORM;
         gpuLightDesc.HostVisible = true;
         gpuLightDesc.DebugName = "Renderer3D_Lights";
         gpuLightDesc.Size = sizeof(LightUBOData);
@@ -90,7 +107,10 @@ namespace Surge
 
         // Per-instance transforms
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
             EnsureInstanceCapacity(i, INITIAL_INSTANCE_CAPACITY);
+            EnsureSkinnedInstanceCapacity(i, INITIAL_SKINNED_INSTANCE_CAPACITY);
+        }
 
         // Create DescriptorSetSlot::ZERO
         mFrameDescriptorSet = mRHI->CreateDescriptorSet(m3DPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "3D_FrameData [Set0]");
@@ -102,7 +122,7 @@ namespace Surge
             writes[0].Buffer = blackBoard.FrameUBOs[i];
             writes[0].BufferRange = sizeof(FrameUBO);
             writes[1].Binding = 1;
-            writes[1].Type = DescriptorType::STORAGE_BUFFER;
+            writes[1].Type = DescriptorType::UNIFORM_BUFFER;
             writes[1].Buffer = mLightUBOs[i];
             writes[1].BufferRange = sizeof(LightUBOData);
             writes[2].Binding = 2;
@@ -110,6 +130,30 @@ namespace Surge
             writes[2].Buffer = mInstanceBuffers[i];
             writes[2].BufferRange = sizeof(glm::mat4) * mInstanceCapacity[i];
             mRHI->UpdateDescriptorSet(mFrameDescriptorSet, writes.data(), static_cast<Uint>(writes.size()), i);
+        }
+
+        mSkinnedFrameDescriptorSet = mRHI->CreateDescriptorSet(m3DSkinnedPipeline, DescriptorSetSlot::ZERO, DescriptorUpdateFrequency::DYNAMIC, "3D_SkinnedFrameData [Set0]");
+        for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
+        {
+            std::array<DescriptorWrite, 4> writes = {};
+            writes[0].Binding = 0;
+            writes[0].Type = DescriptorType::UNIFORM_BUFFER;
+            writes[0].Buffer = blackBoard.FrameUBOs[i];
+            writes[0].BufferRange = sizeof(FrameUBO);
+            writes[1].Binding = 1;
+            writes[1].Type = DescriptorType::UNIFORM_BUFFER;
+            writes[1].Buffer = mLightUBOs[i];
+            writes[1].BufferRange = sizeof(LightUBOData);
+            writes[2].Binding = 2;
+            writes[2].Type = DescriptorType::STORAGE_BUFFER;
+            writes[2].Buffer = mSkinnedInstanceBuffers[i];
+            writes[2].BufferRange = sizeof(SkinnedInstance) * mSkinnedInstanceCapacity[i];
+            writes[3].Binding = 3;
+            writes[3].Type = DescriptorType::STORAGE_BUFFER;
+            writes[3].Buffer = blackBoard.SkinBuffers[i];
+            writes[3].BufferRange = sizeof(SkinMatrix) * blackBoard.SkinBufferCapacity[i];
+            mRHI->UpdateDescriptorSet(mSkinnedFrameDescriptorSet, writes.data(), static_cast<Uint>(writes.size()), i);
+            mSkinBufferVersion[i] = blackBoard.SkinBufferVersion[i];
         }
 
         // Create Shadow UBOs
@@ -154,6 +198,8 @@ namespace Surge
         mVisibleTransforms.reserve(INITIAL_INSTANCE_CAPACITY);
         mDrawItems.reserve(INITIAL_INSTANCE_CAPACITY);
         mDraws.reserve(256);
+        mVisibleSkinned.reserve(INITIAL_SKINNED_INSTANCE_CAPACITY);
+        mSkinnedDrawItems.reserve(INITIAL_SKINNED_INSTANCE_CAPACITY);
 
         blackBoard.MaterialPipeline = m3DPipeline;// TODO: Remove
     }
@@ -190,6 +236,53 @@ namespace Surge
             write.BufferRange = sizeof(glm::mat4) * capacity;
             mRHI->UpdateDescriptorSet(mFrameDescriptorSet, &write, 1, frameIndex);
         }
+    }
+
+    void GeometryPass::EnsureSkinnedInstanceCapacity(Uint frameIndex, Uint instanceCount)
+    {
+        if(instanceCount <= mSkinnedInstanceCapacity[frameIndex] && !mSkinnedInstanceBuffers[frameIndex].IsNull())
+            return;
+
+        Uint capacity = std::max(mSkinnedInstanceCapacity[frameIndex], INITIAL_SKINNED_INSTANCE_CAPACITY);
+        while(capacity < instanceCount)
+            capacity *= 2;
+
+        if(!mSkinnedInstanceBuffers[frameIndex].IsNull())
+            mRHI->DestroyBuffer(mSkinnedInstanceBuffers[frameIndex]); // Deferred, the previous use of this frame slot has already retired
+
+        BufferDesc desc = {};
+        desc.Usage = BufferUsage::STORAGE;
+        desc.HostVisible = true;
+        desc.Size = sizeof(SkinnedInstance) * capacity;
+        desc.DebugName = std::format("Renderer3D_SkinnedInstances Frame: {}", frameIndex);
+        mSkinnedInstanceBuffers[frameIndex] = mRHI->CreateBuffer(desc);
+
+        const bool resized = mSkinnedInstanceCapacity[frameIndex] != 0;
+        mSkinnedInstanceCapacity[frameIndex] = capacity;
+        if(resized)
+        {
+            DescriptorWrite write = {};
+            write.Binding = 2;
+            write.Type = DescriptorType::STORAGE_BUFFER;
+            write.Buffer = mSkinnedInstanceBuffers[frameIndex];
+            write.BufferRange = sizeof(SkinnedInstance) * capacity;
+            mRHI->UpdateDescriptorSet(mSkinnedFrameDescriptorSet, &write, 1, frameIndex);
+        }
+    }
+
+    void GeometryPass::UpdateSkinDescriptors(const FrameContext& ctx, const FrameBlackboard& blackBoard)
+    {
+        // Renderer::UploadSkinMatrices grew this frame's buffer (before any pass prepared)
+        if(mSkinBufferVersion[ctx.FrameIndex] == blackBoard.SkinBufferVersion[ctx.FrameIndex])
+            return;
+
+        DescriptorWrite write = {};
+        write.Binding = 3;
+        write.Type = DescriptorType::STORAGE_BUFFER;
+        write.Buffer = blackBoard.SkinBuffers[ctx.FrameIndex];
+        write.BufferRange = sizeof(SkinMatrix) * blackBoard.SkinBufferCapacity[ctx.FrameIndex];
+        mRHI->UpdateDescriptorSet(mSkinnedFrameDescriptorSet, &write, 1, ctx.FrameIndex);
+        mSkinBufferVersion[ctx.FrameIndex] = blackBoard.SkinBufferVersion[ctx.FrameIndex];
     }
 
     void GeometryPass::UpdateDepthStoreOp(const FrameBlackboard& blackBoard)
@@ -271,7 +364,7 @@ namespace Surge
             mLightData.GroundAmbient = glm::vec3(0.0f);
         }
 
-        // Only the header + the lights in use, not the whole 256 entry array
+        // Only the header + the lights in use, not the whole MAX_LIGHTS entry array
         const Uint uploadSize = static_cast<Uint>(offsetof(LightUBOData, Lights) + sizeof(Light) * count);
         mRHI->UploadBuffer(mLightUBOs[ctx.FrameIndex], &mLightData, uploadSize, 0);
         mUploadedLightCount = count;
@@ -289,6 +382,9 @@ namespace Surge
 
         for(const MeshSubmitCmd& cmd : blackBoard.MeshList)
         {
+            if(cmd.SkinOffset != INVALID_SKIN_OFFSET)
+                continue; // BuildSkinnedDrawList
+
             const Mesh& mesh = *cmd.Mesh_;
             const Vector<Submesh>& submeshes = mesh.GetSubmeshes();
             mSubmittedSubmeshes += static_cast<Uint>(submeshes.size());
@@ -309,14 +405,9 @@ namespace Surge
         if(mDrawItems.empty())
             return;
 
-        // Material first (descriptor set binds), then mesh (vertex/index buffer binds), then submesh (instancing runs)
         std::sort(mDrawItems.begin(), mDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
         {
-            if(a.Material_ != b.Material_)
-                return a.Material_ < b.Material_;
-            if(a.Mesh_ != b.Mesh_)
-                return a.Mesh_ < b.Mesh_;
-            return a.SubmeshIndex < b.SubmeshIndex;
+            return SortDrawItems(a.Material_, a.Mesh_, a.SubmeshIndex, b.Material_, b.Mesh_, b.SubmeshIndex);
         });
 
         const Uint instanceCount = static_cast<Uint>(mDrawItems.size());
@@ -344,38 +435,116 @@ namespace Surge
         }
     }
 
+    void GeometryPass::BuildSkinnedDrawList(const FrameContext& ctx, const FrameBlackboard& blackBoard)
+    {
+        SURGE_PROFILE_FUNC("GeometryPass::BuildSkinnedDrawList");
+
+        const Frustum frustum(blackBoard.ViewProjection);
+        mVisibleSkinned.clear();
+        mSkinnedDrawItems.clear();
+        mSkinnedDraws.clear();
+        mSubmittedSkinned = 0;
+        mVisibleSkinnedMeshes = 0;
+
+        for(const MeshSubmitCmd& cmd : blackBoard.MeshList)
+        {
+            if(cmd.SkinOffset == INVALID_SKIN_OFFSET)
+                continue;
+
+            // One box for the whole pose: the submesh bounds are rest pose, the skin moves the vertices anywhere
+            mSubmittedSkinned++;
+            if(!frustum.IntersectsAABB(cmd.SkinBounds, cmd.Transform))
+                continue;
+
+            mVisibleSkinnedMeshes++;
+            const Mesh& mesh = *cmd.Mesh_;
+            const Uint submeshCount = static_cast<Uint>(mesh.GetSubmeshes().size());
+            for(Uint i = 0; i < submeshCount; i++)
+            {
+                mSkinnedDrawItems.push_back({ mesh.GetMaterialPtrAtIndex(mesh.GetSubmeshes()[i].MaterialIndex), &mesh, i, static_cast<Uint>(mVisibleSkinned.size()) });
+                mVisibleSkinned.push_back({ cmd.Transform, cmd.SkinOffset, {} });
+            }
+        }
+
+        if(mSkinnedDrawItems.empty())
+            return;
+
+        std::sort(mSkinnedDrawItems.begin(), mSkinnedDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
+        {
+            return SortDrawItems(a.Material_, a.Mesh_, a.SubmeshIndex, b.Material_, b.Mesh_, b.SubmeshIndex);
+        });
+
+        const Uint instanceCount = static_cast<Uint>(mSkinnedDrawItems.size());
+        EnsureSkinnedInstanceCapacity(ctx.FrameIndex, instanceCount);
+
+        mSortedSkinned.resize(instanceCount);
+        for(Uint i = 0; i < instanceCount; i++)
+            mSortedSkinned[i] = mVisibleSkinned[mSkinnedDrawItems[i].TransformIndex];
+        mRHI->UploadBuffer(mSkinnedInstanceBuffers[ctx.FrameIndex], mSortedSkinned.data(), static_cast<Uint>(sizeof(SkinnedInstance) * instanceCount), 0);
+
+        for(Uint i = 0; i < instanceCount; i++)
+        {
+            const DrawItem& item = mSkinnedDrawItems[i];
+            if(!mSkinnedDraws.empty())
+            {
+                InstancedDraw& last = mSkinnedDraws.back();
+                if(last.Material_ == item.Material_ && last.Mesh_ == item.Mesh_ && last.SubmeshIndex == item.SubmeshIndex)
+                {
+                    last.InstanceCount++;
+                    continue;
+                }
+            }
+            mSkinnedDraws.push_back({ item.Material_, item.Mesh_, item.SubmeshIndex, i, 1 });
+        }
+    }
+
     void GeometryPass::Prepare(const FrameContext& ctx, FrameBlackboard& blackBoard)
     {
         SURGE_PROFILE_FUNC("GeometryPass::Prepare");
         UpdateDepthStoreOp(blackBoard);
         UpdateShadowDescriptors(ctx, blackBoard);
+        UpdateSkinDescriptors(ctx, blackBoard);
         UploadLights(ctx, blackBoard);
         BuildDrawList(ctx, blackBoard);
+        BuildSkinnedDrawList(ctx, blackBoard);
+        blackBoard.HasSceneGeometry = !mDraws.empty() || !mSkinnedDraws.empty();
     }
 
-    void GeometryPass::Execute(const FrameContext& ctx, const FrameBlackboard& blackBoard)
+    void GeometryPass::Execute(const FrameContext& ctx, const FrameBlackboard&)
     {
         SURGE_PROFILE_FUNC("GeometryPass::Execute");
-        (void)blackBoard;
 
-        if(mDraws.empty())
-            return;
+        if(!mDraws.empty())
+        {
+            mRHI->CmdBindPipeline(ctx, m3DPipeline);
+            mRHI->CmdBindDescriptorSet(ctx, m3DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
+            DrawRuns(ctx, m3DPipeline, mDraws);
+        }
 
-        mRHI->CmdBindPipeline(ctx, m3DPipeline);
-        mRHI->CmdBindDescriptorSet(ctx, m3DPipeline, mFrameDescriptorSet, DescriptorSetSlot::ZERO);
-        mRHI->CmdBindDescriptorSet(ctx, m3DPipeline, mShadowMapDescriptorSet, DescriptorSetSlot::TWO);
+        if(!mSkinnedDraws.empty())
+        {
+            // Set 0 differs between the two pipelines, so binding this one disturbs every set: they are bound again in DrawRuns
+            mRHI->CmdBindPipeline(ctx, m3DSkinnedPipeline);
+            mRHI->CmdBindDescriptorSet(ctx, m3DSkinnedPipeline, mSkinnedFrameDescriptorSet, DescriptorSetSlot::ZERO);
+            DrawRuns(ctx, m3DSkinnedPipeline, mSkinnedDraws);
+        }
+    }
+
+    void GeometryPass::DrawRuns(const FrameContext& ctx, PipelineHandle pipeline, const Vector<InstancedDraw>& draws)
+    {
+        mRHI->CmdBindDescriptorSet(ctx, pipeline, mShadowMapDescriptorSet, DescriptorSetSlot::TWO);
 
         PushConstantData pushConstants = {};
         pushConstants.LightCount = mUploadedLightCount;
-        mRHI->CmdPushConstants(ctx, m3DPipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
+        mRHI->CmdPushConstants(ctx, pipeline, ShaderType::VERTEX | ShaderType::FRAGMENT, 0, sizeof(PushConstantData), &pushConstants);
 
         const Material* boundMaterial = nullptr;
         const Mesh* boundMesh = nullptr;
-        for(const InstancedDraw& draw : mDraws)
+        for(const InstancedDraw& draw : draws)
         {
             if(draw.Material_ != boundMaterial)
             {
-                draw.Material_->Bind(ctx, m3DPipeline); // Uploads its uniforms/descriptors first if dirty
+                draw.Material_->Bind(ctx, pipeline); // Uploads its uniforms/descriptors first if dirty
                 boundMaterial = draw.Material_;
             }
 
@@ -395,14 +564,23 @@ namespace Surge
     {
         const glm::uvec2 size = blackBoard.GetSceneSize(width, height);
         const FramebufferHandle framebuffer = blackBoard.MainPassFramebuffer;
-        Core::AddFrameEndCallback([this, size, framebuffer]() { mRHI->ResizeFramebuffer(framebuffer, size.x, size.y); });
+        mContext.DeferToFrameEnd([this, size, framebuffer]() { mRHI->ResizeFramebuffer(framebuffer, size.x, size.y); });
     }
 
     void GeometryPass::RenderStatsViaImGui(FrameBlackboard& blackBoard)
     {
         ImGui::SeparatorText("Geometry");
         ImGui::Text("Submeshes: %u visible / %u submitted", mVisibleSubmeshes, mSubmittedSubmeshes);
-        ImGui::Text("Draw calls: %u (instanced)", static_cast<Uint>(mDraws.size()));
+        ImGui::Text("Draw calls: %u (instanced)", static_cast<Uint>(mDraws.size() + mSkinnedDraws.size()));
+        if(mSubmittedSkinned > 0)
+        {
+            const Uint skinMatrices = static_cast<Uint>(blackBoard.SkinMatrices.size());
+            ImGui::Text("Skinned: %u visible / %u submitted, %u draws", mVisibleSkinnedMeshes, mSubmittedSkinned, static_cast<Uint>(mSkinnedDraws.size()));
+            ImGui::Text("Skin matrices: %u (%.1f KB)", skinMatrices, static_cast<float>(skinMatrices * sizeof(SkinMatrix)) / 1024.0f);
+        }
+        const AnimationStats& animation = blackBoard.AnimationStatistics;
+        if(animation.Animators > 0)
+            ImGui::Text("Animators: %u, %u culled, %u over budget", animation.Animators, animation.Culled, animation.OverBudget);
         ImGui::Text("Lights: %u uploaded / %u submitted", mUploadedLightCount, static_cast<Uint>(blackBoard.LightList.size()));
         ImGui::Text("Depth stored: %s", mDepthStored ? "Yes" : "No (transient, AO off)");
     }
@@ -415,15 +593,18 @@ namespace Surge
         mRHI->DestroyImage(blackBoard.MainPassColorImage);
         mRHI->DestroyImage(blackBoard.MainPassDepthImage);
         mRHI->DestroyPipeline(m3DPipeline);
+        mRHI->DestroyPipeline(m3DSkinnedPipeline);
 
         for(Uint i = 0; i < RHISettings::FRAMES_IN_FLIGHT; i++)
         {
             mRHI->DestroyBuffer(mLightUBOs[i]);
             mRHI->DestroyBuffer(mInstanceBuffers[i]);
+            mRHI->DestroyBuffer(mSkinnedInstanceBuffers[i]);
             mRHI->DestroyBuffer(blackBoard.ShadowUBOs[i]);
         }
 
         mRHI->DestroyDescriptorSet(mFrameDescriptorSet);
+        mRHI->DestroyDescriptorSet(mSkinnedFrameDescriptorSet);
         mRHI->DestroyDescriptorSet(mShadowMapDescriptorSet);
     }
 }

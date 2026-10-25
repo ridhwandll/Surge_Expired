@@ -334,7 +334,7 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         String json;
         if(Filesystem::ReadTextFile(am->GetAbsolutePath(am->GetMetadata(mEffect->GetID()).RelativePath), json))
-            ParticleEffectSerializer::FromJson(json, *mEffect);
+            ParticleEffectSerializer::FromJson(*am, json, *mEffect);
         mUnsaved = false;
     }
 
@@ -366,7 +366,7 @@ namespace Surge
 
     void ParticleEditorPanel::RestoreState(const String& json)
     {
-        ParticleEffectSerializer::FromJson(json, *mEffect); // Marks the layout changed: instances restart with the restored settings
+        ParticleEffectSerializer::FromJson(*Core::GetAssetManager(), json, *mEffect); // Marks the layout changed: instances restart with the restored settings
         mSelectedEmitter = std::clamp(mSelectedEmitter, 0, std::max(static_cast<int>(mEffect->Emitters.size()) - 1, 0));
         mDocumentChanged = false;
         mLayoutChanged = false;

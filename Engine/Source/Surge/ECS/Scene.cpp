@@ -3,8 +3,8 @@
 #include "Surge/ECS/Components/Components.hpp"
 #include "Surge/ECS/Components/ScriptComponent.hpp"
 
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
+#include "Surge/Core/Window/Window.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/DefaultMeshes.hpp"
@@ -21,10 +21,8 @@
 
 namespace Surge
 {
-    static Entity sSelectedEntity;
-
-    Scene::Scene(const String& name)
-        : mName(name)
+    Scene::Scene(const String& name, const SceneContext& context)
+        : mName(name), mContext(context)
     {
         AddStartupEntities();
 
@@ -36,10 +34,9 @@ namespace Surge
 
     Scene::~Scene()
     {
-        if(Physics* physics = Core::GetPhysics())
+        if(Physics* physics = mContext.Physics_)
             physics->ClearFixedStepCallback(this);
         mRegistry.clear();
-        sSelectedEntity = Entity(entt::null, nullptr);
     }
 
     void Scene::OnRuntimeStart()
@@ -52,13 +49,13 @@ namespace Surge
             for(ScriptEntry& entry : scripts.Scripts)
             {
                 if(entry.ScriptAsset)
-                    entry.ScriptAsset = Core::GetAssetManager()->Load<Script>(entry.ScriptAsset->GetID());
+                    entry.ScriptAsset = mContext.AssetManager_->Load<Script>(entry.ScriptAsset->GetID());
             }
         }
         for(const auto& [entity, canvas] : mRegistry.view<UICanvasComponent>().each())
         {
             if (canvas.ScriptAsset)
-                canvas.ScriptAsset = Core::GetAssetManager()->Load<Script>(canvas.ScriptAsset->GetID());
+                canvas.ScriptAsset = mContext.AssetManager_->Load<Script>(canvas.ScriptAsset->GetID());
         }
 
         for(const auto& [entity, rigidbody] : mRegistry.view<RigidbodyComponent>().each())
@@ -73,7 +70,7 @@ namespace Surge
         mRegistry.on_construct<MeshColliderComponent>().connect<&Scene::OnColliderAdded>(this);
         mRegistry.on_destroy<RigidbodyComponent>().connect<&Scene::OnRigidbodyDestroyed>(this);
 
-        Physics* physics = Core::GetPhysics();
+        Physics* physics = mContext.Physics_;
         physics->OptimizeBroadPhase();
 
         // Contacts of a previous session must not reach this one, OnFixedUpdate runs before every physics step from now on
@@ -93,15 +90,13 @@ namespace Surge
 //             for(auto entityID : view)
 //                 OnUICanvasDestroyed(mRegistry, entityID);
 //         }
-        Core::GetPhysics()->ClearFixedStepCallback(this);
+        mContext.Physics_->ClearFixedStepCallback(this);
+        mContext.Physics_->ClearShapeCache(); // The next scene builds what it uses, live bodies keep their shapes
         mIsRunning = false;
     }
 
     void Scene::DestroyEntityImmediate(Entity entity)
     {
-        if(sSelectedEntity == entity)
-            sSelectedEntity = Entity(entt::null, nullptr);
-
         if(entity.HasComponent<ScriptComponent>())
             OnScriptDestroyed(mRegistry, entity.Raw());
 
@@ -129,7 +124,7 @@ namespace Surge
             return;
 
         auto listenerView = mRegistry.view<TransformComponent, AudioListenerComponent>();
-        AudioEngine* audioEngine = Core::GetAudioEngine();
+        AudioEngine* audioEngine = mContext.AudioEngine_;
 
         // Listener
         for(auto entity : listenerView)
@@ -191,7 +186,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("Scene::UpdateParticles");
 
-        Renderer* renderer = Core::GetRenderer();
+        Renderer* renderer = mContext.Renderer_;
         FrameBlackboard& blackBoard = renderer->GetRenderGraphBlackBoard();
 
         ParticleBudget budget;
@@ -222,15 +217,54 @@ namespace Surge
         blackBoard.ParticleStatistics = stats;
     }
 
-    void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar, float particleDeltaTime, bool cullParticles, const std::function<void(Scene&)>* editorDraw)
+    void Scene::UpdateAnimation(float deltaTime, const Frustum* frustum)
+    {
+        SURGE_PROFILE_FUNC("Scene::UpdateAnimation");
+
+        AnimationStats stats;
+        auto view = mRegistry.view<AnimatorComponent, MeshComponent, TransformComponent>();
+        for(const auto& [entity, animator, meshComponent, transform] : view.each())
+        {
+            if(!animator.Active || !meshComponent.Active || !meshComponent.MeshAsset)
+                continue;
+
+            animator.Runtime.Update(animator, meshComponent.MeshAsset.As<Mesh>(), transform.GetTransform(), deltaTime, frustum, mIsRunning);
+            stats.Animators++;
+
+            if(animator.Runtime.IsCulled())
+                stats.Culled++;
+        }
+
+        // OverBudget is counted by the Renderer while the meshes submit, later this frame
+        mContext.Renderer_->GetRenderGraphBlackBoard().AnimationStatistics = stats;
+    }
+
+    void Scene::UpdateRendering(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec2& cameraNearFar, float scaledDeltaTime, bool cull, const std::function<void(Scene&)>* editorDraw)
     {
         SURGE_PROFILE_FUNC("Scene::UpdateRendering");
 
-        Renderer* renderer = Core::GetRenderer();
+        Renderer* renderer = mContext.Renderer_;
         renderer->BeginFrame(viewMatrix, projectionMatrix, cameraNearFar);
 
+        // First active one wins
+        {
+            const RenderProfile profile = renderer->GetRenderProfile();
+            const RenderSettings* settings = &RenderSettings::GetDefault(profile);
+            for(const auto& [entity, component] : mRegistry.view<RendererSettingsComponent>().each())
+            {
+                if(component.Active)
+                {
+                    settings = &component.GetProfileSettings(profile);
+                    break;
+                }
+            }
+            renderer->SubmitRenderSettings(*settings);
+        }
+
         // After BeginFrame: culled with this frame's camera (transforms are final atp)
-        UpdateParticles(particleDeltaTime, cullParticles ? &renderer->GetRenderGraphBlackBoard().CameraFrustum : nullptr, true);
+        UpdateParticles(scaledDeltaTime, cull ? &renderer->GetRenderGraphBlackBoard().CameraFrustum : nullptr, true);
+        UpdateAnimation(scaledDeltaTime, cull ? &renderer->GetRenderGraphBlackBoard().CameraFrustum : nullptr);
+
         {
             auto view = mRegistry.view<SpriteRendererComponent, TransformComponent>();
             for(const auto& [entity, sprite, transform] : view.each())
@@ -252,7 +286,8 @@ namespace Surge
                 {
                     Ref<Font> font = txtCmp.FontAsset.As<Font>();
                     renderer->SubmitText(transform.GetTransform(), txtCmp.Text, txtCmp.Color, txtCmp.MaxWidth, txtCmp.LetterSpacing, txtCmp.LineSpacing, 
-                                         txtCmp.Alignment, txtCmp.VerticalAlignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset, txtCmp.ShadowColor, font.Raw(), txtCmp.Billboard);
+                                         txtCmp.Alignment, txtCmp.VerticalAlignment, txtCmp.Italic, txtCmp.Underline, txtCmp.ShadowEnabled, txtCmp.ShadowOffset,
+                                         txtCmp.ShadowColor, font.Raw(), txtCmp.Billboard);
                 }
             }
         }
@@ -312,14 +347,21 @@ namespace Surge
                 if(meshComponent.MeshAsset)
                 {
                     Ref<Mesh> mesh = meshComponent.MeshAsset.As<Mesh>();
-                    if(mesh) //Asset might be missing/corrupted, so check before submitting
+                    if(!mesh) //Asset might be missing/corrupted, so check before submitting
+                        continue;
+
+                    // Skinned meshes draw the animator's pose, the rest pose without one (SubmitMesh)
+                    AnimatorComponent* animator = mesh->IsSkinned() ? mRegistry.try_get<AnimatorComponent>(entity) : nullptr;
+                    if(animator && animator->Active && animator->Runtime.HasPose() && animator->Runtime.GetMesh() == mesh.Raw())
+                        animator->Runtime.Submit(*renderer, transformComponent.GetTransform(), meshComponent.DropShadow);
+                    else
                         renderer->SubmitMesh(transformComponent.GetTransform(), mesh.Raw(), meshComponent.DropShadow);
                 }
             }
 
         }
 
-        // Editor-only debug geometry (selection outline, colliders)
+        // Editor-only debug geometry (colliders)
         if(editorDraw && *editorDraw)
             (*editorDraw)(*this);
 
@@ -368,8 +410,8 @@ namespace Surge
         UpdateScripts();
 
         // Scaled game time while running
-        const float deltaTime = Core::GetClock().GetSeconds();
-        return mIsRunning ? deltaTime * Core::GetTimeScale() : deltaTime;
+        const float deltaTime = mContext.Clock_->GetSeconds();
+        return mIsRunning ? deltaTime * mContext.Clock_->GetTimeScale() : deltaTime;
     }
 
     void Scene::Update()
@@ -383,7 +425,10 @@ namespace Surge
         if(camera.Data1)
             UpdateRendering(glm::inverse(camera.Data2), camera.Data1->GetProjectionMatrix(), { camera.Data1->GetPerspectiveNearClip(), camera.Data1->GetPerspectiveFarClip() }, scaledDeltaTime, true);
         else
+        {
             UpdateParticles(scaledDeltaTime, nullptr, false); // Nothing is drawn, one-shot effects still finish (AutoDestroy)
+            UpdateAnimation(scaledDeltaTime, nullptr);
+        }
 
         ProcessPendingEntityDestructions();
     }
@@ -450,6 +495,7 @@ namespace Surge
         CopyComponent<CameraComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<LightComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<EnvironmentComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<RendererSettingsComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<TextComponent>(other->mRegistry, mRegistry, enttMap);
 
         CopyComponent<RigidbodyComponent>(other->mRegistry, mRegistry, enttMap);
@@ -466,9 +512,10 @@ namespace Surge
         CopyComponent<AudioListenerComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<AudioSourceComponent>(other->mRegistry, mRegistry, enttMap);
         CopyComponent<ParticleSystemComponent>(other->mRegistry, mRegistry, enttMap);
+        CopyComponent<AnimatorComponent>(other->mRegistry, mRegistry, enttMap);
     }
 
-    Surge::Entity Scene::FindEntityByUUID(UUID id)
+    Entity Scene::FindEntityByUUID(UUID id)
     {
         auto view = mRegistry.view<IDComponent>();
         for (const auto& entity : view)
@@ -578,6 +625,8 @@ namespace Surge
         CopyIfHas(std::type_identity<AudioListenerComponent>{});
         CopyIfHas(std::type_identity<AudioSourceComponent>{});
         CopyIfHas(std::type_identity<ParticleSystemComponent>{});
+        CopyIfHas(std::type_identity<AnimatorComponent>{});
+        CopyIfHas(std::type_identity<RendererSettingsComponent>{});
 
         return newEntity;
     }
@@ -637,16 +686,6 @@ namespace Surge
             }
             newParentRel.ChildrenCount++;
         }
-    }
-
-    void Scene::SetSelectedEntity(Entity entity)
-    {
-        sSelectedEntity = entity;
-    }
-
-    Entity Scene::GetSelectedEntity() const
-    {
-        return sSelectedEntity;
     }
 
     void Scene::OnResize(float width, float height)
@@ -746,9 +785,9 @@ namespace Surge
         if(!mIsRunning)
             return;
 
-        ScriptEngine* scriptEngine = Core::GetScriptEngine();
-        const float unscaledDeltaTime = Core::GetClock().GetSeconds();
-        const float deltaTime = unscaledDeltaTime * Core::GetTimeScale();
+        ScriptEngine* scriptEngine = mContext.ScriptEngine_;
+        const float unscaledDeltaTime = mContext.Clock_->GetSeconds();
+        const float deltaTime = unscaledDeltaTime * mContext.Clock_->GetTimeScale();
         scriptEngine->AdvanceTime(deltaTime, unscaledDeltaTime);
 
         // Contacts of the fixed steps that already ran this frame, before OnUpdate like the steps themselves
@@ -827,7 +866,7 @@ namespace Surge
         }
 
         {
-            UI::Manager& uiManager = Core::GetRenderer()->GetUIManager();
+            UI::Manager& uiManager = mContext.Renderer_->GetUIManager();
             auto canvasView = mRegistry.view<UICanvasComponent>();
             mScriptEntities.assign(canvasView.begin(), canvasView.end());
 
@@ -899,7 +938,7 @@ namespace Surge
         if(!mIsRunning)
             return;
 
-        ScriptEngine* scriptEngine = Core::GetScriptEngine();
+        ScriptEngine* scriptEngine = mContext.ScriptEngine_;
         auto view = mRegistry.view<ScriptComponent>();
         mFixedScriptEntities.assign(view.begin(), view.end());
         for(entt::entity entityID : mFixedScriptEntities)
@@ -918,11 +957,11 @@ namespace Surge
 
     void Scene::DispatchPhysicsEvents()
     {
-        const Vector<CollisionEvent> events = Core::GetPhysics()->GetContactListener().FlushEvents();
+        const Vector<CollisionEvent> events = mContext.Physics_->GetContactListener().FlushEvents();
         if(events.empty())
             return;
 
-        ScriptEngine* scriptEngine = Core::GetScriptEngine();
+        ScriptEngine* scriptEngine = mContext.ScriptEngine_;
         auto dispatch = [this, scriptEngine](entt::entity self, entt::entity other, const CollisionEvent& event) {
             const bool enter = event.Type == CollisionEventType::ENTER;
             if(enter && !mRegistry.valid(other))
@@ -961,7 +1000,7 @@ namespace Surge
         if(!mIsRunning)
             return;
 
-        Physics* physics = Core::GetPhysics();
+        Physics* physics = mContext.Physics_;
         auto view = mRegistry.view<TransformComponent, RigidbodyComponent>();
         for(auto [entity, transformComp, rb] : view.each())
         {
@@ -996,10 +1035,10 @@ namespace Surge
         transform.Position = glm::vec3(-10, 6, 10);
         transform.Rotation = glm::vec3(-30, -45, 0);
 
-        glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        glm::vec2 windowSize = mContext.Window_->GetSize();
         OnResize(windowSize.x, windowSize.y);
 
-        AssetManager* assetManager = Core::GetAssetManager();
+        AssetManager* assetManager = mContext.AssetManager_;
         {
             Entity e;
             CreateEntity(e, "Cube");
@@ -1039,8 +1078,9 @@ namespace Surge
         }
         {
             Entity env;
-            CreateEntity(env, "Environemnt");
+            CreateEntity(env, "Environment");
             env.AddComponent<EnvironmentComponent>();
+            env.AddComponent<RendererSettingsComponent>();
         }
     }
 
@@ -1050,17 +1090,17 @@ namespace Surge
            !(registry.any_of<BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent, ConvexColliderComponent, MeshColliderComponent>(entity)))
             return;
 
-        Core::GetPhysics()->CreateRigidbody(Entity(entity, this));
+        mContext.Physics_->CreateRigidbody(Entity(entity, this));
     }
 
     void Scene::OnRigidbodyDestroyed([[maybe_unused]] entt::registry& registry, entt::entity entity)
     {
-        Core::GetPhysics()->DestroyRigidbody(Entity(entity, this));
+        mContext.Physics_->DestroyRigidbody(Entity(entity, this));
     }
 
     void Scene::OnScriptDestroyed(entt::registry&, entt::entity entity)
     {
-        ScriptEngine* scriptEngine = Core::GetScriptEngine();
+        ScriptEngine* scriptEngine = mContext.ScriptEngine_;
         const size_t count = ScriptCount(mRegistry, entity);
         for(size_t i = 0; i < count; i++)
         {
@@ -1088,13 +1128,13 @@ namespace Surge
     {
         Entity e(entity, this);
         UICanvasComponent& comp = e.GetComponent<UICanvasComponent>();
-        UI::Manager& uiManager = Core::GetRenderer()->GetUIManager();
+        UI::Manager& uiManager = mContext.Renderer_->GetUIManager();
         if(comp.IsInstantiated)
         {
             if(comp.Instance.OnDestroy.valid())
             {
                 uiManager.BeginCanvasScript(comp.RuntimeCanvasID); // SetUIRoot(nil) in OnDestroy must target this canvas
-                Core::GetScriptEngine()->CallOnDestroy(comp.Instance);
+                mContext.ScriptEngine_->CallOnDestroy(comp.Instance);
                 uiManager.EndCanvasScript();
             }
             comp.Instance = ScriptInstance();
@@ -1114,7 +1154,7 @@ namespace Surge
         Entity e(entity, this);
         AudioSourceComponent& comp = e.GetComponent<AudioSourceComponent>();
         if(comp.IsInitialized && comp.RuntimeID)
-            Core::GetAudioEngine()->DestroyAudio(comp.RuntimeID);
+            mContext.AudioEngine_->DestroyAudio(comp.RuntimeID);
     }
 
 } // namespace Surge

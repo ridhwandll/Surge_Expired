@@ -89,6 +89,46 @@ namespace Surge
         return true;
     }
 
+    // Skinned meshes, in the pose they are drawn with: the vertices go through the palette (any rotation/scale the glTF hierarchy has
+    // reaches them only that way, Z-up files for example), one box (the pose's bounds) for the whole mesh
+    static bool IntersectSkinnedMesh(const Mesh& mesh, const glm::mat4& world, const SkinMatrix* palette, const AABB& bounds, const PickRay& ray, float& outDistance)
+    {
+        const Vector<Vertex>& vertices = mesh.GetVertices();
+        const Vector<VertexSkin>& skin = mesh.GetSkin();
+        const Vector<Index>& triangles = mesh.GetIndices();
+        const Uint vertexCount = static_cast<Uint>(std::min(vertices.size(), skin.size()));
+        const Uint triangleCount = static_cast<Uint>(triangles.size());
+
+        LocalRay localRay;
+        float enter;
+        if(!ToLocalRay(world, ray, localRay) || !IntersectAABB(localRay, bounds, enter))
+            return false;
+
+        float closest = FLT_MAX;
+        for(const Submesh& submesh : mesh.GetSubmeshes())
+        {
+            const Uint firstTriangle = submesh.BaseIndex / 3;
+            const Uint lastTriangle = std::min(firstTriangle + submesh.IndexCount / 3, triangleCount);
+            for(Uint i = firstTriangle; i < lastTriangle; i++)
+            {
+                const Index& triangle = triangles[i];
+                const Uint i0 = submesh.BaseVertex + triangle.V1;
+                const Uint i1 = submesh.BaseVertex + triangle.V2;
+                const Uint i2 = submesh.BaseVertex + triangle.V3;
+                if(i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount)
+                    continue;
+
+                float t;
+                if(IntersectTriangle(localRay, SkinPosition(palette, skin[i0], vertices[i0].Position), SkinPosition(palette, skin[i1], vertices[i1].Position),
+                                     SkinPosition(palette, skin[i2], vertices[i2].Position), t) && t < closest)
+                    closest = t;
+            }
+        }
+
+        outDistance = closest;
+        return closest < FLT_MAX;
+    }
+
     static bool IntersectMesh(const Mesh& mesh, const glm::mat4& world, const PickRay& ray, float& outDistance)
     {
         const Vector<Vertex>& vertices = mesh.GetVertices();
@@ -272,8 +312,24 @@ namespace Surge
                 continue;
 
             Ref<Mesh> mesh = meshComp.MeshAsset.As<Mesh>();
+            if(!mesh)
+                continue;
+
             float distance;
-            if(mesh && IntersectMesh(*mesh, transform.GetTransform(), ray, distance))
+            bool hit;
+            if(mesh->IsSkinned() && !mesh->GetSkin().empty())
+            {
+                // The animator's pose when it drew one, the rest pose otherwise
+                const AnimatorComponent* animator = registry.try_get<AnimatorComponent>(entity);
+                const bool posed = animator && animator->Active && animator->Runtime.HasPose() && animator->Runtime.GetMesh() == mesh.Raw();
+                const SkinMatrix* palette = posed ? animator->Runtime.GetPalette().data() : mesh->GetRestPalette().data();
+                const AABB& bounds = posed ? animator->Runtime.GetBounds() : mesh->GetRestBounds();
+                hit = IntersectSkinnedMesh(*mesh, transform.GetTransform(), palette, bounds, ray, distance);
+            }
+            else
+                hit = IntersectMesh(*mesh, transform.GetTransform(), ray, distance);
+
+            if(hit)
                 mHits.push_back({ entity, distance });
         }
 

@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ScriptSerializer.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Asset/Serializer/AssetStamp.hpp"
@@ -21,7 +20,7 @@ namespace Surge
         Log<Severity::Error>("[ScriptSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");
         return false;
 #else
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
 
         SCOPED_TIMER("ScriptSerializer::Serialize");
         Ref<Script> script = asset.As<Script>();
@@ -36,7 +35,7 @@ namespace Surge
 
     Ref<Asset> ScriptSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
         AssetStamp stamp;

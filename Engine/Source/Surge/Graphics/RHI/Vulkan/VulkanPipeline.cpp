@@ -1,5 +1,4 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanPipeline.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
@@ -252,7 +251,10 @@ namespace Surge
         pipelineInfo.layout = entry.Layout;
         pipelineInfo.renderPass = renderPass;
         pipelineInfo.subpass = 0;
-        VK_CALL(vkCreateGraphicsPipelines(device, rhi.GetPipelineCache(), 1, &pipelineInfo, nullptr, &entry.Pipeline));
+        // Checked in every build: a driver rejecting a shader (old mobile compilers) otherwise only shows up as a null pipeline crash at bind time
+        const VkResult result = vkCreateGraphicsPipelines(device, rhi.GetPipelineCache(), 1, &pipelineInfo, nullptr, &entry.Pipeline);
+        if(result != VK_SUCCESS)
+            Log<Severity::Error>("[VulkanPipeline] Creating pipeline '{}' failed: {}", desc.DebugName, VKResultToStringyy(result));
 
         vkDestroyShaderModule(device, vertModule, nullptr);
         vkDestroyShaderModule(device, fragModule, nullptr);
@@ -310,7 +312,9 @@ namespace Surge
         pipelineInfo.stage.module = computeModule;
         pipelineInfo.stage.pName = "main";
         pipelineInfo.layout = entry.Layout;
-        VK_CALL(vkCreateComputePipelines(device, rhi.GetPipelineCache(), 1, &pipelineInfo, nullptr, &entry.Pipeline));
+        const VkResult result = vkCreateComputePipelines(device, rhi.GetPipelineCache(), 1, &pipelineInfo, nullptr, &entry.Pipeline);
+        if(result != VK_SUCCESS)
+            Log<Severity::Error>("[VulkanPipeline] Creating compute pipeline '{}' failed: {}", desc.DebugName, VKResultToStringyy(result));
 
         vkDestroyShaderModule(device, computeModule, nullptr);
 

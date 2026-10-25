@@ -78,13 +78,10 @@ namespace Surge
             desiredSwapchainImages = surfaceProperties.maxImageCount;
         }
 
-        // Figure out a suitable surface transform
-        VkSurfaceTransformFlagBitsKHR preTransform;
-        if (surfaceProperties.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)		
-            preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        
-        else
-            preTransform = surfaceProperties.currentTransform;		
+        // Pre-rotation: currentExtent is in the window's orientation, the images are in the display's native one (portrait on phones)
+        const VkSurfaceTransformFlagBitsKHR preTransform = SelectPreTransform(surfaceProperties);
+        if(preTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR || preTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)
+            std::swap(swapchainSize.width, swapchainSize.height);
 
         VkSwapchainKHR oldSwapchain = mSwapchain;
 
@@ -116,7 +113,8 @@ namespace Surge
         info.oldSwapchain = oldSwapchain;
 
         VK_CALL(vkCreateSwapchainKHR(device, &info, nullptr, &mSwapchain));
-        Log<Severity::Debug>("VulkanSwapchain created with Width:{} Height:{}", swapchainSize.width, swapchainSize.height);
+        mPreTransform = preTransform;
+        Log<Severity::Debug>("VulkanSwapchain created with Width:{} Height:{} Rotation:{}", swapchainSize.width, swapchainSize.height, GetRotation() * 90);
 
         if (oldSwapchain != VK_NULL_HANDLE)
         {
@@ -183,6 +181,45 @@ namespace Surge
             vkDestroySwapchainKHR(device, mSwapchain, nullptr);
             mSwapchain = VK_NULL_HANDLE;
         }
+    }
+
+    Uint VulkanSwapchain::GetRotation() const
+    {
+        switch(mPreTransform)
+        {
+            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:  return 1;
+            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR: return 2;
+            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR: return 3;
+            default:                                      return 0;
+        }
+    }
+
+    bool VulkanSwapchain::IsTransformOutdated(const VulkanRHI& rhi) const
+    {
+        VkSurfaceCapabilitiesKHR surfaceProperties;
+        if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(rhi.GetGPU(), rhi.GetSurface(), &surfaceProperties) != VK_SUCCESS)
+            return false;
+        return SelectPreTransform(surfaceProperties) != mPreTransform;
+    }
+
+    VkSurfaceTransformFlagBitsKHR VulkanSwapchain::SelectPreTransform(const VkSurfaceCapabilitiesKHR& surfaceProperties)
+    {
+        // (Rid) Android: a landscape game on a portrait display that presents IDENTITY images makes the compositor rotate every frame,
+        // most phones can't do that in the display hardware and fall back to GPU composition (competing with our frame for the GPU).
+        // Taking the display's rotation means the swapchain passes draw rotated (GetRotation()) and the image is scanned out as is
+        switch(surfaceProperties.currentTransform)
+        {
+            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+                return surfaceProperties.currentTransform;
+            default:
+                break;
+        }
+
+        if(surfaceProperties.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+            return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        return surfaceProperties.currentTransform;
     }
 
     VkSurfaceFormatKHR VulkanSwapchain::SelectSurfaceFormat(VkPhysicalDevice gpu, VkSurfaceKHR surface)

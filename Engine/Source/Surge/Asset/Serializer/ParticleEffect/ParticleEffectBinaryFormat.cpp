@@ -2,7 +2,6 @@
 #include "ParticleEffectBinaryFormat.hpp"
 #include "Surge/Asset/Serializer/BinaryHelpers.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Graphics/Particles/ParticleEffect.hpp"
 #include "Surge/Utility/Filesystem.hpp"
@@ -164,20 +163,19 @@ namespace Surge::ParticleEffectBinary
         ReadGradient(reader, color.Gradient);
     }
 
-    static Ref<Asset> LoadTexture(uint64_t rawID)
+    static Ref<Asset> LoadTexture(AssetManager& assetManager, uint64_t rawID)
     {
         if(rawID == AssetID::INVALID)
             return nullptr;
 
-        AssetManager* am = Core::GetAssetManager();
         const AssetID id(rawID);
-        const AssetMetadata& metadata = am->GetMetadata(id);
+        const AssetMetadata& metadata = assetManager.GetMetadata(id);
         if(!metadata.IsValid() || metadata.IsMissing() || metadata.Type != AssetType::TEXTURE2D)
         {
             Log<Severity::Warn>("[ParticleEffectBinary] Texture {} is missing or not a texture, using the default particle", rawID);
             return nullptr;
         }
-        return am->Load<Texture2D>(id);
+        return assetManager.Load<Texture2D>(id);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -316,7 +314,7 @@ namespace Surge::ParticleEffectBinary
         return value;
     }
 
-    static void ReadEmitter(BinaryReader& reader, ParticleEmitterDesc& e)
+    static void ReadEmitter(AssetManager& assetManager, BinaryReader& reader, ParticleEmitterDesc& e)
     {
         e.Name = reader.ReadStr();
         e.Enabled = ReadBool(reader);
@@ -463,7 +461,7 @@ namespace Surge::ParticleEffectBinary
 
         // Last, a corrupted file never loads a texture from a garbage ID
         if(!reader.Failed)
-            e.Renderer.Texture = LoadTexture(textureID);
+            e.Renderer.Texture = LoadTexture(assetManager, textureID);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -492,7 +490,7 @@ namespace Surge::ParticleEffectBinary
         return true;
     }
 
-    bool Read(const String& path, AssetStamp& outStamp, ParticleEffect& outEffect)
+    bool Read(AssetManager& assetManager, const String& path, AssetStamp& outStamp, ParticleEffect& outEffect)
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(path, fileData))
@@ -524,7 +522,7 @@ namespace Surge::ParticleEffectBinary
 
         Vector<ParticleEmitterDesc> emitters(header.EmitterCount);
         for(Uint i = 0; i < header.EmitterCount && !reader.Failed; i++)
-            ReadEmitter(reader, emitters[i]);
+            ReadEmitter(assetManager, reader, emitters[i]);
 
         if(reader.Failed)
         {

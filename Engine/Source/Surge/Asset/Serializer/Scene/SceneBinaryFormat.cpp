@@ -5,6 +5,7 @@
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include <unordered_map>
+#include <cstring>
 
 namespace Surge::SceneBinary
 {
@@ -51,6 +52,18 @@ namespace Surge::SceneBinary
         }
     }
 
+    // Field names + sizes of RenderSettings::VisitSavedFields: changing that list re-cooks every scene, like changing a component
+    static void HashRenderSettingsLayout(Uint& hash)
+    {
+        const RenderSettings settings;
+        RenderSettings::VisitSavedFields(settings, [&hash](const char* group, const char* name, const auto& value) {
+            const Uint size = static_cast<Uint>(sizeof(value));
+            HashBytes(hash, group, std::strlen(group));
+            HashBytes(hash, name, std::strlen(name));
+            HashBytes(hash, &size, sizeof(size));
+        });
+    }
+
     template <typename T>
     static void HashComponent(Uint& hash)
     {
@@ -60,6 +73,8 @@ namespace Surge::SceneBinary
         {
             HashBytes(hash, var.Name->data(), var.Name->size());
             HashBytes(hash, &var.Kind, sizeof(var.Kind));
+            if(var.Kind == SerializedFieldKind::RENDER_SETTINGS)
+                HashRenderSettingsLayout(hash);
         }
     }
 
@@ -114,6 +129,32 @@ namespace Surge::SceneBinary
         return value != 0;
     }
 
+    template <typename T>
+    static void WriteSettingsField(Vector<Byte>& buffer, const T& value)
+    {
+        if constexpr(std::is_same_v<T, bool>)
+            WriteBool(buffer, value);
+        else if constexpr(std::is_enum_v<T>)
+            WriteData(buffer, static_cast<int32_t>(value));
+        else
+            WriteData(buffer, value); // int, Uint, float, glm::vec3
+    }
+
+    template <typename T>
+    static void ReadSettingsField(BinaryReader& reader, T& value)
+    {
+        if constexpr(std::is_same_v<T, bool>)
+            value = ReadBool(reader);
+        else if constexpr(std::is_enum_v<T>)
+        {
+            int32_t raw = 0;
+            reader.Read(raw);
+            value = static_cast<T>(raw);
+        }
+        else
+            reader.Read(value);
+    }
+
     static void WriteField(Vector<Byte>& buffer, SerializedFieldKind kind, const Byte* src)
     {
         switch(kind)
@@ -150,11 +191,14 @@ namespace Surge::SceneBinary
                 WriteData(buffer, asset ? asset->GetID().Get() : static_cast<uint64_t>(AssetID::INVALID));
                 break;
             }
+            case SerializedFieldKind::RENDER_SETTINGS:
+                RenderSettings::VisitSavedFields(*reinterpret_cast<const RenderSettings*>(src), [&buffer](const char*, const char*, const auto& value) { WriteSettingsField(buffer, value); });
+                break;
             case SerializedFieldKind::UNKNOWN: break; // Not saved, the JSON format skips it too
         }
     }
 
-    static void ReadField(BinaryReader& reader, SerializedFieldKind kind, Byte* dest)
+    static void ReadField(BinaryReader& reader, AssetManager& assetManager, SerializedFieldKind kind, Byte* dest)
     {
         switch(kind)
         {
@@ -201,9 +245,12 @@ namespace Surge::SceneBinary
             {
                 uint64_t rawID = 0;
                 reader.Read(rawID);
-                *reinterpret_cast<Ref<Asset>*>(dest) = reader.Failed ? nullptr : LoadSerializedAsset(AssetID(rawID));
+                *reinterpret_cast<Ref<Asset>*>(dest) = reader.Failed ? nullptr : LoadSerializedAsset(assetManager, AssetID(rawID));
                 break;
             }
+            case SerializedFieldKind::RENDER_SETTINGS:
+                RenderSettings::VisitSavedFields(*reinterpret_cast<RenderSettings*>(dest), [&reader](const char*, const char*, auto& value) { ReadSettingsField(reader, value); });
+                break;
             case SerializedFieldKind::UNKNOWN: break;
         }
     }
@@ -385,9 +432,10 @@ namespace Surge::SceneBinary
         }
         else
         {
+            AssetManager& assetManager = *entity.GetScene()->GetContext().AssetManager_;
             Byte* base = reinterpret_cast<Byte*>(&comp);
             for(const SerializedVariable& var : GetSerializedVariables<T>())
-                ReadField(reader, var.Kind, base + var.Offset);
+                ReadField(reader, assetManager, var.Kind, base + var.Offset);
 
             if constexpr(std::is_same_v<T, ScriptComponent>)
             {
@@ -406,7 +454,7 @@ namespace Surge::SceneBinary
                     entry.Active = ReadBool(reader);
                     uint64_t rawID = 0;
                     reader.Read(rawID);
-                    entry.ScriptAsset = reader.Failed ? nullptr : LoadSerializedAsset(AssetID(rawID), AssetType::SCRIPT);
+                    entry.ScriptAsset = reader.Failed ? nullptr : LoadSerializedAsset(assetManager, AssetID(rawID), AssetType::SCRIPT);
                     ReadFieldOverrides(reader, entry.Fields);
                 }
             }

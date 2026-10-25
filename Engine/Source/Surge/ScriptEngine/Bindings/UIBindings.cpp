@@ -116,6 +116,9 @@ namespace Surge::ScriptBinding
 
     static Ref<Font> LoadFont(const String& relativePath, const char* who)
     {
+        if(relativePath.empty())
+            return Core::GetRenderer()->GetEngineFont();
+
         AssetManager* am = Core::GetAssetManager();
         const AssetID id = am->GetIDFromPath(relativePath);
         Ref<Font> font = id ? am->Load<Font>(id) : nullptr;
@@ -260,7 +263,9 @@ namespace Surge::ScriptBinding
         );
 
         lua.new_usertype<UI::Text>("UIText",
-                                   sol::factories([](const String& text, const String& fontRelPath) {
+                                   sol::factories([](const String& text) {
+                                       return Ref<UI::Text>::Create(text, Core::GetRenderer()->GetEngineFont());
+                                   }, [](const String& text, const String& fontRelPath) {
                                        return Ref<UI::Text>::Create(text, LoadFont(fontRelPath, "UIText"));
                                    }),
                                    sol::base_classes, sol::bases<UI::Widget>(),

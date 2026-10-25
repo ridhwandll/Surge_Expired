@@ -1,0 +1,4 @@
+// Copyright (c) - SurgeTechnologies - All rights reserved
+
+// ID 1 is what WindowsWindow loads for the window/taskbar icon, the lowest ID is also the icon Explorer shows for the exe
+1 ICON "Editor.ico"

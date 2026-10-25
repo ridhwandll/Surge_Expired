@@ -1,0 +1,406 @@
+// Copyright (c) - SurgeTechnologies - All rights reserved
+// Fragment stage of Renderer3D.glsl and Renderer3DSkinned.glsl: forward PBR, lights, cascaded shadows
+const int MAX_CASCADE_COUNT = 3;
+const int MAX_LIGHTS = 64; // GeometryPass::MAX_LIGHTS
+
+struct VertexOutput
+{
+    vec3 Normal;
+    vec2 TexCoord;
+    vec3 Tangent;
+    vec3 BiTangent;
+    vec3 WorldPos;
+    float ViewDepth;  // Positive view space depth, picks the shadow cascade
+    vec3 ShadowCoord; // Cascade 0 light space position, the other cascades are a scale + offset of it
+};
+layout(location = 0) in VertexOutput vInput;
+layout(location = 0) out vec4 FinalColor;
+
+struct Light
+{
+    vec4 PositionType;   // xyz = pos/dir, w = type (0 = dir, 1 = point)
+    vec3 Color;
+    float Intensity;
+    float Radius;
+    float Falloff;
+    float _pad1, _pad2;
+};
+
+// Push Constants
+layout(push_constant) uniform PushConstants
+{
+    uint LightCount; // Already culled + capped on the CPU (FrameBlackboard::Lighting)
+} uMesh;
+
+// Set 0: Frame + Lights
+layout(std140, set = 0, binding = 0) uniform FrameUBO
+{
+    mat4 View;
+    mat4 ViewProjection;
+    mat4 InverseViewProjection;
+    vec3 CameraPos;
+    float _pad;
+} uFrame;
+
+// (Rid) A UBO, not an SSBO: Adreno preloads UBOs into constant RAM, SSBO reads are memory loads paid per pixel (~16 ms for one light at 720p on Adreno 610)
+layout(std140, set = 0, binding = 1) uniform Lights
+{
+    vec3 SkyAmbient;
+    float _pad1;
+    vec3 HorizonAmbient;
+    float _pad2;
+    vec3 GroundAmbient;
+    float _pad3;
+
+    Light Lights[MAX_LIGHTS];
+} uLights;
+
+// Set 1: Materials
+layout(set = 1, binding = 0) uniform Material
+{
+    vec3 Albedo;
+    float Metallic;
+    float Roughness;
+    float Reflectance;
+    int UseAlbedoMap;
+    int UseNormalMap;
+    int UseMetallicMap;
+    int UseRoughnessMap;
+    int UseEmissionMap;
+    vec3 Emission;
+    float EmissionIntensity;
+} uMaterial;
+
+layout(set = 1, binding = 1) uniform sampler2D AlbedoMap;
+layout(set = 1, binding = 2) uniform sampler2D NormalMap;
+layout(set = 1, binding = 3) uniform sampler2D RoughnessMetallicMap;
+layout(set = 1, binding = 4) uniform sampler2D EmissionMap;
+
+// Set 2: Shadows, one D16 atlas with the cascades side by side
+layout(set = 2, binding = 0) uniform sampler2DShadow uShadowAtlas;
+layout(std140, set = 2, binding = 1) uniform ShadowUBO
+{
+    mat4 LightSpaceMatrix;                 // World -> cascade 0
+    vec4 CascadeScale[MAX_CASCADE_COUNT];  // xyz: cascade 0 -> cascade i, w: world size of one shadow texel
+    vec4 CascadeOffset[MAX_CASCADE_COUNT];
+    vec4 CascadeEnds;                      // Positive view depth
+    vec2 AtlasTexelSize;
+    float NormalBias;                      // In shadow texels
+    float CascadeBlend;
+    float FadeStart;
+    float Distance;
+    uint CascadeCount;
+    int FilterSize;                        // 3, 5 or 7
+    int DitheredBlend;
+    int ShowCascades;
+    int Enabled;
+    float _pad0;
+} uShadowParams;
+
+// (Rid) Colors and material terms are mediump (RelaxedPrecision): mobile GPUs run fp16 math at up to twice the fp32 rate
+// Positions, normals and anything with a large range (specular power, attenuation) stay highp
+struct PBRParameters
+{
+    mediump vec3 Albedo;
+    mediump float Metallic;
+    mediump float Roughness;
+    vec3 Normal;
+    vec3 View;
+
+    // Material terms every light shares, computed once per pixel (PrepareMaterialTerms) instead of once per light
+    mediump vec3 SpecColor;
+    mediump vec3 DiffuseColor; // Already divided by PI
+    float Shininess;
+    float SpecNormalization;
+};
+PBRParameters gPBRParams;
+
+void PrepareMaterialTerms()
+{
+    mediump vec3 f0 = vec3(0.04) * uMaterial.Reflectance;
+    gPBRParams.SpecColor = mix(f0, gPBRParams.Albedo, gPBRParams.Metallic);
+    gPBRParams.DiffuseColor = gPBRParams.Albedo * (1.0 - gPBRParams.Metallic) * (1.0 / 3.14159);
+
+    float alpha = clamp(gPBRParams.Roughness, 0.04, 1.0);
+    float alpha2 = alpha * alpha;
+    gPBRParams.Shininess = max(2.0 / (alpha2 * alpha2) - 2.0, 1.0);
+    gPBRParams.SpecNormalization = (gPBRParams.Shininess + 8.0) / (8.0 * 3.14159);
+}
+
+float SampleShadowTap(vec2 baseUV, float u, float v, float depth)
+{
+    return texture(uShadowAtlas, vec3(baseUV + vec2(u, v) * uShadowParams.AtlasTexelSize, depth));
+}
+
+// Weight (x) and offset in texels from baseUV (y) of tap i along one axis of the size x size tent (MJP's closed forms)
+vec2 TentTap(int size, int i, float s)
+{
+    if (size == 3)
+    {
+        if (i == 0) { float w = 3.0 - 2.0 * s; return vec2(w, (2.0 - s) / w - 1.0); }
+        float w = 1.0 + 2.0 * s; return vec2(w, s / w + 1.0);
+    }
+    if (size == 5)
+    {
+        if (i == 0) { float w = 4.0 - 3.0 * s; return vec2(w, (3.0 - 2.0 * s) / w - 2.0); }
+        if (i == 1) return vec2(7.0, (3.0 + s) / 7.0);
+        float w = 1.0 + 3.0 * s; return vec2(w, s / w + 2.0);
+    }
+    if (i == 0) { float w = 5.0 * s - 6.0; return vec2(w, (4.0 * s - 5.0) / w - 3.0); }
+    if (i == 1) { float w = 11.0 * s - 28.0; return vec2(w, (4.0 * s - 16.0) / w - 1.0); }
+    if (i == 2) { float w = -(11.0 * s + 17.0); return vec2(w, -(7.0 * s + 5.0) / w + 1.0); }
+    float w = -(5.0 * s + 1.0); return vec2(w, -s / w + 3.0);
+}
+
+// Tent filtered PCF out of hardware 2x2 comparisons (The Witness, MJP's Shadows sample): the 3x3, 5x5 and 7x7 tents cost 4, 9 and 16 lookups.
+// (Rid) One loop for every size instead of three unrolled copies: the register budget is set by the largest path even when shadows are off
+float SampleShadowPCF(vec2 atlasUV, float depth)
+{
+    vec2 uv = atlasUV / uShadowParams.AtlasTexelSize; // In texels
+    vec2 baseUV = floor(uv + 0.5);
+    float s = uv.x + 0.5 - baseUV.x;
+    float t = uv.y + 0.5 - baseUV.y;
+    baseUV = (baseUV - 0.5) * uShadowParams.AtlasTexelSize;
+
+    int size = uShadowParams.FilterSize == 3 || uShadowParams.FilterSize == 5 ? uShadowParams.FilterSize : 7;
+    int taps = (size + 1) / 2;
+    float sum = 0.0;
+    for (int y = 0; y < taps; y++)
+    {
+        vec2 tapV = TentTap(size, y, t);
+        for (int x = 0; x < taps; x++)
+        {
+            vec2 tapU = TentTap(size, x, s);
+            sum += tapU.x * tapV.x * SampleShadowTap(baseUV, tapU.y, tapV.y, depth);
+        }
+    }
+    return sum / (size == 3 ? 16.0 : (size == 5 ? 144.0 : 2704.0));
+}
+
+float SampleCascade(int cascade, vec3 N, float NdotL)
+{
+    vec4 scale = uShadowParams.CascadeScale[cascade];
+
+    // Normal offset: the receiver is pushed off its surface by a few texels of this cascade, more at grazing angles
+    float offset = uShadowParams.NormalBias * scale.w * 1.4142136 * (1.0 - NdotL);
+    vec3 coord0 = vInput.ShadowCoord + mat3(uShadowParams.LightSpaceMatrix) * (N * offset);
+    vec3 coord = coord0 * scale.xyz + uShadowParams.CascadeOffset[cascade].xyz;
+
+    // This cascade's region of the atlas, kept 5 texels inside its edges so the widest filter never reads a neighbour
+    float border = 5.0 * uShadowParams.AtlasTexelSize.y;
+    vec2 uv = clamp(coord.xy * 0.5 + 0.5, vec2(border), vec2(1.0 - border));
+    uv.x = (uv.x + float(cascade)) / float(uShadowParams.CascadeCount);
+    return SampleShadowPCF(uv, min(coord.z, 1.0));
+}
+
+int gCascadeIndex = -1;
+
+// Shadow term of the directional light ShadowPass rendered, L points toward the light
+float CalculateDirectionalShadow(vec3 L)
+{
+    if (uShadowParams.Enabled == 0)
+        return 1.0;
+
+    float depth = vInput.ViewDepth;
+    if (depth >= uShadowParams.Distance)
+        return 1.0;
+
+    int count = int(uShadowParams.CascadeCount);
+    int cascade = count - 1;
+    for (int i = 0; i < count - 1; i++)
+    {
+        if (depth < uShadowParams.CascadeEnds[i])
+        {
+            cascade = i;
+            break;
+        }
+    }
+
+    // Blend band at the end of every cascade but the last one (that one fades out instead)
+    float blend = 0.0;
+    if (cascade < count - 1)
+    {
+        float cascadeStart = cascade == 0 ? 0.0 : uShadowParams.CascadeEnds[cascade - 1];
+        float cascadeEnd = uShadowParams.CascadeEnds[cascade];
+        float bandStart = cascadeEnd - (cascadeEnd - cascadeStart) * uShadowParams.CascadeBlend;
+        blend = clamp((depth - bandStart) / max(cascadeEnd - bandStart, 0.0001), 0.0, 1.0);
+    }
+
+    vec3 N = normalize(vInput.Normal); // Geometric normal, a normal map would make the offset noisy
+    float NdotL = clamp(dot(N, L), 0.0, 1.0);
+
+    // Dithered: one cascade per pixel, picked with interleaved gradient noise (a single lookup set, the filter hides the noise).
+    // Otherwise the blend band mixes this cascade and the next. One SampleCascade call site either way (code size, registers)
+    int samples = 1;
+    if (blend > 0.0)
+    {
+        if (uShadowParams.DitheredBlend == 1)
+        {
+            float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+            if (noise < blend)
+                cascade++;
+        }
+        else
+        {
+            samples = 2;
+        }
+    }
+
+    float shadow = 0.0;
+    for (int i = 0; i < samples; i++)
+    {
+        float weight = samples == 1 ? 1.0 : (i == 0 ? 1.0 - blend : blend);
+        shadow += weight * SampleCascade(cascade + i, N, NdotL);
+    }
+    gCascadeIndex = cascade;
+
+    float fade = clamp((depth - uShadowParams.FadeStart) / max(uShadowParams.Distance - uShadowParams.FadeStart, 0.0001), 0.0, 1.0);
+    return mix(shadow, 1.0, fade);
+}
+
+vec3 CalculateNormal()
+{
+    if (uMaterial.UseNormalMap == 1)
+    {
+        vec3 normal = normalize(vInput.Normal);
+        vec3 tangent = normalize(vInput.Tangent);
+        vec3 bitangent = normalize(vInput.BiTangent);
+
+        vec3 bumpMapNormal = texture(NormalMap, vInput.TexCoord).xyz;
+        bumpMapNormal = 2.0 * bumpMapNormal - vec3(1.0);
+
+        mat3 TBN = mat3(tangent, bitangent, normal);
+        vec3 newNormal = TBN * bumpMapNormal;
+
+        return normalize(newNormal);
+    }
+
+    return normalize(vInput.Normal);
+}
+
+// Diffuse + Blinn-Phong specular of one light, L points toward the light
+vec3 CalculateBRDF(vec3 N, vec3 V, vec3 L)
+{
+    vec3 H = normalize(L + V);
+    float dotNH = max(dot(N, H), 0.0);
+    float dotNL = max(dot(N, L), 0.0);
+
+    float specularTerm = pow(dotNH, gPBRParams.Shininess) * gPBRParams.SpecNormalization;
+    return (gPBRParams.DiffuseColor + gPBRParams.SpecColor * specularTerm) * dotNL;
+}
+
+// Hemispherical Ambient GI with Vertex AO Modulation
+vec3 CalculateFastGI(vec3 N, vec3 V)
+{
+    // Hemispherical diffuse ambient
+    mediump float skyGroundWeight = N.y * 0.5 + 0.5;
+    mediump vec3  rawSkyColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(N.y, 0.0));
+    mediump vec3  totalAmbientDiffuse = mix(uLights.GroundAmbient, rawSkyColor, skyGroundWeight);
+
+    // Metals have no diffuse
+    mediump vec3 diffuseAmbient = totalAmbientDiffuse * gPBRParams.Albedo * (1.0 - gPBRParams.Metallic);
+
+    // Environment reflection direction
+    vec3  R = reflect(-V, N);
+    mediump float reflSkyWeight = R.y * 0.5 + 0.5;
+    mediump vec3  rawReflColor = mix(uLights.HorizonAmbient, uLights.SkyAmbient, max(R.y, 0.0));
+    mediump vec3  environmentRefl = mix(uLights.GroundAmbient, rawReflColor, reflSkyWeight);
+
+    mediump float smoothness = 1.0 - gPBRParams.Roughness;
+    mediump vec3  ambientEnv = mix(totalAmbientDiffuse, environmentRefl, smoothness * smoothness);
+    mediump vec3  specularAmbient = ambientEnv * gPBRParams.SpecColor;
+
+    return (diffuseAmbient + specularAmbient);
+}
+
+vec3 VisualizeCascades(vec3 finalColor, int cascadeIndex)
+{
+    if (uShadowParams.ShowCascades == 1 && cascadeIndex != -1)
+    {
+        switch (cascadeIndex)
+        {
+            case 0: return finalColor *= vec3(1.0,  0.25, 0.25);
+            case 1: return finalColor *= vec3(0.25, 1.0,  0.25);
+            case 2: return finalColor *= vec3(1.0,  1.0,  0.25);
+            case 3: return finalColor *= vec3(0.25, 0.25, 1.0 );
+        }
+    }
+    return finalColor;
+}
+
+void main()
+{
+    if (uMaterial.UseAlbedoMap == 1)
+    {
+        mediump vec4 tex = texture(AlbedoMap, vInput.TexCoord);
+        gPBRParams.Albedo = tex.rgb * uMaterial.Albedo;
+    }
+    else
+    {
+        gPBRParams.Albedo = uMaterial.Albedo;
+    }
+
+    gPBRParams.Normal = CalculateNormal();
+    gPBRParams.Metallic = (uMaterial.UseMetallicMap == 1) 
+        ? texture(RoughnessMetallicMap, vInput.TexCoord).b * uMaterial.Metallic 
+        : uMaterial.Metallic;
+    gPBRParams.Roughness = (uMaterial.UseRoughnessMap == 1) 
+        ? texture(RoughnessMetallicMap, vInput.TexCoord).g * uMaterial.Roughness 
+        : uMaterial.Roughness;
+
+    gPBRParams.View = normalize(uFrame.CameraPos - vInput.WorldPos);
+    PrepareMaterialTerms();
+
+    // GI modulated by baked vertex AO, plus emission, first: the one accumulator the lights add to. A texture read after the
+    // loop gets hoisted above it by the compiler and its result held through the whole loop
+    vec3 emission = uMaterial.Emission * uMaterial.EmissionIntensity;
+    if (uMaterial.UseEmissionMap == 1)
+        emission *= texture(EmissionMap, vInput.TexCoord).rgb;
+    vec3 HDRColor = CalculateFastGI(gPBRParams.Normal, gPBRParams.View) + emission;
+
+    // Direct lighting. GeometryPass uploads directional lights first, so Lights[0] is the sun when there is one: it is shaded
+    // outside the loop (constant index, its data stays in uniform registers) together with the shadow, computed once. The loop
+    // then only adds into HDRColor. Shadow code or extra accumulators inside the loop add to its registers (occupancy, see malioc)
+    float shadow = 1.0;
+    uint firstLoopLight = 0u;
+    if (uMesh.LightCount > 0u && uLights.Lights[0].PositionType.w == 0.0)
+    {
+        vec3 L = normalize(-uLights.Lights[0].PositionType.xyz);
+        vec3 sun = CalculateBRDF(gPBRParams.Normal, gPBRParams.View, L) * uLights.Lights[0].Color * uLights.Lights[0].Intensity;
+        if (any(greaterThan(sun, vec3(0.0))))
+            shadow = CalculateDirectionalShadow(L);
+        HDRColor += sun * shadow;
+        firstLoopLight = 1u;
+    }
+
+    for (uint i = firstLoopLight; i < uMesh.LightCount; i++)
+    {
+        vec4 positionType = uLights.Lights[i].PositionType;
+
+        vec3 L;
+        float attenuation;
+        if (positionType.w == 0.0)
+        {
+            L = normalize(-positionType.xyz);
+            attenuation = shadow; // Extra directional lights share the sun's shadow
+        }
+        else
+        {
+            vec3 dir = positionType.xyz - vInput.WorldPos;
+            float distanceSquare = dot(dir, dir);
+            float radiusSquare = uLights.Lights[i].Radius * uLights.Lights[i].Radius;
+            if (distanceSquare >= radiusSquare)
+                continue; // The window function below is 0 past the radius, skip the BRDF entirely
+            L = dir * inversesqrt(max(distanceSquare, 0.00000001));
+
+            float factor2 = distanceSquare / radiusSquare; // (dist / radius)^2
+            float window = clamp(1.0 - factor2 * factor2, 0.0, 1.0);
+            window *= window;
+            attenuation = pow(window / max(distanceSquare, 0.0001), uLights.Lights[i].Falloff);
+        }
+
+        HDRColor += CalculateBRDF(gPBRParams.Normal, gPBRParams.View, L) * uLights.Lights[i].Color * (uLights.Lights[i].Intensity * attenuation);
+    }
+
+    FinalColor = vec4(VisualizeCascades(HDRColor, gCascadeIndex), 1.0);
+}

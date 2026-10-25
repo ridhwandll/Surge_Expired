@@ -11,10 +11,10 @@
 
 #include "Surge/Graphics/RHI/Vulkan/VulkanFramePacing.hpp"
 
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Utility/Platform.hpp"
 #include <cstdio>
+#include <chrono>
 
 #ifdef SURGE_PLATFORM_ANDROID
 #include <android/native_window.h>
@@ -86,7 +86,29 @@ namespace Surge
         }
     }
 
-    void VulkanRHI::Initialize(Window* window)
+    namespace
+    {
+        // RHIStats::CPUWaitMilliseconds: adds the time the CPU spends blocked in this scope
+        class ScopedCPUWait
+        {
+        public:
+            explicit ScopedCPUWait(float& total)
+                : mTotal(total), mStartTime(std::chrono::steady_clock::now()) {}
+
+            ~ScopedCPUWait()
+            {
+                mTotal += std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - mStartTime).count();
+            }
+
+            SURGE_DISABLE_COPY_AND_MOVE(ScopedCPUWait);
+
+        private:
+            float& mTotal;
+            std::chrono::steady_clock::time_point mStartTime;
+        };
+    }
+
+    void VulkanRHI::Initialize(Window* window, bool enableImGui)
     {
         SCOPED_TIMER("VulkanRHI::Initialize");
 
@@ -97,12 +119,14 @@ namespace Surge
         mUploader.Initialize(*this);
         CreatePipelineCache();
         mFrame.Initialize(*this, RHISettings::FRAMES_IN_FLIGHT);
+        if constexpr (RHISettings::GPU_TIMING)
+            mGPUTimer.Initialize(*this, enableImGui); // On by default where it can be shown (Editor)
         mSwapchain.Initialize(*this, window->GetSize().x, window->GetSize().y);
 
         CreateSwapchainRenderpass();
         CreateSwapchainFramebuffers();
 
-        if (Core::GetClient()->GetClientOptions().EnableImGui == true)
+        if (enableImGui)
             mImGuiContext.Init(*this);
 
         CreateDescriptorPools();
@@ -146,6 +170,7 @@ namespace Surge
         DestroySwapchainFramebuffers();
         DestroySwapchainRenderpass();
 
+        mGPUTimer.Shutdown(*this);
         mFrame.Shutdown(*this);
         mSwapchain.Shutdown(*this);
         mUploader.Shutdown(*this);
@@ -174,19 +199,38 @@ namespace Surge
 
         // Wait for this SLOT's fence
         // This slot was used N frames ago, wait until the GPU is done with it
+
         {
-            //SCOPED_TIMER("vkWaitForFences");
+            ScopedCPUWait wait(mStats.CPUWaitMilliseconds);
             vkWaitForFences(device, 1, &frame.Fence, VK_TRUE, UINT64_MAX);
         }
 
         FlushDeletionQueue(currentFrameIndex);
         mUploader.Collect(*this); // Recycle staging memory of uploads the GPU has finished
+        mGPUTimer.Collect(*this, currentFrameIndex);
+
+        // Android reports a display rotation that keeps the window size (landscape flipped by the sensor) only through a suboptimal present
+        if(mPresentSuboptimal)
+        {
+            mPresentSuboptimal = false;
+            if(mSwapchain.IsTransformOutdated(*this))
+            {
+                ResizeInternal();
+                swapchainWidth = mSwapchain.GetWidth();
+                swapchainHeight = mSwapchain.GetHeight();
+            }
+        }
 
         // Ask swapchain which IMAGE is available
         // This is unpredictable, diver may return any index
         // AcquireSemaphore signals when the image is actually ready to write
         Uint imageIndex = 0;
-        VkResult result = mSwapchain.AcquireNextImage(*this, frame.AcquireSemaphore, imageIndex);
+        VkResult result = {};
+
+        {
+            ScopedCPUWait wait(mStats.CPUWaitMilliseconds);
+            result = mSwapchain.AcquireNextImage(*this, frame.AcquireSemaphore, imageIndex);
+        }
 
         outCtx.FrameIndex = currentFrameIndex;
         outCtx.SwapchainIndex = imageIndex;
@@ -217,6 +261,7 @@ namespace Surge
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(frame.CmdBuffer, &beginInfo);
+        mGPUTimer.BeginFrame(frame.CmdBuffer, currentFrameIndex);
     }
 
     void VulkanRHI::EndFrame(const FrameContext& ctx)
@@ -224,6 +269,7 @@ namespace Surge
         SURGE_PROFILE_FUNC("VulkanRHI::EndFrame");
         // End recording
         const PerFrame& frame = mFrame.GetCurrentVkFrame();
+        mGPUTimer.EndFrame(frame.CmdBuffer);
         vkEndCommandBuffer(frame.CmdBuffer);
 
         // Uploads recorded since the last frame go first, the frame's commands may use them (same queue, submission order)
@@ -251,7 +297,10 @@ namespace Surge
         // Present: swapchain image index + release semaphore from slot
         // We Dont check for out of date here, if the swapchain is out of date we will catch it at the beginning of the next frame when we try to acquire an image
         // (Rid) Is this good?
-        mSwapchain.Present(*this, releaseSemaphore, ctx.SwapchainIndex);
+        {
+            ScopedCPUWait wait(mStats.CPUWaitMilliseconds);
+            mPresentSuboptimal = mSwapchain.Present(*this, releaseSemaphore, ctx.SwapchainIndex) == VK_SUBOPTIMAL_KHR;
+        }
 
         // Advance SLOT index (completely independent of swapchain image index)
         mFrame.AdvanceFrame();
@@ -307,6 +356,11 @@ namespace Surge
         mTargetFrameRate = fps;
         VulkanFramePacing::SetTargetFrameRate(mDevice.GetDevice(), mSwapchain.GetSwapchain(), fps);
         return mSwapchain.IsFramePacingActive();
+    }
+
+    void VulkanRHI::SetFramePacingEnabled(bool enabled)
+    {
+        VulkanFramePacing::SetEnabled(enabled);
     }
 
     bool VulkanRHI::IsFormatSupported(ImageFormat format) const
@@ -667,6 +721,7 @@ namespace Surge
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         vkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
         mStats.DrawCalls++;
+        mStats.Triangles += static_cast<uint64_t>(indexCount / 3) * instanceCount;
     }
 
     void VulkanRHI::CmdDispatch(const FrameContext& ctx, Uint groupCountX, Uint groupCountY, Uint groupCountZ)
@@ -681,6 +736,7 @@ namespace Surge
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         vkCmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
         mStats.DrawCalls++;
+        mStats.Triangles += static_cast<uint64_t>(vertexCount / 3) * instanceCount;
     }
 
     void VulkanRHI::CmdBindVertexBuffer(const FrameContext& ctx, BufferHandle h, Uint offset /*= 0*/)
@@ -827,6 +883,21 @@ namespace Surge
         vkCmdSetScissor(cmd, 0, 1, &scissor);
     }
 
+    void VulkanRHI::CmdWaitForSwapchainImage(const FrameContext& ctx)
+    {
+        // Only while timing: otherwise the swapchain render pass waits on its own, as it always did
+        if(!mGPUTimer.IsRecording())
+            return;
+
+        // The acquire semaphore is waited at COLOR_ATTACHMENT_OUTPUT, this barrier chains after it: everything recorded later, the timer's
+        // closing timestamp included, starts once the presentation engine released the image. Without it that idle time (up to a whole
+        // vsync, e.g. when the GPU is faster than the display) lands in the swapchain group's scope and reads as GPU work
+        VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
+        mGPUTimer.BeginScope(cmd, "Display Wait", true);
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+        mGPUTimer.EndScope(cmd);
+    }
+
     void VulkanRHI::CmdBeginSwapchainRenderpass(const FrameContext& ctx)
     {
         // Set clear color values
@@ -860,7 +931,14 @@ namespace Surge
     {
         VkCommandBuffer cmd = mFrame.GetFrame(ctx.FrameIndex).CmdBuffer;
         if (mImGuiContext.IsInitialized())
+        {
+            const bool timeImGui = SupportsGPUTimingInRenderPass();
+            if(timeImGui)
+                mGPUTimer.BeginScope(cmd, "ImGui");
             mImGuiContext.EndFrame(cmd);
+            if(timeImGui)
+                mGPUTimer.EndScope(cmd);
+        }
 
         vkCmdEndRenderPass(cmd);
     }
@@ -965,7 +1043,7 @@ namespace Surge
         id = 0;
     }
 
-    void VulkanRHI::ShowPoolDebugImGuiWindow()
+    void VulkanRHI::ShowPoolDebugImGuiWindow(float frameTimeMilliseconds)
     {
         ImFont* regularFont = ImGui::GetIO().Fonts->Fonts[0];
         ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
@@ -974,8 +1052,7 @@ namespace Surge
         ImGui::Separator();
         ImGui::PopFont();
 
-        float currentFrameTime = Core::GetClock().GetMilliseconds();
-        String frameTimeText = std::format("Frame Time: {:.2f} ms", currentFrameTime);
+        String frameTimeText = std::format("Frame Time: {:.2f} ms", frameTimeMilliseconds);
         ImGui::PushFont(regularFont, 20.0f);
         ImGui::Text("%s", frameTimeText.c_str());
         ImGui::PopFont();
@@ -988,6 +1065,7 @@ namespace Surge
         ImGui::Text("Vendor: %s", mStats.VendorName.c_str());
         ImGui::Text("%s", mStats.RHIVersion.c_str());
         ImGui::Text("Draw call(s): %i", mStats.DrawCalls);
+        ImGui::Text("Triangles: %llu", static_cast<unsigned long long>(mStats.Triangles));
         ImGui::Text("Dispatch call(s): %i", mStats.DispatchCalls);
         ImGui::Text("Frames in Flight: %d", RHISettings::FRAMES_IN_FLIGHT);
 
@@ -1205,6 +1283,7 @@ namespace Surge
         mStats.RHIVersion = std::format("Vulkan Version: {}.{}.{}", major, minor, patch);
         
         mStats.VendorName = GetVendorName(props.vendorID);
+        mIsTileBasedGPU = props.vendorID == 0x13B5 || props.vendorID == 0x5143 || props.vendorID == 0x1010; // Mali, Adreno, PowerVR
     }
 
     void VulkanRHI::CreateSurface(Window* window)

@@ -16,7 +16,13 @@ file(GLOB_RECURSE SOURCE_FILES
 
 
 add_executable(Editor ${SOURCE_FILES})
-# The shader compiler (shaderc + SPIRV-Cross reflection) is Editor only, the runtime loads cooked shaders
+
+# Exe icon (Explorer, taskbar), the project only enables C/CXX so the resource compiler is enabled here
+enable_language(RC)
+target_sources(Editor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Assets/Resources/Editor.rc)
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Assets/Resources/Editor.rc PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Assets/Resources/Editor.ico)
+
+# The shader compiler
 target_link_libraries(Editor PRIVATE Surge meshoptimizer SPIRV-Cross ${CMAKE_SOURCE_DIR}/Engine/Vendor/shaderc/Lib/shaderc_shared.lib)
 target_include_directories(Editor PRIVATE ${INCLUDE_DIRS})
 target_include_directories(Editor SYSTEM PRIVATE

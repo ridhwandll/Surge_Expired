@@ -26,6 +26,12 @@ namespace Surge
             mFrameStartTime = std::chrono::high_resolution_clock::now();
         }
 
+        // Since BeginFrame, the cap's sleep is not in it yet
+        float GetElapsedMilliseconds() const
+        {
+            return std::chrono::duration<float, std::milli>(std::chrono::high_resolution_clock::now() - mFrameStartTime).count();
+        }
+
         void EndFrameAndCap()
         {
             if(mTargetFrameTime.count() <= 0.0)

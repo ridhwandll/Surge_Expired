@@ -7,6 +7,7 @@
 namespace Surge
 {
     struct BinaryReader;
+    struct AssetContext;
 }
 
 namespace Surge::MaterialBinary
@@ -20,8 +21,8 @@ namespace Surge::MaterialBinary
 
     Uint CalculateSize(const Ref<Material>& mat);
     void WriteBuffer(Vector<Byte>& buffer, const Ref<Material>& mat);
-    Ref<Material> ReadBuffer(BinaryReader& reader); // Null when the material has no data or the reader failed
+    Ref<Material> ReadBuffer(const AssetContext& context, BinaryReader& reader); // Null when the material has no data or the reader failed
 
     bool Write(const String& path, const AssetStamp& stamp, const Ref<Material>& mat);
-    bool Read(const String& path, AssetStamp& outStamp, Ref<Material>& outMat);
+    bool Read(const AssetContext& context, const String& path, AssetStamp& outStamp, Ref<Material>& outMat);
 }

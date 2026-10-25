@@ -14,13 +14,14 @@
 namespace Surge
 {
     class GraphicsRHI;
+    class Renderer;
     class Material : public Asset
     {
     public:
-        Material(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
+        Material(Renderer& renderer, const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName = "Material");
         ~Material();
         SURGE_ASSET_TYPE(AssetType::MATERIAL)
-        static Ref<Material> Create(const String& name);
+        static Ref<Material> Create(Renderer& renderer, const String& name);
 
         void SetName(const String& name) { mName = name; }
         const String& GetName() const { return mName; }
@@ -70,7 +71,7 @@ namespace Surge
          const ShaderBuffer& GetReflectedBuffer() const { return mReflectedBuffer; }
 
     private:
-        void Initialize(const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName);
+        void Initialize(Renderer& renderer, const PipelineHandle& pipeline, const Shader& shader, const String& materialBufferName);
         const ShaderResource* FindResource(const String& name) const;
     private:
         String mName;
@@ -86,6 +87,7 @@ namespace Surge
         mutable MemoryBlock mCPUData;
         std::unordered_map<String, Pair<Ref<Texture2D>, ImageHandle>> mTextures;
         ImageHandle mWhiteTexture;
+        SamplerHandle mSampler;
         mutable bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
         GraphicsRHI* mRHI;
 

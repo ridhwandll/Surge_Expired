@@ -1,0 +1,66 @@
+// Copyright (c) - SurgeTechnologies - All rights reserved
+// Vertex stage of Renderer3D.glsl and Renderer3DSkinned.glsl: inputs, frame data and the outputs the fragment stage reads
+const int MAX_CASCADE_COUNT = 3;
+
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec3 aTangent;
+layout(location = 3) in vec3 aBiTangent;
+layout(location = 4) in vec2 aTexCoord;
+
+layout(set = 0, binding = 0) uniform FrameUBO
+{
+    mat4 View;
+    mat4 ViewProjection;
+    mat4 InverseViewProjection;
+    vec3 CameraPos;
+    float _pad;
+} uFrame;
+
+struct VertexOutput
+{
+    vec3 Normal;
+    vec2 TexCoord;
+    vec3 Tangent;
+    vec3 BiTangent;
+    vec3 WorldPos;
+    float ViewDepth;  // Positive view space depth, picks the shadow cascade
+    vec3 ShadowCoord; // Cascade 0 light space position, the other cascades are a scale + offset of it
+};
+layout(location = 0) out VertexOutput vOutput;
+
+layout(std140, set = 2, binding = 1) uniform ShadowUBO
+{
+    mat4 LightSpaceMatrix;                 // World -> cascade 0
+    vec4 CascadeScale[MAX_CASCADE_COUNT];  // xyz: cascade 0 -> cascade i, w: world size of one shadow texel
+    vec4 CascadeOffset[MAX_CASCADE_COUNT];
+    vec4 CascadeEnds;                      // Positive view depth
+    vec2 AtlasTexelSize;
+    float NormalBias;                      // In shadow texels
+    float CascadeBlend;
+    float FadeStart;
+    float Distance;
+    uint CascadeCount;
+    int FilterSize;                        // 3, 5 or 7
+    int DitheredBlend;
+    int ShowCascades;
+    int Enabled;
+    float _pad0;
+} uShadowParams;
+
+// model: vertex space -> world (the instance transform, times the blended skin matrix for skinned meshes)
+void WriteVertexOutput(mat4 model)
+{
+    vec4 worldPos = model * vec4(aPosition, 1.0);
+
+    vOutput.TexCoord = aTexCoord;
+    vOutput.WorldPos = worldPos.xyz;
+    vOutput.Tangent = mat3(model) * normalize(aTangent);
+    vOutput.BiTangent = mat3(model) * normalize(aBiTangent);
+    vOutput.Normal = mat3(model) * normalize(aNormal);
+
+    vOutput.ViewDepth = -(uFrame.View * worldPos).z;
+    vOutput.ShadowCoord = (uShadowParams.LightSpaceMatrix * worldPos).xyz; // Orthographic, w == 1
+
+    gl_Position = uFrame.ViewProjection * worldPos;
+}

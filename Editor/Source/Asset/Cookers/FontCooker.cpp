@@ -17,28 +17,72 @@ namespace Surge
     {
         AssetManager* am = Core::GetAssetManager();
         CookResult result;
-        const String msdfAtlasGenExe = FindMSDFAtlasGenExe();
         const String outputPath = am->GetSidecarPath(id);
 
-        Path tempPng = sourceAbsPath + ".tmp.png";
-        Path tempJson = sourceAbsPath + ".tmp.json";
-        Path tempKtx2 = sourceAbsPath + ".tmp.ktx2";
+        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
+        if(!CookAtlas(sourceAbsPath, outputPath, stamp, 512, 48, 8.0f))
+        {
+            result.Success = false;
+            return result;
+        }
+
+        result.Success = true;
+        result.OutputPath = outputPath;
+        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
+        result.OutputMegaBytes = Filesystem::FileSizeInMB(outputPath);
+
+        Log<Severity::Info>("[FontCooker] Cooked: {}", outputPath);
+        return result;
+    }
+
+    void FontCooker::CookEngineFontIfOutdated()
+    {
+        Vector<Byte> source;
+        if(!Filesystem::ReadBinaryFile(EngineFont::SOURCE_PATH, source))
+        {
+            Log<Severity::Error>("[FontCooker] Engine font source {} is missing", EngineFont::SOURCE_PATH);
+            return;
+        }
+
+        uint64_t hash = 14695981039346656037ull; // FNV-1a
+        for(Byte byte : source)
+            hash = (hash ^ byte) * 1099511628211ull;
+
+        AssetStamp stamp;
+        if(AssetStampWriter::Read(EngineFont::COOKED_PATH, stamp) && stamp.CookerVersion == ENGINE_FONT_VERSION && stamp.SourceModTime == hash)
+            return;
+
+        stamp = {};
+        stamp.CookerVersion = ENGINE_FONT_VERSION;
+        stamp.SourceModTime = hash; // Content hash, see CookEngineFontIfOutdated
+
+        // ASCII at 32 px fits a 384 atlas (~600 KB): small glyphs, the overlay draws at 11 - 17 UI units
+        Filesystem::CreateOrEnsureDirectories(Filesystem::GetParentPath(EngineFont::COOKED_PATH));
+        if(CookAtlas(EngineFont::SOURCE_PATH, EngineFont::COOKED_PATH, stamp, 384, 32, 6.0f))
+            Log<Severity::Info>("[FontCooker] Cooked the engine UI font: {} (commit it)", EngineFont::COOKED_PATH);
+    }
+
+    bool FontCooker::CookAtlas(const String& sourcePath, const String& outputPath, const AssetStamp& stamp, Uint atlasSize, Uint glyphSize, float pxRange)
+    {
+        const String msdfAtlasGenExe = FindMSDFAtlasGenExe();
+
+        Path tempPng = outputPath + ".tmp.png";
+        Path tempJson = outputPath + ".tmp.json";
 
         const String charsetArg = "[0x0020, 0x007E]";
 
         String msdfCmd = std::format(
-            "\"{}\" -font \"{}\" -type msdf -dimensions 512 512 -size 48 -pxrange 8.0 -kerning "
+            "\"{}\" -font \"{}\" -type msdf -dimensions {} {} -size {} -pxrange {:.1f} -kerning "
             "-chars \"{}\" -json \"{}\" -imageout \"{}\"",
-            msdfAtlasGenExe, sourceAbsPath, charsetArg,
+            msdfAtlasGenExe, sourcePath, atlasSize, atlasSize, glyphSize, pxRange, charsetArg,
             tempJson.string(), tempPng.string());
 
         int exitCode = 0;
         Process::OutputOf(msdfCmd, exitCode);
         if (exitCode != 0)
         {
-            Log<Severity::Error>("[FontCooker] msdf-atlas-gen.exe failed to generate atlas for {}", sourceAbsPath);
-            result.Success = false;
-            return result;
+            Log<Severity::Error>("[FontCooker] msdf-atlas-gen.exe failed to generate atlas for {}", sourcePath);
+            return false;
         }
 
         // Parse MSDF JSON into the Runtime Specification
@@ -95,21 +139,15 @@ namespace Surge
         spec.Height = texSpec.Height;
 
         // Pack runtime file
-        AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
-        FontBinary::Write(outputPath, stamp, spec);
+        const bool written = FontBinary::Write(outputPath, stamp, spec);
 
         Texture2DCooker::FreeLoadedSource(texSpec);
         Filesystem::RemoveFile(tempJson);
         Filesystem::RemoveFile(tempPng);
-        Filesystem::RemoveFile(tempKtx2);
 
-        result.Success = true;
-        result.OutputPath = outputPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(outputPath);
-
-        Log<Severity::Info>("[FontCooker] Cooked: {}", outputPath);
-        return result;
+        if(!written)
+            Log<Severity::Error>("[FontCooker] Could not write {}", outputPath);
+        return written;
     }
 
     String FontCooker::FindMSDFAtlasGenExe()

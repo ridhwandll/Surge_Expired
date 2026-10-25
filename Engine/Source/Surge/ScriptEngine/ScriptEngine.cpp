@@ -12,6 +12,9 @@
 #include "Bindings/SceneBinding.hpp"
 #include "Bindings/StorageBinding.hpp"
 #include "Bindings/ParticleBindings.hpp"
+#include "Bindings/AnimationBindings.hpp"
+#include "Bindings/DiagnosticsBindings.hpp"
+#include "Builtin/PerformanceOverlay.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Asset/AssetManager.hpp"
@@ -236,7 +239,8 @@ Property = {
         lua_newtable(L);
         sSession->ModuleCacheRef = luaL_ref(L, LUA_REGISTRYINDEX);
 
-        lua_gc(L, LUA_GCGEN, 100, 200);
+        // Incremental, default pause/stepmul/stepsize: generational minor collections are stop-the-world (40-64 ms hitches on an A53/A73 phone)
+        lua_gc(L, LUA_GCINC, 0, 0, 0);
 
         ScriptBinding::BindLog(sLua);
         ScriptBinding::BindInput(sLua);
@@ -244,11 +248,14 @@ Property = {
         ScriptBinding::BindEntity(sLua);
         ScriptBinding::BindComponents(sLua);
         ScriptBinding::BindParticles(sLua);
+        ScriptBinding::BindAnimation(sLua);
         ScriptBinding::BindUIWidgets(sLua);
         ScriptBinding::BindScene(sLua);
         ScriptBinding::BindStorage(sLua);
+        ScriptBinding::BindDiagnostics(sLua);
 
         sLua->safe_script(PROPERTY_HELPERS, "=PropertyHelpers");
+        PerformanceOverlay::Initialize(sLua);
 
         // Everything that exists now belongs to the engine, ResetSession() removes the rest
         sSession->BaselineGlobals = sLua->create_table();
@@ -261,6 +268,8 @@ Property = {
     void ScriptEngine::Shutdown()
     {
         SG_ASSERT(sLua, "ScriptEngine not initialized or already shutdown!");
+
+        PerformanceOverlay::Shutdown(); // Holds Lua functions and Lua made widgets
 
         // TODO: Remove from here
         // UI widgets can hold Lua callbacks (sol references), they must be released while the Lua state is still alive

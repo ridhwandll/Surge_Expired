@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "BloomPass.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Core/Profiler.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include <imgui.h>
@@ -43,13 +42,13 @@ namespace Surge
         mRHI = rhi;
         mSceneColor = blackBoard.MainPassColorImage;
         mLinearClampSampler = blackBoard.LinearClampSampler;
-        const glm::vec2 windowSize = Core::GetWindow()->GetSize();
+        const glm::vec2 windowSize = mContext.WindowSize;
         mFullSize = blackBoard.GetSceneSize(static_cast<Uint>(windowSize.x), static_cast<Uint>(windowSize.y)); // Same as the main pass color
 
         if(mRHI->SupportsCompute())
         {
             ComputePipelineDesc computeDesc = {};
-            computeDesc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("BloomCompute.glsl");
+            computeDesc.Shader_ = mContext.Shaders->Get("BloomCompute.glsl");
             computeDesc.DebugName = "BloomCompute";
             mComputePipeline = mRHI->CreateComputePipeline(computeDesc);
         }
@@ -154,7 +153,7 @@ namespace Surge
             if(mFragmentPipeline.IsNull())
             {
                 PipelineDesc pipelineDesc = {};
-                pipelineDesc.Shader_ = Core::GetRenderer()->GetShaderManager().Get("Bloom.glsl");
+                pipelineDesc.Shader_ = mContext.Shaders->Get("Bloom.glsl");
                 pipelineDesc.Raster.Topo = Topology::TRIANGLE_LIST;
                 pipelineDesc.Raster.Polygon = PolygonMode::FILL;
                 pipelineDesc.Raster.Cull = CullMode::NONE;
@@ -270,7 +269,7 @@ namespace Surge
     {
         SURGE_PROFILE_FUNC("BloomPass::Execute");
         const BloomSettings& settings = blackBoard.Bloom;
-        if(!settings.Enable)
+        if(!blackBoard.RunsBloom())
             return;
 
         // Settings changed (ImGui/gameplay code), rebuild at frame end, this frame still renders with the current chain
@@ -278,7 +277,7 @@ namespace Surge
         if(!(desired == mConfig) && !mRebuildPending)
         {
             mRebuildPending = true;
-            Core::AddFrameEndCallback([this, desired]() { Rebuild(desired); });
+            mContext.DeferToFrameEnd([this, desired]() { Rebuild(desired); });
         }
 
         if(mDescriptorsDirty[ctx.FrameIndex])
@@ -345,7 +344,7 @@ namespace Surge
 
         const BloomSettings* settings = &blackBoard.Bloom;
         const glm::uvec2 sceneSize = blackBoard.GetSceneSize(width, height);
-        Core::AddFrameEndCallback([this, sceneSize, settings]() { mFullSize = sceneSize; Rebuild(ComputeConfig(*settings)); });
+        mContext.DeferToFrameEnd([this, sceneSize, settings]() { mFullSize = sceneSize; Rebuild(ComputeConfig(*settings)); });
     }
 
     void BloomPass::RenderStatsViaImGui(FrameBlackboard& blackBoard)
@@ -359,6 +358,8 @@ namespace Surge
             bytes += static_cast<uint64_t>(mMipSizes[i].x) * mMipSizes[i].y * bytesPerPixel * (i + 1 < mMipSizes.size() ? 2 : 1); // Down + Up (no Up for the last mip)
 
         ImGui::SeparatorText("Bloom");
+        if(!blackBoard.RunsBloom())
+            ImGui::TextDisabled("Skipped: the main pass drew nothing (or intensity is 0)");
         ImGui::Text("Path: %s", mConfig.UseCompute ? "Compute (RGBA16F)" : "Fragment (R11G11B10)");
         ImGui::Text("Mips: %u  |  %.2f MB", mConfig.MipCount, static_cast<double>(bytes) / (1024.0 * 1024.0));
         if(!mMipSizes.empty())

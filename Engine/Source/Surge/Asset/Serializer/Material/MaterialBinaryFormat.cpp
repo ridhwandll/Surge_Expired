@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MaterialBinaryFormat.hpp"
 #include "Surge/Asset/Serializer/BinaryHelpers.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
@@ -69,7 +68,7 @@ namespace Surge::MaterialBinary
         }
     }
 
-    Ref<Material> ReadBuffer(BinaryReader& reader)
+    Ref<Material> ReadBuffer(const AssetContext& context, BinaryReader& reader)
     {
         Byte hasData = 0;
         reader.Read(hasData);
@@ -84,7 +83,7 @@ namespace Surge::MaterialBinary
             return nullptr;
 
         // Create with hardcoded pipeline/shader allocates CPU buffer via shader reflection
-        Ref<Material> mat = Material::Create(name);
+        Ref<Material> mat = Material::Create(*context.Renderer_, name);
         MemoryBlock& cpuBuffer = mat->GetCPUData();
         if(propsSize == static_cast<Uint>(cpuBuffer.GetSize()))
         {
@@ -99,7 +98,7 @@ namespace Surge::MaterialBinary
 
         Uint texCount = 0;
         reader.Read(texCount);
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = context.AssetManager_;
         for(Uint i = 0; i < texCount; i++)
         {
             const String texName = reader.ReadStr();
@@ -142,7 +141,7 @@ namespace Surge::MaterialBinary
         return true;
     }
 
-    bool Read(const String& path, AssetStamp& outStamp, Ref<Material>& outMat)
+    bool Read(const AssetContext& context, const String& path, AssetStamp& outStamp, Ref<Material>& outMat)
     {
         Vector<Byte> fileData;
         if(!Filesystem::ReadBinaryFile(path, fileData))
@@ -150,7 +149,7 @@ namespace Surge::MaterialBinary
 
         BinaryReader reader(fileData.data(), fileData.size());
         reader.Read(outStamp);
-        outMat = ReadBuffer(reader);
+        outMat = ReadBuffer(context, reader);
         if(reader.Failed)
         {
             Log<Severity::Error>("[MaterialBinary] {} is truncated or corrupted!", path);

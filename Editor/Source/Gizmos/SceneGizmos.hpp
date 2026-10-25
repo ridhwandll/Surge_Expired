@@ -9,6 +9,7 @@
 namespace Surge
 {
     class RuntimeCamera;
+    class AnimatorRuntime;
     struct ParticleSystemComponent;
 
     struct GizmoSettings
@@ -20,8 +21,8 @@ namespace Surge
         bool ShowLightGizmos = true;
         bool ShowAudioGizmos = true;
         bool ShowParticleGizmos = true; // Emitter shapes
-        bool ShowSelectionOutline = true;
         bool ShowColliders = true;
+        bool ShowSkeletons = true; // Joint hierarchy of the selected animator
     };
 
     // Editor-only scene visualization. Component icons and wire gizmos (camera frustums, light and audio ranges) are an ImGui overlay (ImGuizmo)
@@ -60,6 +61,7 @@ namespace Surge
         void DrawCameraFrustum(const glm::mat4& cameraWorld, const RuntimeCamera& camera, ImU32 color, float thickness);
         void DrawDirectionalLight(const glm::mat4& lightWorld, ImU32 color, float thickness);
         void DrawParticleShapes(const ParticleSystemComponent& particles, const glm::mat4& world, ImU32 color, float thickness);
+        void DrawSkeleton(const AnimatorRuntime& runtime, ImU32 color, float thickness);
         void DrawIcons(Scene& scene, entt::entity selectedHandle, bool allowHover);
 
     private:

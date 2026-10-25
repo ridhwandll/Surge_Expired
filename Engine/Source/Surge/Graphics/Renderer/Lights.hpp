@@ -27,7 +27,7 @@ namespace Surge
         glm::vec3 GroundAmbient;
         float _pad3;
 
-        Light Lights[256] = {};
+        Light Lights[64] = {}; // GeometryPass::MAX_LIGHTS, a UBO: 3 KB, far below the 16 KB every device supports
     };
     static_assert(sizeof(LightUBOData) % 16 == 0, "Size of 'Lights' struct must be 16 bytes aligned!");
 

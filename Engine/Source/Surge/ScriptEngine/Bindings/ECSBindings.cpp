@@ -115,6 +115,7 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<MeshComponent>(entityType, "MeshC");
         BindComponentToEntity<LightComponent>(entityType, "LightC");
         BindComponentToEntity<EnvironmentComponent>(entityType, "EnvironmentC");
+        BindComponentToEntity<RendererSettingsComponent>(entityType, "RendererSettingsC");
         BindComponentToEntity<RigidbodyComponent>(entityType, "RigidbodyC");
         BindComponentToEntity<BoxColliderComponent>(entityType, "BoxColliderC");
         BindComponentToEntity<SphereColliderComponent>(entityType, "SphereColliderC");
@@ -127,6 +128,7 @@ namespace Surge::ScriptBinding
         BindComponentToEntity<UICanvasComponent>(entityType, "UICanvasC");
         BindComponentToEntity<AudioSourceComponent>(entityType, "AudioSourceC");
         BindComponentToEntity<ParticleSystemComponent>(entityType, "ParticleSystemC");
+        BindComponentToEntity<AnimatorComponent>(entityType, "AnimatorC");
     }
 
     void BindComponents(void* luaState)
@@ -143,6 +145,32 @@ namespace Surge::ScriptBinding
         lua.new_enum("LightType",
                      "DIRECTIONAL", LightType::DIRECTIONAL,
                      "POINT", LightType::POINT
+        );
+
+        lua.new_enum("RenderProfile",
+                     "DESKTOP", RenderProfile::DESKTOP,
+                     "MOBILE", RenderProfile::MOBILE
+        );
+
+        lua.new_enum("ShadowQuality",
+                     "LOW", ShadowQuality::LOW,
+                     "MEDIUM", ShadowQuality::MEDIUM,
+                     "HIGH", ShadowQuality::HIGH,
+                     "ULTRA", ShadowQuality::ULTRA
+        );
+
+        lua.new_enum("AOQuality",
+                     "LOW", AOQuality::LOW,
+                     "MEDIUM", AOQuality::MEDIUM,
+                     "HIGH", AOQuality::HIGH,
+                     "ULTRA", AOQuality::ULTRA
+        );
+
+        lua.new_enum("BloomQuality",
+                     "LOW", BloomQuality::LOW,
+                     "MEDIUM", BloomQuality::MEDIUM,
+                     "HIGH", BloomQuality::HIGH,
+                     "ULTRA", BloomQuality::ULTRA
         );
 
         lua.new_enum("TextAlignment",
@@ -330,10 +358,101 @@ namespace Surge::ScriptBinding
                                                "GroundAmbient", BIND_PROP(EnvironmentComponent, GroundAmbient),
                                                STRICT_READ(EnvironmentComponent));
 
+        // RENDER SETTINGS
+        // Nested settings are handed out by pointer, so entity.RendererSettingsC.Desktop.Bloom.Intensity = 2 writes into the component.
+        // Quality is read only: ApplyQualityPreset() sets it together with the knobs it drives
+        lua.new_usertype<ShadowSettings>("ShadowSettings", sol::no_constructor,
+                                         "Enable", BIND_PROP(ShadowSettings, Enable),
+                                         "Quality", sol::readonly_property([](ShadowSettings& s) { return s.Quality; }),
+                                         "ApplyQualityPreset", &ShadowSettings::ApplyQualityPreset,
+                                         "CascadeCount", BIND_PROP(ShadowSettings, CascadeCount),
+                                         "Resolution", BIND_PROP(ShadowSettings, Resolution),
+                                         "FilterSize", BIND_PROP(ShadowSettings, FilterSize),
+                                         "DitheredBlend", BIND_PROP(ShadowSettings, DitheredBlend),
+                                         "Distance", BIND_PROP(ShadowSettings, Distance),
+                                         "FadeRange", BIND_PROP(ShadowSettings, FadeRange),
+                                         "CascadeSplitLambda", BIND_PROP(ShadowSettings, CascadeSplitLambda),
+                                         "CascadeBlend", BIND_PROP(ShadowSettings, CascadeBlend),
+                                         "ShowCascades", BIND_PROP(ShadowSettings, ShowCascades),
+                                         "NormalBias", BIND_PROP(ShadowSettings, NormalBias),
+                                         "DepthBiasConstant", BIND_PROP(ShadowSettings, DepthBiasConstant),
+                                         "DepthBiasClamp", BIND_PROP(ShadowSettings, DepthBiasClamp),
+                                         "DepthBiasSlope", BIND_PROP(ShadowSettings, DepthBiasSlope),
+                                         STRICT_READ(ShadowSettings));
+
+        lua.new_usertype<AmbientOcclusionSettings>("AmbientOcclusionSettings", sol::no_constructor,
+                                                   "Enable", BIND_PROP(AmbientOcclusionSettings, Enable),
+                                                   "Quality", sol::readonly_property([](AmbientOcclusionSettings& s) { return s.Quality; }),
+                                                   "ApplyQualityPreset", &AmbientOcclusionSettings::ApplyQualityPreset,
+                                                   "ResolutionScale", BIND_PROP(AmbientOcclusionSettings, ResolutionScale),
+                                                   "SliceCount", BIND_PROP(AmbientOcclusionSettings, SliceCount),
+                                                   "StepsPerSlice", BIND_PROP(AmbientOcclusionSettings, StepsPerSlice),
+                                                   "BlurRadius", BIND_PROP(AmbientOcclusionSettings, BlurRadius),
+                                                   "AccurateNormals", BIND_PROP(AmbientOcclusionSettings, AccurateNormals),
+                                                   "Radius", BIND_PROP(AmbientOcclusionSettings, Radius),
+                                                   "Intensity", BIND_PROP(AmbientOcclusionSettings, Intensity),
+                                                   "FalloffRange", BIND_PROP(AmbientOcclusionSettings, FalloffRange),
+                                                   "MaxDistance", BIND_PROP(AmbientOcclusionSettings, MaxDistance),
+                                                   "BlurSharpness", BIND_PROP(AmbientOcclusionSettings, BlurSharpness),
+                                                   STRICT_READ(AmbientOcclusionSettings));
+
+        lua.new_usertype<BloomSettings>("BloomSettings", sol::no_constructor,
+                                        "Enable", BIND_PROP(BloomSettings, Enable),
+                                        "Quality", sol::readonly_property([](BloomSettings& s) { return s.Quality; }),
+                                        "ApplyQualityPreset", &BloomSettings::ApplyQualityPreset,
+                                        "UseCompute", BIND_PROP(BloomSettings, UseCompute),
+                                        "MipCount", BIND_PROP(BloomSettings, MipCount),
+                                        "HighQualityFilter", BIND_PROP(BloomSettings, HighQualityFilter),
+                                        "AntiFlicker", BIND_PROP(BloomSettings, AntiFlicker),
+                                        "HighQualityComposite", BIND_PROP(BloomSettings, HighQualityComposite),
+                                        "Threshold", BIND_PROP(BloomSettings, Threshold),
+                                        "Knee", BIND_PROP(BloomSettings, Knee),
+                                        "Intensity", BIND_PROP(BloomSettings, Intensity),
+                                        "Scatter", BIND_PROP(BloomSettings, Scatter),
+                                        "ClampValue", BIND_PROP(BloomSettings, ClampValue),
+                                        "Tint", BIND_PROP(BloomSettings, Tint),
+                                        STRICT_READ(BloomSettings));
+
+        lua.new_usertype<PostProcessSettings>("PostProcessSettings", sol::no_constructor,
+                                              "VignetteIntensity", BIND_PROP(PostProcessSettings, VignetteIntensity),
+                                              "VignetteSoftness", BIND_PROP(PostProcessSettings, VignetteSoftness),
+                                              "Grain", BIND_PROP(PostProcessSettings, Grain),
+                                              "ShowAOOnly", BIND_PROP(PostProcessSettings, ShowAOOnly),
+                                              STRICT_READ(PostProcessSettings));
+
+        lua.new_usertype<RenderSettings>("RenderSettings", sol::no_constructor,
+                                         "RenderScale", BIND_PROP(RenderSettings, RenderScale),
+                                         "MaxLights", sol::property([](RenderSettings& s) { return s.Lighting.MaxLights; }, [](RenderSettings& s, Uint v) { s.Lighting.MaxLights = v; }),
+                                         "MaxParticles", sol::property([](RenderSettings& s) { return s.Particles.MaxParticles; }, [](RenderSettings& s, Uint v) { s.Particles.MaxParticles = v; }),
+                                         "EmissionQuality", sol::property([](RenderSettings& s) { return s.Particles.EmissionQuality; }, [](RenderSettings& s, float v) { s.Particles.EmissionQuality = v; }),
+                                         "MaxSkinMatrices", sol::property([](RenderSettings& s) { return s.Animation.MaxSkinMatrices; }, [](RenderSettings& s, Uint v) { s.Animation.MaxSkinMatrices = v; }),
+                                         "Shadows", sol::readonly_property([](RenderSettings& s) -> ShadowSettings* { return &s.Shadows; }),
+                                         "AO", sol::readonly_property([](RenderSettings& s) -> AmbientOcclusionSettings* { return &s.AO; }),
+                                         "Bloom", sol::readonly_property([](RenderSettings& s) -> BloomSettings* { return &s.Bloom; }),
+                                         "PostProcess", sol::readonly_property([](RenderSettings& s) -> PostProcessSettings* { return &s.PostProcess; }),
+                                         STRICT_READ(RenderSettings));
+
+        lua.new_usertype<RendererSettingsComponent>("RendererSettingsComponent", sol::no_constructor,
+                                                    "Active", BIND_PROP(RendererSettingsComponent, Active),
+                                                    "Desktop", sol::readonly_property([](RendererSettingsComponent& c) -> RenderSettings* { return &c.Desktop; }),
+                                                    "Mobile", sol::readonly_property([](RendererSettingsComponent& c) -> RenderSettings* { return &c.Mobile; }),
+                                                    // The profile this platform renders with (in the Editor: the previewed one)
+                                                    "GetCurrentProfile", [](RendererSettingsComponent& c) -> RenderSettings* { return &c.GetProfileSettings(Core::GetRenderer()->GetRenderProfile()); },
+                                                    "ResetProfile", [](RendererSettingsComponent& c, RenderProfile profile) { c.GetProfileSettings(profile) = RenderSettings::Default(profile); },
+                                                    STRICT_READ(RendererSettingsComponent));
+
         // PHYSICS
         lua.new_usertype<RigidbodyComponent>("RigidbodyComponent", sol::no_constructor,
                                              "Active", BIND_PROP(RigidbodyComponent, Active),
                                              "Type", BIND_PROP(RigidbodyComponent, Type),
+                                             "Layer", sol::property(
+                                                 [](const RigidbodyComponent& rb) { return rb.Layer; },
+                                                 [](RigidbodyComponent& rb, int layer) {
+                                                     rb.Layer = PhysicsSettings::ClampLayer(layer);
+                                                     Physics* physics = Core::GetPhysics();
+                                                     if(!physics->IsInValid(rb.RuntimeBodyID))
+                                                         physics->SetLayer(rb.RuntimeBodyID, rb.Layer);
+                                                 }),
                                              "Mass", BIND_PROP(RigidbodyComponent, Mass),
                                              "Interpolate", BIND_PROP(RigidbodyComponent, Interpolate),
                                              "UseGravity", BIND_PROP(RigidbodyComponent, UseGravity),

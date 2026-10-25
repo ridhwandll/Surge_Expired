@@ -23,7 +23,9 @@ namespace Surge
 
     private:
         // x values are relative to the bar. The right aligned parts return their left edge and draw nothing when they would cross minX
-        void DrawPlayModeAccent();
+        void UpdatePlayModeAnimation();
+        void DrawPlayModeBackground(const ImVec2& origin); // origin: the logo's center, where the amber comes from
+        void DrawLogo(const ImVec2& center);
         float DrawMenus(float x); // Returns the right edge
         void DrawBreadcrumb(float x, float maxX);
         void DrawPlaybackControls(float x);
@@ -39,8 +41,15 @@ namespace Surge
     private:
         Editor* mEditor = nullptr;
         ImageHandle mEngineLogo;
+        ImageHandle mEngineLogoWatermark; // Dark logo for the amber play mode bar
         ImVec2 mWindowPos; // Screen position of the bar, valid during Render()
         float mWidth = 0.0f;
+
+        // Play mode transition, see UpdatePlayModeAnimation
+        float mPlayBlend = 0.0f;  // 0 = edit mode .. 1 = play mode, linear in time
+        float mPauseBlend = 0.0f; // 0 = running .. 1 = paused
+        float mPlayTime = 0.0f;   // Unpaused seconds since the reveal finished (negative during it), drives the sweep
+        bool mWasPlaying = false;
 
         float mStatsTimer = 0.0f;
         String mFrameTimeText;

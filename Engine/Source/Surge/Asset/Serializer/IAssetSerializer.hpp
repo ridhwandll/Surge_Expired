@@ -5,6 +5,8 @@
 
 namespace Surge
 {
+    struct AssetContext;
+
     class AssetSerializer
     {
     public:
@@ -16,7 +18,11 @@ namespace Surge
         virtual void Shutdown() = 0;
 
         AssetType GetSerializerType() const { return mSerializerType; }
+
+        // Set by the AssetManager (Initialize) before anything is loaded or saved
+        void SetContext(const AssetContext* context) { mContext = context; }
     protected:
         AssetType mSerializerType;
+        const AssetContext* mContext = nullptr;
     };
 }

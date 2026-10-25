@@ -2,7 +2,7 @@
 #include "Panels/EditorTitleBar.hpp"
 #include "Editor.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Core/Time/Clock.hpp"
+#include "Surge/Core/Diagnostics/Diagnostics.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Utility/Platform.hpp"
@@ -18,27 +18,45 @@
 #include <cstdio>
 #include <iterator>
 #include <mutex>
+#include <numbers>
 
 namespace Surge
 {
     namespace
     {
-        constexpr float SIDE_PADDING = 12.0f;
-        constexpr float LOGO_SIZE = 22.0f;
+        constexpr float SIDE_PADDING = 4.0f;
+        constexpr float LOGO_SIZE = 44.0f;
         constexpr float ITEM_HEIGHT = 28.0f; // Menu buttons, console counters
         constexpr float ITEM_ROUNDING = 2.0f;
         constexpr float MENU_PADDING_X = 10.0f;
         constexpr float GROUP_GAP = 16.0f; // Between the left, center and right groups
-        constexpr float WINDOW_BUTTON_WIDTH = 46.0f;
+        constexpr float WINDOW_BUTTON_WIDTH = 40.0f;
 
-        constexpr float FONT_SIZE = 15.0f;
-        constexpr float SMALL_FONT_SIZE = 14.0f;
+        constexpr float FONT_SIZE = 17.0f;
+        constexpr float SMALL_FONT_SIZE = 16.0f;
 
         // Play controls: three buttons in one pill
         constexpr ImVec2 PLAY_BUTTON_SIZE = ImVec2(32.0f, 26.0f);
         constexpr float PLAY_GROUP_PADDING = 3.0f;
         constexpr float PLAY_BUTTON_SPACING = 2.0f;
         constexpr float PLAY_GROUP_WIDTH = PLAY_BUTTON_SIZE.x * 3.0f + PLAY_BUTTON_SPACING * 2.0f + PLAY_GROUP_PADDING * 2.0f;
+
+        // Play mode
+        constexpr float PAUSED_BRIGHTNESS = 0.8f;
+        constexpr float REVEAL_DURATION = 0.55f;
+        constexpr float CONCEAL_DURATION = 0.4f;
+        constexpr float PAUSE_FADE_DURATION = 0.1f;
+        constexpr float LOGO_POP = 0.6; // Extra logo scale halfway through the transition
+        constexpr float SWEEP_WIDTH = 167.0f;
+        constexpr float SWEEP_DURATION = 0.6f; // Seconds to cross the bar
+        constexpr float SWEEP_PERIOD = 1.0f;   // One sweep every
+        constexpr ImVec4 SWEEP_COLOR = ImVec4(1.0f, 0.95f, 0.8f, 1.0f);
+        constexpr ImVec4 PLAY_TEXT_COLOR = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+        // Toggled buttons on the amber bar (Stop, Resume): black with an amber glyph
+        constexpr ImVec4 TOGGLED_COLOR = ImVec4(0.0f, 0.0f, 0.0f, 0.85f);
+        constexpr ImVec4 TOGGLED_HOVER_COLOR = ImVec4(0.0f, 0.0f, 0.0f, 0.7f);
+        constexpr ImVec4 TOGGLED_ACTIVE_COLOR = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
 
         constexpr ImVec4 TEXT_COLOR = ImVec4(0.92f, 0.92f, 0.92f, 1.0f);
         constexpr ImVec4 DIM_TEXT_COLOR = ImVec4(0.62f, 0.62f, 0.62f, 1.0f);
@@ -56,7 +74,65 @@ namespace Surge
             const char* Label;
             const char* PopupID;
         };
-        constexpr Menu MENUS[] = { { "File", "##FileMenu" }, { "Edit", "##EditMenu" }, { "View", "##ViewMenu" }, { "Help", "##HelpMenu" } };
+        constexpr Menu MENUS[] = { { "FILE", "##FileMenu" }, { "EDIT", "##EditMenu" }, { "VIEW", "##ViewMenu" }, { "HELP", "##HelpMenu" } };
+
+        // Colors of everything drawn on the bar, picked once per frame (edit mode or the amber play mode bar)
+        struct BarPalette
+        {
+            ImVec4 Background;
+            ImVec4 Text;
+            ImVec4 DimText;
+            ImVec4 FaintText;
+            ImVec4 Hover;
+            ImVec4 Active;
+            ImVec4 Divider;
+            ImVec4 PillFill;
+            ImVec4 PillBorder;
+            ImVec4 Accent; // DEBUG tag, unsaved changes dot
+            ImVec4 Warn;
+            ImVec4 Error;
+        };
+        BarPalette sPalette;
+
+        const BarPalette EDIT_PALETTE = { ImGuiAux::Colors::ExtraDark, TEXT_COLOR, DIM_TEXT_COLOR, FAINT_TEXT_COLOR, HOVER_COLOR, ACTIVE_COLOR, DIVIDER_COLOR,
+                                          ImVec4(1.0f, 1.0f, 1.0f, 0.04f), ImVec4(1.0f, 1.0f, 1.0f, 0.07f), ImGuiAux::Colors::ThemeColor1, WARN_COLOR, ERROR_COLOR };
+        const BarPalette PLAY_PALETTE = { ImGuiAux::Colors::ThemeColor1, PLAY_TEXT_COLOR, ImVec4(0.0f, 0.0f, 0.0f, 0.7f), ImVec4(0.0f, 0.0f, 0.0f, 0.42f), ImVec4(0.0f, 0.0f, 0.0f, 0.1f),
+                                          ImVec4(0.0f, 0.0f, 0.0f, 0.18f), ImVec4(0.0f, 0.0f, 0.0f, 0.22f), ImVec4(0.0f, 0.0f, 0.0f, 0.08f), ImVec4(0.0f, 0.0f, 0.0f, 0.14f),
+                                          PLAY_TEXT_COLOR, PLAY_TEXT_COLOR, ImVec4(0.6f, 0.05f, 0.08f, 1.0f) };
+        const ImVec4 PAUSED_BACKGROUND = glm::mix(ImGuiAux::Colors::ExtraDark, ImGuiAux::Colors::ThemeColor1, PAUSED_BRIGHTNESS);
+
+        ImVec4 Mix(const ImVec4& a, const ImVec4& b, float t)
+        {
+            return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t);
+        }
+
+        float EaseOutCubic(float t)
+        {
+            const float inverse = 1.0f - t;
+            return 1.0f - inverse * inverse * inverse;
+        }
+
+        ImVec4 PlayBackground(float pause)
+        {
+            return Mix(PLAY_PALETTE.Background, PAUSED_BACKGROUND, pause);
+        }
+
+        // play: 0 = edit mode, 1 = play mode. pause: 0 = running, 1 = paused
+        BarPalette MakePalette(float play, float pause)
+        {
+            const BarPalette& a = EDIT_PALETTE;
+            const BarPalette& b = PLAY_PALETTE;
+            return { Mix(a.Background, PlayBackground(pause), play), Mix(a.Text, b.Text, play), Mix(a.DimText, b.DimText, play), Mix(a.FaintText, b.FaintText, play),
+                     Mix(a.Hover, b.Hover, play), Mix(a.Active, b.Active, play), Mix(a.Divider, b.Divider, play), Mix(a.PillFill, b.PillFill, play),
+                     Mix(a.PillBorder, b.PillBorder, play), Mix(a.Accent, b.Accent, play), Mix(a.Warn, b.Warn, play), Mix(a.Error, b.Error, play) };
+        }
+
+        void PushToggledColors()
+        {
+            ImGui::PushStyleColor(ImGuiCol_Button, TOGGLED_COLOR);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, TOGGLED_HOVER_COLOR);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, TOGGLED_ACTIVE_COLOR);
+        }
 
         void PushRegularFont(float size)
         {
@@ -74,7 +150,7 @@ namespace Surge
 
         void VerticalDivider(ImDrawList* drawList, float x, float centerY)
         {
-            drawList->AddLine(ImVec2(x, centerY - 8.0f), ImVec2(x, centerY + 8.0f), ImGui::GetColorU32(DIVIDER_COLOR));
+            drawList->AddLine(ImVec2(x, centerY - 8.0f), ImVec2(x, centerY + 8.0f), ImGui::GetColorU32(sPalette.Divider));
         }
     } // namespace
 
@@ -82,11 +158,13 @@ namespace Surge
     {
         mEditor = editor;
         mEngineLogo = editor->LoadEditorIcon("Editor/Assets/Textures/EngineLogo.png"); // Mipmapped, drawn well below its 200px source
+        mEngineLogoWatermark = editor->LoadEditorIcon("Editor/Assets/Textures/EngineLogoWatermark.png");
     }
 
     void EditorTitleBar::Shutdown()
     {
         Core::GetRenderer()->GetRHI()->DestroyImage(mEngineLogo);
+        Core::GetRenderer()->GetRHI()->DestroyImage(mEngineLogoWatermark);
     }
 
     void EditorTitleBar::Render()
@@ -97,7 +175,9 @@ namespace Surge
         ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, HEIGHT));
         ImGui::SetNextWindowViewport(viewport->ID);
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGuiAux::Colors::ExtraDark);
+        UpdatePlayModeAnimation();
+        sPalette = MakePalette(EaseOutCubic(mPlayBlend), mPauseBlend);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, EDIT_PALETTE.Background); // The amber is drawn by DrawPlayModeBackground
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -112,10 +192,9 @@ namespace Surge
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const float centerY = mWindowPos.y + HEIGHT * 0.5f;
 
-            DrawPlayModeAccent();
-
-            const ImVec2 logoMin(mWindowPos.x + SIDE_PADDING, std::floor(centerY - LOGO_SIZE * 0.5f));
-            drawList->AddImage(Core::GetRenderer()->GetRHI()->GetImGuiImage(mEngineLogo), logoMin, ImVec2(logoMin.x + LOGO_SIZE, logoMin.y + LOGO_SIZE));
+            const ImVec2 logoCenter(mWindowPos.x + SIDE_PADDING + LOGO_SIZE * 0.5f, centerY);
+            DrawPlayModeBackground(logoCenter);
+            DrawLogo(logoCenter);
             float leftX = SIDE_PADDING + LOGO_SIZE + 8.0f;
             float rightX = DrawWindowButtons() - 8.0f;
 
@@ -124,13 +203,13 @@ namespace Surge
                 ImGuiAux::ScopedBoldFont font(FONT_SIZE);
                 constexpr const char* title = "Surge Editor";
                 const ImVec2 titleSize = ImGui::CalcTextSize(title);
-                drawList->AddText(ImVec2(mWindowPos.x + leftX + 2.0f, std::floor(centerY - titleSize.y * 0.5f)), ImGui::GetColorU32(TEXT_COLOR), title);
+                drawList->AddText(ImVec2(mWindowPos.x + leftX + 2.0f, std::floor(centerY - titleSize.y * 0.5f)), ImGui::GetColorU32(sPalette.Text), title);
                 leftX += titleSize.x + 2.0f + 14.0f;
                 VerticalDivider(drawList, mWindowPos.x + leftX, centerY);
 
                 PushRegularFont(FONT_SIZE);
                 constexpr const char* subtitle = "Project Browser";
-                drawList->AddText(ImVec2(mWindowPos.x + leftX + 14.0f, std::floor(centerY - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(DIM_TEXT_COLOR), subtitle);
+                drawList->AddText(ImVec2(mWindowPos.x + leftX + 14.0f, std::floor(centerY - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(sPalette.DimText), subtitle);
                 ImGui::PopFont();
             }
             else
@@ -161,27 +240,81 @@ namespace Surge
         ImGui::PopStyleColor();
     }
 
-    void EditorTitleBar::DrawPlayModeAccent()
+    void EditorTitleBar::UpdatePlayModeAnimation()
+    {
+        // Clamped: entering play mode takes a long frame, the reveal must still play out instead of jumping to the end
+        const float dt = std::min(ImGui::GetIO().DeltaTime, 1.0f / 30.0f);
+        const bool playing = mEditor->IsPlaying();
+        if(playing && !mWasPlaying)
+        {
+            mPlayTime = -REVEAL_DURATION; // First sweep once the amber has filled the bar
+            mPauseBlend = 0.0f;
+        }
+        mWasPlaying = playing;
+
+        mPlayBlend = playing ? std::min(mPlayBlend + dt / REVEAL_DURATION, 1.0f) : std::max(mPlayBlend - dt / CONCEAL_DURATION, 0.0f);
+        if(!playing)
+            return;
+
+        const bool paused = mEditor->IsPaused();
+        mPauseBlend = paused ? std::min(mPauseBlend + dt / PAUSE_FADE_DURATION, 1.0f) : std::max(mPauseBlend - dt / PAUSE_FADE_DURATION, 0.0f);
+        if(!paused)
+            mPlayTime += dt;
+    }
+
+    void EditorTitleBar::DrawPlayModeBackground(const ImVec2& origin)
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImVec2 max(mWindowPos.x + mWidth, mWindowPos.y + HEIGHT);
-        if(!mEditor->IsPlaying())
-        {
+        if(mPlayBlend < 1.0f)
             drawList->AddLine(ImVec2(mWindowPos.x, max.y - 1.0f), ImVec2(max.x, max.y - 1.0f), ImGui::GetColorU32(BOTTOM_LINE_COLOR));
+        if(mPlayBlend <= 0.0f)
+            return;
+
+        const ImU32 fill = ImGui::GetColorU32(PlayBackground(mPauseBlend));
+        if(mPlayBlend < 1.0f)
+        {
+            // Entering/leaving: a disc of amber grows out of the logo (shrinks back into it) with a light rim at its edge.
+            // Linear blend through an ease out: fast out of the logo then settling, slow off the far end then sucked back in
+            const ImVec2 farCorner(max.x - origin.x, HEIGHT * 0.5f);
+            const float radius = EaseOutCubic(mPlayBlend) * std::sqrt(farCorner.x * farCorner.x + farCorner.y * farCorner.y);
+            const float rim = std::sin(mPlayBlend * std::numbers::pi_v<float>);
+            drawList->AddCircleFilled(origin, radius, fill);
+            drawList->AddCircle(origin, radius, ImGui::GetColorU32(ImVec4(SWEEP_COLOR.x, SWEEP_COLOR.y, SWEEP_COLOR.z, 0.8f * rim)), 0, 3.0f);
             return;
         }
+        drawList->AddRectFilled(mWindowPos, max, fill);
 
-        // Play mode: a soft amber glow rising from an accent line along the bottom edge, breathing while running, steady while paused
-        const bool paused = mEditor->IsPaused();
-        ImVec4 accent = ImGuiAux::Colors::ThemeColor1;
-        const float intensity = paused ? 1.0f : 0.75f + 0.25f * std::sin(static_cast<float>(ImGui::GetTime()) * 2.5f);
+        // Running: a light leaves the logo and sweeps across the bar like an indeterminate progress bar, frozen and faded out while paused
+        if(mPlayTime < 0.0f || mPauseBlend >= 1.0f)
+            return;
 
-        const ImU32 glowTop = ImGui::GetColorU32(ImVec4(accent.x, accent.y, accent.z, 0.0f));
-        const ImU32 glowBottom = ImGui::GetColorU32(ImVec4(accent.x, accent.y, accent.z, 0.16f * intensity));
-        drawList->AddRectFilledMultiColor(mWindowPos, max, glowTop, glowTop, glowBottom, glowBottom);
+        const float sweep = std::fmod(mPlayTime, SWEEP_PERIOD) / SWEEP_DURATION;
+        if(sweep >= 1.0f)
+            return;
 
-        accent.w = intensity;
-        drawList->AddRectFilled(ImVec2(mWindowPos.x, max.y - 2.0f), max, ImGui::GetColorU32(accent));
+        const float center = origin.x + sweep * (max.x - origin.x + SWEEP_WIDTH * 0.5f);
+        const float alpha = 0.5f * std::min(sweep * 4.0f, 1.0f) * (1.0f - mPauseBlend);
+        const ImU32 clear = ImGui::GetColorU32(ImVec4(SWEEP_COLOR.x, SWEEP_COLOR.y, SWEEP_COLOR.z, 0.0f));
+        const ImU32 bright = ImGui::GetColorU32(ImVec4(SWEEP_COLOR.x, SWEEP_COLOR.y, SWEEP_COLOR.z, alpha));
+        drawList->AddRectFilledMultiColor(ImVec2(center - SWEEP_WIDTH * 0.5f, mWindowPos.y), ImVec2(center, max.y), clear, bright, bright, clear);
+        drawList->AddRectFilledMultiColor(ImVec2(center, mWindowPos.y), ImVec2(center + SWEEP_WIDTH * 0.5f, max.y), bright, clear, clear, bright);
+    }
+
+    void EditorTitleBar::DrawLogo(const ImVec2& center)
+    {
+        // Pops while the bar changes color, crossfading from the amber logo to the dark one (the amber one would vanish on the amber bar)
+        const float half = LOGO_SIZE * 0.5f * (1.0f + LOGO_POP * std::sin(mPlayBlend * std::numbers::pi_v<float>));
+        const ImVec2 min(std::floor(center.x - half), std::floor(center.y - half));
+        const ImVec2 max(min.x + half * 2.0f, min.y + half * 2.0f);
+        const float watermark = EaseOutCubic(mPlayBlend);
+
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        GraphicsRHI* rhi = Core::GetRenderer()->GetRHI().get();
+        if(watermark < 1.0f)
+            drawList->AddImage(rhi->GetImGuiImage(mEngineLogo), min, max, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f - watermark)));
+        if(watermark > 0.0f)
+            drawList->AddImage(rhi->GetImGuiImage(mEngineLogoWatermark), min, max, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, watermark)));
     }
 
     float EditorTitleBar::DrawMenus(float x)
@@ -215,8 +348,8 @@ namespace Surge
             const ImVec2 min = ImGui::GetItemRectMin();
             const ImVec2 max = ImGui::GetItemRectMax();
             if(open || hovered)
-                drawList->AddRectFilled(min, max, ImGui::GetColorU32(open ? ACTIVE_COLOR : HOVER_COLOR), ITEM_ROUNDING);
-            drawList->AddText(ImVec2(min.x + MENU_PADDING_X, std::floor(min.y + (ITEM_HEIGHT - textSize.y) * 0.5f)), ImGui::GetColorU32(open || hovered ? TEXT_COLOR : DIM_TEXT_COLOR), menu.Label);
+                drawList->AddRectFilled(min, max, ImGui::GetColorU32(open ? sPalette.Active : sPalette.Hover), ITEM_ROUNDING);
+            drawList->AddText(ImVec2(min.x + MENU_PADDING_X, std::floor(min.y + (ITEM_HEIGHT - textSize.y) * 0.5f)), ImGui::GetColorU32(open || hovered ? sPalette.Text : sPalette.DimText), menu.Label);
 
             popupX[i] = min.x;
             x = max.x - mWindowPos.x + 2.0f;
@@ -257,8 +390,7 @@ namespace Surge
             const ImVec2 textSize = ImGui::CalcTextSize("DEBUG");
             const ImVec2 min(cursor, std::floor(centerY - textSize.y * 0.5f) - 3.0f);
             const ImVec2 max(min.x + textSize.x + 12.0f, min.y + textSize.y + 6.0f);
-            const ImVec4 amber = ImGuiAux::Colors::ThemeColor1;
-            drawList->AddText(ImVec2(min.x + 6.0f, min.y + 3.0f), ImGui::GetColorU32(amber), "DEBUG");
+            drawList->AddText(ImVec2(min.x + 6.0f, min.y + 3.0f), ImGui::GetColorU32(sPalette.Accent), "DEBUG");
             cursor = max.x + 10.0f;
         }
 #endif
@@ -267,13 +399,13 @@ namespace Surge
             ImGuiAux::ScopedBoldFont font(FONT_SIZE);
             const char* projectName = mEditor->GetCurrentProject().Name.c_str();
             const ImVec2 textSize = ImGui::CalcTextSize(projectName);
-            drawList->AddText(ImVec2(cursor, std::floor(centerY - textSize.y * 0.5f)), ImGui::GetColorU32(TEXT_COLOR), projectName);
+            drawList->AddText(ImVec2(cursor, std::floor(centerY - textSize.y * 0.5f)), ImGui::GetColorU32(sPalette.Text), projectName);
             cursor += textSize.x + 9.0f;
         }
 
         // Chevron between the project and the scene
         const ImVec2 chevron[] = { ImVec2(cursor, centerY - 4.0f), ImVec2(cursor + 4.0f, centerY), ImVec2(cursor, centerY + 4.0f) };
-        drawList->AddPolyline(chevron, static_cast<int>(std::size(chevron)), ImGui::GetColorU32(FAINT_TEXT_COLOR), ImDrawFlags_None, 1.5f);
+        drawList->AddPolyline(chevron, static_cast<int>(std::size(chevron)), ImGui::GetColorU32(sPalette.FaintText), ImDrawFlags_None, 1.5f);
         cursor += 4.0f + 9.0f;
 
         const AssetID sceneID = mEditor->GetCurrentScene()->GetID();
@@ -281,13 +413,13 @@ namespace Surge
         const String sceneName = sceneID && assetManager->IsRegistered(sceneID) ? Filesystem::GetFilenameWithoutExt(assetManager->GetMetadata(sceneID).RelativePath) : String("Untitled");
         PushRegularFont(FONT_SIZE);
         const ImVec2 sceneSize = ImGui::CalcTextSize(sceneName.c_str());
-        drawList->AddText(ImVec2(cursor, std::floor(centerY - sceneSize.y * 0.5f)), ImGui::GetColorU32(DIM_TEXT_COLOR), sceneName.c_str());
+        drawList->AddText(ImVec2(cursor, std::floor(centerY - sceneSize.y * 0.5f)), ImGui::GetColorU32(sPalette.DimText), sceneName.c_str());
         ImGui::PopFont();
         cursor += sceneSize.x;
 
         // Unsaved changes
         if(mEditor->GetHistory().IsDirty())
-            drawList->AddCircleFilled(ImVec2(cursor + 9.0f, centerY + 1.0f), 3.5f, ImGui::GetColorU32(ImGuiAux::Colors::ThemeColor1));
+            drawList->AddCircleFilled(ImVec2(cursor + 9.0f, centerY + 1.0f), 3.5f, ImGui::GetColorU32(sPalette.Accent));
 
         drawList->PopClipRect();
     }
@@ -297,7 +429,6 @@ namespace Surge
         const bool playing = mEditor->IsPlaying();
         const bool paused = mEditor->IsPaused();
         const ImVec4 amber = ImGuiAux::Colors::ThemeColor1;
-        const ImVec4 selection = ImGuiAux::Colors::Selection;
 
         // The pill behind the buttons
         ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -305,23 +436,19 @@ namespace Surge
         const float groupY = std::floor((HEIGHT - groupHeight) * 0.5f);
         const ImVec2 groupMin(mWindowPos.x + x, mWindowPos.y + groupY);
         const ImVec2 groupMax(groupMin.x + PLAY_GROUP_WIDTH, groupMin.y + groupHeight);
-        drawList->AddRectFilled(groupMin, groupMax, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.04f)), ITEM_ROUNDING + PLAY_GROUP_PADDING);
-        drawList->AddRect(groupMin, groupMax, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.07f)), ITEM_ROUNDING + PLAY_GROUP_PADDING);
+        drawList->AddRectFilled(groupMin, groupMax, ImGui::GetColorU32(sPalette.PillFill), ITEM_ROUNDING + PLAY_GROUP_PADDING);
+        drawList->AddRect(groupMin, groupMax, ImGui::GetColorU32(sPalette.PillBorder), ITEM_ROUNDING + PLAY_GROUP_PADDING);
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, HOVER_COLOR);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ACTIVE_COLOR);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sPalette.Hover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, sPalette.Active);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ITEM_ROUNDING);
         ImGui::SetCursorPos(ImVec2(x + PLAY_GROUP_PADDING, groupY + PLAY_GROUP_PADDING));
 
-        // Play/Stop: shown pressed (selection gray) while running
+        // Play/Stop: shown toggled while running
         if(playing)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Button, selection);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(selection.x * 1.25f, selection.y * 1.25f, selection.z * 1.25f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(selection.x * 0.8f, selection.y * 0.8f, selection.z * 0.8f, 1.0f));
-        }
-        if(GizmoIcons::IconButton("##PlayStop", playing ? GizmoIcon::STOP : GizmoIcon::PLAY, PLAY_BUTTON_SIZE, playing ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : TEXT_COLOR, 0.55f))
+            PushToggledColors();
+        if(GizmoIcons::IconButton("##PlayStop", playing ? GizmoIcon::STOP : GizmoIcon::PLAY, PLAY_BUTTON_SIZE, playing ? amber : sPalette.Text, 0.55f))
         {
             if(playing)
                 mEditor->OnRuntimeEnd();
@@ -337,15 +464,15 @@ namespace Surge
 
         ImGui::SameLine(0.0f, PLAY_BUTTON_SPACING);
         if(paused)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(amber.x, amber.y, amber.z, 0.16f));
-        if(GizmoIcons::IconButton("##PauseResume", paused ? GizmoIcon::PLAY : GizmoIcon::PAUSE, PLAY_BUTTON_SIZE, paused ? amber : TEXT_COLOR, 0.55f))
+            PushToggledColors();
+        if(GizmoIcons::IconButton("##PauseResume", paused ? GizmoIcon::PLAY : GizmoIcon::PAUSE, PLAY_BUTTON_SIZE, paused ? amber : sPalette.Text, 0.55f))
             mEditor->SetPaused(!paused);
         if(paused)
-            ImGui::PopStyleColor();
+            ImGui::PopStyleColor(3);
         ImGuiAux::ItemTooltip(paused ? "Resume (F6)" : "Pause (F6)");
 
         ImGui::SameLine(0.0f, PLAY_BUTTON_SPACING);
-        if(GizmoIcons::IconButton("##Step", GizmoIcon::STEP, PLAY_BUTTON_SIZE, TEXT_COLOR, 0.55f))
+        if(GizmoIcons::IconButton("##Step", GizmoIcon::STEP, PLAY_BUTTON_SIZE, sPalette.Text, 0.55f))
             mEditor->StepFrame();
         ImGuiAux::ItemTooltip("Step one frame, pauses first (F7)");
 
@@ -358,11 +485,13 @@ namespace Surge
 
     float EditorTitleBar::DrawFrameStats(float rightX, float minX)
     {
+        // Read every frame: keeps Diagnostics measuring for as long as the Editor runs (averaged frame time, same numbers as the overlay)
+        const FrameTimings& timings = Core::GetDiagnostics()->GetTimings();
         mStatsTimer += ImGui::GetIO().DeltaTime;
         if(mStatsTimer >= 0.25f || mFpsText.empty())
         {
-            mFrameTimeText = std::format("{:.2f} ms", Core::GetClock().GetMilliseconds());
-            mFpsText = std::format("{:.0f} FPS", ImGui::GetIO().Framerate);
+            mFrameTimeText = std::format("{:.2f} ms", timings.FrameMs);
+            mFpsText = std::format("{:.0f} FPS", timings.FPS);
             mStatsTimer = 0.0f;
         }
 
@@ -380,8 +509,8 @@ namespace Surge
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const float x = mWindowPos.x + rightX - width;
         const float y = std::floor(mWindowPos.y + (HEIGHT - frameTimeSize.y) * 0.5f);
-        drawList->AddText(ImVec2(x, y), ImGui::GetColorU32(DIM_TEXT_COLOR), mFrameTimeText.c_str());
-        drawList->AddText(ImVec2(x + frameTimeSize.x + gap, y), ImGui::GetColorU32(TEXT_COLOR), mFpsText.c_str());
+        drawList->AddText(ImVec2(x, y), ImGui::GetColorU32(sPalette.DimText), mFrameTimeText.c_str());
+        drawList->AddText(ImVec2(x + frameTimeSize.x + gap, y), ImGui::GetColorU32(sPalette.Text), mFpsText.c_str());
         ImGui::PopFont();
         return rightX - width;
     }
@@ -399,15 +528,17 @@ namespace Surge
         char warningText[16], errorText[16];
         std::snprintf(warningText, sizeof(warningText), "%u", warnings);
         std::snprintf(errorText, sizeof(errorText), "%u", errors);
+        constexpr const char* warningLabel = "WARN: ";
+        constexpr const char* errorLabel = "ERR: ";
 
         PushRegularFont(SMALL_FONT_SIZE);
         constexpr float paddingX = 8.0f;
-        constexpr float iconSize = 12.0f;
-        constexpr float iconGap = 5.0f;
         constexpr float counterGap = 12.0f;
+        const float warningLabelWidth = ImGui::CalcTextSize(warningLabel).x;
+        const float errorLabelWidth = ImGui::CalcTextSize(errorLabel).x;
         const ImVec2 warningSize = ImGui::CalcTextSize(warningText);
         const ImVec2 errorSize = ImGui::CalcTextSize(errorText);
-        const float width = paddingX * 2.0f + (iconSize + iconGap) * 2.0f + warningSize.x + counterGap + errorSize.x;
+        const float width = paddingX * 2.0f + warningLabelWidth + warningSize.x + counterGap + errorLabelWidth + errorSize.x;
         if(rightX - width < minX)
         {
             ImGui::PopFont();
@@ -425,30 +556,18 @@ namespace Surge
         const ImVec2 min = ImGui::GetItemRectMin();
         const ImVec2 max = ImGui::GetItemRectMax();
         if(hovered)
-            drawList->AddRectFilled(min, max, ImGui::GetColorU32(ImGui::IsItemActive() ? ACTIVE_COLOR : HOVER_COLOR), ITEM_ROUNDING);
+            drawList->AddRectFilled(min, max, ImGui::GetColorU32(ImGui::IsItemActive() ? sPalette.Active : sPalette.Hover), ITEM_ROUNDING);
 
-        const float centerY = std::floor((min.y + max.y) * 0.5f);
-        const ImU32 cutout = ImGui::GetColorU32(ImGuiAux::Colors::ExtraDark);
+        // WARN: x ERR: x, each label in its severity color while its count isn't zero
+        const float textY = std::floor((min.y + max.y - warningSize.y) * 0.5f);
         float x = min.x + paddingX;
-
-        // Warning: triangle with an exclamation mark carved out
-        const ImU32 warningColor = ImGui::GetColorU32(warnings > 0 ? WARN_COLOR : FAINT_TEXT_COLOR);
-        const float half = iconSize * 0.5f;
-        drawList->AddTriangleFilled(ImVec2(x + half, centerY - half), ImVec2(x + iconSize, centerY + half - 0.5f), ImVec2(x, centerY + half - 0.5f), warningColor);
-        drawList->AddLine(ImVec2(x + half, centerY - 2.0f), ImVec2(x + half, centerY + 1.5f), cutout, 1.5f);
-        drawList->AddCircleFilled(ImVec2(x + half, centerY + 3.5f), 0.9f, cutout);
-        x += iconSize + iconGap;
-        drawList->AddText(ImVec2(x, std::floor(centerY - warningSize.y * 0.5f)), ImGui::GetColorU32(warnings > 0 ? TEXT_COLOR : FAINT_TEXT_COLOR), warningText);
+        drawList->AddText(ImVec2(x, textY), ImGui::GetColorU32(warnings > 0 ? sPalette.Warn : sPalette.FaintText), warningLabel);
+        x += warningLabelWidth;
+        drawList->AddText(ImVec2(x, textY), ImGui::GetColorU32(warnings > 0 ? sPalette.Text : sPalette.FaintText), warningText);
         x += warningSize.x + counterGap;
-
-        // Error: disc with a cross carved out
-        const ImU32 errorColor = ImGui::GetColorU32(errors > 0 ? ERROR_COLOR : FAINT_TEXT_COLOR);
-        const ImVec2 errorCenter(x + half, centerY);
-        drawList->AddCircleFilled(errorCenter, half, errorColor);
-        drawList->AddLine(ImVec2(errorCenter.x - 2.5f, errorCenter.y - 2.5f), ImVec2(errorCenter.x + 2.5f, errorCenter.y + 2.5f), cutout, 1.5f);
-        drawList->AddLine(ImVec2(errorCenter.x + 2.5f, errorCenter.y - 2.5f), ImVec2(errorCenter.x - 2.5f, errorCenter.y + 2.5f), cutout, 1.5f);
-        x += iconSize + iconGap;
-        drawList->AddText(ImVec2(x, std::floor(centerY - errorSize.y * 0.5f)), ImGui::GetColorU32(errors > 0 ? TEXT_COLOR : FAINT_TEXT_COLOR), errorText);
+        drawList->AddText(ImVec2(x, textY), ImGui::GetColorU32(errors > 0 ? sPalette.Error : sPalette.FaintText), errorLabel);
+        x += errorLabelWidth;
+        drawList->AddText(ImVec2(x, textY), ImGui::GetColorU32(errors > 0 ? sPalette.Text : sPalette.FaintText), errorText);
         ImGui::PopFont();
 
         if(hovered)
@@ -486,14 +605,14 @@ namespace Surge
 
             if(hovered || held)
             {
-                ImVec4 background = isClose ? CLOSE_HOVER_COLOR : (held ? ACTIVE_COLOR : HOVER_COLOR);
+                ImVec4 background = isClose ? CLOSE_HOVER_COLOR : (held ? sPalette.Active : sPalette.Hover);
                 if(isClose && held)
                     background.w = 0.8f;
                 drawList->AddRectFilled(min, max, ImGui::GetColorU32(background));
             }
 
             // Thin Windows 11 style glyphs on whole pixels, ImDrawList adds the half pixel offset itself
-            const ImU32 color = ImGui::GetColorU32((isClose && hovered) ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : TEXT_COLOR);
+            const ImU32 color = ImGui::GetColorU32((isClose && hovered) ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : sPalette.Text);
             const ImVec2 c(std::floor((min.x + max.x) * 0.5f), std::floor((min.y + max.y) * 0.5f));
             switch(button)
             {
@@ -511,9 +630,13 @@ namespace Surge
                         drawList->AddRect(ImVec2(c.x - 5.0f, c.y - 5.0f), ImVec2(c.x + 6.0f, c.y + 6.0f), color, 1.0f);
                     break;
                 case WindowButton::CLOSE:
-                    drawList->AddLine(ImVec2(c.x - 5.0f, c.y - 5.0f), ImVec2(c.x + 5.0f, c.y + 5.0f), color);
-                    drawList->AddLine(ImVec2(c.x + 5.0f, c.y - 5.0f), ImVec2(c.x - 5.0f, c.y + 5.0f), color);
+                {
+                    // Diagonals have no pixel grid to snap to: center them on the button, not on the pixel (-0.5 cancels AddLine's offset)
+                    const ImVec2 d(c.x - 0.5f, c.y - 0.5f);
+                    drawList->AddLine(ImVec2(d.x - 5.0f, d.y - 5.0f), ImVec2(d.x + 5.0f, d.y + 5.0f), color);
+                    drawList->AddLine(ImVec2(d.x + 5.0f, d.y - 5.0f), ImVec2(d.x - 5.0f, d.y + 5.0f), color);
                     break;
+                }
             }
 
             if(!pressed)

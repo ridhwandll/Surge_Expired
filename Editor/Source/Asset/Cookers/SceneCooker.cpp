@@ -18,7 +18,7 @@ namespace Surge
 
         // Builds the scene like opening it does, which loads the assets it references
         String json;
-        Ref<Scene> scene = Ref<Scene>::Create(Filesystem::GetFilenameWithoutExt(sourceAbsPath));
+        Ref<Scene> scene = Ref<Scene>::Create(Filesystem::GetFilenameWithoutExt(sourceAbsPath), Core::GetSceneContext());
         if(!Filesystem::ReadTextFile(sourceAbsPath, json) || !SceneSerializer::FromJson(json, *scene))
         {
             Log<Severity::Error>("[SceneCooker] Failed to read scene: {}", sourceAbsPath);

@@ -6070,11 +6070,11 @@ void ImGui::RenderArrowDockMenu(ImDrawList* draw_list, ImVec2 p_min, float sz, I
 
     // Edited Code:
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // (Rid) Edit for Surge Engine: Custom Menu Icon (2 horizontal bars)
-    // Top Bar (Cyber Violet) Y: 15% to 40% (25% thickness)
-    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.15f, sz * 0.15f), p_min + ImVec2(sz * 0.85f, sz * 0.40f), IM_COL32(139, 92, 246, 255));
-    // Bottom Bar (Amber) Y: 60% to 85% (25% thickness)
-    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.15f, sz * 0.60f), p_min + ImVec2(sz * 0.85f, sz * 0.85f), IM_COL32(255, 165, 0, 255));
+    // (Rid) Edit for SURGE Engine: Custom Menu Icon (amber equilateral triangle pointing down, centered in the square)
+    const float side = sz * 0.70f;
+    const float height = side * 0.8660254f; // sqrt(3) / 2
+    const ImVec2 center = p_min + ImVec2(sz * 0.5f, sz * 0.5f);
+    draw_list->AddTriangle(center + ImVec2(-side * 0.5f, -height * 0.5f), center + ImVec2(side * 0.5f, -height * 0.5f), center + ImVec2(0.0f, height * 0.5f), IM_COL32(255, 167, 0, 255));
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 

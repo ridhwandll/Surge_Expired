@@ -4,6 +4,7 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/Shader/ShaderBinaryFormat.hpp"
+#include "Surge/Graphics/HighLevel/Font.hpp"
 #include "Shader/ShaderCompiler.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
@@ -179,6 +180,15 @@ namespace Surge::ExportUtils
             }
             std::error_code ec;
             job.CookedFiles.push_back({ cookedPath, fs::relative(cookedPath, "Engine/Assets", ec) });
+        }
+
+        // Engine UI font (performance overlay, UI text without a font), cooked by the Editor at startup
+        {
+            std::error_code ec;
+            if(fs::is_regular_file(EngineFont::COOKED_PATH, ec))
+                job.CookedFiles.push_back({ EngineFont::COOKED_PATH, fs::relative(EngineFont::COOKED_PATH, "Engine/Assets", ec) });
+            else
+                outMissing.push_back(EngineFont::COOKED_PATH);
         }
 
         std::sort(outMissing.begin(), outMissing.end());

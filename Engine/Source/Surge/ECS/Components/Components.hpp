@@ -6,7 +6,9 @@
 
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "Surge/Graphics/Renderer/Text.hpp"
+#include "Surge/Graphics/RenderGraph/RenderSettings.hpp"
 #include "Surge/Graphics/Particles/ParticleRuntime.hpp"
+#include "Surge/Graphics/Animation/AnimatorRuntime.hpp"
 
 #include "Surge/Physics/RigidbodyID.hpp"
 #include "Surge/Asset/Asset.hpp"
@@ -166,6 +168,18 @@ namespace Surge
         SURGE_REFLECTION_ENABLE;
     };
 
+    struct RendererSettingsComponent
+    {
+        bool Active = true;
+        RenderSettings Desktop = RenderSettings::Default(RenderProfile::DESKTOP);
+        RenderSettings Mobile = RenderSettings::Default(RenderProfile::MOBILE);
+
+        RenderSettings& GetProfileSettings(RenderProfile profile) { return profile == RenderProfile::MOBILE ? Mobile : Desktop; }
+        const RenderSettings& GetProfileSettings(RenderProfile profile) const { return profile == RenderProfile::MOBILE ? Mobile : Desktop; }
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
     //Physics
     enum class RigidbodyType { STATIC, DYNAMIC, KINEMATIC };
 
@@ -174,6 +188,7 @@ namespace Surge
         bool Active = true;
         RigidBodyID RuntimeBodyID; // Jolt's internal handle under the hood
         RigidbodyType Type = RigidbodyType::DYNAMIC;
+        int Layer = 0; // PhysicsSettings layer, the collision matrix decides what it hits
         float Mass = 1.0f;
 
         bool Interpolate = true;
@@ -327,6 +342,26 @@ namespace Surge
         ParticleCullingMode Culling = ParticleCullingMode::PAUSE_OFFSCREEN;
 
         ParticleRuntime Runtime; // Live particles, never serialized, a copy starts empty
+
+        SURGE_REFLECTION_ENABLE;
+    };
+
+    // Plays the clips of the entity's MeshComponent mesh (a glTF with a skin or animated nodes) and those of up to 4 clip sources: other
+    // animated meshes whose joint names match (Mixamo style animation files). Updated right after the particles (Scene::UpdateAnimation)
+    struct AnimatorComponent
+    {
+        bool Active = true;
+        String Clip;                   // Played when the scene starts (and shown in edit mode), empty = the rest pose until Play()
+        bool PlayOnAwake = true;
+        bool Loop = true;
+        float Speed = 1.0f;
+        bool AnimateOffscreen = false; // Player: an animator outside the camera only advances its time (its last pose still casts shadows)
+        Ref<Asset> ClipSource1 = nullptr;
+        Ref<Asset> ClipSource2 = nullptr;
+        Ref<Asset> ClipSource3 = nullptr;
+        Ref<Asset> ClipSource4 = nullptr;
+
+        AnimatorRuntime Runtime; // Live pose, never serialized, a copy starts empty
 
         SURGE_REFLECTION_ENABLE;
     };

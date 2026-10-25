@@ -42,8 +42,8 @@ namespace Surge
     namespace
     {
         constexpr ImU32 DISABLED_GLYPH = IM_COL32(110, 110, 110, 255);
-        constexpr float HEADER_GRADIENT_WIDTH = 0.5f;  // Fraction of the header the component color fades over
-        constexpr float HEADER_GRADIENT_ALPHA = 0.65f; // Opacity at the right edge
+        constexpr float HEADER_GRADIENT_WIDTH = 0.45f; // Fraction of the header the component color fades over
+        constexpr float HEADER_GRADIENT_ALPHA = 0.8f;  // Opacity at the right edge
         constexpr float OUTLINE_THICKNESS = 1.5f;
         const ImVec4 SLOT_BG(0.2f, 0.2f, 0.2f, 1.0f);
         const ImVec4 SLOT_BG_HOVERED(0.07f, 0.07f, 0.07f, 1.0f);
@@ -75,6 +75,7 @@ namespace Surge
             else if constexpr(std::is_same_v<T, MeshComponent>)              return { GizmoIcon::MESH, IM_COL32(150, 160, 255, 255) };
             else if constexpr(std::is_same_v<T, LightComponent>)             return { GizmoIcon::POINT_LIGHT, IM_COL32(255, 205, 90, 255) };
             else if constexpr(std::is_same_v<T, EnvironmentComponent>)       return { GizmoIcon::ENVIRONMENT, IM_COL32(255, 170, 100, 255) };
+            else if constexpr(std::is_same_v<T, RendererSettingsComponent>)  return { GizmoIcon::CAMERA, IM_COL32(120, 200, 230, 255) };
             else if constexpr(std::is_same_v<T, TextComponent>)              return { GizmoIcon::TEXT, IM_COL32(225, 225, 225, 255) };
             else if constexpr(std::is_same_v<T, RigidbodyComponent>)         return { GizmoIcon::RIGIDBODY, PHYSICS_COLOR };
             else if constexpr(std::is_same_v<T, ScriptComponent>)            return { GizmoIcon::SCRIPT, IM_COL32(230, 220, 80, 255) };
@@ -82,6 +83,7 @@ namespace Surge
             else if constexpr(std::is_same_v<T, AudioSourceComponent>)       return { GizmoIcon::AUDIO_SOURCE, AUDIO_COLOR };
             else if constexpr(std::is_same_v<T, AudioListenerComponent>)     return { GizmoIcon::AUDIO_LISTENER, AUDIO_COLOR };
             else if constexpr(std::is_same_v<T, ParticleSystemComponent>)    return { GizmoIcon::PARTICLES, GizmoIcons::PARTICLES_COLOR };
+            else if constexpr(std::is_same_v<T, AnimatorComponent>)          return { GizmoIcon::PLAY, IM_COL32(170, 140, 255, 255) };
             else                                                             return { GizmoIcon::COLLIDER, COLLIDER_COLOR }; // Colliders
         }
 
@@ -94,10 +96,10 @@ namespace Surge
 
         int CountVisibleComponents(Entity e)
         {
-            return CountComponents<TransformComponent, CameraComponent, SpriteRendererComponent, MeshComponent, LightComponent, EnvironmentComponent,
+            return CountComponents<TransformComponent, CameraComponent, SpriteRendererComponent, MeshComponent, LightComponent, EnvironmentComponent, RendererSettingsComponent,
                                    RigidbodyComponent, BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, CylinderColliderComponent,
                                    ConvexColliderComponent, MeshColliderComponent, ScriptComponent, TextComponent, UICanvasComponent,
-                                   AudioListenerComponent, AudioSourceComponent, ParticleSystemComponent>(e);
+                                   AudioListenerComponent, AudioSourceComponent, ParticleSystemComponent, AnimatorComponent>(e);
         }
 
         // ------------------------------------------------------------------ Component clipboard
@@ -172,18 +174,27 @@ namespace Surge
             bool modified = false;
             ImGui::PushID(label);
 
+            const float frameHeight = ImGui::GetFrameHeight();
+            const float spacing = 4.0f;
+            const bool locked = uniformLock && *uniformLock;
+
             ImGui::TableNextColumn();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(label);
+
+            if(uniformLock)
+            {
+                ImGui::SameLine(0.0f, spacing);
+                const ImVec4 glyphColor = locked ? ImVec4(ImGuiAux::Colors::ThemeColor1) : MUTED_TEXT;
+                if(GizmoIcons::IconButton("##UniformLock", GizmoIcon::LINK, ImVec2(frameHeight, frameHeight), glyphColor, 0.66f))
+                    *uniformLock = !*uniformLock;
+                ImGuiAux::DelayedToolTip(locked ? "Uniform scale: ON" : "Uniform scale: OFF");
+            }
             ImGui::TableNextColumn();
 
-            const float frameHeight = ImGui::GetFrameHeight();
-            const float spacing = 4.0f;
-            const float lockWidth = uniformLock ? frameHeight + spacing : 0.0f;
-            const float fieldWidth = glm::max((ImGui::GetContentRegionAvail().x - lockWidth - spacing * 2.0f) / 3.0f, 30.0f);
+            const float fieldWidth = glm::max((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f, 30.0f);
             const float tagWidth = glm::min(frameHeight * 0.85f, fieldWidth * 0.4f);
             const float rounding = ImGui::GetStyle().FrameRounding;
-            const bool locked = uniformLock && *uniformLock;
             const glm::vec3 before = values;
 
             constexpr const char* axisNames[] = { "X", "Y", "Z" };
@@ -218,7 +229,7 @@ namespace Surge
                 ImGui::SameLine(0.0f, 0.0f);
                 ImGui::SetNextItemWidth(fieldWidth - tagWidth);
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-                if(ImGui::DragFloat("##Value", &values[axis], speed, 0.0f, 0.0f, "%.2f"))
+                if(ImGui::DragFloat("##Value", &values[axis], speed, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoRoundToFormat))
                     changedAxis = axis;
                 ImGui::PopStyleVar();
 
@@ -244,15 +255,6 @@ namespace Surge
                     else
                         values = glm::vec3(values[changedAxis]);
                 }
-            }
-
-            if(uniformLock)
-            {
-                ImGui::SameLine(0.0f, spacing);
-                const ImVec4 glyphColor = locked ? ImVec4(ImGuiAux::Colors::ThemeColor1) : MUTED_TEXT;
-                if(GizmoIcons::IconButton("##UniformLock", GizmoIcon::LINK, ImVec2(frameHeight, frameHeight), glyphColor, 0.66f))
-                    *uniformLock = !*uniformLock;
-                ImGuiAux::DelayedToolTip(locked ? "Uniform scale: ON" : "Uniform scale: OFF");
             }
 
             ImGui::PopID();
@@ -429,7 +431,7 @@ namespace Surge
             const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
             const float gap = size * 0.18f;
             const float radius = glm::max(1.5f, size * 0.06f);
-            const ImU32 color = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+            const ImU32 color = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_FrameBg);
             for(int i = -1; i <= 1; i++)
                 drawList->AddCircleFilled(ImVec2(center.x, center.y + gap * static_cast<float>(i)), radius, color, 8);
             return pressed;
@@ -576,8 +578,10 @@ namespace Surge
             { "Mesh", "RENDERING", StyleOf<MeshComponent>(), &HasComponentOf<MeshComponent>, &AddDefault<MeshComponent>, nullptr },
             { "Light", "RENDERING", StyleOf<LightComponent>(), &HasComponentOf<LightComponent>, &AddDefault<LightComponent>, nullptr },
             { "Environment", "RENDERING", StyleOf<EnvironmentComponent>(), &HasComponentOf<EnvironmentComponent>, &AddDefault<EnvironmentComponent>, nullptr },
+            { "Renderer Settings", "RENDERING", StyleOf<RendererSettingsComponent>(), &HasComponentOf<RendererSettingsComponent>, &AddDefault<RendererSettingsComponent>, nullptr },
             { "Text", "RENDERING", StyleOf<TextComponent>(), &HasComponentOf<TextComponent>, &AddDefault<TextComponent>, nullptr },
             { "Particle System", "RENDERING", StyleOf<ParticleSystemComponent>(), &HasComponentOf<ParticleSystemComponent>, &AddDefault<ParticleSystemComponent>, nullptr },
+            { "Animator", "RENDERING", StyleOf<AnimatorComponent>(), &HasComponentOf<AnimatorComponent>, &AddDefault<AnimatorComponent>, &RequiresMesh },
 
             { "Rigidbody", "PHYSICS", StyleOf<RigidbodyComponent>(), &HasComponentOf<RigidbodyComponent>, &AddDefault<RigidbodyComponent>, nullptr },
             { "Box Collider", "PHYSICS", StyleOf<BoxColliderComponent>(), &HasComponentOf<BoxColliderComponent>, &AddDefault<BoxColliderComponent>, nullptr },
@@ -641,7 +645,7 @@ namespace Surge
             {
                 AssetStamp stamp;
                 MeshSpecification spec;
-                if(!MeshBinary::Read(am->GetSidecarPath(mesh->GetID()), stamp, spec) || slot >= spec.Materials.size() || !spec.Materials[slot])
+                if(!MeshBinary::Read(am->GetContext(), am->GetSidecarPath(mesh->GetID()), stamp, spec) || slot >= spec.Materials.size() || !spec.Materials[slot])
                 {
                     EditorStatusBar::Get().Notify(Severity::Error, "Could not read the mesh's own material, re-cook the mesh and try again");
                     return;
@@ -960,6 +964,7 @@ namespace Surge
             ImGui::SetKeyboardFocusHere();
         ImGui::SetNextItemWidth(-FLT_MIN);
         const bool enterPressed = ImGui::InputTextWithHint("##Search", "Search components...", &mAddComponentSearch, ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::SetNavCursorVisible(false);
 
         String needle = mAddComponentSearch;
         std::transform(needle.begin(), needle.end(), needle.begin(), [](char c) { return static_cast<char>(::tolower(static_cast<unsigned char>(c))); });
@@ -985,7 +990,7 @@ namespace Surge
             if(ContainsCaseInsensitive(label, needle))
             {
                 ImGuiAux::StyledSeparator();
-                if(AddComponentRow("##PasteComponent", ComponentStyle { GizmoIcon::ENTITY, IM_COL32(255, 165, 0, 255) }, label.c_str(), "clipboard", true, false))
+                if(AddComponentRow("##PasteComponent", ComponentStyle { GizmoIcon::ENTITY, IM_COL32(255, 165, 0, 255) }, label.c_str(), "CLIPBOARD", true, false))
                     PasteComponent(entity);
             }
         }
@@ -999,19 +1004,20 @@ namespace Surge
 
             if(!searching && (!category || strcmp(category, item.Category) != 0))
             {
-                ImGuiAux::StyledSeparator();
                 ImGuiAux::ScopedBoldFont font;
+                category = item.Category;
                 ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", item.Category);
                 ImGuiAux::StyledSeparator();
             }
             else if(searching && !anyShown)
                 ImGuiAux::StyledSeparator();
+
             anyShown = true;
 
             const bool has = item.Has(entity);
             const char* missing = (!has && item.MissingRequirement) ? item.MissingRequirement(entity) : nullptr;
             ImGui::PushID(item.Name);
-            if(AddComponentRow("##Item", item.Style, item.Name, has ? "added" : nullptr, !has && !missing, &item == firstMatch && searching))
+            if(AddComponentRow("##Item", item.Style, item.Name, has ? "ADDED" : nullptr, !has && !missing, &item == firstMatch && searching))
                 toAdd = &item;
             if(missing)
                 ImGuiAux::ItemTooltip(missing);
@@ -1029,7 +1035,8 @@ namespace Surge
             ImGui::CloseCurrentPopup();
         }
 
-        ImGuiAux::EndStyledPopup();
+        ImGui::EndPopup();
+        ImGuiAux::StyledPopupVars::Pop();
         ImGui::Dummy(ImVec2(0.0f, 8.0f));
     }
 
@@ -1163,12 +1170,47 @@ namespace Surge
             });
         }
 
+        if(entity.HasComponent<RendererSettingsComponent>())
+        {
+            RendererSettingsComponent& component = entity.GetComponent<RendererSettingsComponent>();
+            DrawComponent<RendererSettingsComponent>(entity, "Renderer Settings", [&component, &entity, this]() {
+                mRendererSettings.Draw(entity, component);
+            });
+        }
+
         if(entity.HasComponent<RigidbodyComponent>())
         {
             RigidbodyComponent& component = entity.GetComponent<RigidbodyComponent>();
-            DrawComponent<RigidbodyComponent>(entity, "Rigidbody", [&component]() {
+            DrawComponent<RigidbodyComponent>(entity, "Rigidbody", [&entity, &component]() {
+
+                if (entity.GetScene()->IsRunning())
+                    HintRow("Editing Rigidbody fields in the Inspector during Play does not update the live body (they are read at creation). Lua's RigidbodyC.Layer is the exception.");
+
                 constexpr auto rbTypeStrings = std::array { "STATIC", "DYNAMIC", "KINEMATIC" };
                 ImGuiAux::TComboBox("Type", component.Type, rbTypeStrings);
+
+                // Named layers only (Physics panel); a body on a layer that was renamed away still shows its index
+                const PhysicsSettings& physicsSettings = static_cast<Editor*>(Core::GetClient())->GetPhysicsSettings();
+                const String& layerName = physicsSettings.LayerNames[PhysicsSettings::ClampLayer(component.Layer)];
+                const String preview = layerName.empty() ? std::format("Layer {}", component.Layer) : std::format("{} [{}]", layerName, component.Layer);
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Layer");
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                if(ImGui::BeginCombo("##Layer", preview.c_str()))
+                {
+                    for(int i = 0; i < PhysicsSettings::MAX_LAYERS; i++)
+                    {
+                        if(physicsSettings.LayerNames[i].empty())
+                            continue;
+
+                        ImGui::PushID(i);
+                        if(ImGui::Selectable(std::format("{} [{}]", physicsSettings.LayerNames[i], i).c_str(), component.Layer == i))
+                            component.Layer = i;
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
 
                 if(component.Type != RigidbodyType::STATIC)
                     ImGuiAux::TProperty<float>("Mass", &component.Mass, 0.0f, 100000.0f);
@@ -1445,6 +1487,97 @@ namespace Surge
                 constexpr auto cullingModeStrings = std::array { "ALWAYS_SIMULATE", "PAUSE_OFFSCREEN", "PAUSE_AND_CATCH_UP" };
                 ImGuiAux::TComboBox("Culling", component.Culling, cullingModeStrings);
                 HintRow("Seed 0 = a different sequence every play. Culling: what the effect does outside the camera (Player only)");
+            });
+        }
+
+        if(entity.HasComponent<AnimatorComponent>())
+        {
+            AnimatorComponent& component = entity.GetComponent<AnimatorComponent>();
+            DrawComponent<AnimatorComponent>(entity, "Animator", [&component, &entity]() {
+                const MeshComponent* meshComponent = entity.TryGetComponent<MeshComponent>();
+                const Ref<Mesh> mesh = meshComponent && meshComponent->MeshAsset ? meshComponent->MeshAsset.As<Mesh>() : nullptr;
+                if(!mesh || !mesh->IsSkinned())
+                {
+                    HintRow("Needs a Mesh component with an animated glTF (a skin or animated nodes). Re-import the model if it was imported before animation support.");
+                    return;
+                }
+
+                AnimatorRuntime& runtime = component.Runtime;
+                const bool running = entity.GetScene()->IsRunning();
+
+                // Clip: every clip the runtime knows (the mesh's + the clip sources'), filled once it updated
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Clip");
+                ImGui::TableNextColumn();
+                ImGui::PushItemWidth(-1);
+                if(ImGui::BeginCombo("##Clip", component.Clip.empty() ? "None (rest pose)" : component.Clip.c_str()))
+                {
+                    if(ImGui::Selectable("None (rest pose)", component.Clip.empty()))
+                        component.Clip.clear();
+                    for(Uint i = 0; i < runtime.GetClipCount(); i++)
+                    {
+                        const String& name = runtime.GetClipNameAt(i);
+                        ImGui::PushID(static_cast<int>(i));
+                        if(ImGui::Selectable(name.c_str(), name == component.Clip))
+                            component.Clip = name;
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopItemWidth();
+
+                // Edit mode previews in the Scene views (not saved), Play mode drives the running animator
+                ImGuiAux::TSperator("Playback");
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+                {
+                    const float buttonSize = ImGui::GetFrameHeight();
+                    const ImVec4 glyphColor = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                    const bool playing = running ? !runtime.IsPaused() : runtime.IsPreviewing();
+                    ImGui::BeginDisabled(runtime.GetClipName().empty());
+                    if(GizmoIcons::IconButton("##PlayPause", playing ? GizmoIcon::PAUSE : GizmoIcon::PLAY, ImVec2(buttonSize, buttonSize), glyphColor))
+                    {
+                        if(running)
+                            runtime.SetPaused(playing);
+                        else
+                            runtime.SetPreview(!playing);
+                    }
+                    ImGuiAux::DelayedToolTip(playing ? "Pause" : (running ? "Resume" : "Preview"));
+                    ImGui::SameLine(0.0f, 2.0f);
+                    if(GizmoIcons::IconButton("##Restart", GizmoIcon::STEP, ImVec2(buttonSize, buttonSize), glyphColor))
+                        runtime.SetTime(0.0f);
+                    ImGuiAux::DelayedToolTip("Back to the first frame");
+                    ImGui::EndDisabled();
+
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    if(runtime.GetClipName().empty())
+                        ImGui::TextDisabled("Rest pose");
+                    else
+                        ImGui::TextDisabled("%s  |  %.2f / %.2f s", runtime.GetClipName().c_str(), runtime.GetTime(), runtime.GetDuration());
+                }
+                if(!runtime.GetClipName().empty())
+                {
+                    float time = runtime.GetTime();
+                    if(ImGuiAux::TSlider<float>("Time", &time, 0.0f, runtime.GetDuration(), "%.2f s"))
+                        runtime.SetTime(time);
+                }
+
+                ImGuiAux::TSperator("Settings");
+                ImGuiAux::TProperty<bool>("Play On Awake", &component.PlayOnAwake);
+                ImGuiAux::TProperty<bool>("Loop", &component.Loop);
+                ImGuiAux::TSlider<float>("Speed", &component.Speed, -2.0f, 3.0f, "%.2f");
+                ImGuiAux::TProperty<bool>("Animate Offscreen", &component.AnimateOffscreen);
+
+                ImGuiAux::TSperator("Clip Sources");
+                DrawAssetDropSlot<Mesh>("Source 1", component.ClipSource1, AssetType::MESH, "None (Mesh)");
+                DrawAssetDropSlot<Mesh>("Source 2", component.ClipSource2, AssetType::MESH, "None (Mesh)");
+                DrawAssetDropSlot<Mesh>("Source 3", component.ClipSource3, AssetType::MESH, "None (Mesh)");
+                DrawAssetDropSlot<Mesh>("Source 4", component.ClipSource4, AssetType::MESH, "None (Mesh)");
+
+                const Skeleton& skeleton = mesh->GetSkeleton();
+                ImGuiAux::TString("Skeleton", "%u nodes, %u joints, %u clips (%u own)", skeleton.GetNodeCount(), skeleton.GetPaletteSize(), runtime.GetClipCount(), static_cast<Uint>(mesh->GetClips().size()));
+                HintRow("Clip sources: other animated glTFs whose joint names match (one animation per file, Mixamo style). Animate Offscreen: Player only, otherwise only the time advances outside the camera");
             });
         }
 

@@ -17,7 +17,7 @@ namespace Surge
 
         String json;
         Ref<ParticleEffect> effect = ParticleEffect::Create();
-        if(!Filesystem::ReadTextFile(sourceAbsPath, json) || !ParticleEffectSerializer::FromJson(json, *effect))
+        if(!Filesystem::ReadTextFile(sourceAbsPath, json) || !ParticleEffectSerializer::FromJson(*Core::GetAssetManager(), json, *effect))
         {
             Log<Severity::Error>("[ParticleEffectCooker] Failed to read particle effect: {}", sourceAbsPath);
             return result;

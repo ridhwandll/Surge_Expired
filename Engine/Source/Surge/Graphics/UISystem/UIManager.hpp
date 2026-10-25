@@ -28,7 +28,7 @@ namespace Surge::UI
 
     public:
         void Initialize() {}
-        void Shutdown() { ClearCanvases(); ClearEditorPreview(); }
+        void Shutdown() { ClearCanvases(); ClearEditorPreview(); mDebugRoot = nullptr; }
 
         // Canvases, one per owner (the UICanvasComponent entity UUID), drawn in SortOrder (higher = on top, receives input first)
         // A canvas has an optional layout root (UILayout asset) and an optional script root (SetUIRoot from its Lua script, drawn above the layout)
@@ -50,6 +50,10 @@ namespace Surge::UI
         // Editor only: a layout being edited, drawn on top of everything, never receives input
         void SetEditorPreview(Ref<Widget> root, const CanvasScaler& scaler);
         void ClearEditorPreview();
+
+        // Engine debug UI (performance overlay): drawn above everything, never hit tested (input goes through to the game),
+        // untouched by ClearCanvases() so it survives scene changes. nullptr = nothing drawn
+        void SetDebugRoot(Ref<Widget> root) { mDebugRoot = root; }
 
         // Editor only: fake device safe area (fractions of the UI target: left, top, right, bottom), replaces the platform insets
         void SetSimulatedSafeArea(const glm::vec4& fractions, bool enabled) { mSimulatedSafeArea = fractions; mSimulateSafeArea = enabled; }
@@ -154,6 +158,9 @@ namespace Surge::UI
         bool mSimulateSafeArea = false;
 
         Vector<Ref<Widget>> mOverlays; // Open order, last = on top
+
+        Ref<Widget> mDebugRoot;
+        CanvasScaler mDebugScaler = { { 1280.0f, 720.0f }, 0.5f };
 
         // Trackers, Refs so a widget removed while hovered/pressed can never dangle
         struct PointerPress

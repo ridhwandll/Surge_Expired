@@ -1,7 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ParticleEffectSerializer.hpp"
 #include "ParticleEffectBinaryFormat.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Utility/Filesystem.hpp"
@@ -393,23 +392,22 @@ namespace Surge
         return j;
     }
 
-    static Ref<Asset> LoadTexture(uint64_t rawID)
+    static Ref<Asset> LoadTexture(AssetManager& assetManager, uint64_t rawID)
     {
         if(rawID == AssetID::INVALID)
             return nullptr;
 
-        AssetManager* am = Core::GetAssetManager();
         const AssetID id(rawID);
-        const AssetMetadata& metadata = am->GetMetadata(id);
+        const AssetMetadata& metadata = assetManager.GetMetadata(id);
         if(!metadata.IsValid() || metadata.IsMissing() || metadata.Type != AssetType::TEXTURE2D)
         {
             Log<Severity::Warn>("[ParticleEffectSerializer] Texture {} is missing or not a texture, using the default particle", rawID);
             return nullptr;
         }
-        return am->Load<Texture2D>(id);
+        return assetManager.Load<Texture2D>(id);
     }
 
-    static void EmitterFromJson(const Json& j, ParticleEmitterDesc& e)
+    static void EmitterFromJson(AssetManager& assetManager, const Json& j, ParticleEmitterDesc& e)
     {
         e.Name = Value(j, "Name", e.Name);
         e.Enabled = Value(j, "Enabled", e.Enabled);
@@ -569,7 +567,7 @@ namespace Surge
         {
             const Json& m = j["Renderer"];
             e.Renderer.Mode = EnumFromJson(m, "Mode", e.Renderer.Mode, sRenderModeNames);
-            e.Renderer.Texture = LoadTexture(Value(m, "Texture", static_cast<uint64_t>(AssetID::INVALID)));
+            e.Renderer.Texture = LoadTexture(assetManager, Value(m, "Texture", static_cast<uint64_t>(AssetID::INVALID)));
             e.Renderer.AdditiveAmount = Value(m, "AdditiveAmount", e.Renderer.AdditiveAmount);
             e.Renderer.EmissiveIntensity = Value(m, "EmissiveIntensity", e.Renderer.EmissiveIntensity);
             e.Renderer.Sort = EnumFromJson(m, "Sort", e.Renderer.Sort, sSortModeNames);
@@ -595,7 +593,7 @@ namespace Surge
         return j.dump(4);
     }
 
-    bool ParticleEffectSerializer::FromJson(const String& json, ParticleEffect& outEffect)
+    bool ParticleEffectSerializer::FromJson(AssetManager& assetManager, const String& json, ParticleEffect& outEffect)
     {
         const Json j = Json::parse(json, nullptr, false);
         if(j.is_discarded() || !j.is_object() || !j.contains("Emitters") || !j["Emitters"].is_array())
@@ -607,7 +605,7 @@ namespace Surge
             if(outEffect.Emitters.size() >= ParticleEffect::MAX_EMITTERS)
                 break;
             if(item.is_object())
-                EmitterFromJson(item, outEffect.Emitters.emplace_back());
+                EmitterFromJson(assetManager, item, outEffect.Emitters.emplace_back());
         }
 
         outEffect.MarkChanged(true);
@@ -625,7 +623,7 @@ namespace Surge
         Log<Severity::Error>("[ParticleEffectSerializer] Serialize is unsupported on Android runtime. APK assets are readonly!");
         return false;
 #else
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const AssetMetadata& metadata = am->GetMetadata(asset->GetID());
         const String absolutePath = am->GetAbsolutePath(metadata.RelativePath);
         const ParticleEffect& effect = *asset.As<ParticleEffect>();
@@ -644,11 +642,11 @@ namespace Surge
 
     Ref<Asset> ParticleEffectSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
 
         Ref<ParticleEffect> effect = ParticleEffect::Create();
         AssetStamp stamp;
-        if(!ParticleEffectBinary::Read(am->GetSidecarPath(metadata.ID), stamp, *effect))
+        if(!ParticleEffectBinary::Read(*am, am->GetSidecarPath(metadata.ID), stamp, *effect))
             return nullptr;
         return effect;
     }

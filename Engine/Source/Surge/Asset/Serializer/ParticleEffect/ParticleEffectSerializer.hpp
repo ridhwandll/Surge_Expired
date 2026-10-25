@@ -18,6 +18,6 @@ namespace Surge
 
         // Used by the Editor for undo snapshots. FromJson leaves the effect untouched when the json is invalid
         static String ToJson(const ParticleEffect& effect);
-        static bool FromJson(const String& json, ParticleEffect& outEffect);
+        static bool FromJson(AssetManager& assetManager, const String& json, ParticleEffect& outEffect); // assetManager loads the textures
     };
 }

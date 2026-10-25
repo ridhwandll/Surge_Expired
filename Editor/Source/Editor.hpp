@@ -58,6 +58,8 @@ namespace Surge
         void SetCurrentProject(const Project& project, const Path& projectFile); // Also loads the project's editor settings
         const Project& GetCurrentProject() const { return mCurrentProject; }
         const Path& GetProjectFilePath() const { return mProjectFilePath; }
+        PhysicsSettings& GetPhysicsSettings() { return mCurrentProject.Physics; } // Physics panel, applied with Physics::ApplySettings
+        void SaveProject(); // Writes the .surgeproj
         void LoadStartupScene(); // The scene that was open last time, the project's start scene otherwise
         void CloseProject();     // Back to the Project Browser (asks first when there are unsaved changes)
 

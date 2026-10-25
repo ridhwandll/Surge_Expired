@@ -38,7 +38,7 @@ namespace Surge::ScriptBinding
         time["GetTime"] = []() { return Core::GetScriptEngine()->GetTime(); };
         time["GetUnscaledTime"] = []() { return Core::GetScriptEngine()->GetUnscaledTime(); };
         time["GetFrameCount"] = []() { return static_cast<lua_Integer>(Core::GetScriptEngine()->GetFrameCount()); };
-        time["GetFixedDeltaTime"] = []() { return Physics::FIXED_TIMESTEP; };
+        time["GetFixedDeltaTime"] = []() { return Core::GetPhysics()->GetFixedTimestep(); };
         time["GetTimeScale"] = &Core::GetTimeScale;
         time["SetTimeScale"] = &Core::SetTimeScale;
 
@@ -80,9 +80,9 @@ namespace Surge::ScriptBinding
 
         // Physics queries
         sol::table physics = lua.create_named_table("Physics");
-        physics["Raycast"] = [](const glm::vec3& origin, const glm::vec3& direction, float maxDistance, sol::this_state s) -> sol::object {
+        physics["Raycast"] = [](const glm::vec3& origin, const glm::vec3& direction, float maxDistance, sol::optional<lua_Integer> layerMask, sol::this_state s) -> sol::object {
             RaycastHit hit;
-            if(!Core::GetPhysics()->Raycast(origin, direction, maxDistance, hit))
+            if(!Core::GetPhysics()->Raycast(origin, direction, maxDistance, hit, static_cast<uint32_t>(layerMask.value_or(0xFFFFFFFF))))
                 return sol::make_object(s, sol::lua_nil);
 
             sol::state_view view(s);
@@ -95,6 +95,27 @@ namespace Surge::ScriptBinding
             result["Normal"] = hit.Normal;
             result["Distance"] = hit.Distance;
             return result;
+        };
+
+        physics["GetLayer"] = [](const String& name) -> lua_Integer { return Core::GetPhysics()->GetSettings().FindLayer(name); };
+        physics["GetLayerName"] = [](int layer) -> String {
+            return layer >= 0 && layer < PhysicsSettings::MAX_LAYERS ? Core::GetPhysics()->GetSettings().LayerNames[layer] : String();
+        };
+        physics["GetLayerMask"] = [](sol::variadic_args names) -> lua_Integer {
+            const PhysicsSettings& settings = Core::GetPhysics()->GetSettings();
+            lua_Integer mask = 0;
+            for(const sol::stack_proxy name : names)
+            {
+                const int layer = name.is<String>() ? settings.FindLayer(name.as<String>()) : -1;
+                if(layer < 0)
+                    Log<Severity::Warn>("[Physics] GetLayerMask: unknown layer '{}'", name.is<String>() ? name.as<String>() : String("?"));
+                else
+                    mask |= lua_Integer(1) << layer;
+            }
+            return mask;
+        };
+        physics["ShouldCollide"] = [](int layerA, int layerB) {
+            return Core::GetPhysics()->GetSettings().ShouldCollide(PhysicsSettings::ClampLayer(layerA), PhysicsSettings::ClampLayer(layerB));
         };
     }
 }

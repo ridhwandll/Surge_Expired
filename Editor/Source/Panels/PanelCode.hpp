@@ -15,7 +15,8 @@ namespace Surge
         History,
         AssetRegistry,
         Renderer,
-        ParticleEditor
+        ParticleEditor,
+        Physics
     };
 
     constexpr const char* PanelCodeToString(PanelCode code)
@@ -33,6 +34,7 @@ namespace Surge
             case PanelCode::AssetRegistry: return "Asset Registry";
             case PanelCode::Renderer: return "Renderer"; // Renderer settings, RenderGraph visualizer and stats
             case PanelCode::ParticleEditor: return "Particle Editor";
+            case PanelCode::Physics: return "Physics"; // Project physics settings (layers, collision matrix) and stats
         }
         return nullptr;
     }

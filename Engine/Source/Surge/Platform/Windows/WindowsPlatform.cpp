@@ -260,6 +260,26 @@ namespace Surge
     bool Platform::IsSoftKeyboardVisible() { return false; }
     float Platform::GetSoftKeyboardHeight() { return 0.0f; }
     glm::vec4 Platform::GetSafeAreaInsets() { return { 0.0f, 0.0f, 0.0f, 0.0f }; }
+    int Platform::GetThermalStatus() { return -1; }
+
+    String Platform::GetCPUName()
+    {
+        char name[128] = {};
+        DWORD size = sizeof(name);
+        if(RegGetValueA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "ProcessorNameString", RRF_RT_REG_SZ, nullptr, name, &size) != ERROR_SUCCESS)
+            return String();
+        return String(name);
+    }
+
+    double Platform::GetProcessCPUSeconds()
+    {
+        FILETIME creationTime, exitTime, kernelTime, userTime;
+        if(!GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime))
+            return -1.0;
+
+        const auto ticks = [](const FILETIME& time) { return (static_cast<uint64_t>(time.dwHighDateTime) << 32) | time.dwLowDateTime; };
+        return static_cast<double>(ticks(kernelTime) + ticks(userTime)) * 1e-7; // 100 ns ticks
+    }
 
     String Platform::GetClipboardText()
     {

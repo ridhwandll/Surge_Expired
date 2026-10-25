@@ -14,7 +14,8 @@
                                 ::Surge::RigidbodyComponent, ::Surge::BoxColliderComponent, ::Surge::SphereColliderComponent, \
                                 ::Surge::CapsuleColliderComponent, ::Surge::CylinderColliderComponent, ::Surge::ConvexColliderComponent, ::Surge::MeshColliderComponent, \
                                 ::Surge::ScriptComponent, ::Surge::TextComponent, ::Surge::UICanvasComponent, \
-                                ::Surge::AudioListenerComponent, ::Surge::AudioSourceComponent, ::Surge::ParticleSystemComponent
+                                ::Surge::AudioListenerComponent, ::Surge::AudioSourceComponent, ::Surge::ParticleSystemComponent, \
+                                ::Surge::AnimatorComponent, ::Surge::RendererSettingsComponent
 
 namespace Surge
 {
@@ -38,7 +39,8 @@ namespace Surge
         TEXT_ALIGNMENT,
         TEXT_VERTICAL_ALIGNMENT,
         PARTICLE_CULLING_MODE,
-        ASSET_REF // Ref<Asset>, saved as its AssetID
+        ASSET_REF, // Ref<Asset>, saved as its AssetID
+        RENDER_SETTINGS // RenderSettings, every field of RenderSettings::VisitSavedFields
     };
 
     struct SerializedVariable
@@ -69,6 +71,7 @@ namespace Surge
     }
 
     // Loads a Ref<Asset> field saved by ID. Null for an invalid ID, a missing asset, or when requiredType is set and does not match
-    Ref<Asset> LoadSerializedAsset(AssetID id, AssetType requiredType = AssetType::NONE);
+    class AssetManager;
+    Ref<Asset> LoadSerializedAsset(AssetManager& assetManager, AssetID id, AssetType requiredType = AssetType::NONE);
 
 } // namespace Surge

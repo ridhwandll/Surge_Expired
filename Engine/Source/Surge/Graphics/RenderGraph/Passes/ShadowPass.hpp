@@ -11,7 +11,8 @@ namespace Surge
     *
     * Directional light cascaded shadow maps. Every cascade is a region of one D16 atlas (side by side), all of them are drawn
     * in a single render pass with a viewport per cascade. Prepare fits the cascades (stable bounding spheres, texel snapping,
-    * near plane fitted to the casters), culls + instances the casters per cascade and uploads the ShadowUBO
+    * near plane fitted to the casters), culls + instances the casters per cascade and uploads the ShadowUBO. Skinned casters are
+    * instanced the same way into a second buffer and drawn with ShadowSkinned.glsl inside the same render pass
     */
     class GraphicsRHI;
     class ShadowPass : public RenderPass
@@ -36,6 +37,7 @@ namespace Surge
             glm::vec3 Extents;
             const Mesh* Mesh_;
             Uint SubmeshIndex;
+            Uint SkinOffset;   // INVALID_SKIN_OFFSET for static casters
         };
 
         struct ShadowDrawItem
@@ -43,7 +45,16 @@ namespace Surge
             const Mesh* Mesh_;
             Uint SubmeshIndex;
             Uint CasterIndex;
+            bool Skinned;
         };
+
+        struct SkinnedInstance // Mirrored in ShadowSkinned.glsl
+        {
+            glm::mat4 Transform;
+            Uint SkinOffset;
+            Uint _pad[3];
+        };
+        static_assert(sizeof(SkinnedInstance) == 80, "SkinnedInstance is mirrored by ShadowSkinned.glsl (std430)");
 
         struct ShadowDraw
         {
@@ -59,6 +70,8 @@ namespace Surge
         void BuildCascades(const FrameBlackboard& blackBoard, Uint cascadeCount);
         void UploadShadowData(const FrameContext& ctx, const FrameBlackboard& blackBoard, Uint cascadeCount);
         void EnsureInstanceCapacity(Uint frameIndex, Uint instanceCount);
+        void EnsureSkinnedInstanceCapacity(Uint frameIndex, Uint instanceCount);
+        void UpdateSkinDescriptors(const FrameContext& ctx, const FrameBlackboard& blackBoard);
 
     private:
         GraphicsRHI* mRHI;
@@ -84,5 +97,14 @@ namespace Surge
         Vector<glm::mat4> mInstanceData;   // What goes into the instance buffer
         std::array<Vector<ShadowDraw>, MAX_SHADOW_CASCADE_COUNT> mCascadeDraws;
         std::array<Uint, MAX_SHADOW_CASCADE_COUNT> mCascadeVisible = {};
+
+        // Skinned casters
+        PipelineHandle mSkinnedPipeline;
+        DescriptorSetHandle mSkinnedInstanceSet; // Skinned instances + skin matrices
+        BufferHandle mSkinnedInstanceBuffers[RHISettings::FRAMES_IN_FLIGHT];
+        Uint mSkinnedInstanceCapacity[RHISettings::FRAMES_IN_FLIGHT] = {};
+        Uint mSkinBufferVersion[RHISettings::FRAMES_IN_FLIGHT] = {};
+        Vector<SkinnedInstance> mSkinnedInstanceData;
+        std::array<Vector<ShadowDraw>, MAX_SHADOW_CASCADE_COUNT> mCascadeSkinnedDraws;
     };
 }

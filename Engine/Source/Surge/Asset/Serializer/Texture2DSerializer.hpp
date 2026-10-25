@@ -21,8 +21,9 @@ namespace Surge
         // @param debugStr:     Optional string to identify the source of the KTX2 data in error logs
         // @param raw:          If true, ktx2Data is expected to start directly with the KTX2 header. If false, ktx2Data is expected to have an AssetStamp at the beginning, and the actual KTX2 data starts after the AssetStamp.
         // @returns:            TextureSpecification
-        static TextureSpecification LoadFromKTX2(const Vector<Byte>& ktx2Data, const String& debugStr = "", bool raw = true);
+        // @param rhi:          Picks the transcode target the GPU supports (decided once)
+        static TextureSpecification LoadFromKTX2(GraphicsRHI* rhi, const Vector<Byte>& ktx2Data, const String& debugStr = "", bool raw = true);
 
-        static Ref<Texture2D> LoadFromKTX2(const String& ktx2Path);
+        static Ref<Texture2D> LoadFromKTX2(Renderer& renderer, const String& ktx2Path);
     };
 }

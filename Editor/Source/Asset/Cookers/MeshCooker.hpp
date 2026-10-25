@@ -9,6 +9,6 @@ namespace Surge
     public:
         virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
         virtual AssetType GetAssetType() const override { return AssetType::MESH; }
-        virtual Uint GetCookerVersion() const override { return 4; } // 4: embedded (.glb) textures
+        virtual Uint GetCookerVersion() const override { return 5; } // 4: embedded (.glb) textures, 5: skeleton, skin and clips
     };
 }

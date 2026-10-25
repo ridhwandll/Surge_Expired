@@ -7,9 +7,13 @@
 #include "Surge/Graphics/Renderer/Text.hpp"
 #include "Surge/Graphics/Renderer/RenderView.hpp"
 #include "Surge/Graphics/UISystem/UIManager.hpp"
+#include "Surge/Graphics/HighLevel/Font.hpp"
 
 namespace Surge
 {
+    class Window;
+    struct ClientOptions;
+
     // Space for one emitter's particles in the frame's lists, see Renderer::SubmitParticles
     struct ParticleSubmission
     {
@@ -17,10 +21,20 @@ namespace Surge
         Uint EmitterIndex = 0;             // Goes into every record (ParticleRecord::VelocityZEmitter)
     };
 
+    // Submissions of the last finished frame (main graph, captured before its lists are cleared), shown by the performance overlay
+    struct RendererFrameCounts
+    {
+        Uint Meshes = 0;
+        Uint Lights = 0;
+        Uint Sprites = 0;
+        Uint Texts = 0;
+        Uint UIItems = 0; // UI sprites + text blocks
+    };
+
     class Renderer
     {
     public:
-        void Initialize();
+        void Initialize(Window* window, const ClientOptions& clientOptions);
         void Shutdown();
         void OnEvent(Event& e);
 
@@ -43,8 +57,17 @@ namespace Surge
                                                          .LineSpacing = lineSpacing, .Alignment = alignment, .VerticalAlignment = vAlignment, .Italic = italic, .Underline = underline, .Billboard = billboard,
                                                           .EnableShadow = enableShadow, .ShadowOffset = shadowOffset, .ShadowColor = shadowColor, .FontAsset = font });
         }
-        FORCEINLINE void SubmitMesh(const glm::mat4& transform, const Mesh* mesh, bool dropShadow) { mMainRenderGraph.GetBlackboard().MeshList.emplace_back(MeshSubmitCmd{ transform, mesh, dropShadow }); }
-        FORCEINLINE void SubmitMeshOutline(const glm::mat4& transform, const Mesh* mesh) { mMainRenderGraph.GetBlackboard().OutlineList.emplace_back(OutlineSubmitCmd{ transform, mesh }); }
+        FORCEINLINE void SubmitMesh(const glm::mat4& transform, const Mesh* mesh, bool dropShadow)
+        {
+            if(mesh->IsSkinned()) // Skinned vertex layout: without an animator it shows its rest pose
+                SubmitSkinnedMesh(transform, mesh, dropShadow, mesh->GetRestPalette().data(), static_cast<Uint>(mesh->GetRestPalette().size()), mesh->GetRestBounds());
+            else
+                mMainRenderGraph.GetBlackboard().MeshList.emplace_back(MeshSubmitCmd { transform, mesh, dropShadow });
+        }
+        // A skinned mesh drawn with a palette (one SkinMatrix per palette entry of its skeleton) and the model space bounds of that pose.
+        // Returns the palette's offset in the frame's skin matrices, INVALID_SKIN_OFFSET when the frame's budget (FrameBlackboard::Animation)
+        // is used up: nothing is drawn then
+        Uint SubmitSkinnedMesh(const glm::mat4& transform, const Mesh* mesh, bool dropShadow, const SkinMatrix* palette, Uint paletteSize, const AABB& bounds);
         FORCEINLINE void SubmitLight(const Light& light)
         {
             FrameBlackboard& bb = mMainRenderGraph.GetBlackboard();
@@ -74,6 +97,12 @@ namespace Surge
         void OnSurfaceCreated(Window* window) { mRHI->OnSurfaceCreated(window); }
         void ForceResize(Uint width, Uint height);
 
+        // Scene render settings (RendererSettingsComponent), submitted every frame, written to the main blackboard only when they changed
+        // Views copy them from there. The profile is the platform's, the Editor previews the other one by switching it
+        void SubmitRenderSettings(const RenderSettings& settings);
+        RenderProfile GetRenderProfile() const { return mRenderProfile; }
+        void SetRenderProfile(RenderProfile profile) { mRenderProfile = profile; }
+
         // Scene resolution relative to the output (0.5 - 1.0), UI and post-processing stay at full resolution
         void SetRenderScale(float scale);
         float GetRenderScale() const { return mMainRenderGraph.GetBlackboard().RenderScale; }
@@ -99,10 +128,12 @@ namespace Surge
             return mRHI->GetImGuiImage(mMainRenderGraph.GetBlackboard().FinalImage);
         }
 
-        void SetOutlineColor(glm::vec3 outlineColor) { mMainRenderGraph.GetBlackboard().PostProcessSettings_.OutlineColor = outlineColor; }
-        void SetOutlineThickness(float outlineThickness) { mMainRenderGraph.GetBlackboard().PostProcessSettings_.OutlineThickness = outlineThickness; }
-
         ShaderManager& GetShaderManager() { return mShaderManager; }
+        const RendererFrameCounts& GetLastFrameCounts() const { return mLastFrameCounts; }
+
+        // Engine UI font (EngineFont::COOKED_PATH), loaded on first use. nullptr when the cooked file is missing (warned once)
+        const Ref<Font>& GetEngineFont();
+
         SamplerHandle GetDefaultSampler() const { return mMainRenderGraph.GetBlackboard().DefaultSampler; }
         SamplerHandle GetTextSampler() const { return mMainRenderGraph.GetBlackboard().TextSampler; }
 
@@ -162,16 +193,22 @@ namespace Surge
         // Submissions before BeginEditorOverlay(), set = false: everything is scene content
         struct OverlayMark
         {
-            size_t Meshes, Lights, Quads, Lines, Texts, Outlines, ParticleEmitters, ParticleRecords;
+            size_t Meshes, Lights, Quads, Lines, Texts, ParticleEmitters, ParticleRecords;
             bool Set = false;
         };
 
         void AddScenePasses(RenderGraph& graph, bool withUI);
+        RenderGraphContext MakeGraphContext(); // What every graph's passes get instead of reaching into Core
         RenderView* FindView(RenderViewID id) const;
         FrameBlackboard* FindIsolatedBlackboard(RenderViewID id) const; // nullptr unless it is a live isolated view
         void QueueViewResize(RenderViewID id, glm::uvec2 size);
         void ExecuteViews();
         void DestroyViewImmediate(RenderView& view);
+
+        // Skin matrices: one storage buffer per frame in flight on every graph's blackboard, uploaded right before the graph executes
+        void CreateSkinBuffers(FrameBlackboard& blackBoard, const String& debugName);
+        void DestroySkinBuffers(FrameBlackboard& blackBoard);
+        void UploadSkinMatrices(FrameBlackboard& blackBoard);
 
     private:
         FrameContext mCurrentFrameCtx;
@@ -184,9 +221,18 @@ namespace Surge
         glm::uvec2 mScreenSize = { 0, 0 };
         RenderGraph mMainRenderGraph;
 
+        RenderProfile mRenderProfile = PLATFORM_RENDER_PROFILE;
+        RenderSettings mAppliedSettings;
+        bool mHasAppliedSettings = false;
+
         UI::Manager mUIManager;
         ShaderManager mShaderManager;
+        RendererFrameCounts mLastFrameCounts;
+        Ref<Font> mEngineFont;
+        bool mEngineFontLoaded = false;
 
         Scope<GraphicsRHI> mRHI;
+        Window* mWindow = nullptr;
+        bool mImGuiEnabled = false;
     };
 } // namespace Surge

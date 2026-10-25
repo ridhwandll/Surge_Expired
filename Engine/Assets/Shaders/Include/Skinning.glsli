@@ -1,0 +1,23 @@
+// Copyright (c) - SurgeTechnologies - All rights reserved
+// Linear blend skinning: every vertex blends 4 palette entries (Renderer::SubmitSkinnedMesh writes the palettes, SkinMatrix in Skeleton.hpp:
+// the 3 rows of a 3x4 affine matrix). Define SKIN_SET and SKIN_BINDING before including it. Locations 5 and 6 follow the 5 Vertex inputs
+layout(location = 5) in uint aJoints;  // 4 x u8 palette indices
+layout(location = 6) in uint aWeights; // 4 x unorm8, they add up to 1
+
+layout(std430, set = SKIN_SET, binding = SKIN_BINDING) readonly buffer SkinMatrices
+{
+    vec4 Rows[]; // 3 per palette entry
+} uSkin;
+
+// Vertex space -> model space of this vertex. paletteOffset: the mesh's first palette entry this frame
+mat4 GetSkinMatrix(uint paletteOffset)
+{
+    uvec4 joints = (uvec4(aJoints) >> uvec4(0u, 8u, 16u, 24u)) & 0xFFu;
+    vec4 weights = unpackUnorm4x8(aWeights);
+    uvec4 base = (uvec4(paletteOffset) + joints) * 3u;
+
+    vec4 row0 = weights.x * uSkin.Rows[base.x]      + weights.y * uSkin.Rows[base.y]      + weights.z * uSkin.Rows[base.z]      + weights.w * uSkin.Rows[base.w];
+    vec4 row1 = weights.x * uSkin.Rows[base.x + 1u] + weights.y * uSkin.Rows[base.y + 1u] + weights.z * uSkin.Rows[base.z + 1u] + weights.w * uSkin.Rows[base.w + 1u];
+    vec4 row2 = weights.x * uSkin.Rows[base.x + 2u] + weights.y * uSkin.Rows[base.y + 2u] + weights.z * uSkin.Rows[base.z + 2u] + weights.w * uSkin.Rows[base.w + 2u];
+    return transpose(mat4(row0, row1, row2, vec4(0.0, 0.0, 0.0, 1.0)));
+}

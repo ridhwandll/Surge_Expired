@@ -2,7 +2,6 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanRenderpassFactory.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanRHI.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
-#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {

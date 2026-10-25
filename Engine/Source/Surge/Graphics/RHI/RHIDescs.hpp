@@ -1,6 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Defines.hpp"
+#include "Surge/Core/Vector.hpp"
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/Shader/Shader.hpp"
 #include <array>
@@ -14,6 +15,8 @@ namespace Surge
         String VendorName;
         Uint DrawCalls = 0;
         Uint DispatchCalls = 0;
+        uint64_t Triangles = 0; // Vertex count / 3 of every draw, instances included (every pass: shadow casters count again)
+        float CPUWaitMilliseconds = 0.0f; // CPU blocked this frame on the frame fence (GPU), the swapchain acquire and the present (frame pacer)
 
         uint64_t AllocationCount;
         uint64_t UsedGPUMemory;
@@ -23,7 +26,27 @@ namespace Surge
         {
             DrawCalls = 0;
             DispatchCalls = 0;
+            Triangles = 0;
+            CPUWaitMilliseconds = 0.0f;
         }
+    };
+
+    // GPU timestamp queries, see GraphicsRHI::CmdBeginGPUScope
+    struct GPUTimingScope
+    {
+        String Name;
+        float Milliseconds = 0.0f;
+        Uint Depth = 0; // 0 = top level, children follow their parent (pre-order)
+    };
+
+    struct GPUTimings
+    {
+        Vector<GPUTimingScope> Scopes;  // Work only: wait scopes are left out and their time is taken off their parents
+        float DisplayWaitMilliseconds = 0.0f; // GPU idle until the presentation engine released the swapchain image (CmdWaitForSwapchainImage)
+        float FrameMilliseconds = 0.0f; // Whole frame command buffer, includes waiting for the swapchain image
+        uint64_t ResolvedFrames = 0;    // Incremented every time new results land (FRAMES_IN_FLIGHT frames after recording)
+        bool Overflowed = false;        // More scopes than the query pool holds, the rest were dropped
+        bool Valid = false;
     };
 
     enum class BufferUsage : Uint

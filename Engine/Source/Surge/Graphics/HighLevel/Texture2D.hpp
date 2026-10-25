@@ -6,6 +6,9 @@
 
 namespace Surge
 {
+    class Renderer;
+    class GraphicsRHI;
+
     struct MipLevelData
     {
         Vector<Byte> Data;
@@ -32,15 +35,16 @@ namespace Surge
     class Texture2D : public Asset
     {
     public:
-        Texture2D(const TextureSpecification& spec);
+        Texture2D(Renderer& renderer, const TextureSpecification& spec);
         ~Texture2D();
         SURGE_ASSET_TYPE(AssetType::TEXTURE2D);
 
         ImageHandle GetRHIImage() const { return mImageHandle; }
 
-        static Ref<Texture2D> Create(const TextureSpecification& spec);
+        static Ref<Texture2D> Create(Renderer& renderer, const TextureSpecification& spec);
     private:
         ImageHandle mImageHandle;
+        GraphicsRHI* mRHI;
     };
 
 }

@@ -1,6 +1,5 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Asset/Serializer/Scene/SerializableComponents.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Audio/Audio.hpp"
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
@@ -30,15 +29,16 @@ namespace Surge
         if(type.EqualTo<TextVerticalAlignment>()) return SerializedFieldKind::TEXT_VERTICAL_ALIGNMENT;
         if(type.EqualTo<ParticleCullingMode>()) return SerializedFieldKind::PARTICLE_CULLING_MODE;
         if(type.EqualTo<Ref<Asset>>()) return SerializedFieldKind::ASSET_REF;
+        if(type.EqualTo<RenderSettings>()) return SerializedFieldKind::RENDER_SETTINGS;
         return SerializedFieldKind::UNKNOWN;
     }
 
-    Ref<Asset> LoadSerializedAsset(AssetID id, AssetType requiredType)
+    Ref<Asset> LoadSerializedAsset(AssetManager& assetManager, AssetID id, AssetType requiredType)
     {
         if(id == AssetID(AssetID::INVALID))
             return nullptr;
 
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = &assetManager;
         const AssetMetadata& metadata = am->GetMetadata(id);
         if(!metadata.IsValid() || metadata.IsMissing() || (requiredType != AssetType::NONE && metadata.Type != requiredType))
         {

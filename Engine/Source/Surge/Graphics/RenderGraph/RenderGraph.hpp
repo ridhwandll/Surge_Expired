@@ -40,7 +40,7 @@ namespace Surge
     class RenderGraph 
     {
     public:
-        void Setup(GraphicsRHI* rhi);
+        void Setup(const RenderGraphContext& context); // Hands the context to every pass, then calls their Setup
 
         // Derives execution order, barriers, LoadOp/StoreOp
         void Compile();
@@ -79,6 +79,7 @@ namespace Surge
         const CompiledGraph& GetCompiledGraph() const { return mCompiledGraph; } // For visualizer
         const Vector<Scope<RenderPass>>& GetPasses() const { return mPasses; }   // Registration order
         GraphicsRHI* GetRHI() const { return mRHI; }
+        const RenderGraphContext& GetContext() const { return mContext; }
     private:
         void SortByDependencies(Vector<RenderPass*>& passes); // Topological sort within a group based on ImageReads/ImageWrites
         void DeriveBarriers(Vector<ExecutionGroup*>& orderedGroups); // Inserts a SAMPLED transition before the first group that reads an image written by an earlier group
@@ -91,6 +92,7 @@ namespace Surge
         Vector<std::function<void()>> mImGuiRenderCallbacks;
         FrameBlackboard mBlackboard;
         CompiledGraph mCompiledGraph;
+        RenderGraphContext mContext;
         GraphicsRHI* mRHI = nullptr;
     };
 }

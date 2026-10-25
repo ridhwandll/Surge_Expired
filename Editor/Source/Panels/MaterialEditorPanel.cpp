@@ -135,7 +135,7 @@ namespace Surge
             AssetManager* am = Core::GetAssetManager();
             Filesystem::CreateOrEnsureDirectories(folder);
             const Path path = AssetFileOps::MakeUnique(folder / (baseName + GetExtensionFromAssetType(AssetType::MATERIAL)));
-            outMaterial = am->Create<Material>(AssetFileOps::ToRelative(path), path.stem().string());
+            outMaterial = am->Create<Material>(AssetFileOps::ToRelative(path), *Core::GetRenderer(), path.stem().string());
             return outMaterial ? path : Path();
         }
 
@@ -947,7 +947,7 @@ namespace Surge
     void MaterialEditorPanel::EnsurePreviewMesh()
     {
         if(!mPreviewPlaceholder)
-            mPreviewPlaceholder = Material::Create("MaterialPreview");
+            mPreviewPlaceholder = Material::Create(*Core::GetRenderer(), "MaterialPreview");
 
         if(!mPreviewMesh || mBuiltShape != mPreviewShape)
         {
@@ -959,7 +959,7 @@ namespace Surge
                 case PreviewShape::TORUS: data = MeshGenerator::GenerateTorus(0.45f, 0.18f, 48, 24); break;
                 default: data = MeshGenerator::GenerateSphere(0.5f, 64, 32); break;
             }
-            mPreviewMesh = Mesh::Create(BuildPreviewSpec(std::move(data), mPreviewPlaceholder)); // Its own mesh: the shared default mesh assets keep their materials
+            mPreviewMesh = Mesh::Create(*Core::GetRenderer(), *Core::GetAssetManager(), BuildPreviewSpec(std::move(data), mPreviewPlaceholder)); // Its own mesh: the shared default mesh assets keep their materials
             mBuiltShape = mPreviewShape;
         }
 

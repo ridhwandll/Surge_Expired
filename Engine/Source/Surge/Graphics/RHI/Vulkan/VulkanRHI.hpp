@@ -13,6 +13,7 @@
 #include "Surge/Graphics/RHI/Vulkan/VulkanImGui.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanDescriptorSet.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUploader.hpp"
+#include "Surge/Graphics/RHI/Vulkan/VulkanGPUTimer.hpp"
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -36,7 +37,7 @@ namespace Surge
     public:
         VulkanRHI() = default;
         ~VulkanRHI() = default;
-        void Initialize(Window* window);
+        void Initialize(Window* window, bool enableImGui);
         void WaitIdle() const;
         void Shutdown();
 
@@ -50,10 +51,22 @@ namespace Surge
 
         // Returns true if presentation is paced by the RHI (Swappy), false if the caller has to limit the frame rate itself
         bool SetTargetFrameRate(float fps);
+        void SetFramePacingEnabled(bool enabled);
 
         bool IsFormatSupported(ImageFormat format) const;
+        Uint GetSurfaceRotation() const { return mSwapchain.GetRotation(); }
 
         const RHIStats& GetStats();
+
+        // GPU timing (VulkanGPUTimer)
+        void SetGPUTimingEnabled(bool enabled) { mGPUTimer.SetEnabled(enabled); }
+        bool IsGPUTimingEnabled() const { return mGPUTimer.IsEnabled(); }
+        bool SupportsGPUTiming() const { return mGPUTimer.IsSupported(); }
+        bool SupportsGPUTimingInRenderPass() const { return !mIsTileBasedGPU; } // Tilers run a whole render pass per tile, timestamps inside it mean nothing
+        const GPUTimings& GetGPUTimings() const { return mGPUTimer.GetResults(); }
+        void CmdBeginGPUScope(const FrameContext& ctx, std::string_view name) { mGPUTimer.BeginScope(mFrame.GetFrame(ctx.FrameIndex).CmdBuffer, name); }
+        void CmdEndGPUScope(const FrameContext& ctx) { mGPUTimer.EndScope(mFrame.GetFrame(ctx.FrameIndex).CmdBuffer); }
+        void CmdWaitForSwapchainImage(const FrameContext& ctx);
 
         BufferHandle CreateBuffer(const BufferDesc& desc);
         void UploadBuffer(BufferHandle h, const void* data, Uint size, Uint offset);
@@ -139,7 +152,7 @@ namespace Surge
         const Vector<VkDescriptorPool>& GetDescriptorPools() const { return mVkDescriptorPools; }
         const Vector<VkDescriptorPool>& GetNonResetableDescriptorPools() const { return mNonResetableVkDescriptorPools; }
 
-        void ShowPoolDebugImGuiWindow();
+        void ShowPoolDebugImGuiWindow(float frameTimeMilliseconds);
 
     private:
         void CreateInstance();
@@ -193,6 +206,8 @@ namespace Surge
         Window* mWindow = nullptr;
 
         mutable VulkanUploader mUploader; // Mutable: WaitIdle() (const) has to submit pending uploads first
+        VulkanGPUTimer mGPUTimer;
+        bool mIsTileBasedGPU = false;
         VkPipelineCache mPipelineCache = VK_NULL_HANDLE;
         float mTargetFrameRate = 60.0f;
 
@@ -221,6 +236,7 @@ namespace Surge
         std::array<DeferredDeletes, RHISettings::FRAMES_IN_FLIGHT> mDeletionQueues;
         bool mIsShuttingDown = false;
         bool mIsRecording = false;
+        bool mPresentSuboptimal = false;
 
         friend class VulkanPipeline;
         friend class VulkanImage;

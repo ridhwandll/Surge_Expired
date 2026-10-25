@@ -2,7 +2,6 @@
 #include "SceneSerializer.hpp"
 #include "SceneBinaryFormat.hpp"
 #include "SerializableComponents.hpp"
-#include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/Utility/Filesystem.hpp"
@@ -64,9 +63,32 @@ namespace Surge
     NLOHMANN_JSON_SERIALIZE_ENUM(TextAlignment, { {TextAlignment::LEFT, "LEFT"}, {TextAlignment::CENTER, "CENTER"}, {TextAlignment::RIGHT, "RIGHT"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(TextVerticalAlignment, { {TextVerticalAlignment::TOP, "TOP"}, {TextVerticalAlignment::CENTER, "CENTER"}, {TextVerticalAlignment::BOTTOM, "BOTTOM"}, {TextVerticalAlignment::BASELINE, "BASELINE"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(ParticleCullingMode, { {ParticleCullingMode::ALWAYS_SIMULATE, "ALWAYS_SIMULATE"}, {ParticleCullingMode::PAUSE_OFFSCREEN, "PAUSE_OFFSCREEN"}, {ParticleCullingMode::PAUSE_AND_CATCH_UP, "PAUSE_AND_CATCH_UP"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(ShadowQuality, { {ShadowQuality::LOW, "LOW"}, {ShadowQuality::MEDIUM, "MEDIUM"}, {ShadowQuality::HIGH, "HIGH"}, {ShadowQuality::ULTRA, "ULTRA"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(AOQuality, { {AOQuality::LOW, "LOW"}, {AOQuality::MEDIUM, "MEDIUM"}, {AOQuality::HIGH, "HIGH"}, {AOQuality::ULTRA, "ULTRA"} });
+    NLOHMANN_JSON_SERIALIZE_ENUM(BloomQuality, { {BloomQuality::LOW, "LOW"}, {BloomQuality::MEDIUM, "MEDIUM"}, {BloomQuality::HIGH, "HIGH"}, {BloomQuality::ULTRA, "ULTRA"} });
     NLOHMANN_JSON_SERIALIZE_ENUM(AttenuationModel, { {AttenuationModel::NONE, "NONE"}, {AttenuationModel::INVERSE_DISTANCE, "INVERSE_DISTANCE"}, {AttenuationModel::LINEAR_DISTANCE, "LINEAR_DISTANCE"}, {AttenuationModel::EXPONENTIAL_DISTANCE, "EXPONENTIAL_DISTANCE"} });
 
     // Inspector values of a script's Properties, only written when there are any (older scenes stay untouched)
+    // Nested by group ({ "Shadows": { "Enable": true, ... } }). A missing key keeps the field's default, so settings added later load into older scenes
+    static nlohmann::json RenderSettingsToJson(const RenderSettings& settings)
+    {
+        nlohmann::json out = nlohmann::json::object();
+        RenderSettings::VisitSavedFields(settings, [&out](const char* group, const char* name, const auto& value) { out[group][name] = value; });
+        return out;
+    }
+
+    static void RenderSettingsFromJson(const nlohmann::json& in, RenderSettings& settings)
+    {
+        RenderSettings::VisitSavedFields(settings, [&in](const char* group, const char* name, auto& value) {
+            const auto groupItr = in.find(group);
+            if(groupItr == in.end())
+                return;
+            const auto valueItr = groupItr->find(name);
+            if(valueItr != groupItr->end())
+                value = valueItr->template get<std::remove_reference_t<decltype(value)>>();
+        });
+    }
+
     static nlohmann::json FieldValueToJson(ScriptFieldType type, ScriptFieldType elementType, const ScriptFieldValue& value)
     {
         switch(type)
@@ -165,9 +187,9 @@ namespace Surge
         }
     }
 
-    static Ref<Asset> LoadScriptAsset(uint64_t rawID)
+    static Ref<Asset> LoadScriptAsset(AssetManager& assetManager, uint64_t rawID)
     {
-        return LoadSerializedAsset(AssetID(rawID), AssetType::SCRIPT);
+        return LoadSerializedAsset(assetManager, AssetID(rawID), AssetType::SCRIPT);
     }
 
     // "Scripts": [ { "Active", "ScriptAsset", "Fields" }, ... ]
@@ -185,7 +207,7 @@ namespace Surge
         }
     }
 
-    static void DeserializeScriptList(const nlohmann::json& in, ScriptComponent& component)
+    static void DeserializeScriptList(AssetManager& assetManager, const nlohmann::json& in, ScriptComponent& component)
     {
         component.Scripts.clear();
         if(in.contains("Scripts") && in["Scripts"].is_array())
@@ -194,14 +216,14 @@ namespace Surge
             {
                 ScriptEntry& entry = component.Scripts.emplace_back();
                 entry.Active = item.value("Active", true);
-                entry.ScriptAsset = LoadScriptAsset(item.value("ScriptAsset", 0ULL));
+                entry.ScriptAsset = LoadScriptAsset(assetManager, item.value("ScriptAsset", 0ULL));
                 DeserializeScriptFields(item, entry.Fields);
             }
         }
         else if(in.contains("ScriptAsset")) // Scenes from before multiple scripts per entity: one script, its fields next to it
         {
             ScriptEntry& entry = component.Scripts.emplace_back();
-            entry.ScriptAsset = LoadScriptAsset(in.value("ScriptAsset", 0ULL));
+            entry.ScriptAsset = LoadScriptAsset(assetManager, in.value("ScriptAsset", 0ULL));
             DeserializeScriptFields(in, entry.Fields);
         }
     }
@@ -278,6 +300,8 @@ namespace Surge
                     out[name] = *reinterpret_cast<const TextVerticalAlignment*>(source);
                 else if(type.EqualTo<ParticleCullingMode>())
                     out[name] = *reinterpret_cast<const ParticleCullingMode*>(source);
+                else if(type.EqualTo<RenderSettings>())
+                    out[name] = RenderSettingsToJson(*reinterpret_cast<const RenderSettings*>(source));
                 else if(type.EqualTo<Ref<Asset>>())
                 {
                     const Ref<Asset>& asset = *reinterpret_cast<const Ref<Asset>*>(source);
@@ -343,6 +367,7 @@ namespace Surge
 
         nlohmann::json& inJson = j[clazz->GetName()];
         XComponent& comp = e.GetComponent<XComponent>();
+        AssetManager& assetManager = *e.GetScene()->GetContext().AssetManager_;
 
         if constexpr(std::is_same_v<XComponent, RelationshipComponent>)
         {
@@ -352,7 +377,7 @@ namespace Surge
         }
 
         if constexpr(std::is_same_v<XComponent, ScriptComponent>)
-            DeserializeScriptList(inJson, comp);
+            DeserializeScriptList(assetManager, inJson, comp);
         else if constexpr(std::is_same_v<XComponent, UICanvasComponent>)
             DeserializeScriptFields(inJson, comp.Fields);
 
@@ -407,8 +432,10 @@ namespace Surge
                 *reinterpret_cast<TextVerticalAlignment*>(dest) = inJson.value(name, TextVerticalAlignment::BASELINE);
             else if(type.EqualTo<ParticleCullingMode>())
                 *reinterpret_cast<ParticleCullingMode*>(dest) = inJson.value(name, ParticleCullingMode::PAUSE_OFFSCREEN);
+            else if(type.EqualTo<RenderSettings>())
+                RenderSettingsFromJson(inJson[name], *reinterpret_cast<RenderSettings*>(dest));
             else if(type.EqualTo<Ref<Asset>>())
-                *reinterpret_cast<Ref<Asset>*>(dest) = LoadSerializedAsset(AssetID(inJson.value(name, 0ULL)));
+                *reinterpret_cast<Ref<Asset>*>(dest) = LoadSerializedAsset(assetManager, AssetID(inJson.value(name, 0ULL)));
             else
                 Log<Severity::Warn>("DeserializeComponent: Unhandled type {} for field {}", type.GetFullName(), name);
         }
@@ -543,7 +570,7 @@ namespace Surge
         Log<Severity::Error>("[SceneSerializer] Serialize is unsupported on Android runtime. APK assets are readonly!");
         return false;
 #else
-        AssetManager* assetManager = Core::GetAssetManager();
+        AssetManager* assetManager = mContext->AssetManager_;
         const AssetMetadata& metadata = assetManager->GetMetadata(asset->GetID());
         const String absolutePath = assetManager->GetAbsolutePath(metadata.RelativePath);
         Ref<Scene> scene = asset.As<Scene>();
@@ -562,9 +589,9 @@ namespace Surge
 
     Ref<Asset> SceneSerializer::Deserialize(const AssetMetadata& metadata) const
     {
-        AssetManager* assetManager = Core::GetAssetManager();
+        AssetManager* assetManager = mContext->AssetManager_;
 
-        Ref<Scene> scene = Ref<Scene>::Create(Filesystem::GetFilenameWithoutExt(metadata.RelativePath));
+        Ref<Scene> scene = Ref<Scene>::Create(Filesystem::GetFilenameWithoutExt(metadata.RelativePath), mContext->Scenes);
         AssetStamp stamp;
         if(!SceneBinary::Read(assetManager->GetSidecarPath(metadata.ID), stamp, scene.Raw()))
             return nullptr;

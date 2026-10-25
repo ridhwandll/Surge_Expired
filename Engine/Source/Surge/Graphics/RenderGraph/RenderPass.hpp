@@ -3,6 +3,8 @@
 #include "Surge/Core/Defines.hpp"
 #include "Surge/Graphics/RHI/RHIFrameContext.hpp"
 #include "Surge/Graphics/RenderGraph/FrameBlackboard.hpp"
+#include <glm/glm.hpp>
+#include <functional>
 
 namespace Surge
 {
@@ -12,13 +14,25 @@ namespace Surge
         MAIN_SCENE,
         AMBIENT_OCCLUSION,
         BLOOM,
-        OUTLINE_MASK,
         POST_PROCESS,
         UI_OVERLAY,
         SWAPCHAIN
     };
 
     class GraphicsRHI;
+    class ShaderManager;
+
+    // What a RenderGraph and its passes use from outside the graph, filled by the Renderer: passes never reach into Core
+    struct RenderGraphContext
+    {
+        GraphicsRHI* RHI = nullptr;
+        ShaderManager* Shaders = nullptr;
+        SamplerHandle TextSampler;
+        glm::vec2 WindowSize = { 1.0f, 1.0f }; // When the graph was set up, Resize() follows
+        bool ImGuiEnabled = false;
+        void (*DeferToFrameEnd)(const std::function<void()>& work) = nullptr; // Runs work at the very end of the frame (Core's AddFrameEndCallback)
+    };
+
     class RenderPass
     {
     public:
@@ -56,5 +70,9 @@ namespace Surge
 
         Vector<ImageHandle> mImageReads;
         Vector<ImageHandle> mImageWrites;
+
+        RenderGraphContext mContext; // Set by the RenderGraph right before Setup
+
+        friend class RenderGraph;
     };
 }

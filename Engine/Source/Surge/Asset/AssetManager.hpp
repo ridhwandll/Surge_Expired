@@ -4,6 +4,7 @@
 #include "Serializer/IAssetSerializer.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
+#include "Surge/Asset/AssetContext.hpp"
 #include "Surge/Core/Path.hpp"
 #include "SurgeReflect/Enum.hpp"
 #include <unordered_map>
@@ -34,8 +35,12 @@ namespace Surge
         AssetManager();
         ~AssetManager();
 
-        void Initialize(const Path& assetDirectory);
+        // context.AssetManager_ is this AssetManager
+        void Initialize(const Path& assetDirectory, const AssetContext& context);
         void Shutdown();
+
+        // What the serializers create assets with (Renderer, SceneContext), for code that reads cooked files itself (MeshBinary::Read)
+        const AssetContext& GetContext() const { return mContext; }
 
         // Create
         // Instantiates a new asset of type T, saves it to disk at the given path, and registers it.
@@ -256,6 +261,7 @@ namespace Surge
         std::unordered_map<AssetID, Ref<Asset>> mLoadedAssets;
         std::unordered_map<AssetType, Scope<AssetSerializer>> mSerializers;
         Scope<AssetLoadCallback> mLoadCallback = nullptr;
+        AssetContext mContext;
 
         bool mInitialized = false;
 

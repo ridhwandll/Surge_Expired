@@ -353,6 +353,9 @@ namespace Surge::UI
 
         drawList.CurrentClipIndex = UI_NO_CLIP;
         generateRootDrawCommands(mEditorPreviewRoot.get(), mEditorPreviewScaler);
+
+        drawList.CurrentClipIndex = UI_NO_CLIP;
+        generateRootDrawCommands(mDebugRoot.get(), mDebugScaler);
     }
 
     ///////////

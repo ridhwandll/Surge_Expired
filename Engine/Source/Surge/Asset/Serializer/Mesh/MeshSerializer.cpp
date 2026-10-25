@@ -1,12 +1,11 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MeshSerializer.hpp"
-#include "Surge/Core/Core.hpp"
 #include "MeshBinaryFormat.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 
 namespace Surge
 {
-    static bool CheckAndGenerateDefaultMesh(const String& filepath, MeshSpecification& outSpec)
+    static bool CheckAndGenerateDefaultMesh(Renderer& renderer, const String& filepath, MeshSpecification& outSpec)
     {
         MeshGenerator::MeshData meshData = MeshGenerator::GenerateDefaultMesh(filepath);
         if(meshData.Vertices.empty())
@@ -40,7 +39,7 @@ namespace Surge
         submesh.BoundingBox.Min = minBound;
         submesh.BoundingBox.Max = maxBound;
 
-        outSpec.Materials.emplace_back(Material::Create("DefaultMaterial"));
+        outSpec.Materials.emplace_back(Material::Create(renderer, "DefaultMaterial"));
         outSpec.Materials[0]->SetName("DefaultMaterial");
         outSpec.Materials[0]->Set<glm::vec3>("Albedo", glm::vec3(0.8f));
         outSpec.Materials[0]->Set<float>("Metallic", 0.5f);
@@ -64,7 +63,7 @@ namespace Surge
         Log<Severity::Error>("[MeshSerializer] Serialization is unsupported on Android runtime. Pre-cook the assets!");
         return false;
 #else
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const AssetMetadata& meta = am->GetMetadata(asset->GetID());
         if(HasFlag(meta.Flags, AssetFlags::MEMORY))
             return true;
@@ -75,7 +74,7 @@ namespace Surge
 
         AssetStamp existingStamp;
         MeshSpecification existingGeom;
-        if(!MeshBinary::Read(sidecarPath, existingStamp, existingGeom))
+        if(!MeshBinary::Read(*mContext, sidecarPath, existingStamp, existingGeom))
         {
             // Writing now would replace the cooked geometry with an empty mesh
             Log<Severity::Error>("[MeshSerializer] Could not read {} to update its material overrides, re-cook the mesh first", sidecarPath);
@@ -91,21 +90,21 @@ namespace Surge
         MeshSpecification spec;
         if(HasFlag(metadata.Flags, AssetFlags::MEMORY))
         {
-            CheckAndGenerateDefaultMesh(metadata.RelativePath, spec);
-            return Mesh::Create(std::move(spec)).As<Asset>();
+            CheckAndGenerateDefaultMesh(*mContext->Renderer_, metadata.RelativePath, spec);
+            return Mesh::Create(*mContext->Renderer_, *mContext->AssetManager_, std::move(spec)).As<Asset>();
         }
 
-        AssetManager* am = Core::GetAssetManager();
+        AssetManager* am = mContext->AssetManager_;
         const String sidecarPath = am->GetSidecarPath(metadata.ID);
 
         SCOPED_TIMER("MeshSerializer::Deserialize: {}", sidecarPath);
         AssetStamp existingStamp;
-        if(!MeshBinary::Read(sidecarPath, existingStamp, spec))
+        if(!MeshBinary::Read(*mContext, sidecarPath, existingStamp, spec))
         {
             Log<Severity::Error>("[MeshSerializer] Failed to read sidecar for mesh {}, returing a default sweet cube!", metadata.RelativePath);
-            CheckAndGenerateDefaultMesh(DefaultMesh::CUBE, spec);
+            CheckAndGenerateDefaultMesh(*mContext->Renderer_, DefaultMesh::CUBE, spec);
         }
-        return Mesh::Create(std::move(spec)).As<Asset>();
+        return Mesh::Create(*mContext->Renderer_, *mContext->AssetManager_, std::move(spec)).As<Asset>();
     }
 
     void MeshSerializer::Shutdown()

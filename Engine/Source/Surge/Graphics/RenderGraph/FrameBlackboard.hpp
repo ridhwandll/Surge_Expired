@@ -2,6 +2,7 @@
 #pragma once
 #include "Surge/Graphics/RHI/RHIHandle.hpp"
 #include "Surge/Graphics/RHI/RHISettings.hpp"
+#include "Surge/Graphics/RenderGraph/RenderSettings.hpp"
 #include "Surge/Graphics/Renderer/Lights.hpp"
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/HighLevel/Font.hpp"
@@ -11,7 +12,6 @@
 
 #include <glm/glm.hpp>
 
-#define MAX_SHADOW_CASCADE_COUNT 3
 
 namespace Surge
 {
@@ -46,66 +46,6 @@ namespace Surge
     };
     static_assert(sizeof(ShadowUBO) % 16 == 0, "Size of 'ShadowUBO' struct must be 16 bytes aligned!");
 
-    enum class ShadowQuality : uint8_t
-    {
-        LOW,    // 2 cascades of 2048, 3x3 tent PCF (4 taps), dithered cascade blend (Mobile default)
-        MEDIUM, // 3 cascades of 2048, 5x5 tent PCF (9 taps)
-        HIGH,   // 3 cascades of 2048, 7x7 tent PCF (16 taps)
-        ULTRA   // 3 cascades of 4096, 7x7 tent PCF (16 taps) (Desktop default)
-    };
-
-    // Directional light cascaded shadow maps, every cascade is a region of one D16 atlas rendered in a single render pass
-    struct ShadowSettings
-    {
-        static constexpr Uint MIN_RESOLUTION = 512;
-        static constexpr Uint MAX_RESOLUTION = 4096;
-
-        bool Enable = true;
-        ShadowQuality Quality = ShadowQuality::LOW;
-
-        // Driven by Quality via ApplyQualityPreset(), can be tweaked individually afterwards
-        int CascadeCount = 2;        // Every cascade draws its casters again
-        Uint Resolution = 2048;      // Per cascade, the atlas is CascadeCount * Resolution wide
-        int FilterSize = 3;          // Tent PCF width in texels: 3 (4 taps), 5 (9 taps) or 7 (16 taps)
-        bool DitheredBlend = true;   // Cascade blend picks one cascade per pixel (noise) instead of sampling both
-
-        float Distance = 50.0f;      // View depth covered by the cascades, shadows fade out over the last FadeRange of it
-        float FadeRange = 0.1f;
-        float CascadeSplitLambda = 0.9f;
-        float CascadeBlend = 0.1f;   // Fraction of each cascade blended into the next one, hides the resolution jump
-        bool ShowCascades = false;
-
-        float NormalBias = 1.0f;     // Receiver offset along its normal in shadow texels, so it scales with each cascade
-        float DepthBiasConstant = 1.25f;
-        float DepthBiasClamp = 0.0f;
-        float DepthBiasSlope = 1.75f;
-
-        void ApplyQualityPreset(ShadowQuality quality)
-        {
-            Quality = quality;
-            switch(quality)
-            {
-                case ShadowQuality::LOW:    CascadeCount = 2; Resolution = 2048; FilterSize = 3; DitheredBlend = true;  break;
-                case ShadowQuality::MEDIUM: CascadeCount = 3; Resolution = 2048; FilterSize = 5; DitheredBlend = false; break;
-                case ShadowQuality::HIGH:   CascadeCount = 3; Resolution = 2048; FilterSize = 7; DitheredBlend = false; break;
-                case ShadowQuality::ULTRA:  CascadeCount = 3; Resolution = 4096; FilterSize = 7; DitheredBlend = false; break;
-            }
-        }
-
-        static ShadowSettings PlatformDefault()
-        {
-            ShadowSettings settings;
-#ifdef SURGE_PLATFORM_ANDROID
-            settings.ApplyQualityPreset(ShadowQuality::LOW);
-            settings.Distance = 50.0f;
-#else
-            settings.ApplyQualityPreset(ShadowQuality::ULTRA);
-            settings.Distance = 150.0f;
-#endif
-            return settings;
-        }
-    };
-
     struct Environnment
     {
         bool HasEnvironment = false;
@@ -125,174 +65,30 @@ namespace Surge
         glm::vec3 GroundAmbient { 0.12f, 0.11f, 0.10f };
     };
 
-    enum class AOQuality : uint8_t
-    {
-        LOW,    // Half res, 1 slice x 3 steps, derivative normals (Mobile default)
-        MEDIUM, // Half res, 2 slices x 3 steps
-        HIGH,   // Full res, 3 slices x 4 steps
-        ULTRA   // Full res, 4 slices x 8 steps, wide blur (Desktop default)
-    };
-
-    // GTAO (Ground Truth Ambient Occlusion), computed from depth only
-    // Applied as a multiply on the lit scene color in PostProcess
-    struct AmbientOcclusionSettings
-    {
-        bool Enable = true;
-        AOQuality Quality = AOQuality::LOW;
-
-        // Driven by Quality via ApplyQualityPreset(), can be tweaked individually afterwards
-        float ResolutionScale = 0.5f; // AO render target size relative to the screen (0.25 - 1.0)
-        int SliceCount = 1;
-        int StepsPerSlice = 3;
-        int BlurRadius = 2;           // In AO texels, 0 disables the blur
-        bool AccurateNormals = false; // 4 tap normal reconstruction instead of screen space derivatives
-
-        float Radius = 0.75f;      // World space units
-        float Intensity = 1.0f;    // Final visibility power
-        float FalloffRange = 0.6f; // Fraction of Radius over which occluders fade out
-        float MaxDistance = 80.0f; // AO fades out completely at this view distance
-        float BlurSharpness = 8.0f;
-
-        void ApplyQualityPreset(AOQuality quality)
-        {
-            Quality = quality;
-            switch(quality)
-            {
-                case AOQuality::LOW:    ResolutionScale = 0.5f; SliceCount = 1; StepsPerSlice = 3; BlurRadius = 2; AccurateNormals = false; break;
-                case AOQuality::MEDIUM: ResolutionScale = 0.5f; SliceCount = 2; StepsPerSlice = 3; BlurRadius = 3; AccurateNormals = true;  break;
-                case AOQuality::HIGH:   ResolutionScale = 1.0f; SliceCount = 3; StepsPerSlice = 4; BlurRadius = 3; AccurateNormals = true;  break;
-                case AOQuality::ULTRA:  ResolutionScale = 1.0f; SliceCount = 4; StepsPerSlice = 8; BlurRadius = 4; AccurateNormals = true;  break;
-            }
-        }
-
-        static AmbientOcclusionSettings PlatformDefault()
-        {
-            AmbientOcclusionSettings settings;
-#ifdef SURGE_PLATFORM_ANDROID
-            // 4 extra render passes + a stored full-res depth buffer, opt-in on mobile
-            settings.ApplyQualityPreset(AOQuality::LOW);
-            settings.Enable = false;
-#else
-            settings.ApplyQualityPreset(AOQuality::ULTRA);
-#endif
-            return settings;
-        }
-    };
-
-    enum class BloomQuality : uint8_t
-    {
-        LOW,    // Fragment, 3 mips, dual filter (5/8 taps), bilinear composite (Mobile default)
-        MEDIUM, // Fragment, 5 mips, 13 tap down + 9 tap tent up, anti flicker
-        HIGH,   // Compute, 6 mips, 13 tap down + 9 tap tent up, anti flicker
-        ULTRA   // Compute, 8 mips, 13 tap down + 9 tap tent up, anti flicker (Desktop default)
-    };
-
-    // Physically based style bloom (CoD: Advanced Warfare / Unity URP / Hazel), mip chain starts at half resolution
-    // Fragment path renders each mip with a renderpass (tile friendly, keeps framebuffer compression on mobile, R11G11B10)
-    // Compute path writes storage images (RGBA16F), used on desktop
-    struct BloomSettings
-    {
-        static constexpr int MIN_MIP_COUNT = 2;
-        static constexpr int MAX_MIP_COUNT = 8;
-
-        bool Enable = true;
-        BloomQuality Quality = BloomQuality::LOW;
-
-        // Driven by Quality via ApplyQualityPreset(), can be tweaked individually afterwards
-        bool UseCompute = false;           // Falls back to the fragment path if the device queue has no compute support
-        int MipCount = 3;                  // 2 - 8, clamped further so the smallest mip stays >= 2px
-        bool HighQualityFilter = false;    // 13 tap downsample + 9 tap tent upsample, otherwise ARM dual filter
-        bool AntiFlicker = false;          // Karis average on the first downsample, kills fireflies from tiny HDR highlights
-        bool HighQualityComposite = false; // 9 tap tent when upscaling the half res bloom in PostProcess
-
-        float Threshold = 1.0f;  // Linear HDR brightness where bloom starts
-        float Knee = 0.5f;       // Soft threshold, fraction of Threshold
-        float Intensity = 0.8f;
-        float Scatter = 0.7f;    // How far the glow spreads (mix factor between mips)
-        float ClampValue = 65000.0f; // Max HDR value fed into bloom
-        glm::vec3 Tint = glm::vec3(1.0f);
-
-        void ApplyQualityPreset(BloomQuality quality)
-        {
-            Quality = quality;
-            switch(quality)
-            {
-                case BloomQuality::LOW:    UseCompute = false; MipCount = 3; HighQualityFilter = false; AntiFlicker = false; HighQualityComposite = false; break;
-                case BloomQuality::MEDIUM: UseCompute = false; MipCount = 5; HighQualityFilter = true;  AntiFlicker = true;  HighQualityComposite = true;  break;
-                case BloomQuality::HIGH:   UseCompute = true;  MipCount = 6; HighQualityFilter = true;  AntiFlicker = true;  HighQualityComposite = true;  break;
-                case BloomQuality::ULTRA:  UseCompute = true;  MipCount = 8; HighQualityFilter = true;  AntiFlicker = true;  HighQualityComposite = true;  break;
-            }
-        }
-
-        static BloomSettings PlatformDefault()
-        {
-            BloomSettings settings;
-#ifdef SURGE_PLATFORM_ANDROID
-            settings.Enable = false;
-            settings.ApplyQualityPreset(BloomQuality::LOW);
-#else
-            settings.ApplyQualityPreset(BloomQuality::ULTRA);
-#endif
-            return settings;
-        }
-    };
-
-    // Resolution of the 3D scene (main pass, AO, bloom) relative to the output, UI and post-processing stay at full resolution
-    struct RenderScaleSettings
-    {
-        static constexpr float MIN_SCALE = 0.5f;
-        static constexpr float MAX_SCALE = 1.0f;
-
-        static float PlatformDefault()
-        {
-#ifdef SURGE_PLATFORM_ANDROID
-            return 0.8f;
-#else
-            return 1.0f;
-#endif
-        }
-    };
-
-    struct PostProcessSettings
-    {
-        bool EnableFXAA = false;
-        glm::vec3 OutlineColor = glm::vec3(1.0f, 0.6f, 0.1f);
-        float OutlineThickness = 1.1f;
-        float VignetteIntensity = 0.0f;
-        float VignetteSoftness = 0.25f;
-        float Grain = 0.0f;
-        bool ShowAOOnly = false; // Debug view, outputs the upsampled AO buffer
-    };
-
     // CPU-side submit commands
     // Pushed by Renderer::Submit*(), consumed by nodes in Execute()
 
-    struct MeshSubmitCmd  // Pushed by Renderer::SubmitMesh()
+    static constexpr Uint INVALID_SKIN_OFFSET = UINT32_MAX;
+
+    struct MeshSubmitCmd  // Pushed by Renderer::SubmitMesh() / SubmitSkinnedMesh()
     {
         glm::mat4 Transform;
         const Mesh* Mesh_;
         bool DropShadow;
+        Uint SkinOffset = INVALID_SKIN_OFFSET; // Skinned meshes: first palette entry in FrameBlackboard::SkinMatrices
+        AABB SkinBounds = {};                  // Skinned meshes: model space bounds of this pose, culls the whole mesh
     };
 
-    struct OutlineSubmitCmd // Pushed by Renderer::SubmitOutlinedMesh()
+    struct AnimationStats
     {
-        glm::mat4 Transform;
-        const Mesh* Mesh_;
+        Uint Animators = 0;  // Written by the scene each frame
+        Uint Culled = 0;     // Off screen: time advanced, pose not evaluated
+        Uint OverBudget = 0; // Submissions the Renderer dropped (AnimationSettings::MaxSkinMatrices)
     };
 
     struct LightSubmitCmd // Pushed by Renderer::SubmitLight()
     {
         Light GPULight; // Pre-converted from LightComponent at submit time
-    };
-
-    // Forward lighting budget: every lit pixel loops over these, so only the most relevant lights reach the shader
-    struct LightingSettings
-    {
-#ifdef SURGE_PLATFORM_ANDROID
-        Uint MaxLights = 8;
-#else
-        Uint MaxLights = 64;
-#endif
     };
 
     struct QuadSubmitCmd // Pushed by Renderer::SubmitQuad()
@@ -360,7 +156,7 @@ namespace Surge
     {
         // Written by Renderer::BeginFrame()
         float ScreenWidth, ScreenHeight;
-        float RenderScale = RenderScaleSettings::PlatformDefault();
+        float RenderScale = RenderScaleSettings::Default(PLATFORM_RENDER_PROFILE);
         glm::vec3 CameraPosition;
         glm::mat4 ViewMatrix;
         glm::mat4 ProjectionMatrix;
@@ -382,7 +178,6 @@ namespace Surge
 
         ImageHandle MainPassColorImage;
         ImageHandle MainPassDepthImage;
-        ImageHandle OutlineMask;
         ImageHandle AOImage;       // R8, AO resolution, 1.0 = unoccluded
         ImageHandle AOLinearDepth; // R32F, AO resolution, positive view space depth
         ImageHandle BloomImage;    // Half res, final (top) mip of the bloom upsample chain
@@ -391,7 +186,11 @@ namespace Surge
         ImageHandle ShadowAtlas;     // D16, cascades side by side (ShadowPass)
         Uint ShadowAtlasVersion = 0; // Bumped when the atlas is recreated (resolution/cascade count change), samplers rewrite their descriptors
 
-        FramebufferHandle OutlineFramebuffer;
+        // Skinning palettes of the frame (SkinMatrices), uploaded by the Renderer once per graph before the passes prepare
+        BufferHandle SkinBuffers[RHISettings::FRAMES_IN_FLIGHT];
+        Uint SkinBufferCapacity[RHISettings::FRAMES_IN_FLIGHT] = {}; // In SkinMatrix entries
+        Uint SkinBufferVersion[RHISettings::FRAMES_IN_FLIGHT] = {};  // Bumped when a frame's buffer is recreated, passes rewrite their descriptors
+
         FramebufferHandle PostProcessFramebuffer;
         FramebufferHandle UIOverlayFramebuffer;
         FramebufferHandle MainPassFramebuffer;
@@ -404,19 +203,22 @@ namespace Surge
         PipelineHandle MaterialPipeline; // TODO: Remove this (It is currently GeometryPassPipeline(set by GeometryPass::Setup))
 
         //Shadow Settings
-        ShadowSettings ShadowSettings_ = ShadowSettings::PlatformDefault();
+        ShadowSettings ShadowSettings_ = ShadowSettings::Default(PLATFORM_RENDER_PROFILE);
 
         // GI & skybox
         Environnment Env;
 
-        LightingSettings Lighting;
-        ParticleSettings Particles;
+        LightingSettings Lighting = LightingSettings::Default(PLATFORM_RENDER_PROFILE);
+        ParticleSettings Particles = ParticleSettings::Default(PLATFORM_RENDER_PROFILE);
         ParticleStats ParticleStatistics; // Written by the scene each frame
+        AnimationSettings Animation = AnimationSettings::Default(PLATFORM_RENDER_PROFILE);
+        AnimationStats AnimationStatistics;
 
         // Screen Space options
         PostProcessSettings PostProcessSettings_;
-        AmbientOcclusionSettings AOSettings = AmbientOcclusionSettings::PlatformDefault();
-        BloomSettings Bloom = BloomSettings::PlatformDefault();
+        AmbientOcclusionSettings AOSettings = AmbientOcclusionSettings::Default(PLATFORM_RENDER_PROFILE);
+        BloomSettings Bloom = BloomSettings::Default(PLATFORM_RENDER_PROFILE);
+        bool HasSceneGeometry = false; // 3D draws survived culling this frame (GeometryPass::Prepare), reset by RenderGraph::Execute
 
         // CMD lists
         Vector<MeshSubmitCmd> MeshList;
@@ -424,9 +226,9 @@ namespace Surge
         Vector<QuadSubmitCmd> QuadList;
         Vector<LineSubmitCmd> LineList;
         Vector<TextSubmitCmd> TextList;
-        Vector<OutlineSubmitCmd> OutlineList;
         Vector<ParticleRecord> ParticleList;            // Renderer::SubmitParticles
         Vector<ParticleEmitterCmd> ParticleEmitterList; // One per submitted emitter, records are contiguous per emitter
+        Vector<SkinMatrix> SkinMatrices;                 // Palettes of the skinned meshes in MeshList (MeshSubmitCmd::SkinOffset)
 
         // UI
         bool ShowUI = true;
@@ -435,6 +237,14 @@ namespace Surge
         Vector<TextSubmitCmd> UITextList;
         Vector<UIDrawItem> UIDrawOrder;
         Vector<glm::vec4> UIClipRects; // (minX, minY, maxX, maxY) pixels
+
+        // Screen space effects only run when the main pass has something for them, a UI only scene skips them (PostProcess composites what ran)
+        bool RunsAO() const { return AOSettings.Enable && HasSceneGeometry; }
+        bool RunsBloom() const { return Bloom.Enable && Bloom.Intensity > 0.0f && HasMainPassContent(); }
+        bool HasMainPassContent() const // 3D, sky, sprites/text/lines or particles
+        {
+            return HasSceneGeometry || (Env.HasEnvironment && Env.ShowSky) || !QuadList.empty() || !TextList.empty() || !LineList.empty() || !ParticleEmitterList.empty();
+        }
 
         // Size of the scene targets (main pass, AO, bloom) for a given output size
         glm::uvec2 GetSceneSize(Uint outputWidth, Uint outputHeight) const
@@ -450,9 +260,9 @@ namespace Surge
             TextList.clear();
             QuadList.clear();
             LineList.clear();
-            OutlineList.clear();
             ParticleList.clear();
             ParticleEmitterList.clear();
+            SkinMatrices.clear();
 
             UISpriteList.clear();
             UITextList.clear();

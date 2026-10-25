@@ -66,19 +66,7 @@ namespace Surge
         if(!selected || selected.GetScene() != &scene)
             return;
 
-        Renderer* renderer = Core::GetRenderer();
         const TransformComponent& transformComp = selected.GetComponent<TransformComponent>();
-
-        if(mSettings.ShowSelectionOutline)
-        {
-            const MeshComponent* meshComp = selected.TryGetComponent<MeshComponent>();
-            if(meshComp && meshComp->MeshAsset)
-            {
-                Ref<Mesh> mesh = meshComp->MeshAsset.As<Mesh>();
-                if(mesh) // Asset might be missing/corrupted
-                    renderer->SubmitMeshOutline(transformComp.GetTransform(), mesh.Raw());
-            }
-        }
 
         if(mSettings.ShowColliders && IsColliderShown(selected))
         {
@@ -190,6 +178,13 @@ namespace Surge
                 const float alpha = (isSelected ? 0.85f : 0.4f) * (particles.Active ? 1.0f : 0.5f);
                 DrawParticleShapes(particles, transform.GetTransform(), ScaleAlpha(GizmoIcons::PARTICLES_COLOR, alpha), isSelected ? SELECTED_THICKNESS : UNSELECTED_THICKNESS);
             }
+        }
+
+        if(mSettings.ShowSkeletons && selected && selected.GetScene() == &scene)
+        {
+            const AnimatorComponent* animator = selected.TryGetComponent<AnimatorComponent>();
+            if(animator && animator->Active && animator->Runtime.HasPose())
+                DrawSkeleton(animator->Runtime, IM_COL32(190, 165, 255, 230), SELECTED_THICKNESS);
         }
 
         if(mSettings.ShowIcons)
@@ -419,8 +414,24 @@ namespace Surge
         ImGui::Checkbox("Particle Shapes", &mSettings.ShowParticleGizmos);
         ImGui::Checkbox("Wire Gizmos For All", &mSettings.ShowWireForAll);
         ImGui::SetItemTooltip("Frustums and light/audio ranges for every entity instead of only the selected one");
-        ImGui::Checkbox("Selection Outline", &mSettings.ShowSelectionOutline);
         ImGui::Checkbox("Colliders", &mSettings.ShowColliders);
+        ImGui::Checkbox("Skeletons", &mSettings.ShowSkeletons);
+        ImGui::SetItemTooltip("Joint hierarchy of the selected entity's Animator");
+    }
+
+    void SceneGizmos::DrawSkeleton(const AnimatorRuntime& runtime, ImU32 color, float thickness)
+    {
+        // Parent -> child lines in this frame's pose (every node of the skeleton, the armature root included)
+        for(Uint joint = 0; joint < runtime.GetJointCount(); joint++)
+        {
+            const int parent = runtime.GetJointParent(static_cast<int>(joint));
+            if(parent < 0)
+                continue;
+
+            const glm::vec3 from = glm::vec3(runtime.GetJointWorldTransform(parent)[3]);
+            const glm::vec3 to = glm::vec3(runtime.GetJointWorldTransform(static_cast<int>(joint))[3]);
+            mCanvas.DrawLine3D(from, to, color, thickness);
+        }
     }
 
 } // namespace Surge
