@@ -195,7 +195,7 @@ namespace Surge
         // Cooking touches editor-side state, so it stays on the main thread
         mSession.Log(Severity::Info, "> Cooking assets");
         Editor* editor = static_cast<Editor*>(Core::GetClient());
-        editor->GetAssetImporter().ScanAndCookAll();
+        AssetDatabase::Get().CookAllOutdated();
 
         Vector<String> failedShaders;
         if(!ShaderCompiler::CookLoadedShaders(failedShaders))

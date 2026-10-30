@@ -6,6 +6,9 @@
 #include "Surge/Graphics/Shader/ShaderBinaryFormat.hpp"
 #include "Surge/Graphics/HighLevel/Font.hpp"
 #include "Shader/ShaderCompiler.hpp"
+#include "Asset/AssetDatabase.hpp"
+#include "Surge/Asset/Format/Registry/RegistryFormat.hpp"
+#include "Surge/Core/Project.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Utility/Platform.hpp"
@@ -169,6 +172,21 @@ namespace Surge::ExportUtils
             job.CookedFiles.push_back({ sidecar, fs::relative(sidecar, assetsDir, ec) });
         }
 
+        // The cooked registry and project: the Player reads them instead of AssetRegistry.surge and the .surgeproj (main thread, the registry can change)
+        {
+            std::error_code ec;
+            const Path registryPath = assetsDir / RegistryBinary::FILE_NAME;
+            const Path projectPath = assetsDir / Project::COOKED_FILE_NAME;
+            if(AssetDatabase::Get().WriteCookedRegistry(registryPath))
+                job.CookedFiles.push_back({ registryPath, fs::relative(registryPath, assetsDir, ec) });
+            else
+                outMissing.push_back(RegistryBinary::FILE_NAME);
+            if(job.Proj.SaveCooked(projectPath))
+                job.CookedFiles.push_back({ projectPath, fs::relative(projectPath, assetsDir, ec) });
+            else
+                outMissing.push_back(Project::COOKED_FILE_NAME);
+        }
+
         // Engine shaders ship cooked only (Shaders/Cooked/<Name>.rSHADER), compiled by ShaderCompiler::CookLoadedShaders
         for(const Shader& shader : Core::GetRenderer()->GetShaderManager().GetAllShaders())
         {
@@ -197,14 +215,9 @@ namespace Surge::ExportUtils
 
     bool StageRuntimeContent(ExportSession& session, const Path& root, const ExportJobInfo& job)
     {
-        // Cooked project content: the registry (path lookups, asset types) and Internal/, nothing else of the project's Assets folder
+        // Cooked project content only: Internal/ (assets, Registry.rREG, Project.rPROJ), nothing else of the project's Assets folder
         const Path assetsPath = root / "Engine/Assets";
         Filesystem::CreateOrEnsureDirectories(assetsPath);
-        if(!Filesystem::CopyFile(job.ProjectDir / "Assets/AssetRegistry.surge", assetsPath / "AssetRegistry.surge"))
-        {
-            session.Error("Could not copy the asset registry (Assets/AssetRegistry.surge)");
-            return false;
-        }
 
         for(const ExportCookedFile& file : job.CookedFiles)
         {
@@ -221,12 +234,6 @@ namespace Surge::ExportUtils
         }
         session.Log(Severity::Info, std::format("Staged {} cooked asset(s)", job.CookedFiles.size()));
 
-        Project project = job.Proj;
-        const Path projectFilePath = root / "Engine" / (project.Name + ".surgeproj");
-        Filesystem::CopyFile(job.ProjectDir / (project.Name + ".surgeproj"), projectFilePath);
-
-        // Rewrite the .surgeproj so it points at the chosen start scene
-        project.Save(projectFilePath);
         return true;
     }
 

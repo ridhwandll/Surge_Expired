@@ -1,10 +1,10 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "Surge/Core/Scope.hpp"
-#include "Serializer/IAssetSerializer.hpp"
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/Asset/AssetMetadata.hpp"
 #include "Surge/Asset/AssetContext.hpp"
+#include "Surge/Asset/Format/AssetFormat.hpp"
 #include "Surge/Core/Path.hpp"
 #include "SurgeReflect/Enum.hpp"
 #include <unordered_map>
@@ -14,73 +14,32 @@ namespace Surge
     template<typename T>
     concept IsAssetConcept = std::is_base_of_v<Surge::Asset, T> && !std::is_same_v<Surge::Asset, T> && requires { { T::GetStaticType() } -> std::same_as<AssetType>; };
 
-    class AssetManager;
-    class AssetLoadCallback
+    // Installed by the Editor (AssetManager::SetCookHook), the runtime has none
+    class AssetCookHook
     {
     public:
-        virtual ~AssetLoadCallback() = default;
-    protected:
-        // OnAssetLoad
-        // Called internally when an asset is requested to be loaded. Return true to force a reload(skip cache), false to use the cached version if available.
-        // @param id    AssetID of the asset being loaded
-        // @param meta  AssetMetadata of the asset being loaded
-        // @return      true to force a reload, false to use cached version if available
-        virtual bool OnAssetLoad(AssetID id, AssetMetadata& meta) = 0;
-        friend class AssetManager;
+        virtual ~AssetCookHook() = default;
+
+        // Called by Load before it returns an asset. Cooks the asset when its cooked file is missing or older than its source.
+        // cached: the asset is loaded already. Return true when the cooked file was rewritten, a cached asset is then read again
+        virtual bool OnLoad(AssetID id, const AssetMetadata& metadata, bool cached) = 0;
     };
 
+    // The runtime side of the asset pipeline: reads cooked binary files (Internal/<TYPE>/<id>.r<TYPE>) through the AssetFormat of their type,
+    // caches the live assets and resolves paths. It never writes a file and knows no source format: the Editor's AssetDatabase imports,
+    // cooks and saves, and keeps this registry in sync through Register/Unregister/SetPath/Invalidate
     class AssetManager
     {
     public:
         AssetManager();
         ~AssetManager();
 
-        // context.AssetManager_ is this AssetManager
+        // context.AssetManager_ is this AssetManager. Reads the cooked registry (Internal/Registry.rREG) when the directory has one (exported games)
         void Initialize(const Path& assetDirectory, const AssetContext& context);
         void Shutdown();
 
-        // What the serializers create assets with (Renderer, SceneContext), for code that reads cooked files itself (MeshBinary::Read)
+        // What the formats create assets with (Renderer, SceneContext), for code that reads cooked files itself
         const AssetContext& GetContext() const { return mContext; }
-
-        // Create
-        // Instantiates a new asset of type T, saves it to disk at the given path, and registers it.
-        // @param relativePath  Path where the new asset should be saved.
-        // @param args          Arguments to forward to the asset's Create method
-        // @return              Stable AssetID of the newly created asset
-        template<IsAssetConcept T, typename... Args>
-        Ref<T> Create(const String& relativePath, Args&&... args)
-        {
-            if(GetIDFromPath(relativePath).IsValid())
-            {
-                Log<Severity::Warn>("[AssetManager] Create: Asset already exists at path '{}'", relativePath);
-                return nullptr;
-            }
-            AssetID newID = UUID();
-
-            AssetMetadata meta;
-            meta.ID = newID;
-            meta.Type = T::GetStaticType();
-            meta.RelativePath = relativePath;
-            meta.Flags = AssetFlags::VALID | AssetFlags::LOADED;
-            mAssetRegistry[newID] = meta;
-            mPathToID[relativePath] = newID;
-
-            Ref<T> newAsset = T::Create(std::forward<Args>(args)...);
-            newAsset->mID = newID;
-            mLoadedAssets[newID] = newAsset;
-
-            Save(meta.ID);
-
-            Log<Severity::Info>("[AssetManager] Created & Saved new asset: {}", relativePath);
-            return newAsset;
-        }
-
-        // Import
-        // Registers a source file into the registry. Returns the existing ID if already imported
-        // @param str     Path relative to the assets directory e.g. "Textures/Surge.png" OR memoryStr if created from memory e.g. DefaultMeshes::CUBE
-        // @param type    Explicit asset type, must match intended usage
-        // @return        Stable AssetID, or UUID::INVALID on failure
-        AssetID Import(const String& str, AssetType type);
 
         // Load<T>
         // Returns a cached Ref<T> immediately if already loaded, performs a full synchronous load (CPU + GPU) otherwise
@@ -90,50 +49,38 @@ namespace Surge
         template<IsAssetConcept T>
         Ref<T> Load(AssetID id)
         {
-            auto cacheIt = mLoadedAssets.find(id);
-            bool isCached = cacheIt != mLoadedAssets.end();
-            bool shouldReload = false;
-
-            AssetMetadata* metadata = nullptr;
-            if(mLoadCallback)
-            {
-                metadata = GetMetadataForEdit(id);
-                if(!metadata)
-                {
-                    Log<Severity::Error>("[AssetManager] Load: Invalid AssetID {}!", id.Get());
-                    return nullptr;
-                }
-
-                // Trigger user callback (In Editor this reads the binary file header to see if it is uptodate, Cooks the asset if needed)
-                shouldReload = mLoadCallback->OnAssetLoad(id, *metadata);
-
-                // Cooking can load other assets (a scene's meshes, a material's textures) and rehash the cache
-                cacheIt = mLoadedAssets.find(id);
-                isCached = cacheIt != mLoadedAssets.end();
-            }
-
-            // FAST PATH
-            if(isCached && !shouldReload)
-            {
-                if (cacheIt->second->GetAssetType() != T::GetStaticType())
-                    return nullptr;
-
-                return cacheIt->second.As<T>();
-            }
-
-            // SLOW PATH
-            if(!metadata)
-                metadata = GetMetadataForEdit(id); // Fetch if we are in Release mode (no hook)
-
+            AssetMetadata* metadata = GetMetadataForEdit(id);
             if(!metadata)
             {
                 Log<Severity::Error>("[AssetManager] Load: No metadata found for AssetID {}!", id.Get());
                 return nullptr;
             }
 
-            // The Player has nothing that could bring a MISSING asset back. In the Editor the source may have been fixed or re-cooked since the
-            // failed load (JSON assets have no cooker to notice), so always retry: a successful load clears the flag
-            if(!mLoadCallback && HasFlag(metadata->Flags, AssetFlags::MISSING))
+            auto cacheIt = mLoadedAssets.find(id);
+            bool reload = false;
+            if(mCookHook)
+            {
+                // In the Editor this cooks the asset when its source changed. Cooking can load and register other assets (a scene's meshes,
+                // a model's textures), which rehashes the cache and the registry
+                const AssetMetadata copy = *metadata;
+                reload = mCookHook->OnLoad(id, copy, cacheIt != mLoadedAssets.end());
+                cacheIt = mLoadedAssets.find(id);
+                metadata = GetMetadataForEdit(id);
+                if(!metadata)
+                    return nullptr;
+            }
+
+            // FAST PATH
+            if(cacheIt != mLoadedAssets.end() && !reload)
+            {
+                if(cacheIt->second->GetAssetType() != T::GetStaticType())
+                    return nullptr;
+                return cacheIt->second.As<T>();
+            }
+
+            // SLOW PATH
+            // The Player has nothing that could bring a MISSING asset back. In the Editor the cook hook may have fixed it, so always retry
+            if(!mCookHook && HasFlag(metadata->Flags, AssetFlags::MISSING))
             {
                 Log<Severity::Error>("[AssetManager] Load: Asset is marked as MISSING for ID {}!", id.Get());
                 return nullptr;
@@ -145,13 +92,12 @@ namespace Surge
                 return nullptr;
             }
             Ref<Asset> asset = LoadAssetInternal(id, metadata);
-            SG_ASSERT(!asset || asset->GetAssetType() == T::GetStaticType(), "[AssetManager] LoadInternal returned wrong type, loader bug!");
+            SG_ASSERT(!asset || asset->GetAssetType() == T::GetStaticType(), "[AssetManager] LoadInternal returned wrong type, format bug!");
             return asset ? asset.As<T>() : nullptr;
         }
 
         // GetLoaded<T>
-        // Cache lookup only: no loading, no load callback (in the Editor that callback checks the cooked file on disk).
-        // A reload replaces the cached asset, so this is always the newest version of an asset that is loaded
+        // Cache lookup only: no loading, no cook hook. A reload replaces the cached asset, so this is always the newest version of an asset that is loaded
         // @param id    AssetID of the requested asset
         // @return      Ref<T> of the cached asset, null if it is not loaded or has another type
         template<IsAssetConcept T>
@@ -163,24 +109,17 @@ namespace Surge
             return cacheIt->second.As<T>();
         }
 
+        // GetBuiltin
+        // Registers (once) and returns the ID of an asset made in code, name is an "Engine://" path e.g. DefaultMesh::CUBE
+        // @return      Stable AssetID, or UUID::INVALID if name is not a built-in path
+        AssetID GetBuiltin(const String& name, AssetType type);
+
         // Unload
-        // Removes the live Ref from the cache if no other objects are referencing it i.e. Ref count = 1, otherwise does nothing since it's still in use 
-        // somewhere else in the program Note that the asset will still be registered and can be loaded again later, this just removes it from memory
+        // Removes the live Ref from the cache if no other objects are referencing it i.e. Ref count = 1, otherwise does nothing since it's still in use
+        // somewhere else in the program. The asset stays registered and can be loaded again later, this just removes it from memory
         // @param id    AssetID of the asset to be removed
         // @return      true if unload was successful, false otherwise
         bool Unload(AssetID id);
-
-        // IsLoaded
-        // Checks if the asset is currently loaded in memory
-        // @param id    AssetID of the asset to check
-        // @return      true if the asset is loaded, false otherwise
-        bool IsLoaded(AssetID id);
-
-        // IsRegistered
-        // Checks if the asset is registered in the registry (i.e. has been imported)
-        // @param id    AssetID of the asset to check
-        // @return      true if the asset is registered, false otherwise
-        bool IsRegistered(AssetID id);
 
         // UnloadUnreferenced
         // Drops every cached asset nothing else references (Ref count = 1), repeated until nothing changes since freeing a Material/Mesh/UILayout
@@ -188,85 +127,78 @@ namespace Surge
         // @return      Number of assets unloaded
         Uint UnloadUnreferenced();
 
-        // Save
-        // Saves the asset to disk
-        // @param id    AssetID of the asset to save
-        // @return      false if the asset is not loaded/registered or its serializer failed
-        bool Save(AssetID id);
-
-        // UnregisterAsset
-        // Removes the asset from the registry
-        // @param id    AssetID of the asset to unregister
-        void UnregisterAsset(AssetID id);
+        bool IsLoaded(AssetID id) const;
+        bool IsRegistered(AssetID id) const;
 
         // GetIDFromPath
         // Returns the AssetID associated with a given relative path (hash lookup, the match is exact and case sensitive like the APK)
         // @param relativePath    Path to the asset relative to the assets directory
         // @return                AssetID of the asset, or UUID::INVALID if not found
-        AssetID GetIDFromPath(const String& relativePath);
+        AssetID GetIDFromPath(const String& relativePath) const;
 
-        // UpdateAssetPath
-        // Updates the relative path of an already registered asset. This is used when renaming/moving source files on disk.
-        // Refused if another asset is registered at newRelativePath
-        // @param id                 AssetID of the asset to update
-        // @param newRelativePath    New path relative to the assets directory
-        // serialize = false lets a batch (moving a folder) write the registry once at the end with SerializeRegistry()
-        void UpdateAssetPath(AssetID id, const String& newRelativePath, bool serialize = true);
-
-        const AssetMetadata& GetMetadata(AssetID id);
-        const String& GetAssetsDirectory() { return sAssetsDirectory; }
-        const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() { return mAssetRegistry; }
+        const AssetMetadata& GetMetadata(AssetID id) const;
+        const String& GetAssetsDirectory() const { return mAssetsDirectory; }
+        const std::unordered_map<AssetID, AssetMetadata>& GetRegistryMap() const { return mAssetRegistry; }
+        const AssetFormat* GetFormat(AssetType type) const;
 
         // GetAssetRefCount
         // Returns the current reference count of the asset, asset ref count = 1 means only the AssetManager is referencing it, and it can be safely unloaded if desired
-        // @param id    AssetID of the asset to check
-        // @return      Reference count of the asset, or 0 if the asset is not loaded
-        size_t GetAssetRefCount(AssetID id)
+        size_t GetAssetRefCount(AssetID id) const
         {
             auto it = mLoadedAssets.find(id);
-            if(it != mLoadedAssets.end())
-                return it->second->GetRefCount();
-            return 0;
+            return it != mLoadedAssets.end() ? it->second->GetRefCount() : 0;
         }
 
         // GetSidecarPath
-        // Returns the absolute/relative path to the sidecar file for a given asset file. The sidecar file is where the cooked runtime data is stored for an asset
-        // @param filePath    Relative/Absolute, but must include the file extension. The returned sidecar path will just have the sidecar extension
+        // Path of the cooked file of an asset: <assets directory>/Internal/<TYPE>/<id>.r<TYPE>
         // @param id          AssetID of the asset
-        // @param type        [Internal] Used for internal purposes, do NOT specify
-        String GetSidecarPath(AssetID id, AssetType type = AssetType::NONE);
+        // @param type        The asset's type when it is not registered yet, NONE = the registry's
+        String GetSidecarPath(AssetID id, AssetType type = AssetType::NONE) const;
 
-        // AddAssetLoadCallback
-        // Use this to add a callback function that will be called every time an asset is loaded
-        // @param hook An overriden class of AssetLoadCallback that implements the OnAssetLoad method.
-        //             The method will be called with the AssetID and AssetMetadata of the asset being loaded, and should return true if the asset should be 
-        //             reloaded from disk or false if it should not be reloaded
-        void AddAssetLoadCallback(Scope<AssetLoadCallback>&& hook) { mLoadCallback = std::move(hook); }
+        // Editor (AssetDatabase) side: in memory only, none of these touch the disk
 
-        // Registry
-        void SerializeRegistry();
-        bool DeserializeRegistry();
+        // Register
+        // Adds an asset to the registry, refused (false) when its ID or path is registered already
+        bool Register(const AssetMetadata& metadata);
 
-        // Utilities
-        String GetAbsolutePath(const String& relativePath) const { return sAssetsDirectory + '/' + relativePath; }
+        // Unregister
+        // Removes the asset from the registry (and from the cache when nothing else references it)
+        void Unregister(AssetID id);
+
+        // SetPath
+        // Moves a registered asset to another relative path (rename/move of its source), refused if another asset is registered there
+        bool SetPath(AssetID id, const String& newRelativePath);
+
+        // Adopt
+        // Caches an asset created in memory (a new scene, material...) as the loaded version of a registered asset and stamps its ID
+        void Adopt(AssetID id, Ref<Asset> asset);
+
+        // Invalidate
+        // Its cooked file changed on disk: the next Load reads it again. Holders of the old Ref keep using it until they load it again
+        void Invalidate(AssetID id);
+
+        // Clear
+        // Empties the registry and the cache (the Editor opens another project)
+        void Clear();
+
+        void SetCookHook(Scope<AssetCookHook>&& hook) { mCookHook = std::move(hook); }
+
     private:
         Ref<Asset> LoadAssetInternal(AssetID id, AssetMetadata* meta);
         AssetMetadata* GetMetadataForEdit(AssetID id);
-        String GetSidecarDirectory(AssetType type);
+        String GetSidecarDirectory(AssetType type) const;
+        void LoadCookedRegistry();
 
     private:
-        String sAssetsDirectory;
+        String mAssetsDirectory;
         std::unordered_map<AssetID, AssetMetadata> mAssetRegistry;
         std::unordered_map<String, AssetID> mPathToID; // Mirrors mAssetRegistry's RelativePaths, only the methods below may change either
         std::unordered_map<AssetID, Ref<Asset>> mLoadedAssets;
-        std::unordered_map<AssetType, Scope<AssetSerializer>> mSerializers;
-        Scope<AssetLoadCallback> mLoadCallback = nullptr;
+        std::unordered_map<AssetType, Scope<AssetFormat>> mFormats;
+        Scope<AssetCookHook> mCookHook = nullptr;
         AssetContext mContext;
 
         bool mInitialized = false;
-
-        static constexpr const char* kRegistryFilename = "AssetRegistry.surge";
-        static constexpr const char* kRegistryDelimiter = "|";
     };
 
 } // namespace Surge

@@ -236,6 +236,10 @@ namespace Surge::ScriptBinding
                                           "Active", BIND_PROP(CameraComponent, Active),
                                           "Primary", BIND_PROP(CameraComponent, Primary),
                                           "FixedAspectRatio", BIND_PROP(CameraComponent, FixedAspectRatio),
+                                          "FieldOfView", sol::property(
+                                              [](CameraComponent& c) { return c.Camera.GetPerspectiveVerticalFOV(); },
+                                              [](CameraComponent& c, float degrees) { c.Camera.SetPerspectiveVerticalFOV(glm::clamp(degrees, 1.0f, 170.0f)); }
+                                          ),
                                           STRICT_READ(CameraComponent));
 
         // Material Asset

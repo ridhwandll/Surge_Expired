@@ -78,6 +78,6 @@ target_compile_definitions(Surge
 add_custom_command(TARGET Surge POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         "${CMAKE_SOURCE_DIR}/Engine/Assets/"
-        "${CMAKE_SOURCE_DIR}/android/app/src/main/assets/Engine/Assets/"
-    COMMENT "Copying Engine/Assets directory to android Assets folder"
+        "${CMAKE_SOURCE_DIR}/Android/app/src/main/assets/Engine/Assets/"
+    COMMENT "Copying Engine/Assets directory to Android Assets folder"
 )

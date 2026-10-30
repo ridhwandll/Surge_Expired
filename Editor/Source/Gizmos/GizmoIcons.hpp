@@ -34,14 +34,14 @@ namespace Surge
         PLAY,
         STOP,
         PAUSE,
-        STEP
+        STEP,
+
+        ADD
     };
 
     // Vector glyphs built from ImDrawList primitives, crisp at any size & no texture assets to ship (pogchamp)
     namespace GizmoIcons
     {
-        constexpr ImU32 PARTICLES_COLOR = IM_COL32(90, 220, 245, 255);
-
         struct BadgeStyle
         {
             ImU32 Background;

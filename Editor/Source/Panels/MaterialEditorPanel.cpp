@@ -9,9 +9,9 @@
 
 #include "Editor.hpp"
 #include "Asset/AssetFileOps.hpp"
-#include "Asset/SourceWriters/MaterialSourceWriter.hpp"
+#include "Asset/AssetExtensions.hpp"
 #include "StatusBar/EditorStatusBar.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <imgui_stdlib.h>
 #include <imgui_internal.h>
@@ -76,25 +76,6 @@ namespace Surge
             return result;
         }
 
-        bool BeginProperties()
-        {
-            if(!ImGui::BeginTable("##Properties", 2, ImGuiTableFlags_SizingFixedFit))
-                return false;
-            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, LABEL_WIDTH);
-            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-            return true;
-        }
-
-        void LabelCell(const char* label, const char* tooltip = nullptr)
-        {
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            if(tooltip)
-                ImGuiAux::DelayedToolTip(tooltip);
-            ImGui::TableNextColumn();
-        }
-
         // One submesh using material slot 0, bounds are rebuilt by the Mesh
         MeshSpecification BuildPreviewSpec(MeshGenerator::MeshData&& data, const Ref<Material>& material)
         {
@@ -132,10 +113,9 @@ namespace Surge
 
         Path CreateMaterialFile(const Path& folder, const String& baseName, Ref<Material>& outMaterial)
         {
-            AssetManager* am = Core::GetAssetManager();
             Filesystem::CreateOrEnsureDirectories(folder);
             const Path path = AssetFileOps::MakeUnique(folder / (baseName + GetExtensionFromAssetType(AssetType::MATERIAL)));
-            outMaterial = am->Create<Material>(AssetFileOps::ToRelative(path), *Core::GetRenderer(), path.stem().string());
+            outMaterial = AssetDatabase::Get().Create<Material>(AssetFileOps::ToRelative(path), *Core::GetRenderer(), path.stem().string());
             return outMaterial ? path : Path();
         }
 
@@ -198,7 +178,7 @@ namespace Surge
         };
 
         if(mMaterial && mUnsaved)
-            ImGuiAux::ShowConfirmationBox("Unsaved Material", "The open material has unsaved changes.\nDiscard them and open the other material?", open);
+            EditorUI::ShowConfirmationBox("Unsaved Material", "The open material has unsaved changes.\nDiscard them and open the other material?", open);
         else
             open();
     }
@@ -221,7 +201,7 @@ namespace Surge
             };
 
             if(mMaterial && mUnsaved)
-                ImGuiAux::ShowConfirmationBox("Unsaved Material", "Discard the changes of the open material?", close);
+                EditorUI::ShowConfirmationBox("Unsaved Material", "Discard the changes of the open material?", close);
             else
                 close();
         });
@@ -276,14 +256,12 @@ namespace Surge
         if(!mMaterial || IsReadOnly())
             return;
 
-        AssetManager* am = Core::GetAssetManager();
-        const String& relativePath = am->GetMetadata(mMaterial->GetID()).RelativePath;
-        if(!MaterialSourceWriter::Write(mMaterial, am->GetAbsolutePath(relativePath)))
+        const String relativePath = Core::GetAssetManager()->GetMetadata(mMaterial->GetID()).RelativePath;
+        if(!AssetDatabase::Get().Save(mMaterial->GetID())) // The .smat source + the cooked material
         {
             EditorStatusBar::Get().Notify(Severity::Error, std::format("Failed to save {}", Filesystem::GetFilenameWithExt(relativePath)));
             return;
         }
-        am->Save(mMaterial->GetID());
 
         mSaved = TakeSnapshot();
         mUnsaved = false;
@@ -375,7 +353,7 @@ namespace Surge
         // Next to the mesh the material comes from, Assets/Materials when it is unknown
         Path folder = AssetFileOps::GetAssetsRoot() / "Materials";
         if(mOwnerMesh && mOwnerMesh->GetID())
-            folder = Path(am->GetAbsolutePath(am->GetMetadata(mOwnerMesh->GetID()).RelativePath)).parent_path();
+            folder = Path(AssetDatabase::Get().GetAbsolutePath(am->GetMetadata(mOwnerMesh->GetID()).RelativePath)).parent_path();
 
         Ref<Material> copy;
         const Path path = CreateMaterialFile(folder, MakeFileName(mMaterial->GetName()), copy);
@@ -391,15 +369,14 @@ namespace Surge
             copy->SetTexture(slot.Name, mMaterial->GetTexture(slot.Name));
         copy->MarkDirty();
 
-        MaterialSourceWriter::Write(copy, path.generic_string());
-        am->Save(copy->GetID());
+        AssetDatabase::Get().Save(copy->GetID());
 
         // The slot this was opened from now uses the copy, like dropping it on the Inspector slot
         if(mOwnerMesh && mOwnerSlot < mOwnerMesh->GetMaterials().size())
         {
             mOwnerMesh->SetMaterialOverride(mOwnerSlot, copy);
             if(mOwnerMesh->GetID())
-                am->Save(mOwnerMesh->GetID());
+                AssetDatabase::Get().Save(mOwnerMesh->GetID()); // Its .import, then a re-cook
         }
 
         RefreshContentBrowser();
@@ -464,21 +441,20 @@ namespace Surge
     {
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
         {
-            ImGuiAux::ScopedBoldFont bold(20.0f);
-            ImGuiAux::TextCentered("No material open");
+            EditorUI::ScopedBoldFont bold(20.0f);
+            EditorUI::TextCentered("No material open");
         }
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
         ImGui::TextWrapped("Double click a material in the Content Browser, click a material slot in the Inspector, drop a material on the button below, or create a new one.");
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
-        ImGuiAux::ScopedBoldFont bold;
+        EditorUI::ScopedBoldFont bold;
         if(ImGui::Button("Create New Material", ImVec2(-FLT_MIN, 40.0f)))
         {
             Ref<Material> material;
-            const Path path = CreateMaterialFile(AssetFileOps::GetAssetsRoot() / "Materials", "NewMaterial", material);
+            CreateMaterialFile(AssetFileOps::GetAssetsRoot() / "Materials", "NewMaterial", material);
             if(material)
             {
-                MaterialSourceWriter::Write(material, path.generic_string());
                 RefreshContentBrowser();
                 OpenMaterial(material);
             }
@@ -506,24 +482,24 @@ namespace Surge
         const String relativePath = readOnly ? String() : am->GetMetadata(mMaterial->GetID()).RelativePath;
         const String title = readOnly ? mMaterial->GetName() : Filesystem::GetFilenameWithExt(relativePath);
         {
-            ImGuiAux::ScopedBoldFont bold(18.0f);
+            EditorUI::ScopedBoldFont bold(18.0f);
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.0f, 1.0f), "%s%s", title.c_str(), mUnsaved ? " *" : "");
+            ImGui::TextColored(EditorUI::Colors::Accent, "%s%s", title.c_str(), mUnsaved ? " *" : "");
         }
         if(!relativePath.empty())
-            ImGuiAux::DelayedToolTip(relativePath.c_str());
+            EditorUI::DelayedToolTip(relativePath.c_str());
 
         if(!readOnly)
         {
             ImGui::SameLine();
             if(ImGui::Button("Save"))
                 Save();
-            ImGuiAux::DelayedToolTip("Ctrl+S");
+            EditorUI::DelayedToolTip("Ctrl+S");
 
             ImGui::SameLine();
             ImGui::BeginDisabled(!mUnsaved);
             if(ImGui::Button("Revert"))
-                ImGuiAux::ShowConfirmationBox("Revert Material", "Go back to the last saved state and drop every unsaved change?", [this]() {
+                EditorUI::ShowConfirmationBox("Revert Material", "Go back to the last saved state and drop every unsaved change?", [this]() {
                     Revert();
                     ResetDocument();
                 });
@@ -534,14 +510,14 @@ namespace Surge
             if(ImGui::Button("Undo"))
                 Undo();
             ImGui::EndDisabled();
-            ImGuiAux::DelayedToolTip("Ctrl+Z");
+            EditorUI::DelayedToolTip("Ctrl+Z");
 
             ImGui::SameLine();
             ImGui::BeginDisabled(mRedoStack.empty());
             if(ImGui::Button("Redo"))
                 Redo();
             ImGui::EndDisabled();
-            ImGuiAux::DelayedToolTip("Ctrl+Y / Ctrl+Shift+Z");
+            EditorUI::DelayedToolTip("Ctrl+Y / Ctrl+Shift+Z");
         }
 
         ImGui::SameLine();
@@ -554,13 +530,13 @@ namespace Surge
         AssetManager* am = Core::GetAssetManager();
         const String meshName = mOwnerMesh && mOwnerMesh->GetID() ? Filesystem::GetFilenameWithExt(am->GetMetadata(mOwnerMesh->GetID()).RelativePath) : String("a mesh file");
 
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.42f, 0.33f, 0.13f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorUI::Colors::AccentMuted);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
         if(ImGui::BeginChild("##ReadOnlyBanner", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding))
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.94f, 0.84f, 0.54f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::AccentSoft);
             {
-                ImGuiAux::ScopedBoldFont bold;
+                EditorUI::ScopedBoldFont bold;
                 ImGui::TextUnformatted("Read-only glTF material");
             }
             ImGui::PushTextWrapPos(0.0f);
@@ -570,7 +546,7 @@ namespace Surge
 
             if(ImGui::Button("Make Editable Copy"))
                 MakeEditableCopy();
-            ImGuiAux::DelayedToolTip(mOwnerMesh ? "Saves a .smat with the same values next to the mesh and uses it for this mesh slot"
+            EditorUI::DelayedToolTip(mOwnerMesh ? "Saves a .smat with the same values next to the mesh and uses it for this mesh slot"
                                                 : "Saves a .smat with the same values to Assets/Materials");
         }
         ImGui::EndChild();
@@ -584,10 +560,10 @@ namespace Surge
         ImGui::PushID(name);
         bool open = false;
         {
-            ImGuiAux::ScopedBoldFont bold;
+            EditorUI::ScopedBoldFont bold;
             open = ImGui::CollapsingHeader(name, ImGuiTreeNodeFlags_DefaultOpen);
         }
-        if(open && BeginProperties())
+        if(open && EditorUI::BeginPropertyTable("##Properties", LABEL_WIDTH))
             return true;
 
         ImGui::PopID();
@@ -605,9 +581,8 @@ namespace Surge
     {
         auto colorRow = [this](const char* label, const char* property, const char* tooltip = nullptr) {
             ImGui::PushID(property);
-            LabelCell(label, tooltip);
+            EditorUI::TLabel(label, tooltip);
             glm::vec3 value = mMaterial->Get<glm::vec3>(property);
-            ImGui::SetNextItemWidth(-FLT_MIN);
             if(ImGui::ColorEdit3("##v", &value.x, ImGuiColorEditFlags_Float))
             {
                 mMaterial->Set<glm::vec3>(property, value);
@@ -618,9 +593,8 @@ namespace Surge
 
         auto sliderRow = [this](const char* label, const char* property, const char* tooltip = nullptr) {
             ImGui::PushID(property);
-            LabelCell(label, tooltip);
+            EditorUI::TLabel(label, tooltip);
             float value = mMaterial->Get<float>(property);
-            ImGui::SetNextItemWidth(-FLT_MIN);
             if(ImGui::SliderFloat("##v", &value, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
             {
                 mMaterial->Set<float>(property, value);
@@ -653,9 +627,8 @@ namespace Surge
             colorRow("Color", "Emission", "Added on top of the lighting, black = no emission");
 
             ImGui::PushID("EmissionIntensity");
-            LabelCell("Intensity", "HDR multiplier, the result above the bloom threshold (1.0 by default) glows");
+            EditorUI::TLabel("Intensity", "HDR multiplier, the result above the bloom threshold (1.0 by default) glows");
             float intensity = mMaterial->Get<float>("EmissionIntensity");
-            ImGui::SetNextItemWidth(-FLT_MIN);
             if(ImGui::DragFloat("##v", &intensity, 0.05f, 0.0f, FLT_MAX, "%.2f", ImGuiSliderFlags_AlwaysClamp))
             {
                 mMaterial->Set<float>("EmissionIntensity", intensity);
@@ -737,7 +710,7 @@ namespace Surge
             {
                 const String fileName = Filesystem::GetFilenameWithExt(am->GetMetadata(texture->GetID()).RelativePath);
                 {
-                    ImGuiAux::ScopedBoldFont bold;
+                    EditorUI::ScopedBoldFont bold;
                     ImGui::TextUnformatted(fileName.c_str());
                 }
                 const ImageDesc& desc = rhi->GetDesc(texture->GetRHIImage());
@@ -754,13 +727,13 @@ namespace Surge
 
         if(ImGui::Button("Pick..."))
             OpenTexturePicker(slot);
-        ImGuiAux::DelayedToolTip("Choose from every texture in the project");
+        EditorUI::DelayedToolTip("Choose from every texture in the project");
         if(texture)
         {
             ImGui::SameLine();
             if(ImGui::Button("Remove"))
                 SetSlotTexture(slot, nullptr);
-            ImGuiAux::DelayedToolTip("Clears the slot and turns its Use flag off");
+            EditorUI::DelayedToolTip("Clears the slot and turns its Use flag off");
         }
 
         // Use flags: a map can stay assigned while the shader ignores it. Without a map they would only multiply by white
@@ -771,7 +744,7 @@ namespace Surge
                 mMaterial->Set<int>(flag, use ? 1 : 0);
                 MarkChanged();
             }
-            ImGuiAux::DelayedToolTip(tooltip);
+            EditorUI::DelayedToolTip(tooltip);
         };
         ImGui::BeginDisabled(!texture);
         if(info.SecondUseFlag)
@@ -828,7 +801,7 @@ namespace Surge
             entry.Name = relative.filename().string();
             entry.Folder = relative.parent_path().generic_string();
             entry.SearchKey = ToLower(metadata.RelativePath);
-            entry.AbsolutePath = am->GetAbsolutePath(metadata.RelativePath);
+            entry.AbsolutePath = AssetDatabase::Get().GetAbsolutePath(metadata.RelativePath);
             std::error_code error;
             entry.WriteTime = std::filesystem::last_write_time(entry.AbsolutePath, error);
         }
@@ -1026,7 +999,7 @@ namespace Surge
     void MaterialEditorPanel::DrawPreview()
     {
         {
-            ImGuiAux::ScopedBoldFont bold;
+            EditorUI::ScopedBoldFont bold;
             mPreviewOpen = ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen);
         }
         if(!mPreviewOpen)
@@ -1043,13 +1016,13 @@ namespace Surge
             ImGui::Image(static_cast<ImTextureID>(renderer->GetViewImGuiID(mView)), size);
         else
         {
-            ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(10, 10, 12, 255));
+            ImGui::GetWindowDrawList()->AddRectFilled(min, max, EditorUI::ToU32(EditorUI::Colors::Viewport::Clear));
             ImGui::Dummy(size);
         }
         const bool imageHovered = ImGui::IsItemHovered();
         const ImVec2 belowImage = ImGui::GetCursorScreenPos();
 
-        ImGui::GetWindowDrawList()->AddText(ImVec2(min.x + 6.0f, max.y - ImGui::GetTextLineHeight() - 4.0f), IM_COL32(200, 200, 200, 170),
+        ImGui::GetWindowDrawList()->AddText(ImVec2(min.x + 6.0f, max.y - ImGui::GetTextLineHeight() - 4.0f), EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Viewport::TextDim, 0.67f)),
                                             "LMB orbit  //  RMB rotate light  //  Wheel zoom  //  F reset");
 
         // Input item over the image: during a drag it is the active item and owns the mouse (the window doesn't move, other widgets don't react)
@@ -1082,7 +1055,7 @@ namespace Surge
     void MaterialEditorPanel::DrawPreviewToolbar(const ImVec2& min)
     {
         ImGui::SetCursorScreenPos(ImVec2(min.x + 4.0f, min.y + 4.0f));
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(15, 15, 15, 200));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Overlay);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 0.0f));
 
         for(Uint i = 0; i < static_cast<Uint>(PreviewShape::COUNT); i++)
@@ -1090,8 +1063,8 @@ namespace Surge
             const bool active = mPreviewShape == static_cast<PreviewShape>(i);
             if(active)
             {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImGuiAux::Colors::Selection);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiAux::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorUI::Colors::Selection);
             }
             if(ImGui::SmallButton(sShapeNames[i]) && !active)
             {
@@ -1109,8 +1082,8 @@ namespace Surge
         ImGui::SameLine();
         if(mAutoRotate)
         {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGuiAux::Colors::Selection);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiAux::Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorUI::Colors::Selection);
         }
         const bool toggleRotate = ImGui::SmallButton("Auto-Rotate");
         if(mAutoRotate)
@@ -1121,11 +1094,11 @@ namespace Surge
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(6.0f, 0.0f));
         ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 200));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorUI::Colors::Overlay);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, 0.0f)); // As tall as the small buttons
         ImGui::SetNextItemWidth(120.0f);
         ImGui::SliderFloat("##Ambient", &mAmbient, 0.0f, 3.0f, "Ambient %.2f", ImGuiSliderFlags_AlwaysClamp);
-        ImGuiAux::DelayedToolTip("Preview only: strength of the sky/ground fill light");
+        EditorUI::DelayedToolTip("Preview only: strength of the sky/ground fill light");
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
 

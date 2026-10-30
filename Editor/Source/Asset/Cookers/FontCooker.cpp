@@ -4,8 +4,8 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Core/Process.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/AssetStamp.hpp"
-#include "Surge/Asset/Serializer/Font/FontBinaryFormat.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/Font/FontFormat.hpp"
 #include "Surge/Graphics/HighLevel/Font.hpp"
 #include "AssetCooker.hpp"
 #include <json/json.hpp>
@@ -13,26 +13,13 @@
 
 namespace Surge
 {
-    CookResult FontCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool FontCooker::Cook(const CookContext& context) const
     {
-        AssetManager* am = Core::GetAssetManager();
-        CookResult result;
-        const String outputPath = am->GetSidecarPath(id);
+        if(!CookAtlas(context.SourcePath.generic_string(), context.OutputPath.generic_string(), context.Header, 512, 48, 8.0f))
+            return false;
 
-        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
-        if(!CookAtlas(sourceAbsPath, outputPath, stamp, 512, 48, 8.0f))
-        {
-            result.Success = false;
-            return result;
-        }
-
-        result.Success = true;
-        result.OutputPath = outputPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(outputPath);
-
-        Log<Severity::Info>("[FontCooker] Cooked: {}", outputPath);
-        return result;
+        Log<Severity::Info>("[FontCooker] Cooked: {}", context.OutputPath.string());
+        return true;
     }
 
     void FontCooker::CookEngineFontIfOutdated()
@@ -48,21 +35,24 @@ namespace Surge
         for(Byte byte : source)
             hash = (hash ^ byte) * 1099511628211ull;
 
-        AssetStamp stamp;
-        if(AssetStampWriter::Read(EngineFont::COOKED_PATH, stamp) && stamp.CookerVersion == ENGINE_FONT_VERSION && stamp.SourceModTime == hash)
+        // A content hash instead of the write time: a fresh clone (new write times) keeps the committed file
+        CookedHeader header;
+        if(CookedFileIO::ReadHeader(EngineFont::COOKED_PATH, header) && header.Type == AssetType::FONT && header.FormatVersion == FontBinary::VERSION &&
+           header.CookerVersion == ENGINE_FONT_VERSION && header.InputHash == hash)
             return;
 
-        stamp = {};
-        stamp.CookerVersion = ENGINE_FONT_VERSION;
-        stamp.SourceModTime = hash; // Content hash, see CookEngineFontIfOutdated
+        header = {};
+        header.Type = AssetType::FONT;
+        header.CookerVersion = ENGINE_FONT_VERSION;
+        header.InputHash = hash;
 
         // ASCII at 32 px fits a 384 atlas (~600 KB): small glyphs, the overlay draws at 11 - 17 UI units
         Filesystem::CreateOrEnsureDirectories(Filesystem::GetParentPath(EngineFont::COOKED_PATH));
-        if(CookAtlas(EngineFont::SOURCE_PATH, EngineFont::COOKED_PATH, stamp, 384, 32, 6.0f))
+        if(CookAtlas(EngineFont::SOURCE_PATH, EngineFont::COOKED_PATH, header, 384, 32, 6.0f))
             Log<Severity::Info>("[FontCooker] Cooked the engine UI font: {} (commit it)", EngineFont::COOKED_PATH);
     }
 
-    bool FontCooker::CookAtlas(const String& sourcePath, const String& outputPath, const AssetStamp& stamp, Uint atlasSize, Uint glyphSize, float pxRange)
+    bool FontCooker::CookAtlas(const String& sourcePath, const String& outputPath, const CookedHeader& header, Uint atlasSize, Uint glyphSize, float pxRange)
     {
         const String msdfAtlasGenExe = FindMSDFAtlasGenExe();
 
@@ -139,7 +129,9 @@ namespace Surge
         spec.Height = texSpec.Height;
 
         // Pack runtime file
-        const bool written = FontBinary::Write(outputPath, stamp, spec);
+        Rapt0R::Writer payload(sizeof(FontGlyph) * spec.Glyphs.size() * 2 + spec.UncompressedData.size() + 256);
+        FontBinary::Write(payload, spec);
+        const bool written = !payload.HasError() && CookedFileIO::Write(outputPath, header, FontBinary::VERSION, payload.WrittenSpan());
 
         Texture2DCooker::FreeLoadedSource(texSpec);
         Filesystem::RemoveFile(tempJson);

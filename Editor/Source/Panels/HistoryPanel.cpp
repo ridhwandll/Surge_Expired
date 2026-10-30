@@ -2,7 +2,7 @@
 #include "Panels/HistoryPanel.hpp"
 #include "Surge/Core/Core.hpp"
 #include "History/EditorHistory.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Editor.hpp"
 
 #include <imgui.h>
@@ -27,7 +27,7 @@ namespace Surge
 
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
             {
-                ImGuiAux::ScopedBoldFont font;
+                EditorUI::ScopedBoldFont font;
                 ImGui::BeginDisabled(playing || !history.CanUndo());
                 if(ImGui::Button("UNDO"))
                     editor->RequestUndo();
@@ -43,7 +43,7 @@ namespace Surge
             ImGui::TextDisabled("%zu / %zu steps", history.GetSize(), EditorHistory::MAX_STEPS);
 
             if(playing)
-                ImGui::TextColored(ImGuiAux::Colors::Red, "Runtime changes are not recorded; UNDO/REDO will NOT work.");
+                ImGui::TextColored(EditorUI::Colors::Error, "Runtime changes are not recorded; UNDO/REDO will NOT work.");
 
             ImGui::Separator();
 
@@ -61,9 +61,9 @@ namespace Surge
 
                     ImGui::PushID(static_cast<int>(row));
                     if(isRedoable)
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::Tone45);
                     if(isCurrent)
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::Green);
+                        ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::Success);
 
                     if(ImGui::Selectable(label, isCurrent, ImGuiSelectableFlags_AllowOverlap) && !isCurrent && !playing)
                         editor->RequestHistoryJump(row);
@@ -76,8 +76,8 @@ namespace Surge
                     if(history.IsSavedPosition(row))
                     {
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("SAVED").x);
-                        ImGuiAux::ScopedBoldFont font;
-                        ImGui::TextColored(ImGuiAux::Colors::LightGreen, "SAVED");
+                        EditorUI::ScopedBoldFont font;
+                        ImGui::TextColored(EditorUI::Scale(EditorUI::Colors::Success, 0.8f), "SAVED");
                     }
 
                     if(isCurrent && positionChanged)

@@ -6,7 +6,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "SurgeMath/Math.hpp"
 #include "Editor.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Gizmos/GizmoIcons.hpp"
 
 #include <ImGuizmo.h>
@@ -36,24 +36,24 @@ namespace Surge
         style.OutlineThickness = 1.25f;
         style.InfoRounding = 4.0f;
 
-        style.Colors[ImGuizmo::COLOR::DIRECTION_X] = ImVec4(0.984f, 0.200f, 0.200f, 0.95f);
-        style.Colors[ImGuizmo::COLOR::PLANE_X] = ImVec4(0.984f, 0.200f, 0.200f, 0.25f);
+        style.Colors[ImGuizmo::COLOR::DIRECTION_X] = EditorUI::WithAlpha(EditorUI::Colors::AxisX, 0.95f);
+        style.Colors[ImGuizmo::COLOR::PLANE_X] = EditorUI::WithAlpha(EditorUI::Colors::AxisX, 0.25f);
 
-        style.Colors[ImGuizmo::COLOR::DIRECTION_Y] = ImVec4(0.553f, 0.831f, 0.000f, 0.95f);
-        style.Colors[ImGuizmo::COLOR::PLANE_Y] = ImVec4(0.553f, 0.831f, 0.000f, 0.25f);
+        style.Colors[ImGuizmo::COLOR::DIRECTION_Y] = EditorUI::WithAlpha(EditorUI::Colors::AxisY, 0.95f);
+        style.Colors[ImGuizmo::COLOR::PLANE_Y] = EditorUI::WithAlpha(EditorUI::Colors::AxisY, 0.25f);
 
-        style.Colors[ImGuizmo::COLOR::DIRECTION_Z] = ImVec4(0.137f, 0.565f, 1.000f, 0.95f);
-        style.Colors[ImGuizmo::COLOR::PLANE_Z] = ImVec4(0.137f, 0.565f, 1.000f, 0.25f);
+        style.Colors[ImGuizmo::COLOR::DIRECTION_Z] = EditorUI::WithAlpha(EditorUI::Colors::AxisZ, 0.95f);
+        style.Colors[ImGuizmo::COLOR::PLANE_Z] = EditorUI::WithAlpha(EditorUI::Colors::AxisZ, 0.25f);
 
-        style.Colors[ImGuizmo::COLOR::SELECTION] = ImVec4(1.000f, 0.659f, 0.000f, 1.00f);
-        style.Colors[ImGuizmo::COLOR::TRANSLATION_LINE] = ImVec4(1.000f, 0.659f, 0.000f, 1.00f);
-        style.Colors[ImGuizmo::COLOR::ROTATION_USING_BORDER] = ImVec4(1.000f, 0.659f, 0.000f, 1.00f);
-        style.Colors[ImGuizmo::COLOR::ROTATION_USING_FILL] = ImVec4(1.000f, 0.659f, 0.000f, 0.25f);
-        style.Colors[ImGuizmo::COLOR::SCALE_LINE] = ImVec4(0.450f, 0.450f, 0.450f, 0.70f);
-        style.Colors[ImGuizmo::COLOR::INACTIVE] = ImVec4(0.600f, 0.600f, 0.600f, 0.60f);
-        style.Colors[ImGuizmo::COLOR::OUTLINE] = ImVec4(0.000f, 0.000f, 0.000f, 0.55f);
-        style.Colors[ImGuizmo::COLOR::INFO_BACKGROUND] = ImVec4(0.060f, 0.060f, 0.060f, 0.85f);
-        style.Colors[ImGuizmo::COLOR::TEXT] = ImVec4(0.920f, 0.920f, 0.920f, 1.00f);
+        style.Colors[ImGuizmo::COLOR::SELECTION] = EditorUI::Colors::Accent;
+        style.Colors[ImGuizmo::COLOR::TRANSLATION_LINE] = EditorUI::Colors::Accent;
+        style.Colors[ImGuizmo::COLOR::ROTATION_USING_BORDER] = EditorUI::Colors::Accent;
+        style.Colors[ImGuizmo::COLOR::ROTATION_USING_FILL] = EditorUI::WithAlpha(EditorUI::Colors::Accent, 0.25f);
+        style.Colors[ImGuizmo::COLOR::SCALE_LINE] = EditorUI::WithAlpha(EditorUI::Colors::Viewport::TextFaint, 0.7f);
+        style.Colors[ImGuizmo::COLOR::INACTIVE] = EditorUI::WithAlpha(EditorUI::Colors::Viewport::Inactive, 0.6f);
+        style.Colors[ImGuizmo::COLOR::OUTLINE] = EditorUI::WithAlpha(EditorUI::Colors::Black, 0.55f);
+        style.Colors[ImGuizmo::COLOR::INFO_BACKGROUND] = EditorUI::WithAlpha(EditorUI::Colors::Viewport::Shade, 0.85f);
+        style.Colors[ImGuizmo::COLOR::TEXT] = EditorUI::Colors::Viewport::Text;
     }
 
     void SceneViewport::ApplySettings(const ViewportSettings& settings)
@@ -247,19 +247,19 @@ namespace Surge
         auto toggleButton = [](const char* label, bool active, const char* tooltip) -> bool {
             if(active)
             {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImGuiAux::Colors::Selection);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiAux::Colors::Selection);
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorUI::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::Ink);
             }
             const bool pressed = ImGui::Button(label);
             if(active)
                 ImGui::PopStyleColor(3);
-            ImGuiAux::ItemTooltip(tooltip);
+            EditorUI::ItemTooltip(tooltip);
             return pressed;
         };
 
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(15, 15, 15, 200));
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 200));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Overlay);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorUI::Colors::Overlay);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 0.0f));
 
         // Tool icons, square-ish frame height buttons
@@ -270,19 +270,19 @@ namespace Surge
             const bool active = settings.GizmoOperation == tool.Operation;
             if(active)
             {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImGuiAux::Colors::Selection);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiAux::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorUI::Colors::Selection);
             }
 
             ImGui::PushID(tool.Operation);
-            const ImVec4 tint = active ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.85f, 0.85f, 0.85f, 1.0f);
+            const ImVec4 tint = active ? EditorUI::Colors::Ink : EditorUI::Colors::Tone85;
             if(GizmoIcons::IconButton("##Tool", rhi->GetImGuiImage(editor->GetToolIcon(tool.Icon)), toolButtonSize, tint, 0.9f))
                 settings.GizmoOperation = tool.Operation;
             ImGui::PopID();
 
             if(active)
                 ImGui::PopStyleColor(2);
-            ImGuiAux::ItemTooltip(tool.Tooltip);
+            EditorUI::ItemTooltip(tool.Tooltip);
             ImGui::SameLine();
         }
 
@@ -304,7 +304,7 @@ namespace Surge
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(2);
 
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(ImGui::BeginPopup("SnapSettingsPopup"))
         {
             ImGui::SetNextItemWidth(120.0f);
@@ -336,7 +336,7 @@ namespace Surge
                 mCamera.SetView(mCamera.GetFocalPoint(), mCamera.GetDistance(), 0.0f, glm::half_pi<float>());
             ImGui::EndPopup();
         }
-        ImGuiAux::StyledPopupVars::Pop();
+        EditorUI::StyledPopupVars::Pop();
     }
 
 } // namespace Surge

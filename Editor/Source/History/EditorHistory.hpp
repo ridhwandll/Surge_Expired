@@ -30,7 +30,7 @@ namespace Surge
     /*
      * Scene Undo/Redo (Edit mode only)
      * - Create, delete, duplicate, paste, reparent are pushed explicitly as commands by the Editor
-     * - Property edits are picked up automatically: the selected entity is snapshotted (SceneSerializer::EntityToJson) and when an interaction
+     * - Property edits are picked up automatically: the selected entity is snapshotted (SceneSourceIO::EntityToJson) and when an interaction
      *   ends (mouse released, widget deactivated) the snapshot is compared against the live entity, a difference becomes one undo step.
      *   Every Inspector field, the gizmo and Add/Remove Component are undoable this way without the widgets knowing about the history,
      *   and a whole drag/typing session merges into a single step

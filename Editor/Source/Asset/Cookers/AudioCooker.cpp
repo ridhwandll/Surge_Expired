@@ -1,22 +1,22 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AudioCooker.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/Audio/AudioFormat.hpp"
 #include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Core/Core.hpp"
 
 namespace Surge
 {
-    CookResult AudioCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool AudioCooker::Cook(const CookContext& context) const
     {
-        CookResult result;
-        AssetManager* am = Core::GetAssetManager();
-        const String outputPath = am->GetSidecarPath(id, AssetType::AUDIO);
-
-        // The encoded file is kept as is behind the stamp, AudioEngine decodes/streams it at runtime
-        result.Success = AudioBinary::Write(outputPath, AssetStampWriter::Build(sourceAbsPath, GetCookerVersion()), sourceAbsPath);
-        result.OutputPath = outputPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(outputPath);
-        return result;
+        // The encoded file is kept as is, the AudioEngine decodes/streams it at runtime
+        Vector<Byte> source;
+        if(!Filesystem::ReadBinaryFile(context.SourcePath, source) || source.empty())
+        {
+            Log<Severity::Error>("[AudioCooker] Failed to read {}", context.SourcePath.string());
+            return false;
+        }
+        Rapt0R::Writer payload(source.size());
+        AudioBinary::Write(payload, source);
+        return context.Write(AudioBinary::VERSION, payload);
     }
 }

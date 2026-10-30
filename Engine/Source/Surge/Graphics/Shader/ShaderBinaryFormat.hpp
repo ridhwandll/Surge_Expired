@@ -6,19 +6,9 @@
 namespace Surge::ShaderBinary
 {
     // Engine shaders, compiled by the Editor's ShaderCompiler: SPIR-V of every stage + its reflection, loaded as is on every platform
-    // Layout: Header, include list, stages (type + SPIR-V words), ShaderReflectionData
+    // Layout: Magic, Version, SourceHash, Stages, include list, stages (type + SPIR-V words), ShaderReflectionData (Rapt0R)
     constexpr Uint MAGIC = 0x52444853; // SHDR
-    constexpr Uint VERSION = 1;
-
-    struct Header
-    {
-        Uint Magic = MAGIC;
-        Uint Version = VERSION;
-        uint64_t SourceHash = 0;
-        Uint Stages = 0;
-        Uint IncludeCount = 0;
-    };
-    static_assert(sizeof(Header) == 24);
+    constexpr Uint VERSION = 2;        // 2: Rapt0R format
 
     struct CookedShader
     {

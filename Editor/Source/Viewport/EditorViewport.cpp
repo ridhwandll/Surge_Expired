@@ -9,6 +9,7 @@
 #include "Panels/ContentBrowserPanel.hpp"
 #include "Panels/UIEditorPanel.hpp"
 #include "Panels/ParticleEditorPanel.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <format>
 
@@ -85,7 +86,7 @@ namespace Surge
 
             mContentMin = ImGui::GetCursorScreenPos();
             mContentSize = ImGui::GetContentRegionAvail();
-            ImGui::GetWindowDrawList()->AddRectFilled(mContentMin, ImVec2(mContentMin.x + mContentSize.x, mContentMin.y + mContentSize.y), IM_COL32(16, 16, 16, 255)); // Letterbox
+            ImGui::GetWindowDrawList()->AddRectFilled(mContentMin, ImVec2(mContentMin.x + mContentSize.x, mContentMin.y + mContentSize.y), EditorUI::ToU32(EditorUI::Colors::Tone06)); // Letterbox
 
             ImVec2 offset = { 0.0f, 0.0f };
             ImVec2 size = mContentSize;
@@ -160,15 +161,15 @@ namespace Surge
     void EditorViewport::DrawCornerLabel(const char* text, const ImVec2& imageMin, const ImVec2& imageSize) const
     {
         constexpr float padding = 3.0f;
-        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]); // Bold
+        ImGui::PushFont(EditorUI::BoldFont());
         const float textHeight = ImGui::GetTextLineHeight();
         const float textWidth = ImGui::CalcTextSize(text).x;
 
         const ImVec2 bgMax(imageMin.x + imageSize.x - padding, imageMin.y + padding + textHeight + padding * 2.0f);
         const ImVec2 bgMin(bgMax.x - textWidth - padding * 2.0f, imageMin.y + padding);
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        drawList->AddRectFilled(bgMin, bgMax, IM_COL32(15, 15, 15, 200), 4.0f);
-        drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), IM_COL32(230, 230, 230, 255), text);
+        drawList->AddRectFilled(bgMin, bgMax, EditorUI::ToU32(EditorUI::Colors::Overlay), 4.0f);
+        drawList->AddText(ImVec2(bgMin.x + padding, bgMin.y + padding), EditorUI::ToU32(EditorUI::Colors::Tone90), text);
         ImGui::PopFont();
     }
 

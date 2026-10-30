@@ -7,6 +7,7 @@
 #include "Editor.hpp"
 #include "Panels/UIEditorPanel.hpp"
 #include "Settings/EditorSettings.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <cstdio>
 #include <iterator>
@@ -121,7 +122,7 @@ namespace Surge
             // Unsafe bands, what a notch / the system bars would cover
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 imageMax = { imageMin.x + imageSize.x, imageMin.y + imageSize.y };
-            const ImU32 color = IM_COL32(255, 70, 70, 45);
+            const ImU32 color = EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Error, 0.18f));
             drawList->AddRectFilled(imageMin, { imageMin.x + imageSize.x * safeInsets.x, imageMax.y }, color);
             drawList->AddRectFilled(imageMin, { imageMax.x, imageMin.y + imageSize.y * safeInsets.y }, color);
             drawList->AddRectFilled({ imageMax.x - imageSize.x * safeInsets.z, imageMin.y }, imageMax, color);
@@ -137,23 +138,23 @@ namespace Surge
             const float centerX = imageMin.x + imageSize.x * 0.5f;
             const float centerY = imageMin.y + imageSize.y * 0.5f;
 
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1], 20.0f);
+            ImGui::PushFont(EditorUI::BoldFont(), 20.0f);
             const ImVec2 titleSize = ImGui::CalcTextSize(title);
-            drawList->AddText(ImVec2(std::floor(centerX - titleSize.x * 0.5f), std::floor(centerY - titleSize.y)), IM_COL32(200, 200, 200, 255), title);
+            drawList->AddText(ImVec2(std::floor(centerX - titleSize.x * 0.5f), std::floor(centerY - titleSize.y)), EditorUI::ToU32(EditorUI::Colors::Viewport::TextDim), title);
             ImGui::PopFont();
             const ImVec2 hintSize = ImGui::CalcTextSize(hint);
-            drawList->AddText(ImVec2(std::floor(centerX - hintSize.x * 0.5f), std::floor(centerY + 6.0f)), IM_COL32(130, 130, 130, 255), hint);
+            drawList->AddText(ImVec2(std::floor(centerX - hintSize.x * 0.5f), std::floor(centerY + 6.0f)), EditorUI::ToU32(EditorUI::Colors::Viewport::TextFaint), hint);
         }
 
         // Toolbar: aspect preset left, output resolution right
         const ImVec2 contentMin = mContentMin;
         const float contentWidth = mContentSize.x;
         const float toolbarHeight = ToolbarHeight();
-        ImGui::GetWindowDrawList()->AddRectFilled(contentMin, ImVec2(contentMin.x + contentWidth, contentMin.y + toolbarHeight), IM_COL32(24, 24, 24, 255));
+        ImGui::GetWindowDrawList()->AddRectFilled(contentMin, ImVec2(contentMin.x + contentWidth, contentMin.y + toolbarHeight), EditorUI::ToU32(EditorUI::Colors::Tone09));
 
         ImGui::SetCursorScreenPos(ImVec2(contentMin.x + 4.0f, contentMin.y + 3.0f));
         ImGui::SetNextItemWidth(150.0f);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 255));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorUI::Colors::Tone06);
         if(ImGui::BeginCombo("##Aspect", ASPECT_PRESETS[mAspectMode].Name))
         {
             for(int i = 0; i < ASPECT_PRESET_COUNT; i++)
@@ -187,7 +188,7 @@ namespace Surge
         char resolution[48];
         std::snprintf(resolution, sizeof(resolution), "%d x %d", static_cast<int>(imageSize.x), static_cast<int>(imageSize.y));
         const float textWidth = ImGui::CalcTextSize(resolution).x;
-        ImGui::GetWindowDrawList()->AddText(ImVec2(contentMin.x + contentWidth - textWidth - 8.0f, contentMin.y + (toolbarHeight - ImGui::GetTextLineHeight()) * 0.5f), IM_COL32(140, 140, 140, 255), resolution);
+        ImGui::GetWindowDrawList()->AddText(ImVec2(contentMin.x + contentWidth - textWidth - 8.0f, contentMin.y + (toolbarHeight - ImGui::GetTextLineHeight()) * 0.5f), EditorUI::ToU32(EditorUI::Colors::TextMuted), resolution);
     }
 
 } // namespace Surge

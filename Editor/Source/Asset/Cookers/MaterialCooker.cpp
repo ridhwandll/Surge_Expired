@@ -1,31 +1,21 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "MaterialCooker.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/Material/MaterialBinaryFormat.hpp"
-#include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/Material/MaterialFormat.hpp"
 
-#include "Asset/SourceWriters/MaterialSourceWriter.hpp"
+#include "Asset/SourceIO/MaterialSourceWriter.hpp"
 
 namespace Surge
 {
-    CookResult MaterialCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool MaterialCooker::Cook(const CookContext& context) const
     {
-        AssetManager* am = Core::GetAssetManager();
-        const String sidecarPath = am->GetSidecarPath(id);
-
         Ref<Material> material = Material::Create(*Core::GetRenderer(), "MaterialCooker::Cook");
-        MaterialSourceWriter::Read(material, sourceAbsPath);
+        if(!MaterialSourceWriter::Read(material, context.SourcePath.generic_string()))
+            Log<Severity::Warn>("[MaterialCooker] Could not read {}, cooking the default material", context.SourcePath.string());
 
-        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
-
-        bool success = MaterialBinary::Write(sidecarPath, stamp, material);
-
-        CookResult result;
-        result.Success = success;
-        result.OutputPath = sidecarPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(sidecarPath);
-        return result;
+        Rapt0R::Writer payload(1024);
+        MaterialBinary::Write(payload, material.Raw());
+        return context.Write(MaterialBinary::VERSION, payload);
     }
 }

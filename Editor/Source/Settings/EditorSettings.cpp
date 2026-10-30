@@ -2,6 +2,7 @@
 #include "Settings/EditorSettings.hpp"
 #include "Export/ExportSettingsIO.hpp"
 #include "Surge/Core/Logger/Logger.hpp"
+#include "Surge/Utility/Platform.hpp"
 #include <json/json.hpp>
 #include <algorithm>
 #include <array>
@@ -160,6 +161,30 @@ namespace Surge
         ContentBrowser.SortField = glm::clamp(ContentBrowser.SortField, 0, 3);
         ContentBrowser.FolderTreeWidth = glm::clamp(ContentBrowser.FolderTreeWidth, 120.0f, 800.0f);
         ContentBrowser.DrawerHeight = glm::clamp(ContentBrowser.DrawerHeight, 0.2f, 0.9f);
+    }
+
+    EditorPreferences EditorPreferences::Load()
+    {
+        EditorPreferences preferences;
+        const Path path = Path(Platform::GetPersistantStoragePath()) / FILE_NAME;
+        String text;
+        if(!Filesystem::Exists(path) || !Filesystem::ReadTextFile(path, text))
+            return preferences;
+
+        const nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
+        String theme;
+        ExportSettingsIO::Read(j, "Theme", theme);
+        preferences.LightTheme = theme == "Light";
+        return preferences;
+    }
+
+    void EditorPreferences::Save() const
+    {
+        nlohmann::json j;
+        j["Theme"] = LightTheme ? "Light" : "Dark";
+        const Path path = Path(Platform::GetPersistantStoragePath()) / FILE_NAME;
+        if(!Filesystem::WriteTextFile(path, j.dump(4)))
+            Log<Severity::Warn>("[Editor] Could not write {}", path.string());
     }
 
     void EditorSettingsStore::Load(const Path& projectDir, EditorSettings& outSettings)

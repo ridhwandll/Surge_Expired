@@ -69,6 +69,17 @@ namespace Surge
         void FromString(const String& text); // Unknown/missing/mistyped keys keep their defaults
     };
 
+    // Editor wide preferences, shared by every project (<PersistentStorage>/EditorPreferences.json)
+    struct EditorPreferences
+    {
+        static constexpr const char* FILE_NAME = "EditorPreferences.json";
+
+        bool LightTheme = false;
+
+        static EditorPreferences Load(); // Defaults when the file is missing or broken
+        void Save() const;
+    };
+
     // Reads/writes EditorSettings next to the project file, the file is only touched when something changed
     class EditorSettingsStore
     {

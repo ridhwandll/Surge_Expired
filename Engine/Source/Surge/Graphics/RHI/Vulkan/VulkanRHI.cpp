@@ -13,6 +13,7 @@
 
 #include "Surge/Core/Logger/Logger.hpp"
 #include "Surge/Utility/Platform.hpp"
+#include "Surge/Core/Raptor/Reader.hpp"
 #include <cstdio>
 #include <chrono>
 
@@ -1342,14 +1343,10 @@ namespace Surge
         VkPhysicalDeviceProperties props = {};
         vkGetPhysicalDeviceProperties(mDevice.GetGPU(), &props);
 
-        bool valid = data.size() > sizeof(VkPipelineCacheHeaderVersionOne);
-        if(valid)
-        {
-            VkPipelineCacheHeaderVersionOne header = {};
-            memcpy(&header, data.data(), sizeof(header));
-            valid = header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE && header.vendorID == props.vendorID &&
-                    header.deviceID == props.deviceID && memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) == 0;
-        }
+        VkPipelineCacheHeaderVersionOne header = {};
+        Rapt0R::Reader reader(data.data(), data.size());
+        const bool valid = data.size() > sizeof(header) && reader.Read(header) && header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE &&
+                           header.vendorID == props.vendorID && header.deviceID == props.deviceID && memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) == 0;
 
         VkPipelineCacheCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;

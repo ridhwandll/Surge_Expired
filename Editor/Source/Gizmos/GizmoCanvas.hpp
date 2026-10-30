@@ -29,7 +29,6 @@ namespace Surge
         const glm::vec3& GetCameraPosition() const { return mCameraPosition; }
         float GetNearClip() const { return mNearClip; }
 
-        static ImU32 ScaleAlpha(ImU32 color, float factor);
         static void GetPerpendicularBasis(const glm::vec3& n, glm::vec3& outU, glm::vec3& outV);
 
     private:

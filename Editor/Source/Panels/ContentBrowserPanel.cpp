@@ -13,14 +13,15 @@
 
 #include "Editor.hpp"
 #include "Asset/AssetFileOps.hpp"
-#include "Asset/SourceWriters/MaterialSourceWriter.hpp"
-#include "Asset/SourceWriters/ScriptSourceWriter.hpp"
+#include "Asset/AssetDatabase.hpp"
+#include "Asset/AssetExtensions.hpp"
+#include "Asset/SourceIO/ScriptSourceWriter.hpp"
 #include "Panels/MaterialEditorPanel.hpp"
 #include "Panels/UIEditorPanel.hpp"
 #include "Panels/ParticleEditorPanel.hpp"
 #include "Panels/EditorTitleBar.hpp"
 #include "StatusBar/EditorStatusBar.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <imgui_internal.h>
 #include <imgui_stdlib.h>
@@ -32,6 +33,8 @@
 
 namespace Surge
 {
+    namespace Colors = EditorUI::Colors;
+
     namespace fs = std::filesystem;
 
     static constexpr float TILE_PADDING = 6.0f;
@@ -63,20 +66,19 @@ namespace Surge
     {
         switch(type)
         {
-            case AssetType::TEXTURE2D: return ImVec4(0.90f, 0.36f, 0.36f, 1.0f);
-            case AssetType::SPRITE: return ImVec4(0.95f, 0.50f, 0.70f, 1.0f);
-            case AssetType::MESH: return ImVec4(0.30f, 0.70f, 0.98f, 1.0f);
-            case AssetType::MATERIAL: return ImVec4(0.42f, 0.82f, 0.38f, 1.0f);
-            case AssetType::SCENE: return ImVec4(1.00f, 0.62f, 0.18f, 1.0f);
-            case AssetType::SCRIPT: return ImVec4(0.96f, 0.84f, 0.30f, 1.0f);
-            case AssetType::FONT: return ImVec4(0.85f, 0.85f, 0.85f, 1.0f);
-            case AssetType::AUDIO: return ImVec4(0.30f, 0.86f, 0.76f, 1.0f);
-            case AssetType::UI_LAYOUT: return ImVec4(0.42f, 0.58f, 1.00f, 1.0f);
-            case AssetType::PARTICLE_EFFECT: return ImVec4(0.35f, 0.86f, 0.96f, 1.0f);
-            default: return ImVec4(0.45f, 0.45f, 0.45f, 1.0f);
+            case AssetType::TEXTURE2D: return Colors::Asset::Texture;
+            case AssetType::SPRITE: return Colors::Asset::Sprite;
+            case AssetType::MESH: return Colors::Asset::Mesh;
+            case AssetType::MATERIAL: return Colors::Asset::Material;
+            case AssetType::SCENE: return Colors::Asset::Scene;
+            case AssetType::SCRIPT: return Colors::Asset::Script;
+            case AssetType::FONT: return Colors::Asset::Font;
+            case AssetType::AUDIO: return Colors::Asset::Audio;
+            case AssetType::UI_LAYOUT: return Colors::Asset::UILayout;
+            case AssetType::PARTICLE_EFFECT: return Colors::Asset::ParticleEffect;
+            default: return Colors::Asset::Unknown;
         }
     }
-    static constexpr ImVec4 FOLDER_COLOR = ImVec4(0.86f, 0.70f, 0.36f, 1.0f);
 
     static const char* GetTypeLabel(AssetType type)
     {
@@ -123,11 +125,6 @@ namespace Surge
         return buffer;
     }
 
-    static ImU32 WithAlpha(const ImVec4& color, float alpha)
-    {
-        return ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, color.w * alpha));
-    }
-
     // p is 'from' or below it: the same place below 'to'
     static bool Rebase(Path& path, const Path& from, const Path& to)
     {
@@ -136,105 +133,6 @@ namespace Surge
         const Path relative = path.lexically_normal().lexically_relative(from.lexically_normal());
         path = (relative == "." ? to : to / relative).lexically_normal();
         return true;
-    }
-
-    // Up to two centered lines, the last one ends with "..." when the text doesn't fit
-    static void DrawWrappedLabel(ImDrawList* drawList, const String& text, ImVec2 pos, float width, ImU32 color)
-    {
-        constexpr int maxLines = 2;
-        const float lineHeight = ImGui::GetTextLineHeight();
-        const char* cursor = text.c_str();
-        const char* end = cursor + text.size();
-
-        for(int line = 0; line < maxLines && cursor < end; line++)
-        {
-            const bool lastLine = line == maxLines - 1;
-            const char* lineEnd = end;
-            if(ImGui::CalcTextSize(cursor, end).x > width)
-            {
-                // Longest prefix that fits, preferably broken after a separator
-                const float available = lastLine ? width - ImGui::CalcTextSize("...").x : width;
-                lineEnd = cursor;
-                while(lineEnd < end)
-                {
-                    const char* next = lineEnd + 1;
-                    while(next < end && (static_cast<unsigned char>(*next) & 0xC0) == 0x80)
-                        next++; // Whole UTF-8 sequences
-                    if(ImGui::CalcTextSize(cursor, next).x > available)
-                        break;
-                    lineEnd = next;
-                }
-                if(lineEnd == cursor)
-                    lineEnd = cursor + 1;
-
-                if(!lastLine)
-                {
-                    for(const char* breakAt = lineEnd; breakAt > cursor + 1; breakAt--)
-                    {
-                        const char c = *(breakAt - 1);
-                        if(c == ' ' || c == '_' || c == '-' || c == '.')
-                        {
-                            lineEnd = breakAt;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            String lineText(cursor, lineEnd);
-            if(lastLine && lineEnd < end)
-                lineText += "...";
-            const float lineWidth = ImGui::CalcTextSize(lineText.c_str()).x;
-            drawList->AddText(ImVec2(pos.x + std::max(0.0f, (width - lineWidth) * 0.5f), pos.y), color, lineText.c_str());
-
-            cursor = lineEnd;
-            while(cursor < end && *cursor == ' ')
-                cursor++;
-            pos.y += lineHeight;
-        }
-    }
-
-    // Small rounded label drawn over thumbnails, horizontally centered on centerX. anchorBottom: y is the badge's bottom edge, otherwise its top.
-    // The font shrinks when the badge would be wider than maxWidth (small thumbnails)
-    static void DrawBadge(ImDrawList* drawList, float centerX, float y, bool anchorBottom, float maxWidth, const char* text, ImU32 background, ImU32 textColor)
-    {
-        constexpr float paddingX = 4.0f;
-        constexpr float paddingY = 2.0f;
-        ImFont* font = ImGui::GetIO().Fonts->Fonts[1];
-
-        float fontSize = 15.0f;
-        ImVec2 textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
-        if(textSize.x + paddingX * 2.0f > maxWidth && textSize.x > 0.0f)
-        {
-            fontSize = std::max(8.0f, fontSize * (maxWidth - paddingX * 2.0f) / textSize.x);
-            textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
-        }
-
-        const ImVec2 badgeSize(textSize.x + paddingX * 2.0f, textSize.y + paddingY * 2.0f);
-        const ImVec2 min(std::floor(centerX - badgeSize.x * 0.5f), std::floor(anchorBottom ? y - badgeSize.y : y));
-        drawList->AddRectFilled(min, ImVec2(min.x + badgeSize.x, min.y + badgeSize.y), background, 3.0f);
-        drawList->AddText(font, fontSize, ImVec2(min.x + paddingX, min.y + paddingY), textColor, text);
-    }
-
-    // Full width bar ending at bottomY (the preview's bottom edge flows into it), label centered, the font shrinks to fit narrow tiles
-    static void DrawTypeBar(ImDrawList* drawList, float minX, float maxX, float bottomY, const char* text, ImU32 background, ImU32 textColor)
-    {
-        constexpr float paddingX = 4.0f;
-        constexpr float paddingY = 2.0f;
-        ImFont* font = ImGui::GetIO().Fonts->Fonts[1];
-        const float width = maxX - minX;
-
-        float fontSize = 15.0f;
-        ImVec2 textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
-        if(textSize.x + paddingX * 2.0f > width && textSize.x > 0.0f)
-        {
-            fontSize = std::max(8.0f, fontSize * (width - paddingX * 2.0f) / textSize.x);
-            textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
-        }
-
-        const float top = std::floor(bottomY - textSize.y - paddingY * 2.0f);
-        drawList->AddRectFilled(ImVec2(minX, top), ImVec2(maxX, bottomY), background, 4.0f, ImDrawFlags_RoundCornersBottom); // Same rounding as the preview
-        drawList->AddText(font, fontSize, ImVec2(std::floor(minX + (width - textSize.x) * 0.5f), top + paddingY), textColor, text);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -672,7 +570,7 @@ namespace Surge
                 {
                     ImGui::SetCursorPosY(std::floor((ImGui::GetWindowHeight() - ImGui::GetFontSize()) * 0.5f));
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                    ImGuiAux::TextCentered("Open in the Content Drawer (Ctrl+Space)");
+                    EditorUI::TextCentered("Open in the Content Drawer (Ctrl+Space)");
                     ImGui::PopStyleColor();
                 }
                 else
@@ -705,9 +603,7 @@ namespace Surge
         {
             const ImVec2 treePos = ImGui::GetWindowPos();
             const ImVec2 treeSize = ImGui::GetWindowSize();
-            const ImU32 shadowLeft = IM_COL32(0, 0, 0, 10);
-            const ImU32 shadowRight = IM_COL32(0, 0, 0, 200);
-            ImGui::GetWindowDrawList()->AddRectFilledMultiColor(treePos, ImVec2(treePos.x + treeSize.x, treePos.y + treeSize.y), shadowLeft, shadowRight, shadowRight, shadowLeft);
+            EditorUI::AddSidePanelShadow(ImGui::GetWindowDrawList(), treePos, ImVec2(treePos.x + treeSize.x, treePos.y + treeSize.y));
         }
         DrawFolderTree();
         ImGui::EndChild();
@@ -716,7 +612,7 @@ namespace Surge
         DrawSplitter(bodyHeight);
         ImGui::SameLine(0.0f, 0.0f);
 
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.12f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorUI::WithAlpha(Colors::Black, 0.12f));
         // The list scrolls inside its table, Ctrl+Wheel zooms the grid instead of scrolling it
         ImGuiWindowFlags contentFlags = ImGuiWindowFlags_None;
         if(Settings().ListView)
@@ -782,7 +678,7 @@ namespace Surge
         {
             const ImVec2 min = ImGui::GetWindowPos();
             const ImVec2 max(min.x + ImGui::GetWindowWidth(), min.y + ImGui::GetWindowHeight());
-            ImGui::GetWindowDrawList()->AddLine(min, ImVec2(max.x, min.y), ImGui::GetColorU32(ImVec4(0.26f, 0.26f, 0.26f, 1.0f)));
+            ImGui::GetWindowDrawList()->AddLine(min, ImVec2(max.x, min.y), ImGui::GetColorU32(Colors::Tone25));
 
             DrawDrawerHeader(areaHeight);
             DrawBody();
@@ -840,12 +736,12 @@ namespace Surge
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImVec2 headerMin = ImGui::GetItemRectMin();
         {
-            ImGuiAux::ScopedBoldFont font;
+            EditorUI::ScopedBoldFont font;
             drawList->AddText(ImVec2(headerMin.x, std::floor(headerMin.y + (headerHeight - ImGui::GetFontSize()) * 0.5f)), ImGui::GetColorU32(ImGuiCol_TextDisabled), "CONTENT DRAWER");
         }
         const float gripX = std::floor(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() * 0.5f);
         const float gripY = std::floor(headerMin.y + headerHeight * 0.5f);
-        drawList->AddRectFilled(ImVec2(gripX - 18.0f, gripY - 1.5f), ImVec2(gripX + 18.0f, gripY + 1.5f), ImGui::GetColorU32(ImVec4(0.4f, 0.4f, 0.4f, 1.0f)), 1.5f);
+        drawList->AddRectFilled(ImVec2(gripX - 18.0f, gripY - 1.5f), ImVec2(gripX + 18.0f, gripY + 1.5f), ImGui::GetColorU32(Colors::Tone40), 1.5f);
 
         ImGui::SetCursorPos(ImVec2(start.x + width - dockWidth, start.y + std::floor((headerHeight - ImGui::GetFrameHeight()) * 0.5f)));
         if(ImGui::Button(dockLabel))
@@ -856,7 +752,7 @@ namespace Surge
             mDrawerAnimation = 0.0f;
             mFocusTab = true;
         }
-        ImGuiAux::ItemTooltip("Close the drawer and show the Content Browser as a tab");
+        EditorUI::ItemTooltip("Close the drawer and show the Content Browser as a tab");
 
         ImGui::SetCursorPos(ImVec2(start.x, start.y + headerHeight + 2.0f));
     }
@@ -868,16 +764,16 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
 
         {
-            ImGuiAux::ScopedBoldFont bold;
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImGuiAux::Colors::ThemeColor1));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.74f, 0.25f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.85f, 0.55f, 0.0f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+            EditorUI::ScopedBoldFont bold;
+            ImGui::PushStyleColor(ImGuiCol_Button, Colors::Accent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::AccentLight);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, Colors::AccentDark);
+            ImGui::PushStyleColor(ImGuiCol_Text, Colors::Black);
             if(ImGui::Button("+ ADD"))
                 ImGui::OpenPopup("##CreatePopup");
             ImGui::PopStyleColor(4);
         }
-        ImGuiAux::ItemTooltip("Create a folder or a new asset in this folder");
+        EditorUI::ItemTooltip("Create a folder or a new asset in this folder");
 
         ImGui::SameLine();
         if(ImGui::Button("IMPORT"))
@@ -886,7 +782,7 @@ namespace Surge
             if(!files.empty())
                 ImportExternal(files, mCurrentDirectory);
         }
-        ImGuiAux::ItemTooltip("Copy files into this folder and import them (or drop them here from Explorer)");
+        EditorUI::ItemTooltip("Copy files into this folder and import them (or drop them here from Explorer)");
 
         // History
         ImGui::SameLine(0.0f, 12.0f);
@@ -894,19 +790,19 @@ namespace Surge
         if(ImGui::ArrowButton("##Back", ImGuiDir_Left))
             NavigateBack();
         ImGui::EndDisabled();
-        ImGuiAux::ItemTooltip("Back (Alt+Left, Mouse 4)");
+        EditorUI::ItemTooltip("Back (Alt+Left, Mouse 4)");
         ImGui::SameLine(0.0f, 2.0f);
         ImGui::BeginDisabled(mForwardHistory.empty());
         if(ImGui::ArrowButton("##Forward", ImGuiDir_Right))
             NavigateForward();
         ImGui::EndDisabled();
-        ImGuiAux::ItemTooltip("Forward (Alt+Right, Mouse 5)");
+        EditorUI::ItemTooltip("Forward (Alt+Right, Mouse 5)");
         ImGui::SameLine(0.0f, 2.0f);
         ImGui::BeginDisabled(mCurrentDirectory == mBaseDirectory);
         if(ImGui::ArrowButton("##Up", ImGuiDir_Up))
             NavigateUp();
         ImGui::EndDisabled();
-        ImGuiAux::ItemTooltip("Parent folder (Backspace)");
+        EditorUI::ItemTooltip("Parent folder (Backspace)");
 
         // Right side: search, filter, sort, view
         constexpr float searchWidth = 210.0f;
@@ -931,12 +827,12 @@ namespace Surge
 
         ImGui::SameLine();
         if(filterActive)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImGuiAux::Colors::ThemeColor1));
+            ImGui::PushStyleColor(ImGuiCol_Text, Colors::Accent);
         if(ImGui::Button(filterLabel))
             ImGui::OpenPopup("##FilterPopup");
         if(filterActive)
             ImGui::PopStyleColor();
-        ImGuiAux::ItemTooltip("Asset types to show, unimported files, search scope");
+        EditorUI::ItemTooltip("Asset types to show, unimported files, search scope");
 
         ImGui::SameLine();
         if(ImGui::Button("Sort"))
@@ -950,9 +846,9 @@ namespace Surge
             const bool active = settings.ListView == (view == 1);
             if(active)
             {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImGuiAux::Colors::Selection));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImGuiAux::Colors::Selection));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_Text, Colors::Ink);
             }
             if(ImGui::Button(view == 0 ? "Grid" : "List"))
                 settings.ListView = view == 1;
@@ -965,14 +861,14 @@ namespace Surge
         ImGui::PopStyleVar(); // FrameRounding
 
         // Popups
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(ImGui::BeginPopup("##CreatePopup"))
         {
             DrawCreateMenuItems(mCurrentDirectory);
-            ImGuiAux::EndStyledPopup();
+            EditorUI::EndStyledPopup();
         }
         else
-            ImGuiAux::StyledPopupVars::Pop();
+            EditorUI::StyledPopupVars::Pop();
 
         DrawFilterPopup();
         DrawSortPopup();
@@ -990,14 +886,14 @@ namespace Surge
         std::reverse(segments.begin(), segments.end());
 
         ImGui::BeginChild("##Breadcrumbs", ImVec2(width, ImGui::GetFrameHeight()), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, Colors::Transparent);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 0.0f));
         for(size_t i = 0; i < segments.size(); i++)
         {
             const bool last = i + 1 == segments.size();
             ImGui::PushID(static_cast<int>(i));
             if(last)
-                ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+                ImGui::PushFont(EditorUI::BoldFont());
             if(ImGui::Button(i == 0 ? "Assets" : segments[i].filename().string().c_str()))
                 Navigate(segments[i]);
             if(last)
@@ -1019,19 +915,15 @@ namespace Surge
 
     void ContentBrowserPanel::DrawFilterPopup()
     {
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(!ImGui::BeginPopup("##FilterPopup"))
         {
-            ImGuiAux::StyledPopupVars::Pop();
+            EditorUI::StyledPopupVars::Pop();
             return;
         }
 
         ContentBrowserSettings& settings = Settings();
-        {
-            ImGuiAux::ScopedBoldFont font;
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "SHOW");
-        }
-        ImGuiAux::StyledSeparator();
+        EditorUI::MenuHeader("SHOW");
 
         for(AssetType type : sAssetTypeArray)
         {
@@ -1048,36 +940,32 @@ namespace Surge
             ImGui::PopID();
         }
 
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
         if(ImGui::Checkbox("Unimported files", &settings.ShowUnimported))
             mNeedsSort = true;
         if(ImGui::Checkbox("Search the whole project", &settings.SearchAllFolders))
             mAppliedSearch = "\x01"; // Rebuild with the new scope
-        ImGuiAux::StyledSeparator();
-        if(ImGuiAux::StyledMenuItem("Reset Filters"))
+        EditorUI::StyledSeparator();
+        if(EditorUI::StyledMenuItem("Reset Filters"))
         {
             settings.HiddenTypes = 0;
             settings.ShowUnimported = true;
             mNeedsSort = true;
         }
-        ImGuiAux::EndStyledPopup();
+        EditorUI::EndStyledPopup();
     }
 
     void ContentBrowserPanel::DrawSortPopup()
     {
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(!ImGui::BeginPopup("##SortPopup"))
         {
-            ImGuiAux::StyledPopupVars::Pop();
+            EditorUI::StyledPopupVars::Pop();
             return;
         }
 
         ContentBrowserSettings& settings = Settings();
-        {
-            ImGuiAux::ScopedBoldFont font;
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "SORT BY");
-        }
-        ImGuiAux::StyledSeparator();
+        EditorUI::MenuHeader("SORT BY");
 
         constexpr const char* fields[] = { "Name", "Type", "Size", "Date Modified" };
         for(int i = 0; i < 4; i++)
@@ -1088,17 +976,17 @@ namespace Surge
                 mNeedsSort = true;
             }
         }
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
         if(ImGui::Checkbox("Descending", &settings.SortDescending))
             mNeedsSort = true;
         ImGui::TextDisabled("Folders are always listed first");
-        ImGuiAux::EndStyledPopup();
+        EditorUI::EndStyledPopup();
     }
 
     void ContentBrowserPanel::DrawFolderTree()
     {
         ContentBrowserSettings& settings = Settings();
-        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+        ImFont* boldFont = EditorUI::BoldFont();
 
         if(!settings.Favorites.empty())
         {
@@ -1113,22 +1001,22 @@ namespace Surge
                 const bool exists = fs::is_directory(folder);
                 ImGui::PushID(i);
                 if(!exists)
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.35f, 0.35f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_Text, Colors::Error);
                 if(ImGui::Selectable(folder.filename().string().c_str(), folder == mCurrentDirectory) && exists)
                     Navigate(folder);
                 if(!exists)
                     ImGui::PopStyleColor();
-                ImGuiAux::ItemTooltip(exists ? ("Assets/" + settings.Favorites[i]).c_str() : "This folder no longer exists");
+                EditorUI::ItemTooltip(exists ? ("Assets/" + settings.Favorites[i]).c_str() : "This folder no longer exists");
                 if(exists)
                     AcceptDrop(folder);
 
-                if(ImGuiAux::BeginStyledPopupContextItem())
+                if(EditorUI::BeginStyledPopupContextItem())
                 {
-                    if(ImGuiAux::StyledMenuItem("Remove from Favorites"))
+                    if(EditorUI::StyledMenuItem("Remove from Favorites"))
                         removeIndex = i;
-                    if(exists && ImGuiAux::StyledMenuItem("Show in Explorer"))
+                    if(exists && EditorUI::StyledMenuItem("Show in Explorer"))
                         Platform::OpenFolderInExplorer(folder.string());
-                    ImGuiAux::EndStyledPopup();
+                    EditorUI::EndStyledPopup();
                 }
                 ImGui::PopID();
             }
@@ -1144,8 +1032,8 @@ namespace Surge
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 3.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 14.0f);
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.07f));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 1.0f, 1.0f, 0.12f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorUI::WithAlpha(Colors::Ink, 0.07f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorUI::WithAlpha(Colors::Ink, 0.12f));
         DrawFolderNode(mFolderTree, true);
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(3);
@@ -1169,11 +1057,11 @@ namespace Surge
         // The open folder is highlighted like the selection in the Hierarchy
         if(isCurrent)
         {
-            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(ImGuiAux::Colors::Selection));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(ImGuiAux::Colors::Selection));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(ImGuiAux::Colors::Selection));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+            ImGui::PushStyleColor(ImGuiCol_Header, Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_Text, Colors::Ink);
+            ImGui::PushFont(EditorUI::BoldFont());
         }
         const bool open = ImGui::TreeNodeEx(node.Name.c_str(), flags, "%s", node.Name.c_str());
         if(isCurrent)
@@ -1189,10 +1077,10 @@ namespace Surge
             ImGui::SetScrollHereY(0.5f);
         AcceptDrop(node.AbsolutePath);
 
-        if(ImGuiAux::BeginStyledPopupContextItem())
+        if(EditorUI::BeginStyledPopupContextItem())
         {
             DrawFolderContextMenu(node.AbsolutePath, isRoot);
-            ImGuiAux::EndStyledPopup();
+            EditorUI::EndStyledPopup();
         }
 
         if(open)
@@ -1205,38 +1093,34 @@ namespace Surge
 
     void ContentBrowserPanel::DrawFolderContextMenu(const Path& folder, bool isRoot)
     {
-        {
-            ImGuiAux::ScopedBoldFont font;
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", isRoot ? "Assets" : folder.filename().string().c_str());
-        }
-        ImGuiAux::StyledSeparator();
+        EditorUI::MenuHeader(isRoot ? "Assets" : folder.filename().string().c_str());
 
-        if(ImGuiAux::StyledMenuItem("New Folder"))
+        if(EditorUI::StyledMenuItem("New Folder"))
         {
             Navigate(folder);
             CreateFolderIn(folder);
         }
         if(!isRoot)
         {
-            if(ImGuiAux::StyledMenuItem("Rename"))
+            if(EditorUI::StyledMenuItem("Rename"))
             {
                 // Renamed inline, in its parent folder
                 Navigate(folder.parent_path());
                 SelectAfterRefresh({ folder }, true);
             }
-            if(ImGuiAux::StyledMenuItem("Delete"))
+            if(EditorUI::StyledMenuItem("Delete"))
                 DeletePaths({ folder });
         }
-        if(mClipboard.size() > 0 && ImGuiAux::StyledMenuItem("Paste Here"))
+        if(mClipboard.size() > 0 && EditorUI::StyledMenuItem("Paste Here"))
             PasteInto(folder);
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
         if(!isRoot)
         {
             Vector<String>& favorites = Settings().Favorites;
             const String relative = AssetFileOps::ToRelative(folder);
             const auto it = std::find(favorites.begin(), favorites.end(), relative);
-            if(ImGuiAux::StyledMenuItem(it == favorites.end() ? "Add to Favorites" : "Remove from Favorites"))
+            if(EditorUI::StyledMenuItem(it == favorites.end() ? "Add to Favorites" : "Remove from Favorites"))
             {
                 if(it == favorites.end())
                     favorites.push_back(relative);
@@ -1244,11 +1128,11 @@ namespace Surge
                     favorites.erase(it);
             }
         }
-        if(ImGuiAux::StyledMenuItem("Import All Unimported Files"))
+        if(EditorUI::StyledMenuItem("Import All Unimported Files"))
             ImportUnregistered({ folder });
-        if(ImGuiAux::StyledMenuItem("Copy Path"))
+        if(EditorUI::StyledMenuItem("Copy Path"))
             ImGui::SetClipboardText(("Assets/" + AssetFileOps::ToRelative(folder)).c_str());
-        if(ImGuiAux::StyledMenuItem("Show in Explorer"))
+        if(EditorUI::StyledMenuItem("Show in Explorer"))
             Platform::OpenFolderInExplorer(folder.string());
     }
 
@@ -1268,7 +1152,7 @@ namespace Surge
         const ImVec2 min = ImGui::GetItemRectMin();
         const ImVec2 max = ImGui::GetItemRectMax();
         const float x = (min.x + max.x) * 0.5f;
-        const ImU32 color = active ? WithAlpha(ImVec4(ImGuiAux::Colors::ThemeColor1), 1.0f) : (hovered ? IM_COL32(120, 120, 120, 255) : IM_COL32(50, 50, 50, 255));
+        const ImU32 color = active ? ImGui::GetColorU32(Colors::Accent) : (ImGui::GetColorU32(hovered ? Colors::Tone47 : Colors::Tone20));
         ImGui::GetWindowDrawList()->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), color, active || hovered ? 2.0f : 1.0f);
     }
 
@@ -1299,12 +1183,12 @@ namespace Surge
         const ImGuiMultiSelectFlags msFlags = ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid | ImGuiMultiSelectFlags_BoxSelect2d | ImGuiMultiSelectFlags_NavWrapX;
         ImGuiMultiSelectIO* msIO = ImGui::BeginMultiSelect(msFlags, mSelection.Size, itemCount);
         mSelection.ApplyRequests(msIO);
-        ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // The tiles show selection/focus themselves, no ImGui focus rectangle
+        ImGui::PushStyleColor(ImGuiCol_NavCursor, Colors::Transparent); // The tiles show selection/focus themselves, no ImGui focus rectangle
 
         // The highlight is drawn by the tiles themselves
-        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Header, Colors::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, Colors::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, Colors::Transparent);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(TILE_SPACING, TILE_SPACING));
 
         int scrollToIndex = -1;
@@ -1386,19 +1270,19 @@ namespace Surge
         {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 max(pos.x + size.x, pos.y + size.y);
-            const ImVec4 accent(ImGuiAux::Colors::ThemeColor1);
+            const ImVec4 accent(Colors::Accent);
 
             // Card
-            const ImU32 background = selected ? IM_COL32(255, 255, 255, 0) : (hovered ? IM_COL32(255, 255, 255, 25) : IM_COL32(255, 255, 255, 7));
+            const ImU32 background = EditorUI::ToU32(EditorUI::WithAlpha(Colors::Ink, selected ? 0.0f : (hovered ? 0.1f : 0.03f)));
             drawList->AddRectFilled(pos, max, background, 6.0f);
             if(selected)
-                drawList->AddRect(pos, max, WithAlpha(accent, 0.9f), 6.0f, ImDrawFlags_None, 1.5f);
+                drawList->AddRect(pos, max, ImGui::GetColorU32(EditorUI::WithAlpha(accent, 0.9f)), 6.0f, ImDrawFlags_None, 1.5f);
 
             // Preview
             const float thumbnailSize = size.x - TILE_PADDING * 2.0f;
             const ImVec2 previewMin(pos.x + TILE_PADDING, pos.y + TILE_PADDING);
             const ImVec2 previewMax(previewMin.x + thumbnailSize, previewMin.y + thumbnailSize);
-            drawList->AddRectFilled(previewMin, previewMax, IM_COL32(0, 0, 0, 55), 4.0f);
+            drawList->AddRectFilled(previewMin, previewMax, EditorUI::ToU32(EditorUI::WithAlpha(Colors::Black, 0.22f)), 4.0f);
             const bool isCut = mClipboardCut && std::find(mClipboard.begin(), mClipboard.end(), item.AbsolutePath) != mClipboard.end();
             DrawItemIcon(drawList, item, previewMin, previewMax, isCut ? 0.4f : 1.0f);
 
@@ -1408,26 +1292,26 @@ namespace Surge
             {
                 const float maxBadgeWidth = thumbnailSize - 6.0f;
                 if(item.IsMissing)
-                    DrawBadge(drawList, centerX, previewMin.y + 3.0f, false, maxBadgeWidth, "MISSING", IM_COL32(205, 45, 45, 240), IM_COL32(255, 255, 255, 255));
+                    EditorUI::AddFittedBadge(drawList, centerX, previewMin.y + 3.0f, false, maxBadgeWidth, "MISSING", EditorUI::ToU32(EditorUI::WithAlpha(Colors::Danger, 0.94f)), EditorUI::ToU32(Colors::White));
                 else if(!item.IsRegistered && item.Type != AssetType::NONE)
-                    DrawBadge(drawList, centerX, previewMin.y + 3.0f, false, maxBadgeWidth, "NOT IMPORTED", IM_COL32(25, 25, 25, 230), IM_COL32(200, 200, 200, 255));
+                    EditorUI::AddFittedBadge(drawList, centerX, previewMin.y + 3.0f, false, maxBadgeWidth, "NOT IMPORTED", EditorUI::ToU32(EditorUI::WithAlpha(Colors::Tone10, 0.9f)), EditorUI::ToU32(Colors::Tone78));
             }
 
             // Type strip under the preview, assets carry their type label in it
-            const ImVec4 stripColor = item.IsDirectory ? FOLDER_COLOR : GetTypeColor(item.Type);
+            const ImVec4 stripColor = item.IsDirectory ? Colors::Asset::Folder : GetTypeColor(item.Type);
             if(!item.IsDirectory && item.Type != AssetType::NONE)
             {
-                const ImU32 barColor = WithAlpha(stripColor, item.IsRegistered ? 1.0f : 0.3f);
-                const ImU32 labelColor = item.IsRegistered ? IM_COL32(0, 0, 0, 255) : WithAlpha(stripColor, 1.0f);
-                DrawTypeBar(drawList, previewMin.x, previewMax.x, previewMax.y + 4.0f, GetTypeLabel(item.Type), barColor, labelColor);
+                const ImU32 barColor = ImGui::GetColorU32(EditorUI::WithAlpha(stripColor, item.IsRegistered ? 1.0f : 0.3f));
+                const ImU32 labelColor = item.IsRegistered ? EditorUI::ToU32(Colors::Black) : ImGui::GetColorU32(stripColor);
+                EditorUI::AddLabelBar(drawList, previewMin.x, previewMax.x, previewMax.y + 4.0f, GetTypeLabel(item.Type), barColor, labelColor);
             }
             else
-                drawList->AddRectFilled(ImVec2(previewMin.x, previewMax.y + 2.0f), ImVec2(previewMax.x, previewMax.y + 4.0f), WithAlpha(stripColor, item.IsRegistered || item.IsDirectory ? 1.0f : 0.35f), 1.0f);
+                drawList->AddRectFilled(ImVec2(previewMin.x, previewMax.y + 2.0f), ImVec2(previewMax.x, previewMax.y + 4.0f), ImGui::GetColorU32(EditorUI::WithAlpha(stripColor, item.IsRegistered || item.IsDirectory ? 1.0f : 0.35f)), 1.0f);
 
             if(!renaming)
             {
                 const ImU32 textColor = item.IsRegistered || item.IsDirectory ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                DrawWrappedLabel(drawList, item.DisplayName, ImVec2(previewMin.x, previewMax.y + 7.0f), thumbnailSize, textColor);
+                EditorUI::AddWrappedLabel(drawList, item.DisplayName, ImVec2(previewMin.x, previewMax.y + 7.0f), thumbnailSize, textColor);
             }
         }
 
@@ -1453,7 +1337,7 @@ namespace Surge
                 const float fit = boxSize * 0.92f;
                 const ImVec2 half = thumbnail.AspectRatio >= 1.0f ? ImVec2(fit * 0.5f, fit * 0.5f / thumbnail.AspectRatio) : ImVec2(fit * 0.5f * thumbnail.AspectRatio, fit * 0.5f);
                 drawList->AddImage(thumbnail.TextureID, ImVec2(center.x - half.x, center.y - half.y), ImVec2(center.x + half.x, center.y + half.y), ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
-                                   IM_COL32(255, 255, 255, static_cast<int>(255.0f * alpha)));
+                                   EditorUI::ToU32(EditorUI::WithAlpha(Colors::White, alpha)));
                 return;
             }
         }
@@ -1462,7 +1346,7 @@ namespace Surge
         const float iconHalf = boxSize * (item.IsDirectory ? 0.40f : 0.33f);
         const float iconAlpha = item.IsRegistered || item.IsDirectory ? alpha : alpha * 0.45f;
         drawList->AddImage(icon, ImVec2(center.x - iconHalf, center.y - iconHalf - (item.IsDirectory ? 0.0f : boxSize * 0.04f)), ImVec2(center.x + iconHalf, center.y + iconHalf - (item.IsDirectory ? 0.0f : boxSize * 0.04f)),
-                           ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), IM_COL32(255, 255, 255, static_cast<int>(255.0f * iconAlpha)));
+                           ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), EditorUI::ToU32(EditorUI::WithAlpha(Colors::White, iconAlpha)));
     }
 
     void ContentBrowserPanel::DrawList()
@@ -1503,7 +1387,7 @@ namespace Surge
         const float rowHeight = ImGui::GetFrameHeight();
         ImGuiMultiSelectIO* msIO = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid | ImGuiMultiSelectFlags_BoxSelect1d, mSelection.Size, itemCount);
         mSelection.ApplyRequests(msIO);
-        ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Row highlight only, no ImGui focus rectangle
+        ImGui::PushStyleColor(ImGuiCol_NavCursor, Colors::Transparent); // Row highlight only, no ImGui focus rectangle
 
         int scrollToIndex = -1;
         if(!mScrollToPath.empty())
@@ -1564,15 +1448,15 @@ namespace Surge
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
                 if(item.IsDirectory)
-                    ImGui::TextColored(FOLDER_COLOR, "FOLDER");
+                    ImGui::TextColored(Colors::Asset::Folder, "FOLDER");
                 else if(item.Type != AssetType::NONE)
                 {
                     const ImVec4 color = GetTypeColor(item.Type);
-                    ImGui::TextColored(item.IsRegistered ? color : ImVec4(color.x, color.y, color.z, 0.5f), "%s", GetTypeLabel(item.Type));
+                    ImGui::TextColored(item.IsRegistered ? color : EditorUI::WithAlpha(color, 0.5f), "%s", GetTypeLabel(item.Type));
                     if(item.IsMissing)
                     {
                         ImGui::SameLine();
-                        ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.25f, 1.0f), "MISSING");
+                        ImGui::TextColored(Colors::Error, "MISSING");
                     }
                 }
                 else
@@ -1709,7 +1593,7 @@ namespace Surge
             }
             if(mSearchBuffer[0] != '\0')
                 tooltip += "\n" + item.Location;
-            ImGuiAux::ItemTooltip(tooltip.c_str());
+            EditorUI::ItemTooltip(tooltip.c_str());
         }
     }
 
@@ -1749,10 +1633,10 @@ namespace Surge
             mOpenItemContext = false;
         }
 
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(!ImGui::BeginPopup("##ItemContext"))
         {
-            ImGuiAux::StyledPopupVars::Pop();
+            EditorUI::StyledPopupVars::Pop();
             return;
         }
 
@@ -1760,7 +1644,7 @@ namespace Surge
         if(selection.empty())
         {
             ImGui::CloseCurrentPopup();
-            ImGuiAux::EndStyledPopup();
+            EditorUI::EndStyledPopup();
             return;
         }
 
@@ -1773,72 +1657,72 @@ namespace Surge
         }
 
         {
-            ImGuiAux::ScopedBoldFont font;
+            EditorUI::ScopedBoldFont font;
             if(single)
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", single->Name.c_str());
+                ImGui::TextColored(Colors::Hint, "%s", single->Name.c_str());
             else
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%zu ITEMS", selection.size());
+                ImGui::TextColored(Colors::Hint, "%zu ITEMS", selection.size());
         }
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
         Editor* editor = static_cast<Editor*>(Core::GetClient());
-        if(single && ImGuiAux::StyledMenuItem(single->IsDirectory ? "Open" : (single->IsRegistered ? "Open" : "Import"), "Enter"))
+        if(single && EditorUI::StyledMenuItem(single->IsDirectory ? "Open" : (single->IsRegistered ? "Open" : "Import"), "Enter"))
             OpenItem(*single);
-        if(anyUnregistered && !(single && !single->IsRegistered && !single->IsDirectory) && ImGuiAux::StyledMenuItem("Import"))
+        if(anyUnregistered && !(single && !single->IsRegistered && !single->IsDirectory) && EditorUI::StyledMenuItem("Import"))
         {
             Vector<Path> paths;
             for(const Item* item : selection)
                 paths.push_back(item->AbsolutePath);
             ImportUnregistered(paths);
         }
-        if(anyCookable && ImGuiAux::StyledMenuItem("Reimport"))
+        if(anyCookable && EditorUI::StyledMenuItem("Reimport"))
             Reimport(selection);
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
-        if(ImGuiAux::StyledMenuItem("Rename", "F2", nullptr, single != nullptr))
+        if(EditorUI::StyledMenuItem("Rename", "F2", nullptr, single != nullptr))
             BeginRename(single->AbsolutePath);
-        if(ImGuiAux::StyledMenuItem("Duplicate", "Ctrl+D"))
+        if(EditorUI::StyledMenuItem("Duplicate", "Ctrl+D"))
             Duplicate(GetSelectedPaths());
-        if(ImGuiAux::StyledMenuItem("Cut", "Ctrl+X"))
+        if(EditorUI::StyledMenuItem("Cut", "Ctrl+X"))
         {
             mClipboard = GetSelectedPaths();
             mClipboardCut = true;
         }
-        if(ImGuiAux::StyledMenuItem("Copy", "Ctrl+C"))
+        if(EditorUI::StyledMenuItem("Copy", "Ctrl+C"))
         {
             mClipboard = GetSelectedPaths();
             mClipboardCut = false;
         }
-        if(single && single->IsDirectory && !mClipboard.empty() && ImGuiAux::StyledMenuItem("Paste Into", "Ctrl+V"))
+        if(single && single->IsDirectory && !mClipboard.empty() && EditorUI::StyledMenuItem("Paste Into", "Ctrl+V"))
             PasteInto(single->AbsolutePath);
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-            if(ImGuiAux::StyledMenuItem("Delete", "Del"))
+            ImGui::PushStyleColor(ImGuiCol_Text, Colors::Error);
+            if(EditorUI::StyledMenuItem("Delete", "Del"))
                 DeletePaths(GetSelectedPaths());
             ImGui::PopStyleColor();
         }
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
-        if(ImGuiAux::StyledMenuItem("Copy Path"))
+        if(EditorUI::StyledMenuItem("Copy Path"))
         {
             String text;
             for(const Item* item : selection)
                 text += (text.empty() ? "" : "\n") + ("Assets/" + AssetFileOps::ToRelative(item->AbsolutePath));
             ImGui::SetClipboardText(text.c_str());
         }
-        if(single && single->IsRegistered && ImGuiAux::StyledMenuItem("Copy Asset ID"))
+        if(single && single->IsRegistered && EditorUI::StyledMenuItem("Copy Asset ID"))
             ImGui::SetClipboardText(std::to_string(single->ID.Get()).c_str());
-        if(single && ImGuiAux::StyledMenuItem("Show in Explorer"))
+        if(single && EditorUI::StyledMenuItem("Show in Explorer"))
             Platform::OpenInExplorer(single->AbsolutePath.string());
 
         if(single && !single->IsDirectory && (single->Type == AssetType::SCRIPT || single->Type == AssetType::SCENE || single->Type == AssetType::MATERIAL || single->Type == AssetType::UI_LAYOUT || single->Type == AssetType::PARTICLE_EFFECT) &&
-           ImGuiAux::StyledMenuItem("Open in VS Code"))
+           EditorUI::StyledMenuItem("Open in VS Code"))
             Platform::OpenInVSCode(mAssetManager->GetAssetsDirectory(), single->AbsolutePath.string());
 
         if(single && single->IsRegistered && single->Type == AssetType::SCENE)
         {
             const bool isStart = editor->GetCurrentProject().StartScene == single->ID;
-            if(ImGuiAux::StyledMenuItem(isStart ? "Start Scene" : "Set as Start Scene", nullptr, nullptr, !isStart))
+            if(EditorUI::StyledMenuItem(isStart ? "Start Scene" : "Set as Start Scene", nullptr, nullptr, !isStart))
                 editor->SetStartScene(single->ID);
         }
         if(single && single->IsDirectory)
@@ -1846,7 +1730,7 @@ namespace Surge
             Vector<String>& favorites = Settings().Favorites;
             const String relative = AssetFileOps::ToRelative(single->AbsolutePath);
             const auto it = std::find(favorites.begin(), favorites.end(), relative);
-            if(ImGuiAux::StyledMenuItem(it == favorites.end() ? "Add to Favorites" : "Remove from Favorites"))
+            if(EditorUI::StyledMenuItem(it == favorites.end() ? "Add to Favorites" : "Remove from Favorites"))
             {
                 if(it == favorites.end())
                     favorites.push_back(relative);
@@ -1854,20 +1738,20 @@ namespace Surge
                     favorites.erase(it);
             }
         }
-        ImGuiAux::EndStyledPopup();
+        EditorUI::EndStyledPopup();
     }
 
     void ContentBrowserPanel::DrawBackgroundContextMenu()
     {
-        if(!ImGuiAux::BeginStyledPopupContextWindow("##BackgroundContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_NoOpenOverExistingPopup))
+        if(!EditorUI::BeginStyledPopupContextWindow("##BackgroundContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_NoOpenOverExistingPopup))
             return;
 
         {
-            ImGuiAux::ScopedBoldFont font;
+            EditorUI::ScopedBoldFont font;
             const String relative = AssetFileOps::ToRelative(mCurrentDirectory);
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", relative.empty() ? "Assets" : ("Assets/" + relative).c_str());
+            ImGui::TextColored(Colors::Hint, "%s", relative.empty() ? "Assets" : ("Assets/" + relative).c_str());
         }
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
         if(ImGui::BeginMenu("Create"))
@@ -1877,39 +1761,39 @@ namespace Surge
         }
         ImGui::PopStyleVar();
 
-        if(ImGuiAux::StyledMenuItem("Import Files..."))
+        if(EditorUI::StyledMenuItem("Import Files..."))
         {
             const Vector<String> files = FileDialog::OpenFiles(IMPORT_FILTER);
             if(!files.empty())
                 ImportExternal(files, mCurrentDirectory);
         }
-        if(ImGuiAux::StyledMenuItem("Import All Unimported Files"))
+        if(EditorUI::StyledMenuItem("Import All Unimported Files"))
             ImportUnregistered({ mCurrentDirectory });
-        if(ImGuiAux::StyledMenuItem("Paste", "Ctrl+V", nullptr, !mClipboard.empty()))
+        if(EditorUI::StyledMenuItem("Paste", "Ctrl+V", nullptr, !mClipboard.empty()))
             PasteInto(mCurrentDirectory);
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
-        if(ImGuiAux::StyledMenuItem("Show in Explorer"))
+        if(EditorUI::StyledMenuItem("Show in Explorer"))
             Platform::OpenFolderInExplorer(mCurrentDirectory.string());
-        if(ImGuiAux::StyledMenuItem("Refresh", "Ctrl+R"))
+        if(EditorUI::StyledMenuItem("Refresh", "Ctrl+R"))
             mNeedsRefresh = true;
-        ImGuiAux::EndStyledPopup();
+        EditorUI::EndStyledPopup();
     }
 
     void ContentBrowserPanel::DrawCreateMenuItems(const Path& folder)
     {
-        if(ImGuiAux::StyledMenuItem("Folder", "Ctrl+Shift+N"))
+        if(EditorUI::StyledMenuItem("Folder", "Ctrl+Shift+N"))
             CreateFolderIn(folder);
-        ImGuiAux::StyledSeparator();
-        if(ImGuiAux::StyledMenuItem("Scene"))
+        EditorUI::StyledSeparator();
+        if(EditorUI::StyledMenuItem("Scene"))
             CreateAssetIn(AssetType::SCENE, folder);
-        if(ImGuiAux::StyledMenuItem("Material"))
+        if(EditorUI::StyledMenuItem("Material"))
             CreateAssetIn(AssetType::MATERIAL, folder);
-        if(ImGuiAux::StyledMenuItem("Script"))
+        if(EditorUI::StyledMenuItem("Script"))
             CreateAssetIn(AssetType::SCRIPT, folder);
-        if(ImGuiAux::StyledMenuItem("UI Layout"))
+        if(EditorUI::StyledMenuItem("UI Layout"))
             CreateAssetIn(AssetType::UI_LAYOUT, folder);
-        if(ImGuiAux::StyledMenuItem("Particle Effect"))
+        if(EditorUI::StyledMenuItem("Particle Effect"))
             CreateAssetIn(AssetType::PARTICLE_EFFECT, folder);
     }
 
@@ -1961,7 +1845,7 @@ namespace Surge
         {
             const float alpha = std::min(1.0f, mStatusTimer);
             ImGui::SameLine(0.0f, 24.0f);
-            ImGui::TextColored(mStatusIsError ? ImVec4(1.0f, 0.4f, 0.4f, alpha) : ImVec4(0.55f, 0.85f, 0.55f, alpha), "%s", mStatusMessage.c_str());
+            ImGui::TextColored(EditorUI::WithAlpha(mStatusIsError ? Colors::Error : Colors::Success, alpha), "%s", mStatusMessage.c_str());
         }
 
         // Right: zoom
@@ -1971,7 +1855,7 @@ namespace Surge
             ImGui::SameLine(std::max(ImGui::GetCursorPosX() + 8.0f, ImGui::GetWindowContentRegionMax().x - sliderWidth));
             ImGui::SetNextItemWidth(sliderWidth);
             ImGui::SliderFloat("##ThumbnailSize", &settings.ThumbnailSize, MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE, "%.0f px");
-            ImGuiAux::ItemTooltip("Thumbnail size (Ctrl+Wheel)");
+            EditorUI::ItemTooltip("Thumbnail size (Ctrl+Wheel)");
         }
     }
 
@@ -2210,7 +2094,7 @@ namespace Surge
         if(registered > 0)
             message += std::format("\n\n{} registered asset{} will be unregistered. Anything still using them shows them as missing once reloaded.", registered, registered == 1 ? "" : "s");
 
-        ImGuiAux::ShowConfirmationBox("Delete", message, [this, paths]() {
+        EditorUI::ShowConfirmationBox("Delete", message, [this, paths]() {
             size_t deleted = 0;
             for(const Path& path : paths)
             {
@@ -2357,13 +2241,13 @@ namespace Surge
 
     void ContentBrowserPanel::Reimport(const Vector<const Item*>& items)
     {
-        AssetImporter& importer = static_cast<Editor*>(Core::GetClient())->GetAssetImporter();
+        AssetDatabase& database = AssetDatabase::Get();
         size_t succeeded = 0, failed = 0;
         for(const Item* item : items)
         {
             if(!item->IsRegistered || !IsCookable(item->Type))
                 continue;
-            importer.RecookAsset(item->ID).Success ? succeeded++ : failed++;
+            database.Cook(item->ID).Success ? succeeded++ : failed++;
         }
         if(failed > 0)
             Notify(std::format("Reimported {}, {} failed (see the Console)", succeeded, failed), true);
@@ -2410,22 +2294,18 @@ namespace Surge
 
             if(type == AssetType::SCENE)
             {
-                if(mAssetManager->Create<Scene>(relative, Filesystem::GetFilenameWithoutExt(path), Core::GetSceneContext()))
+                if(AssetDatabase::Get().Create<Scene>(relative, Filesystem::GetFilenameWithoutExt(path), Core::GetSceneContext()))
                     created = path;
             }
             else if(type == AssetType::MATERIAL)
             {
-                if(Ref<Material> material = mAssetManager->Create<Material>(relative, *Core::GetRenderer(), path.stem().string()))
-                {
-                    MaterialSourceWriter::Write(material, path.generic_string());
+                if(AssetDatabase::Get().Create<Material>(relative, *Core::GetRenderer(), path.stem().string())) // Writes the .smat
                     created = path;
-                }
             }
             else if(type == AssetType::SCRIPT)
             {
-                ScriptSourceWriter::WriteNew(path.generic_string());
-                Vector<Byte> bytecode = Core::GetScriptEngine()->Compile(ScriptSourceWriter::GetDefaultScriptContent(), path.filename().string());
-                if(mAssetManager->Create<Script>(relative, std::move(bytecode)))
+                // Imported like any other script file, it cooks on its first Load
+                if(ScriptSourceWriter::WriteNew(path.generic_string()) && AssetDatabase::Get().Import(relative, AssetType::SCRIPT))
                     created = path;
             }
         }

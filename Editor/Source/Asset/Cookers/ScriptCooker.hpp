@@ -7,8 +7,9 @@ namespace Surge
     class ScriptCooker final : public AssetCooker
     {
     public:
-        virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
+        virtual bool Cook(const CookContext& context) const override;
         virtual AssetType GetAssetType() const override { return AssetType::SCRIPT; }
-        virtual Uint GetCookerVersion() const override { return 2; }
+        virtual Uint GetCookerVersion() const override { return 3; }
+        virtual String GetExtraInputs(const AssetMetadata& metadata) const override { return metadata.RelativePath; } // Baked into the chunk name
     };
 }

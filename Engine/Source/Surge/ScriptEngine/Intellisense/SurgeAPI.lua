@@ -2,9 +2,10 @@
 
 -- ==============================================================================
 -- SURGE ENGINE: MASTER INTELLISENSE FILE
--- Do NOT Add this file in ScriptComponent, drop this file in your Assets/Scripts
--- directory and VSCode should automatically provide you with intellisense. You 
--- need to have the VSCode Lua extension by sumneko installed
+-- The Surge Lua VS Code extension (SurgeLuaExt repo) ships this file to the Lua
+-- language server, nothing needs to be copied into a project. Without the extension:
+-- drop this file in your Assets/Scripts directory (never add it to a ScriptComponent)
+-- and install the VSCode Lua extension by sumneko
 -- https://marketplace.visualstudio.com/items?itemName=sumneko.lua
 -- ==============================================================================
 
@@ -346,9 +347,15 @@ function Input.GetMouseX() end
 ---@return number
 function Input.GetMouseY() end
 
---- Sets the cursor mode (e.g., locked, hidden, normal).
----@param cursorMode number
+--- Sets the cursor mode: CursorMode.Locked hides the cursor and keeps it inside the window, CursorMode.Normal releases it.
+---@param cursorMode number CursorMode
 function Input.SetCursorMode(cursorMode) end
+
+--- Moves the OS cursor (window client pixels, the same space as GetMousePosition). No-op without a cursor (Android).
+--- Mouse look: with the cursor locked, read the offset from a point every frame and move the cursor back to it.
+---@param x number
+---@param y number
+function Input.SetMousePosition(x, y) end
 
 --- True only in the frame the key went down / up.
 ---@param key number
@@ -489,6 +496,11 @@ Key = {
     KP0 = 96, KP1 = 97, KP2 = 98, KP3 = 99, KP4 = 100, KP5 = 101, KP6 = 102, KP7 = 103, KP8 = 104, KP9 = 105,
     KPMultiply = 106, KPAdd = 107, KPEqual = 108, KPSubtract = 109, KPDecimal = 110, KPDivide = 111,
     LeftShift = 160, RightShift = 161, LeftControl = 162, RightControl = 163, LeftAlt = 164, RightAlt = 165
+}
+
+CursorMode = {
+    Normal = 0,
+    Locked = 1
 }
 
 Mouse = {
@@ -1807,6 +1819,7 @@ local SpriteRendererComponent = {}
 ---@field Active boolean
 ---@field Primary boolean
 ---@field FixedAspectRatio boolean
+---@field FieldOfView number Perspective vertical field of view in degrees
 local CameraComponent = {}
 
 ---@class MeshComponent

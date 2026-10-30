@@ -100,7 +100,7 @@ namespace Surge
         ImVec2 mWindowPos = { 0.0f, 0.0f }; // Restored when it was floating
         ImVec2 mWindowSize = { 0.0f, 0.0f };
 
-        // Undo: JSON of the effect (ParticleEffectSerializer)
+        // Undo: JSON of the effect (ParticleEffectSourceIO)
         static constexpr size_t MAX_UNDO_STEPS = 64;
         Vector<String> mUndoStack;
         Vector<String> mRedoStack;

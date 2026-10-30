@@ -2,7 +2,7 @@
 #include "StatusBar/EditorStatusBar.hpp"
 #include "Console/EditorConsole.hpp"
 #include "Panels/ConsolePanel.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Editor.hpp"
 
@@ -20,81 +20,13 @@ namespace Surge
         constexpr auto TASK_SHOW_DELAY = std::chrono::milliseconds(200); // Tasks that finish quicker never flash on screen
         constexpr float SIDE_PADDING = 14.0f;
 
-        ImVec4 SeverityColor(Severity severity)
-        {
-            switch(severity)
-            {
-                case Severity::Trace: return ImVec4(0.6f,  0.6f,  0.6f, 1.0f);
-                case Severity::Info:  return ImVec4(0.45f, 0.85f, 0.45f, 1.0f);
-                case Severity::Debug: return ImVec4(0.4f,  0.8f,  0.9f, 1.0f);
-                case Severity::Warn:  return ImVec4(1.0f,  0.8f,  0.2f, 1.0f);
-                case Severity::Error: return ImVec4(1.0f,  0.4f,  0.4f, 1.0f);
-                case Severity::Fatal: return ImVec4(1.0f,  0.1f,  0.1f, 1.0f);
-            }
-            return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        }
-
         float SecondsSince(std::chrono::steady_clock::time_point time, std::chrono::steady_clock::time_point now)
         {
             return std::chrono::duration<float>(now - time).count();
         }
 
-        // Styled like ImGuiAux::ItemTooltip, wrapped: log lines (compiler errors, paths) can be very long
-        bool BeginStatusTooltip()
-        {
-            if(!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenBlockedByPopup))
-                return false;
-
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 4.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 4.0f));
-            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.11f, 0.11f, 0.97f));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
-
-            // Delayed tool tip
-            if(ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 0.5f)
-            {
-                if(ImGui::BeginTooltip())
-                {
-                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
-                    return true;
-                }
-            }
-            ImGui::PopStyleColor(3);
-            ImGui::PopStyleVar(4);
-            return false;
-        }
-
-        void EndStatusTooltip()
-        {
-            ImGui::PopTextWrapPos();
-            ImGui::EndTooltip();
-            ImGui::PopStyleColor(3);
-            ImGui::PopStyleVar(4);
-        }
-
-        void DrawProgressBar(ImDrawList* drawList, const ImVec2& min, const ImVec2& max, float progress)
-        {
-            const float rounding = (max.y - min.y) * 0.5f;
-            drawList->AddRectFilled(min, max, ImGui::GetColorU32(ImVec4(0.18f, 0.18f, 0.18f, 1.0f)), rounding);
-
-            const ImU32 fillColor = ImGui::GetColorU32(ImGuiAux::Colors::Selection);
-            const float width = max.x - min.x;
-            if(progress < 0.0f)
-            {
-                // Indeterminate: a chunk sweeping across the bar
-                constexpr float chunk = 0.3f;
-                const float t = std::fmod(static_cast<float>(ImGui::GetTime()) * 0.8f, 1.0f + chunk) - chunk;
-                const float begin = min.x + std::max(0.0f, t) * width;
-                const float end = min.x + std::min(1.0f, t + chunk) * width;
-                if(end > begin)
-                    drawList->AddRectFilled(ImVec2(begin, min.y), ImVec2(end, max.y), fillColor, rounding);
-            }
-            else if(progress > 0.0f)
-                drawList->AddRectFilled(min, ImVec2(min.x + std::max(width * progress, rounding * 2.0f), max.y), fillColor, rounding);
-        }
+        // Wrapped: log lines (compiler errors, paths) can be very long
+        constexpr ImGuiHoveredFlags TOOLTIP_FLAGS = ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenBlockedByPopup;
     } // namespace
 
     EditorStatusBar& EditorStatusBar::Get()
@@ -179,7 +111,7 @@ namespace Surge
         ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, HEIGHT));
         ImGui::SetNextWindowViewport(viewport->ID);
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGuiAux::Colors::ExtraDark);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, EditorUI::Colors::Background);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -191,7 +123,7 @@ namespace Surge
         {
             const ImVec2 windowPos = ImGui::GetWindowPos();
             const float width = ImGui::GetWindowWidth();
-            ImGui::GetWindowDrawList()->AddLine(windowPos, ImVec2(windowPos.x + width, windowPos.y), ImGui::GetColorU32(ImVec4(0.16f, 0.16f, 0.16f, 1.0f)));
+            ImGui::GetWindowDrawList()->AddLine(windowPos, ImVec2(windowPos.x + width, windowPos.y), ImGui::GetColorU32(EditorUI::Colors::Border));
 
             const float tasksWidth = mDrawTasks.empty() ? 0.0f : DrawTasks(width - SIDE_PADDING, ROW_HEIGHT);
             const float gap = tasksWidth > 0.0f ? 24.0f : 0.0f;
@@ -246,9 +178,9 @@ namespace Surge
         const ImVec2 max = ImGui::GetItemRectMax();
         const float textY = min.y + (height - ImGui::GetFontSize()) * 0.5f;
         if(hovered)
-            drawList->AddRectFilled(min, max, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.04f)));
+            drawList->AddRectFilled(min, max, ImGui::GetColorU32(EditorUI::WithAlpha(EditorUI::Colors::Ink, 0.04f)));
 
-        ImVec4 color = SeverityColor(level);
+        ImVec4 color = EditorUI::SeverityColor(level);
         color.w *= alpha;
         float cursorX = min.x + 4.0f;
         if(notifying || mHasLog)
@@ -259,13 +191,13 @@ namespace Surge
 
         if(time)
         {
-            drawList->AddText(ImVec2(cursorX, textY), ImGui::GetColorU32(ImVec4(0.45f, 0.45f, 0.45f, alpha)), time);
+            drawList->AddText(ImVec2(cursorX, textY), ImGui::GetColorU32(EditorUI::WithAlpha(EditorUI::Colors::Tone45, alpha)), time);
             cursorX += ImGui::CalcTextSize(time).x + 8.0f;
         }
 
         // Plain logs in the regular text color, warnings/errors and notifications in their severity color
         const bool tinted = notifying || level >= Severity::Warn;
-        ImVec4 textColor = (notifying || mHasLog) ? ImVec4(0.82f, 0.82f, 0.82f, alpha) : ImVec4(0.45f, 0.45f, 0.45f, 1.0f);
+        ImVec4 textColor = (notifying || mHasLog) ? EditorUI::WithAlpha(EditorUI::Colors::Tone82, alpha) : EditorUI::Colors::Tone45;
         if(tinted)
             textColor = color;
 
@@ -286,15 +218,15 @@ namespace Surge
             if(countText[0])
             {
                 const float textWidth = std::min(ImGui::CalcTextSize(text, firstLineEnd).x, textEndX - cursorX);
-                drawList->AddText(ImVec2(cursorX + textWidth + 8.0f, textY), ImGui::GetColorU32(ImVec4(0.5f, 0.5f, 0.5f, 1.0f)), countText);
+                drawList->AddText(ImVec2(cursorX + textWidth + 8.0f, textY), ImGui::GetColorU32(EditorUI::Colors::Hint), countText);
             }
         }
 
-        if((notifying || mHasLog) && BeginStatusTooltip())
+        if((notifying || mHasLog) && EditorUI::BeginStyledTooltip(TOOLTIP_FLAGS, ImGui::GetFontSize() * 40.0f))
         {
             ImGui::TextUnformatted(text);
             ImGui::TextDisabled("Click to open the Console");
-            EndStatusTooltip();
+            EditorUI::EndStyledTooltip();
         }
     }
 
@@ -329,33 +261,34 @@ namespace Surge
         const float textY = min.y + (height - ImGui::GetFontSize()) * 0.5f;
         float cursorX = min.x;
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.82f, 0.82f, 0.82f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::Tone82);
         ImGui::RenderTextEllipsis(drawList, ImVec2(cursorX, textY), ImVec2(cursorX + titleWidth, min.y + height), cursorX + titleWidth, primary.Title.c_str(), nullptr, nullptr);
         ImGui::PopStyleColor();
         cursorX += titleWidth + spacing;
 
         if(others > 0)
         {
-            drawList->AddText(ImVec2(cursorX, textY), ImGui::GetColorU32(ImGuiAux::Colors::ThemeColor1), othersText);
+            drawList->AddText(ImVec2(cursorX, textY), ImGui::GetColorU32(EditorUI::Colors::Accent), othersText);
             cursorX += othersWidth;
         }
 
         const float barY = min.y + (height - barHeight) * 0.5f;
-        DrawProgressBar(drawList, ImVec2(cursorX, barY), ImVec2(cursorX + barWidth, barY + barHeight), primary.Progress >= 0.0f ? primary.DisplayProgress : INDETERMINATE);
+        EditorUI::AddProgressBar(drawList, ImVec2(cursorX, barY), ImVec2(cursorX + barWidth, barY + barHeight), primary.Progress >= 0.0f ? primary.DisplayProgress : INDETERMINATE,
+                                 EditorUI::Colors::Selection, EditorUI::Colors::Tone18);
         cursorX += barWidth + spacing;
 
         if(percentText[0])
         {
             const float width = ImGui::CalcTextSize(percentText).x;
-            drawList->AddText(ImVec2(cursorX + percentWidth - width, textY), ImGui::GetColorU32(ImVec4(0.6f, 0.6f, 0.6f, 1.0f)), percentText);
+            drawList->AddText(ImVec2(cursorX + percentWidth - width, textY), ImGui::GetColorU32(EditorUI::Colors::Tone60), percentText);
         }
 
-        if(BeginStatusTooltip())
+        if(EditorUI::BeginStyledTooltip(TOOLTIP_FLAGS, ImGui::GetFontSize() * 40.0f))
         {
             for(auto it = mDrawTasks.rbegin(); it != mDrawTasks.rend(); ++it)
             {
                 {
-                    ImGuiAux::ScopedBoldFont bold;
+                    EditorUI::ScopedBoldFont bold;
                     ImGui::TextUnformatted(it->Title.c_str());
                 }
                 if(!it->Detail.empty())
@@ -364,11 +297,12 @@ namespace Surge
                 const ImVec2 barMin = ImGui::GetCursorScreenPos();
                 const float tooltipBarWidth = ImGui::GetFontSize() * 16.0f;
                 ImGui::Dummy(ImVec2(tooltipBarWidth, barHeight));
-                DrawProgressBar(ImGui::GetWindowDrawList(), barMin, ImVec2(barMin.x + tooltipBarWidth, barMin.y + barHeight), it->Progress >= 0.0f ? it->DisplayProgress : INDETERMINATE);
+                EditorUI::AddProgressBar(ImGui::GetWindowDrawList(), barMin, ImVec2(barMin.x + tooltipBarWidth, barMin.y + barHeight), it->Progress >= 0.0f ? it->DisplayProgress : INDETERMINATE,
+                                         EditorUI::Colors::Selection, EditorUI::Colors::Tone18);
                 if(it + 1 != mDrawTasks.rend())
                     ImGui::Separator();
             }
-            EndStatusTooltip();
+            EditorUI::EndStyledTooltip();
         }
 
         return totalWidth;

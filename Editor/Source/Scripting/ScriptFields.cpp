@@ -2,7 +2,7 @@
 #include "Scripting/ScriptFields.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/AssetStamp.hpp"
+#include "Asset/AssetDatabase.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components/Components.hpp"
 #include "Surge/ECS/Components/ScriptComponent.hpp"
@@ -11,7 +11,7 @@
 #include "Surge/Utility/Filesystem.hpp"
 
 #include "Editor.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Panels/ContentBrowserPanel.hpp"
 
 #include <imgui.h>
@@ -330,7 +330,7 @@ return Marker, {
             // Declaration order from the source, alphabetical for anything not found there
             String source;
             AssetManager* am = Core::GetAssetManager();
-            Filesystem::ReadTextFile(am->GetAbsolutePath(am->GetMetadata(id).RelativePath), source);
+            Filesystem::ReadTextFile(AssetDatabase::Get().GetAbsolutePath(am->GetMetadata(id).RelativePath), source);
             const size_t propertiesPos = source.find("Properties");
             std::unordered_map<String, size_t> order;
             for(const ScriptFieldInfo& field : schema.Fields)
@@ -354,7 +354,7 @@ return Marker, {
             watch.NextCheck = now + 1.0;
 
             AssetManager* am = Core::GetAssetManager();
-            const uint64_t modTime = AssetStampWriter::GetModTime(am->GetAbsolutePath(am->GetMetadata(scriptAsset->GetID()).RelativePath));
+            const uint64_t modTime = AssetDatabase::GetFileModTime(AssetDatabase::Get().GetAbsolutePath(am->GetMetadata(scriptAsset->GetID()).RelativePath));
             if(watch.ModTime != 0 && modTime != watch.ModTime)
             {
                 Ref<Script> reloaded = am->Load<Script>(scriptAsset->GetID());
@@ -421,7 +421,7 @@ return Marker, {
             const float clearWidth = value.EntityID ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x : 0.0f;
             if(ImGui::Button(label.c_str(), ImVec2(ImGui::GetContentRegionAvail().x - clearWidth, 0.0f)) && target)
                 static_cast<Editor*>(Core::GetClient())->SelectEntity(target);
-            ImGuiAux::ItemTooltip(target ? "Click to select it, drop another entity from the Hierarchy to replace it" : "Drop an entity from the Hierarchy");
+            EditorUI::ItemTooltip(target ? "Click to select it, drop another entity from the Hierarchy to replace it" : "Drop an entity from the Hierarchy");
 
             if(ImGui::BeginDragDropTarget())
             {
@@ -462,7 +462,7 @@ return Marker, {
 
             const float clearWidth = value.AssetID ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x : 0.0f;
             ImGui::Button(label.c_str(), ImVec2(ImGui::GetContentRegionAvail().x - clearWidth, 0.0f));
-            ImGuiAux::ItemTooltip(value.AssetID && meta.IsValid() ? meta.RelativePath.c_str() : "Drop an asset from the Content Browser");
+            EditorUI::ItemTooltip(value.AssetID && meta.IsValid() ? meta.RelativePath.c_str() : "Drop an asset from the Content Browser");
 
             if(ImGui::BeginDragDropTarget())
             {
@@ -628,20 +628,16 @@ return Marker, {
         const ScriptFieldSchema& schema = GetSchema(scriptAsset);
         if(!schema.Error.empty())
         {
-            //ImGuiAux::TSperator("Properties", true);
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
+            //EditorUI::TSeparator("Properties", true);
             const String firstLine = schema.Error.substr(0, schema.Error.find('\n'));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-            ImGui::TextWrapped("Script error: %s", firstLine.c_str());
-            ImGui::PopStyleColor();
-            ImGuiAux::ItemTooltip(schema.Error.c_str());
+            EditorUI::THint(("Script error: " + firstLine).c_str(), EditorUI::Colors::Error, 0.0f);
+            EditorUI::ItemTooltip(schema.Error.c_str());
             return false;
         }
         if(schema.Fields.empty())
             return false;
 
-        //ImGuiAux::TSperator(live ? "Properties (LIVE)" : "Properties", true);
+        //EditorUI::TSeparator(live ? "Properties (LIVE)" : "Properties", true);
         bool modified = false;
         for(const ScriptFieldInfo& field : schema.Fields)
         {
@@ -660,21 +656,21 @@ return Marker, {
             ImGui::TableNextColumn();
             ImGui::AlignTextToFramePadding();
             if(fieldOverride)
-                ImGui::PushStyleColor(ImGuiCol_Text, ImGuiAux::Colors::ThemeColor1);
+                ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::Accent);
             ImGui::TextUnformatted(field.Name.c_str());
             if(fieldOverride)
                 ImGui::PopStyleColor();
             if(!field.Tooltip.empty())
-                ImGuiAux::ItemTooltip(field.Tooltip.c_str());
-            if(fieldOverride && ImGuiAux::BeginStyledPopupContextItem("##FieldMenu"))
+                EditorUI::ItemTooltip(field.Tooltip.c_str());
+            if(fieldOverride && EditorUI::BeginStyledPopupContextItem("##FieldMenu"))
             {
-                if(ImGuiAux::StyledMenuItem("Reset to default"))
+                if(EditorUI::StyledMenuItem("Reset to default"))
                 {
                     RemoveOverride(overrides, field.Name);
                     fieldOverride = nullptr;
                     modified = true;
                 }
-                ImGuiAux::EndStyledPopup();
+                EditorUI::EndStyledPopup();
             }
 
             ImGui::TableNextColumn();

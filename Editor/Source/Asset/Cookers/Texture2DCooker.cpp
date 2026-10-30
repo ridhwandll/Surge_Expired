@@ -3,7 +3,8 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Core/Process.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/AssetStamp.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/Texture2D/Texture2DFormat.hpp"
 #include "Surge/Core/Core.hpp"
 
 #include "AssetCooker.hpp"
@@ -11,13 +12,13 @@
 
 namespace Surge
 {
-    CookResult Texture2DCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool Texture2DCooker::Cook(const CookContext& context) const
     {
-        AssetManager* am = Core::GetAssetManager();
-        CookResult result;
         const String exe = FindBasisuExe();
-        const String outputPath = am->GetSidecarPath(id);
-        const bool linear = IsLinearColorSpace(sourceAbsPath);
+        const String sourceAbsPath = context.SourcePath.generic_string();
+        const String outputPath = context.OutputPath.generic_string();
+        const ImportSettings::ColorSpace colorSpace = context.Settings.TextureColorSpace;
+        const bool linear = colorSpace == ImportSettings::ColorSpace::AUTO ? IsLinearColorSpace(sourceAbsPath) : colorSpace == ImportSettings::ColorSpace::LINEAR;
 
         const String tmpPath = outputPath + ".tmp";
         // Build basisu.exe arguments
@@ -33,38 +34,28 @@ namespace Surge
         args += "\"" + sourceAbsPath + "\"";
         const String fullCmd = "\"" + exe + "\" " + args;
 
+        Filesystem::CreateOrEnsureDirectories(context.OutputPath.parent_path());
         int exitCode = 0;
         Process::OutputOf(fullCmd, exitCode);
         if(exitCode != 0)
         {
             Log<Severity::Error>("[Texture2DCooker] Failed to cook '{}'. Command: {}", sourceAbsPath, fullCmd);
-            result.Success = false;
-            return result;
+            return false;
         }
 
         Vector<Byte> ktx2Data;
         if(!Filesystem::ReadBinaryFile(tmpPath, ktx2Data))
-        {
-            result.Success = false;
-            return result;
-        }
+            return false;
         Filesystem::RemoveFile(tmpPath);
 
-        // Write the asset stamp + ktx2 data to the sidecar
-        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
-        Vector<Byte> final;
-        final.resize(sizeof(AssetStamp) + ktx2Data.size());
-        memcpy(final.data(), &stamp, sizeof(AssetStamp));
-        memcpy(final.data() + sizeof(AssetStamp), ktx2Data.data(), ktx2Data.size());
-        Filesystem::WriteBinaryFile(outputPath, final.data(), final.size());
-
-        result.Success = true;
-        result.OutputPath = outputPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(outputPath);
+        // The payload is the KTX2 file basisu wrote
+        Rapt0R::Writer payload(ktx2Data.size());
+        Texture2DBinary::Write(payload, ktx2Data);
+        if(!context.Write(Texture2DBinary::VERSION, payload))
+            return false;
 
         Log<Severity::Info>("[Texture2DCooker] Cooked: {}", outputPath);
-        return result;
+        return true;
     }
 
     String Texture2DCooker::FindBasisuExe()

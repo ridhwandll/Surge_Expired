@@ -2,30 +2,23 @@
 #include "ParticleEffectCooker.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/ParticleEffect/ParticleEffectSerializer.hpp"
-#include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/ParticleEffect/ParticleEffectFormat.hpp"
+#include "Asset/SourceIO/ParticleEffectSourceIO.hpp"
 
 namespace Surge
 {
-    CookResult ParticleEffectCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool ParticleEffectCooker::Cook(const CookContext& context) const
     {
-        AssetManager* am = Core::GetAssetManager();
-        const String sidecarPath = am->GetSidecarPath(id, AssetType::PARTICLE_EFFECT);
-
-        CookResult result;
-        result.OutputPath = sidecarPath;
-
-        String json;
         Ref<ParticleEffect> effect = ParticleEffect::Create();
-        if(!Filesystem::ReadTextFile(sourceAbsPath, json) || !ParticleEffectSerializer::FromJson(*Core::GetAssetManager(), json, *effect))
+        if(!ParticleEffectSourceIO::Read(*Core::GetAssetManager(), context.SourcePath, *effect))
         {
-            Log<Severity::Error>("[ParticleEffectCooker] Failed to read particle effect: {}", sourceAbsPath);
-            return result;
+            Log<Severity::Error>("[ParticleEffectCooker] Failed to read particle effect: {}", context.SourcePath.string());
+            return false;
         }
 
-        result.Success = ParticleEffectBinary::Write(sidecarPath, AssetStampWriter::Build(sourceAbsPath, GetCookerVersion()), *effect);
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(sidecarPath);
-        return result;
+        Rapt0R::Writer payload(16 * 1024);
+        ParticleEffectBinary::Write(payload, *effect);
+        return context.Write(ParticleEffectBinary::VERSION, payload);
     }
 }

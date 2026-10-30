@@ -4,7 +4,6 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Physics/Physics.hpp"
 #include "Surge/Graphics/UISystem/UIManager.hpp"
-#include "Surge/Utility/Filesystem.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -14,25 +13,14 @@
 
 namespace Surge
 {
-    static Path GetProjectPath()
-    {
-        Path searchDir = "Engine";
-        Path foundPath;
-
-        Vector<Path> files = Filesystem::GetFilesInDirectory("Engine", ".surgeproj");
-
-        if(files.empty())
-            Log<Severity::Fatal>("No .surgeproj file found!");
-
-        return files.front();
-    }
-
     void Player::OpenProject()
     {
-        const Path projectPath = GetProjectPath();
+        // Written by the Editor's export next to the cooked assets
+        const Path projectPath = Path(mAssetManager->GetAssetsDirectory()) / Project::COOKED_FILE_NAME;
 
         Project openedProject;
-        openedProject.Load(projectPath);
+        if(!openedProject.LoadCooked(projectPath))
+            Log<Severity::Fatal>("[Player] No project at {}, export the game again", projectPath.string());
         mCurrentProject = std::move(openedProject);
         Core::GetPhysics()->ApplySettings(mCurrentProject.Physics);
         mActiveScene = CreateRuntimeScene(mCurrentProject.StartScene);

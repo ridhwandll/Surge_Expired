@@ -5,7 +5,7 @@
 #include "Surge/Core/Diagnostics/Diagnostics.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <imgui.h>
 #include <algorithm>
@@ -21,12 +21,10 @@ namespace Surge
         constexpr std::array<float, 4> BUDGET_RATES = { 30.0f, 60.0f, 90.0f, 120.0f };
         constexpr std::array<const char*, 4> BUDGET_NAMES = { "30 Hz", "60 Hz", "90 Hz", "120 Hz" };
 
-        constexpr ImU32 GPU_PLOT_COLOR = IM_COL32(100, 160, 255, 255);
-        constexpr ImU32 CPU_PLOT_COLOR = IM_COL32(205, 205, 205, 200);
-        constexpr ImU32 FRAME_PLOT_COLOR = IM_COL32(205, 205, 205, 80);
-        constexpr ImVec4 GOOD_COLOR = ImVec4(0.4f, 0.85f, 0.5f, 1.0f);
-        constexpr ImVec4 WARNING_COLOR = ImVec4(1.0f, 0.75f, 0.3f, 1.0f);
-        constexpr ImVec4 OVER_COLOR = ImVec4(1.0f, 0.42f, 0.38f, 1.0f);
+        namespace Colors = EditorUI::Colors;
+        using EditorUI::ToU32;
+        using EditorUI::WithAlpha;
+        constexpr ImU32 GPU_PLOT_COLOR = ToU32(Colors::Blue);
 
         // Fixed per group, so a group keeps its color in every view and every session
         ImU32 GroupColor(const String& name)
@@ -37,13 +35,13 @@ namespace Surge
                 ImU32 Color;
             };
             static constexpr std::array<GroupColorEntry, 7> GROUP_COLORS = { {
-                { "Shadow", IM_COL32(146, 112, 202, 255) },
-                { "MainScene", IM_COL32(91, 143, 249, 255) },
-                { "AmbientOcclusion", IM_COL32(90, 216, 166, 255) },
-                { "Bloom", IM_COL32(246, 189, 22, 255) },
-                { "PostProcess", IM_COL32(232, 104, 74, 255) },
-                { "UIOverlay", IM_COL32(109, 200, 236, 255) },
-                { "Swapchain", IM_COL32(255, 157, 77, 255) },
+                { "Shadow", ToU32(Colors::PassGroup::Shadow) },
+                { "MainScene", ToU32(Colors::PassGroup::MainScene) },
+                { "AmbientOcclusion", ToU32(Colors::PassGroup::AmbientOcclusion) },
+                { "Bloom", ToU32(Colors::PassGroup::Bloom) },
+                { "PostProcess", ToU32(Colors::PassGroup::PostProcess) },
+                { "UIOverlay", ToU32(Colors::PassGroup::UIOverlay) },
+                { "Swapchain", ToU32(Colors::PassGroup::Swapchain) },
             } };
             for(const GroupColorEntry& entry : GROUP_COLORS)
                 if(name == entry.Name)
@@ -64,23 +62,12 @@ namespace Surge
             return scope.Depth == 0 ? 0 : groupColor;
         }
 
-        ImU32 WithAlpha(ImU32 color, float alpha)
-        {
-            return (color & ~IM_COL32_A_MASK) | (static_cast<ImU32>(alpha * 255.0f) << IM_COL32_A_SHIFT);
-        }
-
         // Green under 80% of the budget, amber up to it, red past it
         ImU32 BudgetColor(float milliseconds, float budget)
         {
             if(milliseconds <= budget * 0.8f)
-                return ImGui::GetColorU32(GOOD_COLOR);
-            return ImGui::GetColorU32(milliseconds <= budget ? WARNING_COLOR : OVER_COLOR);
-        }
-
-        ImFont* BoldFont()
-        {
-            ImFontAtlas* atlas = ImGui::GetIO().Fonts;
-            return atlas->Fonts.Size > 1 ? atlas->Fonts[1] : ImGui::GetFont();
+                return ImGui::GetColorU32(Colors::Success);
+            return ImGui::GetColorU32(milliseconds <= budget ? Colors::Warning : Colors::Error);
         }
     } // namespace
 
@@ -135,7 +122,7 @@ namespace Surge
     void RendererPanel::DrawStats(RenderGraph& graph)
     {
         if(mTarget.IsMainGraph() && !graph.IsSceneEnabled())
-            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "The main graph only presents ImGui in the Editor, pick a viewport.");
+            ImGui::TextColored(Colors::Warning, "The main graph only presents ImGui in the Editor, pick a viewport.");
 
         if(ImGui::BeginChild("##Stats"))
         {
@@ -165,7 +152,7 @@ namespace Surge
         bool enabled = diagnostics->IsGPUTimingEnabled();
         if(ImGui::Checkbox("GPU Timing", &enabled))
             diagnostics->SetGPUTimingEnabled(enabled);
-        ImGuiAux::ItemTooltip("Timestamp queries around every render graph group and pass, results arrive 2 frames late");
+        EditorUI::ItemTooltip("Timestamp queries around every render graph group and pass, results arrive 2 frames late");
 
         // Frame budget everything is colored against, right aligned next to the switch
         const float comboWidth = ImGui::CalcTextSize("120 Hz").x + ImGui::GetFrameHeight() + style.FramePadding.x * 2.0f;
@@ -183,7 +170,7 @@ namespace Surge
                     mBudgetIndex = i;
             ImGui::EndCombo();
         }
-        ImGuiAux::ItemTooltip("Frame budget the timings are judged against: green under 80%, amber up to it, red past it");
+        EditorUI::ItemTooltip("Frame budget the timings are judged against: green under 80%, amber up to it, red past it");
         const float budget = 1000.0f / BUDGET_RATES[mBudgetIndex];
 
         const FrameTimings& timings = diagnostics->GetTimings();
@@ -196,9 +183,9 @@ namespace Surge
         }
 
         if(!Core::GetRenderer()->GetRHI()->SupportsGPUTimingInRenderPass())
-            ImGui::TextColored(WARNING_COLOR, "Tile based GPU: passes sharing a render pass are timed together.");
+            ImGui::TextColored(Colors::Warning, "Tile based GPU: passes sharing a render pass are timed together.");
         if(timings.GPUOverflowed)
-            ImGui::TextColored(WARNING_COLOR, "More scopes than the query pool holds, the last ones were dropped.");
+            ImGui::TextColored(Colors::Warning, "More scopes than the query pool holds, the last ones were dropped.");
 
         ImGui::Spacing();
         DrawTimingSummary(timings, budget);
@@ -258,7 +245,7 @@ namespace Surge
         } };
 
         const ImGuiStyle& style = ImGui::GetStyle();
-        ImFont* boldFont = BoldFont();
+        ImFont* boldFont = EditorUI::BoldFont();
         const float valueSize = ImGui::GetFontSize() * 1.6f;
         const float lineHeight = ImGui::GetTextLineHeight();
         const ImVec2 padding = ImVec2(10.0f, 6.0f);
@@ -328,7 +315,7 @@ namespace Surge
         const auto toY = [&](float milliseconds) { return max.y - std::min(milliseconds / scaleMax, 1.0f) * (size.y - 2.0f); };
 
         const float budgetY = toY(budget);
-        const ImU32 budgetColor = WithAlpha(ImGui::GetColorU32(OVER_COLOR), 0.7f);
+        const ImU32 budgetColor = WithAlpha(ImGui::GetColorU32(Colors::Error), 0.7f);
         drawList->AddLine(ImVec2(min.x, budgetY), ImVec2(max.x, budgetY), budgetColor, 1.0f);
 
         if(count > 1)
@@ -352,8 +339,8 @@ namespace Surge
                 drawList->AddPolyline(points.data(), static_cast<int>(count), color, ImDrawFlags_None, thickness);
             };
             plot(history.GPUWorkMs, GPU_PLOT_COLOR, 1.5f);
-            plot(history.FrameMs, FRAME_PLOT_COLOR, 1.0f);
-            plot(history.CPUWorkMs, CPU_PLOT_COLOR, 1.0f);
+            plot(history.FrameMs, ToU32(WithAlpha(Colors::Tone80, 0.31f)), 1.0f);
+            plot(history.CPUWorkMs, ToU32(WithAlpha(Colors::Tone80, 0.78f)), 1.0f);
         }
 
         // Legend (top left) and budget label (right, under its line)
@@ -362,7 +349,7 @@ namespace Surge
         const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
         float legendX = min.x + 6.0f;
         const float legendY = min.y + 4.0f;
-        for(const auto& [color, label] : { std::pair { GPU_PLOT_COLOR, "GPU" }, std::pair { CPU_PLOT_COLOR, "CPU" }, std::pair { FRAME_PLOT_COLOR, "Frame" } })
+        for(const auto& [color, label] : { std::pair { GPU_PLOT_COLOR, "GPU" }, std::pair { ToU32(WithAlpha(Colors::Tone80, 0.78f)), "CPU" }, std::pair { ToU32(WithAlpha(Colors::Tone80, 0.31f)), "Frame" } })
         {
             const float swatchY = legendY + (lineHeight - swatch) * 0.5f;
             drawList->AddRectFilled(ImVec2(legendX, swatchY), ImVec2(legendX + swatch, swatchY + swatch), color, 2.0f);
@@ -409,7 +396,7 @@ namespace Surge
         const Vector<DiagnosticsScope>& scopes = timings.Scopes;
         const float total = std::max(timings.GPUWorkMs, 0.0001f);
         const ImU32 separatorColor = ImGui::GetColorU32(ImGuiCol_WindowBg);
-        const ImU32 labelColor = IM_COL32(20, 20, 24, 255);
+        const ImU32 labelColor = ToU32(Colors::OnAccent);
         const DiagnosticsScope* graph = nullptr;
         const DiagnosticsScope* hoveredRow = nullptr;
         const DiagnosticsScope* hoveredGraph = nullptr;
@@ -478,7 +465,7 @@ namespace Surge
         const float indent = style.IndentSpacing * 0.75f;
         const float lineHeight = ImGui::GetTextLineHeight();
         const float swatchSize = std::floor(lineHeight * 0.6f);
-        ImFont* boldFont = BoldFont();
+        ImFont* boldFont = EditorUI::BoldFont();
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImU32 graphRowBackground = ImGui::GetColorU32(ImGuiCol_TableHeaderBg);
         const ImU32 barBackground = ImGui::GetColorU32(ImGuiCol_FrameBg);
@@ -525,16 +512,16 @@ namespace Surge
             // Heat: the scopes that eat the frame stand out
             ImGui::TableSetColumnIndex(1);
             if(row.Depth > 0 && share >= 0.25f)
-                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "%.2f", row.AverageMs);
+                ImGui::TextColored(Colors::HeatHigh, "%.2f", row.AverageMs);
             else if(row.Depth > 0 && share >= 0.1f)
-                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.5f, 1.0f), "%.2f", row.AverageMs);
+                ImGui::TextColored(Colors::HeatMedium, "%.2f", row.AverageMs);
             else
                 ImGui::Text("%.2f", row.AverageMs);
 
             ImGui::TableSetColumnIndex(2);
             if(row.MaxMs > row.AverageMs * 2.0f && row.MaxMs - row.AverageMs > 0.25f)
             {
-                ImGui::TextColored(WARNING_COLOR, "%.2f", row.MaxMs);
+                ImGui::TextColored(Colors::Warning, "%.2f", row.MaxMs);
                 ImGui::SetItemTooltip("Spiky: the peak is over twice the average");
             }
             else

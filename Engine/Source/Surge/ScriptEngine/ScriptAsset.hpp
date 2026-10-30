@@ -19,6 +19,5 @@ namespace Surge
         static Ref<Script> Create(Vector<Byte>&& bytecode);
     private:
         Vector<Byte> mBytecode;
-        friend class ScriptSerializer;
     };
 }

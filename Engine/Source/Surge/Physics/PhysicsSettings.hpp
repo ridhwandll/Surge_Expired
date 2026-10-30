@@ -7,7 +7,7 @@
 
 namespace Surge
 {
-    // Project wide (saved in the .surgeproj, so every build ships them), applied with Physics::ApplySettings
+    // Project wide (saved in the .surgeproj, cooked into Project.rPROJ by the export, so every build ships them), applied with Physics::ApplySettings
     struct PhysicsSettings
     {
         static constexpr int MAX_LAYERS = 16;

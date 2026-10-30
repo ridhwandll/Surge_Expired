@@ -10,10 +10,11 @@
 #include "Surge/Utility/FileDialogs.hpp"
 #include "Surge/Utility/Platform.hpp"
 
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Editor.hpp"
 
 #include <imgui.h>
+#include <imgui_stdlib.h>
 #include <algorithm>
 #include <cctype>
 #include <cfloat>
@@ -24,137 +25,13 @@ namespace Surge
 {
     namespace
     {
-        constexpr ImVec4 kAccent = ImGuiAux::Colors::ThemeColor1;
-        constexpr ImVec4 kAccentHover = ImGuiAux::Colors::Selection;
-        constexpr ImVec4 kAccentActive = ImGuiAux::Colors::ThemeColor1;
-        constexpr ImVec4 kInputBg = ImVec4(0.067f, 0.067f, 0.067f, 1.0f);
-        constexpr ImVec4 kInputHover = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
-        constexpr ImVec4 kTextMuted = ImVec4(0.67f, 0.67f, 0.67f, 1.0f);
-        constexpr ImVec4 kTrackBg = ImVec4(0.06f, 0.06f, 0.06f, 1.0f);
-        constexpr ImVec4 kCardBg = ImVec4(0.09f, 0.09f, 0.09f, 1.0f);
-        constexpr ImVec4 kOk = ImVec4(0.35f, 0.80f, 0.45f, 1.0f);
-        constexpr ImVec4 kWarn = ImVec4(0.95f, 0.75f, 0.25f, 1.0f);
-        constexpr ImVec4 kErr = ImVec4(0.95f, 0.3f, 0.3f, 1.0f);
+        namespace Colors = EditorUI::Colors;
         constexpr float kRounding = 2.0f;
-
-        ImFont* sBold = nullptr;
         float sLabelWidth = 0.0f;
 
         void ShowLogInConsole(const char* tag = ExportSession::LOG_TAG)
         {
             static_cast<Editor*>(Core::GetClient())->GetPanelManager().GetPanel<ConsolePanel>()->FocusWithSearch(tag);
-        }
-
-        // Widgets
-        int StringResizeCallback(ImGuiInputTextCallbackData* data)
-        {
-            if(data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-            {
-                String* str = static_cast<String*>(data->UserData);
-                str->resize(static_cast<size_t>(data->BufTextLen));
-                data->Buf = str->data();
-            }
-            return 0;
-        }
-
-        bool InputString(const char* id, String& value, const char* hint = "", ImGuiInputTextFlags flags = 0)
-        {
-            flags |= ImGuiInputTextFlags_CallbackResize;
-            return ImGui::InputTextWithHint(id, hint, value.data(), value.capacity() + 1, flags, StringResizeCallback, &value);
-        }
-
-        void Section(const char* title, bool first = false)
-        {
-            if(!first)
-                ImGui::Dummy(ImVec2(0.0f, 14.0f));
-            ImGui::PushFont(sBold);
-            ImGui::TextColored(kAccent, "%s", title);
-            ImGui::PopFont();
-            ImGui::Separator();
-            ImGui::Dummy(ImVec2(0.0f, 4.0f));
-        }
-
-        void RowLabel(const char* label)
-        {
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(kTextMuted, "%s", label);
-            ImGui::SameLine(sLabelWidth);
-        }
-
-        void HelpMarker(const char* text)
-        {
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if(ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", text);
-        }
-
-        void TextRow(const char* label, const char* id, String& value, const char* hint = "", ImGuiInputTextFlags flags = 0)
-        {
-            RowLabel(label);
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            InputString(id, value, hint, flags);
-        }
-
-        template <typename BrowseFn>
-        void PathRow(const char* label, const char* id, String& value, const char* hint, bool clearable, BrowseFn&& browse)
-        {
-            RowLabel(label);
-            ImGui::PushID(id);
-
-            const float spacing = ImGui::GetStyle().ItemSpacing.x;
-            ImGui::PushFont(sBold);
-            const float browseW = ImGui::CalcTextSize("BROWSE").x + 28.0f;
-            const float clearW = ImGui::CalcTextSize("X").x + 28.0f;
-            ImGui::PopFont();
-
-            const bool showClear = clearable && !value.empty();
-            ImGui::SetNextItemWidth(-(browseW + spacing + (showClear ? clearW + spacing : 0.0f)));
-            InputString("##path", value, hint, ImGuiInputTextFlags_ReadOnly);
-
-            ImGui::PushFont(sBold);
-            ImGui::PushStyleColor(ImGuiCol_Button, kInputBg);
-            ImGui::SameLine();
-            if(ImGuiAux::Button("BROWSE", ImVec2(browseW, 0.0f)))
-            {
-                String selected = browse();
-                if(!selected.empty())
-                    value = selected;
-            }
-            if(showClear)
-            {
-                ImGui::SameLine();
-                if(ImGuiAux::Button("X", ImVec2(clearW, 0.0f)))
-                    value.clear();
-            }
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-            ImGui::PopID();
-        }
-
-        void CheckRow(const char* label, const char* id, bool& value, const char* tooltip)
-        {
-            RowLabel(label);
-            ImGui::Checkbox(id, &value);
-            HelpMarker(tooltip);
-        }
-
-        void ClampedIntField(const char* id, int& value, int minV, int maxV, float width)
-        {
-            ImGui::SetNextItemWidth(width);
-            if(ImGui::InputInt(id, &value, 0, 0))
-                value = std::clamp(value, minV, maxV);
-        }
-
-        bool SmallActionButton(const char* label)
-        {
-            ImGui::PushFont(sBold);
-            ImGui::PushStyleColor(ImGuiCol_Button, kInputBg);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kInputHover);
-            const bool pressed = ImGuiAux::Button(label);
-            ImGui::PopStyleColor(2);
-            ImGui::PopFont();
-            return pressed;
         }
 
         // One tab per registered exporter
@@ -167,12 +44,12 @@ namespace Surge
             const float count = static_cast<float>(exporters.size());
             const float tabWidth = (availWidth - tabSpacing * (count - 1.0f)) / count;
 
-            ImGui::PushFont(sBold);
+            ImGui::PushFont(EditorUI::BoldFont());
 
             const ImVec2 trackPos = ImGui::GetCursorScreenPos();
             ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(trackPos.x - 4.0f, trackPos.y - 4.0f),
                                                       ImVec2(trackPos.x + availWidth + 4.0f, trackPos.y + tabHeight + 4.0f),
-                                                      ImGui::ColorConvertFloat4ToU32(kTrackBg), kRounding);
+                                                      EditorUI::ToU32(Colors::Tone06), kRounding);
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tabSpacing, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, kRounding);
@@ -182,13 +59,13 @@ namespace Surge
             {
                 const PlatformExporter& exporter = *exporters[i];
                 const bool active = common.SelectedPlatform == exporter.GetPlatform();
-                const ImVec4 idleText = exporter.IsSupported() ? kTextMuted : ImVec4(kTextMuted.x, kTextMuted.y, kTextMuted.z, 0.45f);
+                const ImVec4 idleText = exporter.IsSupported() ? Colors::Tone67 : EditorUI::WithAlpha(Colors::Tone67, 0.45f);
 
                 if(i > 0)
                     ImGui::SameLine();
-                ImGui::PushStyleColor(ImGuiCol_Button, active ? kAccent : ImVec4(0, 0, 0, 0));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? kAccentHover : kInputBg);
-                ImGui::PushStyleColor(ImGuiCol_Text, active ? ImVec4(0, 0, 0, 1) : idleText);
+                ImGui::PushStyleColor(ImGuiCol_Button, active ? Colors::Accent : Colors::Transparent);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? Colors::Selection : Colors::Tone07);
+                ImGui::PushStyleColor(ImGuiCol_Text, active ? Colors::Black : idleText);
                 if(ImGui::Button(exporter.GetDisplayName(), ImVec2(tabWidth, tabHeight)))
                     common.SelectedPlatform = exporter.GetPlatform();
                 ImGui::PopStyleColor(3);
@@ -205,7 +82,7 @@ namespace Surge
         // Sections shared by every platform
         void DrawProjectSection(ExportCommonSettings& common)
         {
-            Section("PROJECT", true);
+            EditorUI::SectionHeading("PROJECT", true);
 
             AssetManager* am = Core::GetAssetManager();
             Vector<AssetID> sceneIDs;
@@ -221,7 +98,7 @@ namespace Surge
             if(!found)
                 common.StartScene = AssetID::INVALID; // scene was deleted / project switched
 
-            RowLabel("Start scene");
+            EditorUI::FormLabel("Start scene", sLabelWidth);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const String preview = common.StartScene.IsValid() ? am->GetMetadata(common.StartScene).RelativePath : String("No scene selected...");
             if(ImGui::BeginCombo("##StartScene", preview.c_str()))
@@ -242,62 +119,61 @@ namespace Surge
         void DrawApplicationSection(ExportCommonSettings& common)
         {
             ExportBranding& b = common.Branding;
-            Section("APPLICATION");
+            EditorUI::SectionHeading("APPLICATION");
 
-            TextRow("Name", "##AppName", b.AppName, "Product / display name");
-            TextRow("Company", "##Company", b.Company, "e.g. Surge Technologies");
-            TextRow("Description", "##Desc", b.Description, "Shown as the executable's file description");
-            TextRow("Copyright", "##Copyright", b.Copyright, "e.g. Copyright (C) 2026 Surge Technologies");
+            EditorUI::FormInputText("Name", "##AppName", b.AppName, sLabelWidth, "Product / display name");
+            EditorUI::FormInputText("Company", "##Company", b.Company, sLabelWidth, "e.g. Surge Technologies");
+            EditorUI::FormInputText("Description", "##Desc", b.Description, sLabelWidth, "Shown as the executable's file description");
+            EditorUI::FormInputText("Copyright", "##Copyright", b.Copyright, sLabelWidth, "e.g. Copyright (C) 2026 Surge Technologies");
 
-            RowLabel("Version");
+            EditorUI::FormLabel("Version", sLabelWidth);
             const float spacing = ImGui::GetStyle().ItemSpacing.x;
             const float avail = ImGui::GetContentRegionAvail().x;
             const float w = (avail - spacing * 2.0f) / 3.0f;
-            ClampedIntField("##Major", b.Major, 0, 65535, w);
+            EditorUI::InputIntClamped("##Major", b.Major, 0, 65535, w);
             ImGui::SameLine();
-            ClampedIntField("##Minor", b.Minor, 0, 65535, w);
+            EditorUI::InputIntClamped("##Minor", b.Minor, 0, 65535, w);
             ImGui::SameLine();
-            ClampedIntField("##Patch", b.Patch, 0, 65535, w);
+            EditorUI::InputIntClamped("##Patch", b.Patch, 0, 65535, w);
 
-            RowLabel("Build number");
-            ClampedIntField("##Build", b.Build, 1, 65535, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("(?)").x - spacing);
-            HelpMarker("Windows: 4th part of the file/product version (M.m.p.build).\nAndroid: versionCode - must increase for every Play Store upload.");
+            EditorUI::FormLabel("Build number", sLabelWidth);
+            EditorUI::InputIntClamped("##Build", b.Build, 1, 65535, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("(?)").x - spacing);
+            EditorUI::HelpMarker("Windows: 4th part of the file/product version (M.m.p.build).\nAndroid: versionCode - must increase for every Play Store upload.");
 
-            CheckRow("Auto-increment build", "##AutoBuild", common.Options.AutoIncrementBuild, "Bump the build number after every successful export.");
+            EditorUI::FormCheckbox("Auto-increment build", "##AutoBuild", common.Options.AutoIncrementBuild, sLabelWidth, "Bump the build number after every successful export.");
         }
 
         // Platform sections
         void DrawWindowsSettings(WindowsExportSettings& w, ExportOptions& options)
         {
-            Section("WINDOWS");
+            EditorUI::SectionHeading("WINDOWS");
 
-            PathRow("Build destination", "##WinOut", w.OutputPath, "Folder to export into", false,
-                    []() { return FileDialog::ChooseFolder(); });
-            PathRow("Icon (.ico)", "##WinIcon", w.IconPath, "Optional - embedded into the executable", true,
-                    []() { return FileDialog::OpenFile("Icon Files (*.ico)\0*.ico\0All Files (*.*)\0*.*\0"); });
+            EditorUI::FormLabel("Build destination", sLabelWidth);
+            EditorUI::PathField("##WinOut", w.OutputPath, "Folder to export into", false, []() { return FileDialog::ChooseFolder(); });
+            EditorUI::FormLabel("Icon (.ico)", sLabelWidth);
+            EditorUI::PathField("##WinIcon", w.IconPath, "Optional - embedded into the executable", true, []() { return FileDialog::OpenFile("Icon Files (*.ico)\0*.ico\0All Files (*.*)\0*.*\0"); });
 
-            RowLabel("Architecture");
+            EditorUI::FormLabel("Architecture", sLabelWidth);
             ImGui::TextDisabled("Windows x86_64");
 
-            CheckRow("Clean destination", "##WinClean", w.CleanOutput, "Delete everything inside the destination folder before exporting.");
-            CheckRow("Stamp executable info", "##WinStamp", w.StampExecutable,
-                     "Write product name, company, description, copyright and version into the exe via rcedit.");
-            CheckRow("Open folder when done", "##WinOpen", options.OpenFolderWhenDone, "Show the exported executable in Explorer after a successful export.");
+            EditorUI::FormCheckbox("Clean destination", "##WinClean", w.CleanOutput, sLabelWidth, "Delete everything inside the destination folder before exporting.");
+            EditorUI::FormCheckbox("Stamp executable info", "##WinStamp", w.StampExecutable, sLabelWidth, "Write product name, company, description, copyright and version into the exe via rcedit.");
+            EditorUI::FormCheckbox("Open folder when done", "##WinOpen", options.OpenFolderWhenDone, sLabelWidth, "Show the exported executable in Explorer after a successful export.");
         }
 
         // Every path the Android build uses, missing ones in their expected location. Click a path to copy it
         void DrawAndroidToolchain(AndroidExporter& exporter)
         {
-            Section("ANDROID TOOLCHAIN");
+            EditorUI::SectionHeading("ANDROID TOOLCHAIN");
 
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0], 14.0f);
+            ImGui::PushFont(EditorUI::RegularFont(), 14.0f);
             bool incomplete = false;
             for(const AndroidToolItem& item : exporter.GetToolchain().Items)
             {
                 incomplete |= item.State != AndroidToolState::OK;
-                RowLabel(item.Name.c_str());
+                EditorUI::FormLabel(item.Name.c_str(), sLabelWidth);
 
-                const ImVec4 color = item.State == AndroidToolState::OK ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : item.State == AndroidToolState::WARN ? kWarn : kErr;
+                const ImVec4 color = item.State == AndroidToolState::OK ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : item.State == AndroidToolState::WARN ? Colors::Warning : Colors::Error;
                 ImGui::PushStyleColor(ImGuiCol_Text, color);
                 ImGui::PushTextWrapPos(0.0f);
                 ImGui::TextUnformatted(item.Location.empty() ? "Not found" : item.Location.c_str());
@@ -314,7 +190,7 @@ namespace Surge
                 if(!item.Note.empty() && item.Location.empty())
                 {
                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + sLabelWidth);
-                    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
+                    ImGui::PushStyleColor(ImGuiCol_Text, Colors::Tone67);
                     ImGui::PushTextWrapPos(0.0f);
                     ImGui::TextUnformatted(item.Note.c_str());
                     ImGui::PopTextWrapPos();
@@ -323,7 +199,7 @@ namespace Surge
             }
             ImGui::PopFont();
             if(incomplete)
-                ImGuiAux::TextCentered("Scripts/AndroidSetup.bat installs everything the Android build needs! Just run it and restart the editor!");
+                EditorUI::TextCentered("Scripts/AndroidSetup.bat installs everything the Android build needs! Just run it and restart the editor!");
         }
 
         void DrawAndroidSettings(AndroidExporter& exporter, ExportOptions& options)
@@ -331,21 +207,21 @@ namespace Surge
             AndroidExportSettings& a = exporter.GetSettings();
             DrawAndroidToolchain(exporter);
 
-            Section("ANDROID");
-            PathRow("Build destination", "##AndOut", a.OutputPath, "Folder to export into", false,
-                    []() { return FileDialog::ChooseFolder(); });
-            PathRow("Icon (.png)", "##AndIcon", a.IconPath, "Optional - 192x192 or larger", true,
-                    []() { return FileDialog::OpenFile("PNG Images (*.png)\0*.png\0All Files (*.*)\0*.*\0"); });
+            EditorUI::SectionHeading("ANDROID");
+            EditorUI::FormLabel("Build destination", sLabelWidth);
+            EditorUI::PathField("##AndOut", a.OutputPath, "Folder to export into", false, []() { return FileDialog::ChooseFolder(); });
+            EditorUI::FormLabel("Icon (.png)", sLabelWidth);
+            EditorUI::PathField("##AndIcon", a.IconPath, "Optional - 192x192 or larger", true, []() { return FileDialog::OpenFile("PNG Images (*.png)\0*.png\0All Files (*.*)\0*.*\0"); });
 
-            TextRow("Package ID", "##PkgId", a.PackageId, "com.company.game");
+            EditorUI::FormInputText("Package ID", "##PkgId", a.PackageId, sLabelWidth, "com.company.game");
             if(!AndroidExporter::IsValidPackageId(a.PackageId))
             {
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + sLabelWidth);
-                ImGui::TextColored(kWarn, "Invalid package ID (letters, digits, '_' - at least two dot-separated parts)");
+                ImGui::TextColored(Colors::Warning, "Invalid package ID (letters, digits, '_' - at least two dot-separated parts)");
             }
 
             // Format
-            RowLabel("Format");
+            EditorUI::FormLabel("Format", sLabelWidth);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const char* formatPreview = a.Format == AndroidPackageFormat::APK ? "APK (.apk) - sideload / testing" : "AAB (.aab) - Google Play";
             if(ImGui::BeginCombo("##AndFormat", formatPreview))
@@ -358,7 +234,7 @@ namespace Surge
             }
 
             // Min API
-            RowLabel("Minimum API level");
+            EditorUI::FormLabel("Minimum API level", sLabelWidth);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const char* apiPreview = "Custom";
             for(const AndroidApiLevel& api : AndroidExporter::API_LEVELS)
@@ -373,7 +249,7 @@ namespace Surge
             }
 
             // Target API
-            RowLabel("Target API level");
+            EditorUI::FormLabel("Target API level", sLabelWidth);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const char* targetPreview = "Custom";
             for(const AndroidApiLevel& api : AndroidExporter::TARGET_API_LEVELS)
@@ -389,17 +265,17 @@ namespace Surge
             if(a.TargetApi < 36)
             {
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + sLabelWidth);
-                ImGui::TextColored(kWarn, "Google Play rejects new apps and updates below API 36");
+                ImGui::TextColored(Colors::Warning, "Google Play rejects new apps and updates below API 36");
             }
 
-            RowLabel("Architecture");
+            EditorUI::FormLabel("Architecture", sLabelWidth);
             ImGui::TextDisabled("ARM64-v8a");
 
-            CheckRow("Clean destination", "##AndClean", a.CleanOutput, "Delete everything inside the destination folder before exporting.");
-            CheckRow("Verbose build log", "##AndVerbose", a.VerboseLog, "Print every compiled C++ file to the Console. Warnings and errors are always printed.");
+            EditorUI::FormCheckbox("Clean destination", "##AndClean", a.CleanOutput, sLabelWidth, "Delete everything inside the destination folder before exporting.");
+            EditorUI::FormCheckbox("Verbose build log", "##AndVerbose", a.VerboseLog, sLabelWidth, "Print every compiled C++ file to the Console. Warnings and errors are always printed.");
 
-            Section("DISPLAY");
-            RowLabel("Orientation");
+            EditorUI::SectionHeading("DISPLAY");
+            EditorUI::FormLabel("Orientation", sLabelWidth);
             ImGui::SetNextItemWidth(-FLT_MIN);
             if(ImGui::BeginCombo("##AndOrient", AndroidExporter::ORIENTATIONS[a.Orientation].Name))
             {
@@ -409,30 +285,28 @@ namespace Surge
                 ImGui::EndCombo();
             }
 
-            CheckRow("Immersive fullscreen", "##AndImmersive", a.Immersive, "Hide the status and navigation bars. Swiping from a screen edge shows them briefly, then they hide again.");
-            CheckRow("Draw into display cutout", "##AndCutout", a.UseCutout, "Use the full screen including the notch / camera cut-out. Your UI must respect the safe-area insets.");
-            CheckRow("Keep screen on", "##AndKeepOn", a.KeepScreenOn, "Prevent the screen from dimming or locking while the game is running.");
-            CheckRow("Exit on back (TODO)", "##AndExitOnBack", a.ExitOnBack, "Exit the app when the back button is pressed.");
+            EditorUI::FormCheckbox("Immersive fullscreen", "##AndImmersive", a.Immersive, sLabelWidth, "Hide the status and navigation bars. Swiping from a screen edge shows them briefly, then they hide again.");
+            EditorUI::FormCheckbox("Draw into display cutout", "##AndCutout", a.UseCutout, sLabelWidth, "Use the full screen including the notch / camera cut-out. Your UI must respect the safe-area insets.");
+            EditorUI::FormCheckbox("Keep screen on", "##AndKeepOn", a.KeepScreenOn, sLabelWidth, "Prevent the screen from dimming or locking while the game is running.");
+            EditorUI::FormCheckbox("Exit on back (TODO)", "##AndExitOnBack", a.ExitOnBack, sLabelWidth, "Exit the app when the back button is pressed.");
 
-            Section("SIGNING");
-            PathRow("Keystore", "##AndKey", a.KeystorePath, "Path to .keystore / .jks", false,
-                    []() { return FileDialog::OpenFile("Android Keystore (*.keystore;*.jks)\0*.keystore;*.jks\0All Files (*.*)\0*.*\0"); });
-            TextRow("Key alias", "##KeyAlias", a.KeyAlias);
-            TextRow("Keystore password", "##StorePass", a.KeystorePass, "", ImGuiInputTextFlags_Password);
-            TextRow("Key password", "##KeyPass", a.KeyPass, "Same as keystore password if empty", ImGuiInputTextFlags_Password);
-            ImGuiAux::TextCentered("NOTE: Passwords are kept in memory only and NEVER written to disk or passed to command line");
+            EditorUI::SectionHeading("SIGNING");
+            EditorUI::FormLabel("Keystore", sLabelWidth);
+            EditorUI::PathField("##AndKey", a.KeystorePath, "Path to .keystore / .jks", false, []() { return FileDialog::OpenFile("Android Keystore (*.keystore;*.jks)\0*.keystore;*.jks\0All Files (*.*)\0*.*\0"); });
+            EditorUI::FormInputText("Key alias", "##KeyAlias", a.KeyAlias, sLabelWidth);
+            EditorUI::FormInputText("Keystore password", "##StorePass", a.KeystorePass, sLabelWidth, "", ImGuiInputTextFlags_Password);
+            EditorUI::FormInputText("Key password", "##KeyPass", a.KeyPass, sLabelWidth, "Same as keystore password if empty", ImGuiInputTextFlags_Password);
+            EditorUI::TextCentered("NOTE: Passwords are kept in memory only and NEVER written to disk or passed to command line");
 
-            Section("AFTER EXPORT");
+            EditorUI::SectionHeading("AFTER EXPORT");
             const bool isApk = a.Format == AndroidPackageFormat::APK;
-            CheckRow("Open folder when done", "##AndOpen", options.OpenFolderWhenDone, "Show the exported package in Explorer after a successful export.");
+            EditorUI::FormCheckbox("Open folder when done", "##AndOpen", options.OpenFolderWhenDone, sLabelWidth, "Show the exported package in Explorer after a successful export.");
             ImGui::BeginDisabled(!isApk);
-            CheckRow("Install on device", "##AndInstall", a.InstallOnDevice,
-                     isApk ? "Install the APK on the connected device with adb (USB debugging must be enabled)." : "Only available for APK exports.");
+            EditorUI::FormCheckbox("Install on device", "##AndInstall", a.InstallOnDevice, sLabelWidth, isApk ? "Install the APK on the connected device with adb (USB debugging must be enabled)." : "Only available for APK exports.");
             ImGui::BeginDisabled(!a.InstallOnDevice);
-            CheckRow("Launch after install", "##AndLaunch", a.LaunchAfterInstall, "Start the app on the device once it is installed.");
+            EditorUI::FormCheckbox("Launch after install", "##AndLaunch", a.LaunchAfterInstall, sLabelWidth, "Start the app on the device once it is installed.");
             ImGui::BeginDisabled(!a.LaunchAfterInstall);
-            CheckRow("Attach device log", "##AndLogcat", a.AttachLogcat,
-                     "After launching, stream the app's log and native crash reports into the Console (search [Device]).\nCrash backtraces are symbolized against the last build.");
+            EditorUI::FormCheckbox("Attach device log", "##AndLogcat", a.AttachLogcat, sLabelWidth, "After launching, stream the app's log and native crash reports into the Console (search [Device]).\nCrash backtraces are symbolized against the last build.");
             ImGui::EndDisabled();
             ImGui::EndDisabled();
             ImGui::EndDisabled();
@@ -455,14 +329,14 @@ namespace Surge
 
             ImGui::Dummy(ImVec2(0.0f, 30.0f));
             {
-                ImGuiAux::ScopedBoldFont font(22.0f);
+                EditorUI::ScopedBoldFont font(22.0f);
                 const String title = std::format("{} export is not supported yet", exporter.GetDisplayName());
-                ImGui::PushStyleColor(ImGuiCol_Text, kWarn);
-                ImGuiAux::TextCentered(title.c_str());
+                ImGui::PushStyleColor(ImGuiCol_Text, Colors::Warning);
+                EditorUI::TextCentered(title.c_str());
                 ImGui::PopStyleColor();
             }
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
-            ImGuiAux::TextCentered(reason);
+            EditorUI::TextCentered(reason);
             ImGui::Dummy(ImVec2(0.0f, 30.0f));
         }
 
@@ -477,74 +351,21 @@ namespace Surge
             std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 
             ImGui::BeginDisabled(!canBuild);
-            ImGui::PushFont(sBold, 22.0f);
-            ImGui::PushStyleColor(ImGuiCol_Button, kAccent);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kAccentHover);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, kAccentActive);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 1));
-            const bool pressed = ImGuiAux::Button(label.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 60.0f));
+            ImGui::PushFont(EditorUI::BoldFont(), 22.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button, Colors::Accent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, Colors::Accent);
+            ImGui::PushStyleColor(ImGuiCol_Text, Colors::Black);
+            const bool pressed = EditorUI::Button(label.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 60.0f));
             ImGui::PopStyleColor(4);
             ImGui::PopFont();
             ImGui::EndDisabled();
 
             if(!busy)
                 for(const String& issue : issues)
-                    ImGui::TextColored(kWarn, "- %s", issue.c_str());
+                    ImGui::TextColored(Colors::Warning, "- %s", issue.c_str());
 
             return pressed && canBuild;
-        }
-
-        void DrawProgressBar(float fraction, bool indeterminate)
-        {
-            constexpr float height = 10.0f;
-            const float rounding = height * 0.5f;
-            const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            const float width = ImGui::GetContentRegionAvail().x;
-            const ImVec2 p1(p0.x + width, p0.y + height);
-            const float time = static_cast<float>(ImGui::GetTime());
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-            drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32(kTrackBg), rounding);
-            drawList->PushClipRect(p0, p1, true);
-
-            if(indeterminate)
-            {
-                // A segment sweeping across the track
-                const float segment = width * 0.25f;
-                const float x = p0.x - segment + std::fmod(time * width * 0.6f, width + segment);
-                drawList->AddRectFilled(ImVec2(x, p0.y), ImVec2(x + segment, p1.y), ImGui::ColorConvertFloat4ToU32(kAccent), rounding);
-            }
-            else
-            {
-                const float fillEnd = p0.x + std::max(height, width * std::clamp(fraction, 0.0f, 1.0f));
-                drawList->AddRectFilled(p0, ImVec2(fillEnd, p1.y), ImGui::ColorConvertFloat4ToU32(kAccent), rounding);
-
-                // Sheen running over the filled part, so long steps still look alive
-                const float sheenWidth = 60.0f;
-                const float sheenX = p0.x - sheenWidth + std::fmod(time * 220.0f, (fillEnd - p0.x) + sheenWidth * 2.0f);
-                drawList->PushClipRect(p0, ImVec2(fillEnd, p1.y), true);
-                drawList->AddRectFilledMultiColor(ImVec2(sheenX, p0.y), ImVec2(sheenX + sheenWidth * 0.5f, p1.y),
-                                                  IM_COL32(255, 255, 255, 0), IM_COL32(255, 255, 255, 70), IM_COL32(255, 255, 255, 70), IM_COL32(255, 255, 255, 0));
-                drawList->AddRectFilledMultiColor(ImVec2(sheenX + sheenWidth * 0.5f, p0.y), ImVec2(sheenX + sheenWidth, p1.y),
-                                                  IM_COL32(255, 255, 255, 70), IM_COL32(255, 255, 255, 0), IM_COL32(255, 255, 255, 0), IM_COL32(255, 255, 255, 70));
-                drawList->PopClipRect();
-            }
-
-            drawList->PopClipRect();
-            ImGui::Dummy(ImVec2(width, height));
-        }
-
-        // Text on the left, right-aligned text on the same line
-        void SplitLine(const ImVec4& leftColor, const String& left, const String& right)
-        {
-            ImGui::PushFont(sBold, 16.0f);
-            ImGui::TextColored(leftColor, "%s", left.c_str());
-            ImGui::PopFont();
-            if(!right.empty())
-            {
-                ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(right.c_str()).x);
-                ImGui::TextColored(kTextMuted, "%s", right.c_str());
-            }
         }
 
         // Attach by hand: an app started from the launcher, or after a crash (the recent log is included)
@@ -554,17 +375,17 @@ namespace Surge
             const String& packageId = exporter.GetSettings().PackageId;
             const bool hasAdb = !exporter.GetToolchain().Adb.empty();
 
-            RowLabel("Device log");
+            EditorUI::FormLabel("Device log", sLabelWidth);
             ImGui::BeginDisabled(busy);
             if(logcat.IsRunning())
             {
-                if(SmallActionButton("DETACH"))
+                if(EditorUI::FlatButton("DETACH"))
                     exporter.DetachLogcat();
             }
             else
             {
                 ImGui::BeginDisabled(!hasAdb || !AndroidExporter::IsValidPackageId(packageId));
-                if(SmallActionButton("ATTACH"))
+                if(EditorUI::FlatButton("ATTACH"))
                     exporter.AttachLogcat(packageId);
                 ImGui::EndDisabled();
                 if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -572,11 +393,11 @@ namespace Surge
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
-            if(SmallActionButton("SHOW LOG##DeviceLog"))
+            if(EditorUI::FlatButton("SHOW LOG##DeviceLog"))
                 ShowLogInConsole(AndroidLogcat::LOG_TAG);
             ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(kTextMuted, "%s", logcat.GetStatusText().c_str());
+            ImGui::TextColored(Colors::Tone67, "%s", logcat.GetStatusText().c_str());
         }
 
         // The last exported APK, else the one an earlier export left in the build destination
@@ -600,20 +421,20 @@ namespace Surge
             const ExportStatus status = installer.GetStatus();
             const bool ownsResult = status.State != ExportState::IDLE && !apk.empty() && installer.GetApk() == Path(apk);
 
-            RowLabel("Install");
+            EditorUI::FormLabel("Install", sLabelWidth);
             ImGui::BeginGroup();
             if(IsExportBusy(status.State))
             {
-                SplitLine(ImVec4(1.0f, 1.0f, 1.0f, 0.85f), status.StepName, ExportUtils::FormatDuration(status.ElapsedSeconds));
+                EditorUI::SplitText(EditorUI::WithAlpha(Colors::Ink, 0.85f), status.StepName, ExportUtils::FormatDuration(status.ElapsedSeconds));
                 ImGui::Dummy(ImVec2(0.0f, 2.0f));
-                DrawProgressBar(status.Progress, false);
-                ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
+                EditorUI::ProgressBar(status.Progress, 10.0f, Colors::Accent, Colors::Tone06, true);
+                ImGui::PushStyleColor(ImGuiCol_Text, Colors::Tone67);
                 ImGui::TextWrapped("%s", status.StepDetail.empty() ? " " : status.StepDetail.c_str());
                 ImGui::PopStyleColor();
 
                 ImGui::Dummy(ImVec2(0.0f, 4.0f));
                 ImGui::BeginDisabled(status.CancelRequested);
-                if(SmallActionButton(status.CancelRequested ? "CANCELLING...##Device" : "CANCEL##Device"))
+                if(EditorUI::FlatButton(status.CancelRequested ? "CANCELLING...##Device" : "CANCEL##Device"))
                     installer.Cancel();
                 ImGui::EndDisabled();
                 ImGui::EndGroup();
@@ -624,7 +445,7 @@ namespace Surge
             const bool lastFailed = ownsResult ? status.State != ExportState::SUCCEEDED : apk == exportStatus.ArtifactPath && !exportStatus.ResultWarning.empty();
             const char* label = lastFailed ? "REATTACH ADB & INSTALL" : ownsResult ? "INSTALL AGAIN" : "INSTALL";
             ImGui::BeginDisabled(!hasAdb || apk.empty() || busy);
-            if(SmallActionButton(label))
+            if(EditorUI::FlatButton(label))
                 exporter.ReattachAndInstall(apk);
             ImGui::EndDisabled();
             if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -633,9 +454,9 @@ namespace Surge
             ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             if(apk.empty())
-                ImGui::TextColored(kTextMuted, "No APK yet - export one first");
+                ImGui::TextColored(Colors::Tone67, "No APK yet - export one first");
             else
-                ImGui::TextColored(kTextMuted, "%s", Path(apk).filename().string().c_str());
+                ImGui::TextColored(Colors::Tone67, "%s", Path(apk).filename().string().c_str());
             if(!apk.empty() && ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", apk.c_str());
 
@@ -644,18 +465,18 @@ namespace Surge
                 ImGui::PushTextWrapPos(0.0f);
                 if(status.State == ExportState::SUCCEEDED)
                 {
-                    ImGui::TextColored(kOk, "Installed on the device");
+                    ImGui::TextColored(Colors::Success, "Installed on the device");
                     if(!status.ResultWarning.empty())
-                        ImGui::TextColored(kWarn, "%s", status.ResultWarning.c_str());
+                        ImGui::TextColored(Colors::Warning, "%s", status.ResultWarning.c_str());
                 }
                 else if(status.State == ExportState::FAILED)
                 {
-                    ImGui::PushStyleColor(ImGuiCol_Text, kErr);
+                    ImGui::PushStyleColor(ImGuiCol_Text, Colors::Error);
                     ImGui::TextUnformatted(status.FailureSummary.empty() ? "Installing on the device failed. See the Console." : status.FailureSummary.c_str());
                     ImGui::PopStyleColor();
                 }
                 else if(status.State == ExportState::CANCELLED)
-                    ImGui::TextColored(kWarn, "Device install cancelled");
+                    ImGui::TextColored(Colors::Warning, "Device install cancelled");
                 ImGui::PopTextWrapPos();
             }
             ImGui::EndGroup();
@@ -665,7 +486,7 @@ namespace Surge
         void DrawAndroidDevice(ExportManager& manager, const ExportStatus& exportStatus, bool busy)
         {
             AndroidExporter& exporter = *manager.GetExporter<AndroidExporter>();
-            Section("DEVICE");
+            EditorUI::SectionHeading("DEVICE");
             DrawAndroidDeviceLog(exporter, busy);
             DrawAndroidDeviceInstall(exporter, FindInstallableApk(manager, exportStatus), exportStatus, busy);
         }
@@ -680,18 +501,18 @@ namespace Surge
             const String elapsed = ExportUtils::FormatDuration(status.ElapsedSeconds);
             if(IsExportBusy(status.State))
             {
-                SplitLine(ImVec4(1.0f, 1.0f, 1.0f, 0.85f), status.StepName, std::format("{}%  |  {}", static_cast<int>(displayProgress * 100.0f), elapsed));
+                EditorUI::SplitText(EditorUI::WithAlpha(Colors::Ink, 0.85f), status.StepName, std::format("{}%  |  {}", static_cast<int>(displayProgress * 100.0f), elapsed));
                 ImGui::Dummy(ImVec2(0.0f, 2.0f));
-                DrawProgressBar(displayProgress, status.State == ExportState::COOKING);
-                ImGui::TextColored(kTextMuted, "%s", status.StepDetail.empty() ? " " : status.StepDetail.c_str());
+                EditorUI::ProgressBar(status.State == ExportState::COOKING ? -1.0f : displayProgress, 10.0f, Colors::Accent, Colors::Tone06, true);
+                ImGui::TextColored(Colors::Tone67, "%s", status.StepDetail.empty() ? " " : status.StepDetail.c_str());
 
                 ImGui::Dummy(ImVec2(0.0f, 4.0f));
                 ImGui::BeginDisabled(status.CancelRequested);
-                if(SmallActionButton(status.CancelRequested ? "CANCELLING..." : "CANCEL"))
+                if(EditorUI::FlatButton(status.CancelRequested ? "CANCELLING..." : "CANCEL"))
                     manager.Cancel();
                 ImGui::EndDisabled();
                 ImGui::SameLine();
-                if(SmallActionButton("SHOW LOG"))
+                if(EditorUI::FlatButton("SHOW LOG"))
                     ShowLogInConsole();
                 return;
             }
@@ -700,52 +521,52 @@ namespace Surge
 
             if(status.State == ExportState::SUCCEEDED)
             {
-                SplitLine(kOk, "EXPORT SUCCEEDED", duration.empty() ? String() : "in " + duration);
-                DrawProgressBar(1.0f, false);
+                EditorUI::SplitText(Colors::Success, "EXPORT SUCCEEDED", duration.empty() ? String() : "in " + duration);
+                EditorUI::ProgressBar(1.0f, 10.0f, Colors::Accent, Colors::Tone06, true);
 
                 std::error_code ec;
                 const uintmax_t size = std::filesystem::file_size(status.ArtifactPath, ec);
                 const String sizeText = ec ? String() : "  (" + ExportUtils::FormatSize(size) + ")";
                 ImGui::TextWrapped("%s%s", status.ArtifactPath.c_str(), sizeText.c_str());
                 if(status.WarningCount > 0)
-                    ImGui::TextColored(kWarn, "%u warning%s", status.WarningCount, status.WarningCount == 1 ? "" : "s");
+                    ImGui::TextColored(Colors::Warning, "%u warning%s", status.WarningCount, status.WarningCount == 1 ? "" : "s");
                 if(!status.ResultWarning.empty())
-                    ImGui::TextColored(kWarn, "%s", status.ResultWarning.c_str());
+                    ImGui::TextColored(Colors::Warning, "%s", status.ResultWarning.c_str());
 
                 ImGui::Dummy(ImVec2(0.0f, 4.0f));
-                if(SmallActionButton("SHOW FILE"))
+                if(EditorUI::FlatButton("SHOW FILE"))
                     Platform::OpenInExplorer(status.ArtifactPath);
                 ImGui::SameLine();
-                if(SmallActionButton("COPY PATH"))
+                if(EditorUI::FlatButton("COPY PATH"))
                     ImGui::SetClipboardText(status.ArtifactPath.c_str());
                 ImGui::SameLine();
-                if(SmallActionButton("SHOW LOG"))
+                if(EditorUI::FlatButton("SHOW LOG"))
                     ShowLogInConsole();
             }
             else if(status.State == ExportState::FAILED)
             {
-                SplitLine(kErr, "EXPORT FAILED", duration.empty() ? String() : "after " + duration);
+                EditorUI::SplitText(Colors::Error, "EXPORT FAILED", duration.empty() ? String() : "after " + duration);
 
-                ImGui::PushStyleColor(ImGuiCol_Text, kErr);
+                ImGui::PushStyleColor(ImGuiCol_Text, Colors::Error);
                 ImGui::PushTextWrapPos(0.0f);
                 ImGui::TextUnformatted(status.FailureSummary.empty() ? "Unknown error. See the Console." : status.FailureSummary.c_str());
                 ImGui::PopTextWrapPos();
                 ImGui::PopStyleColor();
 
                 ImGui::Dummy(ImVec2(0.0f, 4.0f));
-                if(SmallActionButton("SHOW LOG"))
+                if(EditorUI::FlatButton("SHOW LOG"))
                     ShowLogInConsole();
                 if(!status.FailureSummary.empty())
                 {
                     ImGui::SameLine();
-                    if(SmallActionButton("COPY ERROR"))
+                    if(EditorUI::FlatButton("COPY ERROR"))
                         ImGui::SetClipboardText(status.FailureSummary.c_str());
                 }
             }
             else if(status.State == ExportState::CANCELLED)
             {
-                SplitLine(kWarn, "EXPORT CANCELLED", duration.empty() ? String() : "after " + duration);
-                if(SmallActionButton("SHOW LOG"))
+                EditorUI::SplitText(Colors::Warning, "EXPORT CANCELLED", duration.empty() ? String() : "after " + duration);
+                if(EditorUI::FlatButton("SHOW LOG"))
                     ShowLogInConsole();
             }
         }
@@ -759,7 +580,7 @@ namespace Surge
             {
                 const String msg = std::format("All the files in the output folder:\n\"{}\" will be DELETED PERMANENTLY.\n\nAre you sure you want to continue?",
                                                manager.GetOutputPath(platform));
-                ImGuiAux::ShowConfirmationBox("WARNING", msg, [&manager, platform]() { manager.Launch(platform); });
+                EditorUI::ShowConfirmationBox("WARNING", msg, [&manager, platform]() { manager.Launch(platform); });
             }
             else
                 manager.Launch(platform);
@@ -804,7 +625,6 @@ namespace Surge
 
         if(ImGui::Begin("Export Project", show))
         {
-            sBold = ImGui::GetIO().Fonts->Fonts[1];
             sLabelWidth = ImGui::GetFontSize() * 11.0f;
 
             ExportCommonSettings& common = manager.GetCommonSettings();
@@ -816,8 +636,8 @@ namespace Surge
             // Settings card
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, kRounding);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(25.0f, 25.0f));
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, kCardBg);
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::Tone09);
+            ImGui::PushStyleColor(ImGuiCol_Border, Colors::Tone18);
 
             bool buildPressed = false;
             const ExportPlatform platform = common.SelectedPlatform;
@@ -827,12 +647,12 @@ namespace Surge
             {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 9.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, kRounding);
-                ImGui::PushStyleColor(ImGuiCol_FrameBg, kInputBg);
-                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, kInputHover);
-                ImGui::PushStyleColor(ImGuiCol_Header, kInputHover);
-                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, kAccentHover);
-                ImGui::PushStyleColor(ImGuiCol_HeaderActive, kAccentActive);
-                ImGui::PushStyleColor(ImGuiCol_CheckMark, kAccent);
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, Colors::Tone07);
+                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, Colors::Tone10);
+                ImGui::PushStyleColor(ImGuiCol_Header, Colors::Tone10);
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, Colors::Accent);
+                ImGui::PushStyleColor(ImGuiCol_CheckMark, Colors::Accent);
 
                 if(exporter && !exporter->IsSupported())
                     DrawUnsupportedPlatform(*exporter);

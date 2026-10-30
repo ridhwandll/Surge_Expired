@@ -1,5 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/UIEditorPanel.hpp"
+#include "Asset/AssetDatabase.hpp"
+#include "Asset/AssetExtensions.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
@@ -8,7 +10,7 @@
 
 #include "Editor.hpp"
 #include "Panels/ContentBrowserPanel.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <imgui_stdlib.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -24,10 +26,13 @@ namespace Surge
         constexpr float HANDLE_HALF_SIZE = 4.5f;
         constexpr float PROPERTY_LABEL_WIDTH = 125.0f;
 
-        constexpr ImU32 COLOR_OUTLINE = IM_COL32(255, 255, 255, 45);
-        constexpr ImU32 COLOR_HOVER = IM_COL32(110, 185, 255, 220);
-        constexpr ImU32 COLOR_SELECTED = IM_COL32(255, 168, 0, 255);
-        constexpr ImU32 COLOR_PARENT = IM_COL32(255, 168, 0, 70);
+        namespace Colors = EditorUI::Colors;
+        using EditorUI::ToU32;
+        using EditorUI::WithAlpha;
+        constexpr ImU32 COLOR_OUTLINE = ToU32(WithAlpha(Colors::White, 0.18f));
+        constexpr ImU32 COLOR_HOVER = ToU32(WithAlpha(Colors::Blue, 0.86f));
+        constexpr ImU32 COLOR_SELECTED = ToU32(Colors::Accent);
+        constexpr ImU32 COLOR_PARENT = ToU32(WithAlpha(Colors::Accent, 0.27f));
 
         bool ContainsID(const UI::WidgetDesc& node, UUID id)
         {
@@ -73,101 +78,16 @@ namespace Surge
             return grid > 0.0f ? std::round(value / grid) * grid : value;
         }
 
-        // Property table helpers (label column + value column), all return true when the value changed
-        void PropertyLabel(const char* label)
-        {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableSetColumnIndex(1);
-            ImGui::SetNextItemWidth(-FLT_MIN);
-        }
-
-        bool PropertyVec2(const char* label, glm::vec2& value, float speed, float min = 0.0f, float max = 0.0f, const char* format = "%.1f")
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::DragFloat2("##v", glm::value_ptr(value), speed, min, max, format);
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool PropertyFloat(const char* label, float& value, float speed, float min = 0.0f, float max = 0.0f, const char* format = "%.1f")
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::DragFloat("##v", &value, speed, min, max, format);
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool PropertyColor(const char* label, glm::vec4& value)
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::ColorEdit4("##v", glm::value_ptr(value), ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool PropertyBool(const char* label, bool& value)
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::Checkbox("##v", &value);
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool PropertyText(const char* label, String& value, bool multiline)
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = multiline ? ImGui::InputTextMultiline("##v", &value, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 3.5f)) : ImGui::InputText("##v", &value);
-            ImGui::PopID();
-            return changed;
-        }
-
-        template <typename E, size_t N>
-        bool PropertyCombo(const char* label, E& value, const std::array<const char*, N>& names, const std::array<E, N>& values)
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            bool changed = false;
-            size_t current = 0;
-            for(size_t i = 0; i < N; i++)
-            {
-                if(values[i] == value)
-                    current = i;
-            }
-
-            if(ImGui::BeginCombo("##v", names[current]))
-            {
-                for(size_t i = 0; i < N; i++)
-                {
-                    if(ImGui::Selectable(names[i], i == current))
-                    {
-                        value = values[i];
-                        changed = true;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::PopID();
-            return changed;
-        }
-
         // Combo of every registered asset of the type, also accepts drops from the Content Browser
-        bool PropertyAsset(const char* label, AssetID& id, AssetType type)
+        bool PropertyAsset(const char* label, AssetID& id, AssetType type, const char* noneLabel = "None")
         {
             AssetManager* am = Core::GetAssetManager();
             bool changed = false;
 
             ImGui::PushID(label);
-            PropertyLabel(label);
+            EditorUI::TLabel(label);
 
-            String preview = "None";
+            String preview = noneLabel;
             if(id)
             {
                 const AssetMetadata& meta = am->GetMetadata(id);
@@ -176,7 +96,7 @@ namespace Surge
 
             if(ImGui::BeginCombo("##v", preview.c_str(), ImGuiComboFlags_HeightLarge))
             {
-                if(ImGui::Selectable("None", !id))
+                if(ImGui::Selectable(noneLabel, !id))
                 {
                     id = UUID::INVALID;
                     changed = true;
@@ -221,34 +141,6 @@ namespace Surge
             return changed;
         }
 
-        bool PropertyInt(const char* label, int& value, int min, int max)
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::DragInt("##v", &value, 0.1f, min, max);
-            ImGui::PopID();
-            value = glm::clamp(value, min, max);
-            return changed;
-        }
-
-        bool PropertySlider(const char* label, float& value, float min, float max)
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::SliderFloat("##v", &value, min, max, "%.2f");
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool PropertyVec4(const char* label, glm::vec4& value, float speed, float min = 0.0f, float max = 0.0f, const char* format = "%.1f")
-        {
-            ImGui::PushID(label);
-            PropertyLabel(label);
-            const bool changed = ImGui::DragFloat4("##v", glm::value_ptr(value), speed, min, max, format);
-            ImGui::PopID();
-            return changed;
-        }
-
         // One drawn part of a widget (texture, color, 9-slice, rounded corners, border), as rows of the current property table
         bool PropertyImagePart(const char* label, UI::ImagePartDesc& part, bool showColor, bool allowFilled, bool* outSetNativeSize)
         {
@@ -258,59 +150,41 @@ namespace Surge
             constexpr std::array<UI::ImageMode, 2> partModeValues = { UI::ImageMode::SIMPLE, UI::ImageMode::SLICED };
 
             ImGui::PushID(label);
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.0f, 1.0f), "%s", label);
+            ImGui::TableNextColumn();
+            ImGui::TextColored(Colors::Accent, "%s", label);
+            ImGui::TableNextColumn();
 
             bool changed = PropertyAsset("Texture", part.Texture, AssetType::TEXTURE2D);
             if(part.Texture && outSetNativeSize)
             {
-                PropertyLabel("");
+                EditorUI::TLabel("");
                 if(ImGui::Button("Set Native Size", ImVec2(-FLT_MIN, 0.0f)))
                     *outSetNativeSize = true;
             }
             if(showColor)
-                changed |= PropertyColor("Color", part.Color);
+                changed |= EditorUI::TColorEdit4("Color", glm::value_ptr(part.Color));
 
-            changed |= allowFilled ? PropertyCombo("Mode", part.Mode, modeNames, modeValues) : PropertyCombo("Mode", part.Mode, partModeNames, partModeValues);
+            changed |= allowFilled ? EditorUI::TComboValues("Mode", part.Mode, modeNames, modeValues) : EditorUI::TComboValues("Mode", part.Mode, partModeNames, partModeValues);
             if(part.Mode == UI::ImageMode::SLICED)
             {
-                changed |= PropertyVec4("Slice Border", part.SliceBorder, 0.5f, 0.0f, 4096.0f, "%.0f");
-                ImGuiAux::DelayedToolTip("Left, top, right, bottom in texture pixels: corners keep their size, edges and center stretch");
-                changed |= PropertyFloat("Slice Scale", part.SliceScale, 0.01f, 0.0f, 100.0f, "%.2f");
-                changed |= PropertyBool("Fill Center", part.FillCenter);
+                changed |= EditorUI::TDragVec("Slice Border", part.SliceBorder, 0.5f, 0.0f, 4096.0f, "%.0f");
+                EditorUI::DelayedToolTip("Left, top, right, bottom in texture pixels: corners keep their size, edges and center stretch");
+                changed |= EditorUI::TDragFloat("Slice Scale", &part.SliceScale, 0.01f, 0.0f, 100.0f, "%.2f");
+                changed |= EditorUI::TCheckbox("Fill Center", &part.FillCenter);
             }
             else
             {
-                changed |= PropertyFloat("Corner Radius", part.CornerRadius, 0.25f, 0.0f, 10000.0f);
-                ImGuiAux::DelayedToolTip("UI units. Half the height (or more) makes a pill / circle");
+                changed |= EditorUI::TDragFloat("Corner Radius", &part.CornerRadius, 0.25f, 0.0f, 10000.0f, "%.1f");
+                EditorUI::DelayedToolTip("UI units. Half the height (or more) makes a pill / circle");
             }
-            changed |= PropertyFloat("Border Width", part.BorderWidth, 0.1f, 0.0f, 500.0f);
+            changed |= EditorUI::TDragFloat("Border Width", &part.BorderWidth, 0.1f, 0.0f, 500.0f, "%.1f");
             if(part.BorderWidth > 0.0f)
-                changed |= PropertyColor("Border Color", part.BorderColor);
+                changed |= EditorUI::TColorEdit4("Border Color", glm::value_ptr(part.BorderColor));
 
             ImGui::PopID();
             return changed;
         }
-
-        bool BeginPropertyTable(const char* id)
-        {
-            if(!ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
-                return false;
-
-            ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, PROPERTY_LABEL_WIDTH);
-            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-            return true;
-        }
-
-        void SectionHeader(const char* title)
-        {
-            ImGui::Dummy(ImVec2(0.0f, 4.0f));
-            ImGuiAux::ScopedBoldFont bold;
-            ImGuiAux::ScopedColor color({ ImGuiCol_Separator }, ImGuiAux::Colors::ThemeColor1);
-            ImGui::SeparatorText(title);
-        }
-    }
+    } // namespace
 
     // -----------------------------------------------------------------------------------------------
     // Lifetime
@@ -344,7 +218,7 @@ namespace Surge
             path = absoluteDirectory / std::format("{} ({}){}", baseName, count, extension);
 
         const String relativePath = Filesystem::GetRelativePath(path, am->GetAssetsDirectory()).generic_string();
-        Ref<UILayout> layout = am->Create<UILayout>(relativePath);
+        Ref<UILayout> layout = AssetDatabase::Get().Create<UILayout>(relativePath);
         return layout ? layout->GetID() : AssetID(UUID::INVALID);
     }
 
@@ -369,7 +243,7 @@ namespace Surge
         };
 
         if(mLayout && mUnsaved)
-            ImGuiAux::ShowConfirmationBox("Unsaved UI Layout", "The open UI Layout has unsaved changes.\nDiscard them and open the other layout?", open);
+            EditorUI::ShowConfirmationBox("Unsaved UI Layout", "The open UI Layout has unsaved changes.\nDiscard them and open the other layout?", open);
         else
             open();
     }
@@ -392,7 +266,7 @@ namespace Surge
         };
 
         if(mUnsaved)
-            ImGuiAux::ShowConfirmationBox("Unsaved UI Layout", "Discard unsaved changes?", close);
+            EditorUI::ShowConfirmationBox("Unsaved UI Layout", "Discard unsaved changes?", close);
         else
             close();
     }
@@ -419,7 +293,7 @@ namespace Surge
 
         mLayout->Root = mRoot;
         mLayout->Scaler = mScaler;
-        Core::GetAssetManager()->Save(mLayout->GetID());
+        AssetDatabase::Get().Save(mLayout->GetID());
         mUnsaved = false;
         Log<Severity::Info>("[UIEditor] Saved {}", Core::GetAssetManager()->GetMetadata(mLayout->GetID()).RelativePath);
     }
@@ -648,15 +522,15 @@ namespace Surge
     {
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
         {
-            ImGuiAux::ScopedBoldFont bold(20.0f);
-            ImGuiAux::TextCentered("No UI Layout open");
+            EditorUI::ScopedBoldFont bold(20.0f);
+            EditorUI::TextCentered("No UI Layout open");
         }
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
         ImGui::TextWrapped("Double click a .sui file in the Content Browser, drop one on the button below, or create a new layout. "
                            "Add a UI Canvas Component to an entity and assign the layout to show it in game.");
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
-        ImGuiAux::ScopedBoldFont bold;
+        EditorUI::ScopedBoldFont bold;
         if(ImGui::Button("Create New UI Layout", ImVec2(-FLT_MIN, 40.0f)))
         {
             const String assetsDir = Core::GetAssetManager()->GetAssetsDirectory();
@@ -683,29 +557,29 @@ namespace Surge
         const String fileName = Filesystem::GetFilenameWithExt(Core::GetAssetManager()->GetMetadata(mLayout->GetID()).RelativePath);
 
         {
-            ImGuiAux::ScopedBoldFont bold(18.0f);
+            EditorUI::ScopedBoldFont bold(18.0f);
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.0f, 1.0f), "%s%s", fileName.c_str(), mUnsaved ? " *" : "");
+            ImGui::TextColored(Colors::Accent, "%s%s", fileName.c_str(), mUnsaved ? " *" : "");
         }
 
         ImGui::SameLine();
         if(ImGui::Button("Save"))
             Save();
-        ImGuiAux::DelayedToolTip("Ctrl+S");
+        EditorUI::DelayedToolTip("Ctrl+S");
 
         ImGui::SameLine();
         ImGui::BeginDisabled(mUndoStack.empty() && !mDocumentChanged);
         if(ImGui::Button("Undo"))
             Undo();
         ImGui::EndDisabled();
-        ImGuiAux::DelayedToolTip("Ctrl+Z");
+        EditorUI::DelayedToolTip("Ctrl+Z");
 
         ImGui::SameLine();
         ImGui::BeginDisabled(mRedoStack.empty());
         if(ImGui::Button("Redo"))
             Redo();
         ImGui::EndDisabled();
-        ImGuiAux::DelayedToolTip("Ctrl+Y / Ctrl+Shift+Z");
+        EditorUI::DelayedToolTip("Ctrl+Y / Ctrl+Shift+Z");
 
         ImGui::SameLine();
         if(ImGui::Button("Close"))
@@ -736,19 +610,19 @@ namespace Surge
         ImGui::BeginDisabled(!canEditSelection);
         if(ImGui::Button("Duplicate"))
             QueueAction({ .Op = PendingAction::Type::DUPLICATE_WIDGET, .Target = mSelected });
-        ImGuiAux::DelayedToolTip("Ctrl+D");
+        EditorUI::DelayedToolTip("Ctrl+D");
         ImGui::SameLine();
         if(ImGui::Button("Delete"))
             QueueAction({ .Op = PendingAction::Type::REMOVE_WIDGET, .Target = mSelected });
-        ImGuiAux::DelayedToolTip("Delete");
+        EditorUI::DelayedToolTip("Delete");
         ImGui::SameLine();
         if(ImGui::ArrowButton("##MoveUp", ImGuiDir_Up))
             QueueAction({ .Op = PendingAction::Type::MOVE_WIDGET, .Target = mSelected, .Direction = -1 });
-        ImGuiAux::DelayedToolTip("Move up (drawn earlier, behind its siblings)");
+        EditorUI::DelayedToolTip("Move up (drawn earlier, behind its siblings)");
         ImGui::SameLine();
         if(ImGui::ArrowButton("##MoveDown", ImGuiDir_Down))
             QueueAction({ .Op = PendingAction::Type::MOVE_WIDGET, .Target = mSelected, .Direction = 1 });
-        ImGuiAux::DelayedToolTip("Move down (drawn later, on top of its siblings)");
+        EditorUI::DelayedToolTip("Move down (drawn later, on top of its siblings)");
         ImGui::EndDisabled();
 
         ImGui::SameLine();
@@ -756,19 +630,19 @@ namespace Surge
         ImGui::SameLine();
         if(ImGui::Checkbox("Edit in Viewport", &mEditInViewport))
             mNeedsRebuild = true;
-        ImGuiAux::DelayedToolTip("Show the layout in the Viewport and select/move/resize widgets there");
+        EditorUI::DelayedToolTip("Show the layout in the Viewport and select/move/resize widgets there");
 
         ImGui::SameLine();
         ImGui::Checkbox("Outlines", &mShowAllOutlines);
         ImGui::SameLine();
         ImGui::Checkbox("Snap", &mSnapToGrid);
-        ImGuiAux::DelayedToolTip("Snap offsets and sizes to the grid while dragging (hold Ctrl to toggle temporarily)");
+        EditorUI::DelayedToolTip("Snap offsets and sizes to the grid while dragging (hold Ctrl to toggle temporarily)");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(60.0f);
         ImGui::DragFloat("##Grid", &mGridSize, 0.5f, 1.0f, 200.0f, "%.0f");
 
         if(editor->IsPlaying())
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Playing: the game uses the last saved version of this layout");
+            ImGui::TextColored(Colors::Error, "Playing: the game uses the last saved version of this layout");
     }
 
     // -----------------------------------------------------------------------------------------------
@@ -1068,35 +942,35 @@ namespace Surge
         }
 
         {
-            ImGuiAux::ScopedBoldFont bold(18.0f);
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.0f, 1.0f), "%s", UI::WidgetTypeToDisplayName(desc->Type));
+            EditorUI::ScopedBoldFont bold(18.0f);
+            ImGui::TextColored(Colors::Accent, "%s", UI::WidgetTypeToDisplayName(desc->Type));
         }
 
-        if(BeginPropertyTable("##General"))
+        if(EditorUI::BeginPropertyTable("##General", PROPERTY_LABEL_WIDTH, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
         {
-            if(PropertyText("Name", desc->Name, false))
+            if(EditorUI::TInputText("Name", desc->Name, false))
                 MarkChanged();
-            if(PropertyBool("Visible", desc->Visible))
+            if(EditorUI::TCheckbox("Visible", &desc->Visible))
                 MarkChanged();
             ImGui::EndTable();
         }
 
         if(desc->Name.empty())
-            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "Give the widget a name to find it from Lua");
+            ImGui::TextColored(Colors::Warning, "Give the widget a name to find it from Lua");
         else if(CountName(mRoot, desc->Name) > 1)
-            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "Name is not unique, FindWidget returns the first match");
+            ImGui::TextColored(Colors::Warning, "Name is not unique, FindWidget returns the first match");
 
-        SectionHeader("Rect Transform");
+        EditorUI::SeparatorTitle("Rect Transform", 4.0f);
         DrawAnchorPresets(*desc);
         DrawRectTransform(*desc);
 
-        SectionHeader(UI::WidgetTypeToDisplayName(desc->Type));
+        EditorUI::SeparatorTitle(UI::WidgetTypeToDisplayName(desc->Type), 4.0f);
         DrawWidgetSettings(*desc);
 
         // Scripting hint
         if(!desc->Name.empty())
         {
-            SectionHeader("Scripting");
+            EditorUI::SeparatorTitle("Scripting", 4.0f);
             String snippet;
             switch(desc->Type)
             {
@@ -1150,13 +1024,13 @@ namespace Surge
 
     void UIEditorPanel::DrawCanvasSettings()
     {
-        SectionHeader("Canvas Scaler");
+        EditorUI::SeparatorTitle("Canvas Scaler", 4.0f);
         ImGui::TextWrapped("The layout is designed at the reference resolution and scaled to the screen. "
                            "Match Height (1) keeps sizes relative to the screen height (landscape), Match Width (0) to the width (portrait).");
 
-        if(BeginPropertyTable("##Canvas"))
+        if(EditorUI::BeginPropertyTable("##Canvas", PROPERTY_LABEL_WIDTH, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
         {
-            PropertyLabel("Preset");
+            EditorUI::TLabel("Preset");
             struct ResolutionPreset { const char* Name; glm::vec2 Resolution; float Match; };
             constexpr ResolutionPreset presets[] = {
                 { "1920 x 1080 (Landscape)", { 1920.0f, 1080.0f }, 1.0f },
@@ -1179,11 +1053,11 @@ namespace Surge
                 ImGui::EndCombo();
             }
 
-            if(PropertyVec2("Reference Res", mScaler.ReferenceResolution, 1.0f, 1.0f, 8192.0f, "%.0f"))
+            if(EditorUI::TDragVec("Reference Res", mScaler.ReferenceResolution, 1.0f, 1.0f, 8192.0f, "%.0f"))
                 MarkChanged();
 
             ImGui::PushID("Match");
-            PropertyLabel("Match W/H");
+            EditorUI::TLabel("Match W/H");
             if(ImGui::SliderFloat("##v", &mScaler.MatchWidthOrHeight, 0.0f, 1.0f, mScaler.MatchWidthOrHeight < 0.5f ? "%.2f (Width)" : "%.2f (Height)"))
                 MarkChanged();
             ImGui::PopID();
@@ -1228,12 +1102,12 @@ namespace Surge
                 // Icon: outer box = parent, inner marker = anchor (lines for stretched axes)
                 const ImVec2 min = ImGui::GetItemRectMin();
                 const ImVec2 max = ImGui::GetItemRectMax();
-                drawList->AddRectFilled(min, max, isCurrent ? IM_COL32(255, 168, 0, 90) : (hovered ? IM_COL32(80, 80, 80, 255) : IM_COL32(45, 45, 45, 255)), 2.0f);
+                drawList->AddRectFilled(min, max, isCurrent ? ToU32(WithAlpha(Colors::Accent, 0.35f)) : (hovered ? ToU32(Colors::Tone30) : ToU32(Colors::Tone18)), 2.0f);
                 const ImVec2 innerMin = { min.x + 5.0f, min.y + 5.0f };
                 const ImVec2 innerMax = { max.x - 5.0f, max.y - 5.0f };
-                drawList->AddRect(innerMin, innerMax, IM_COL32(150, 150, 150, 255));
+                drawList->AddRect(innerMin, innerMax, ToU32(Colors::Tone60));
 
-                const ImU32 markerColor = isCurrent ? IM_COL32(255, 200, 80, 255) : IM_COL32(230, 230, 230, 255);
+                const ImU32 markerColor = isCurrent ? ToU32(Colors::Highlight) : ToU32(Colors::Tone90);
                 const float innerW = innerMax.x - innerMin.x;
                 const float innerH = innerMax.y - innerMin.y;
                 const float x0 = innerMin.x + innerW * anchorMin.x, x1 = innerMin.x + innerW * anchorMax.x;
@@ -1276,15 +1150,15 @@ namespace Surge
 
     void UIEditorPanel::DrawRectTransform(UI::WidgetDesc& desc)
     {
-        if(!BeginPropertyTable("##RectTransform"))
+        if(!EditorUI::BeginPropertyTable("##RectTransform", PROPERTY_LABEL_WIDTH, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
             return;
 
         bool changed = false;
-        changed |= PropertyVec2("Anchor Min", desc.AnchorMin, 0.005f, 0.0f, 1.0f, "%.3f");
-        changed |= PropertyVec2("Anchor Max", desc.AnchorMax, 0.005f, 0.0f, 1.0f, "%.3f");
-        changed |= PropertyVec2("Pivot", desc.Pivot, 0.005f, 0.0f, 1.0f, "%.3f");
-        changed |= PropertyVec2("Offset", desc.Offset, 1.0f);
-        changed |= PropertyVec2(IsStretched(desc) ? "Size (+Stretch)" : "Size", desc.Size, 1.0f);
+        changed |= EditorUI::TDragVec("Anchor Min", desc.AnchorMin, 0.005f, 0.0f, 1.0f, "%.3f");
+        changed |= EditorUI::TDragVec("Anchor Max", desc.AnchorMax, 0.005f, 0.0f, 1.0f, "%.3f");
+        changed |= EditorUI::TDragVec("Pivot", desc.Pivot, 0.005f, 0.0f, 1.0f, "%.3f");
+        changed |= EditorUI::TDragVec("Offset", desc.Offset, 1.0f, 0.0f, 0.0f, "%.1f");
+        changed |= EditorUI::TDragVec(IsStretched(desc) ? "Size (+Stretch)" : "Size", desc.Size, 1.0f, 0.0f, 0.0f, "%.1f");
         ImGui::EndTable();
 
         if(changed)
@@ -1356,76 +1230,76 @@ namespace Surge
         // Shared groups
         auto textProperties = [&](const char* textLabel, bool multiline) {
             if(textLabel)
-                changed |= PropertyText(textLabel, desc.Text, multiline);
-            changed |= PropertyAsset("Font", desc.Font, AssetType::FONT);
-            changed |= PropertyFloat("Font Size", desc.FontSize, 0.25f, 1.0f, 512.0f);
+                changed |= EditorUI::TInputText(textLabel, desc.Text, multiline);
+            changed |= PropertyAsset("Font", desc.Font, AssetType::FONT, "Engine Font");
+            changed |= EditorUI::TDragFloat("Font Size", &desc.FontSize, 0.25f, 1.0f, 512.0f, "%.1f");
         };
         auto valueProperties = [&]() {
-            changed |= PropertyFloat("Min", desc.MinValue, 0.05f, 0.0f, 0.0f, "%.2f");
-            changed |= PropertyFloat("Max", desc.MaxValue, 0.05f, 0.0f, 0.0f, "%.2f");
-            changed |= PropertySlider("Value", desc.Value, glm::min(desc.MinValue, desc.MaxValue), glm::max(desc.MinValue, desc.MaxValue));
-            changed |= PropertyCombo("Direction", desc.Origin, originNames, originValues);
+            changed |= EditorUI::TDragFloat("Min", &desc.MinValue, 0.05f, 0.0f, 0.0f, "%.2f");
+            changed |= EditorUI::TDragFloat("Max", &desc.MaxValue, 0.05f, 0.0f, 0.0f, "%.2f");
+            changed |= EditorUI::TSliderFloat("Value", &desc.Value, glm::min(desc.MinValue, desc.MaxValue), glm::max(desc.MinValue, desc.MaxValue));
+            changed |= EditorUI::TComboValues("Direction", desc.Origin, originNames, originValues);
         };
         auto stateColors = [&]() {
-            changed |= PropertyColor("Normal", desc.NormalColor);
-            changed |= PropertyColor("Hover", desc.HoverColor);
-            changed |= PropertyColor("Pressed", desc.PressedColor);
+            changed |= EditorUI::TColorEdit4("Normal", glm::value_ptr(desc.NormalColor));
+            changed |= EditorUI::TColorEdit4("Hover", glm::value_ptr(desc.HoverColor));
+            changed |= EditorUI::TColorEdit4("Pressed", glm::value_ptr(desc.PressedColor));
         };
 
-        if(BeginPropertyTable("##WidgetSettings"))
+        if(EditorUI::BeginPropertyTable("##WidgetSettings", PROPERTY_LABEL_WIDTH, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
         {
             switch(desc.Type)
             {
                 case UI::WidgetType::IMAGE:
-                    changed |= PropertyColor("Tint", desc.Color);
+                    changed |= EditorUI::TColorEdit4("Tint", glm::value_ptr(desc.Color));
                     changed |= PropertyImagePart("Image", desc.Background, false, true, &setNativeSize);
-                    changed |= PropertyBool("Preserve Aspect", desc.PreserveAspect);
+                    changed |= EditorUI::TCheckbox("Preserve Aspect", &desc.PreserveAspect);
                     if(desc.Background.Mode == UI::ImageMode::FILLED)
                     {
-                        changed |= PropertySlider("Fill Amount", desc.FillAmount, 0.0f, 1.0f);
-                        changed |= PropertyCombo("Fill Origin", desc.Origin, originNames, originValues);
+                        changed |= EditorUI::TSliderFloat("Fill Amount", &desc.FillAmount, 0.0f, 1.0f);
+                        changed |= EditorUI::TComboValues("Fill Origin", desc.Origin, originNames, originValues);
                     }
                     break;
 
                 case UI::WidgetType::TEXT:
                     textProperties("Text", true);
-                    changed |= PropertyCombo("Align", desc.HAlign, hAlignNames, hAlignValues);
-                    changed |= PropertyCombo("Vertical Align", desc.VAlign, vAlignNames, vAlignValues);
-                    changed |= PropertyColor("Color", desc.Color);
-                    changed |= PropertyCombo("Overflow", desc.Overflow, overflowNames, overflowValues);
+                    changed |= EditorUI::TComboValues("Align", desc.HAlign, hAlignNames, hAlignValues);
+                    changed |= EditorUI::TComboValues("Vertical Align", desc.VAlign, vAlignNames, vAlignValues);
+                    changed |= EditorUI::TColorEdit4("Color", glm::value_ptr(desc.Color));
+                    changed |= EditorUI::TComboValues("Overflow", desc.Overflow, overflowNames, overflowValues);
                     break;
 
                 case UI::WidgetType::BUTTON:
                     textProperties("Label", false);
-                    changed |= PropertyCombo("Align", desc.HAlign, hAlignNames, hAlignValues);
-                    changed |= PropertyCombo("Vertical Align", desc.VAlign, vAlignNames, vAlignValues);
-                    changed |= PropertyColor("Label Color", desc.TextColor);
-                    changed |= PropertyFloat("Label Padding", desc.TextPadding, 0.25f, 0.0f, 500.0f);
+                    changed |= EditorUI::TComboValues("Align", desc.HAlign, hAlignNames, hAlignValues);
+                    changed |= EditorUI::TComboValues("Vertical Align", desc.VAlign, vAlignNames, vAlignValues);
+                    changed |= EditorUI::TColorEdit4("Label Color", glm::value_ptr(desc.TextColor));
+                    changed |= EditorUI::TDragFloat("Label Padding", &desc.TextPadding, 0.25f, 0.0f, 500.0f, "%.1f");
                     stateColors();
                     changed |= PropertyImagePart("Background", desc.Background, false, false, &setNativeSize);
                     break;
 
                 case UI::WidgetType::IMAGE_BUTTON:
                     stateColors();
-                    changed |= PropertyBool("Preserve Aspect", desc.PreserveAspect);
+                    changed |= EditorUI::TCheckbox("Preserve Aspect", &desc.PreserveAspect);
                     changed |= PropertyImagePart("Image", desc.Background, false, false, &setNativeSize);
                     break;
 
                 case UI::WidgetType::PROGRESS_BAR:
                     valueProperties();
-                    changed |= PropertyFloat("Fill Padding", desc.FillPadding, 0.25f, 0.0f, 500.0f);
+                    changed |= EditorUI::TDragFloat("Fill Padding", &desc.FillPadding, 0.25f, 0.0f, 500.0f, "%.1f");
                     changed |= PropertyImagePart("Background", desc.Background, true, false, nullptr);
                     changed |= PropertyImagePart("Fill", desc.Fill, true, false, nullptr);
                     break;
 
                 case UI::WidgetType::TOGGLE:
-                    changed |= PropertyCombo("Style", desc.ToggleType, toggleNames, toggleValues);
-                    changed |= PropertyBool("Is On", desc.IsOn);
-                    changed |= PropertyText("Group", desc.Group, false);
+                    changed |= EditorUI::TComboValues("Style", desc.ToggleType, toggleNames, toggleValues);
+                    changed |= EditorUI::TCheckbox("Is On", &desc.IsOn);
+                    changed |= EditorUI::TInputText("Group", desc.Group, false);
                     if(!desc.Group.empty())
-                        changed |= PropertyBool("Allow Switch Off", desc.AllowSwitchOff);
+                        changed |= EditorUI::TCheckbox("Allow Switch Off", &desc.AllowSwitchOff);
                     textProperties("Label", false);
-                    changed |= PropertyColor("Label Color", desc.TextColor);
+                    changed |= EditorUI::TColorEdit4("Label Color", glm::value_ptr(desc.TextColor));
                     changed |= PropertyImagePart(desc.ToggleType == UI::ToggleStyle::SWITCH ? "Track (Off)" : "Box", desc.Background, true, false, nullptr);
                     changed |= PropertyImagePart(desc.ToggleType == UI::ToggleStyle::SWITCH ? "Track (On)" : "Check Mark", desc.Fill, true, false, nullptr);
                     if(desc.ToggleType == UI::ToggleStyle::SWITCH)
@@ -1434,73 +1308,73 @@ namespace Surge
 
                 case UI::WidgetType::SLIDER:
                     valueProperties();
-                    changed |= PropertyBool("Whole Numbers", desc.WholeNumbers);
-                    changed |= PropertyFloat("Handle Size", desc.HandleSize, 0.25f, 0.0f, 1000.0f);
-                    changed |= PropertyFloat("Track Thickness", desc.TrackThickness, 0.25f, 0.0f, 1000.0f);
+                    changed |= EditorUI::TCheckbox("Whole Numbers", &desc.WholeNumbers);
+                    changed |= EditorUI::TDragFloat("Handle Size", &desc.HandleSize, 0.25f, 0.0f, 1000.0f, "%.1f");
+                    changed |= EditorUI::TDragFloat("Track Thickness", &desc.TrackThickness, 0.25f, 0.0f, 1000.0f, "%.1f");
                     changed |= PropertyImagePart("Track", desc.Background, true, false, nullptr);
                     changed |= PropertyImagePart("Fill", desc.Fill, true, false, nullptr);
                     changed |= PropertyImagePart("Handle", desc.Handle, true, false, nullptr);
                     break;
 
                 case UI::WidgetType::JOYSTICK:
-                    changed |= PropertyCombo("Mode", desc.StickMode, stickNames, stickValues);
-                    changed |= PropertyFloat("Base Size", desc.BaseSize, 0.5f, 0.0f, 4000.0f);
-                    changed |= PropertyFloat("Handle Size", desc.HandleSize, 0.5f, 0.0f, 4000.0f);
-                    changed |= PropertySlider("Dead Zone", desc.DeadZone, 0.0f, 0.95f);
-                    changed |= PropertyFloat("Handle Range", desc.HandleRange, 0.01f, 0.0f, 4.0f, "%.2f");
-                    changed |= PropertyBool("Hide When Idle", desc.HideWhenIdle);
+                    changed |= EditorUI::TComboValues("Mode", desc.StickMode, stickNames, stickValues);
+                    changed |= EditorUI::TDragFloat("Base Size", &desc.BaseSize, 0.5f, 0.0f, 4000.0f, "%.1f");
+                    changed |= EditorUI::TDragFloat("Handle Size", &desc.HandleSize, 0.5f, 0.0f, 4000.0f, "%.1f");
+                    changed |= EditorUI::TSliderFloat("Dead Zone", &desc.DeadZone, 0.0f, 0.95f);
+                    changed |= EditorUI::TDragFloat("Handle Range", &desc.HandleRange, 0.01f, 0.0f, 4.0f, "%.2f");
+                    changed |= EditorUI::TCheckbox("Hide When Idle", &desc.HideWhenIdle);
                     changed |= PropertyImagePart("Base", desc.Background, true, false, nullptr);
                     changed |= PropertyImagePart("Knob", desc.Handle, true, false, nullptr);
                     break;
 
                 case UI::WidgetType::SCROLL_VIEW:
                 case UI::WidgetType::LIST_VIEW:
-                    changed |= PropertyBool("Scroll Vertical", desc.ScrollVertical);
-                    changed |= PropertyBool("Scroll Horizontal", desc.ScrollHorizontal);
-                    changed |= PropertySlider("Deceleration", desc.DecelerationRate, 0.0f, 0.99f);
-                    changed |= PropertyBool("Show Scrollbars", desc.ShowScrollbars);
+                    changed |= EditorUI::TCheckbox("Scroll Vertical", &desc.ScrollVertical);
+                    changed |= EditorUI::TCheckbox("Scroll Horizontal", &desc.ScrollHorizontal);
+                    changed |= EditorUI::TSliderFloat("Deceleration", &desc.DecelerationRate, 0.0f, 0.99f);
+                    changed |= EditorUI::TCheckbox("Show Scrollbars", &desc.ShowScrollbars);
                     if(desc.ShowScrollbars)
-                        changed |= PropertyColor("Scrollbar Color", desc.ScrollbarColor);
+                        changed |= EditorUI::TColorEdit4("Scrollbar Color", glm::value_ptr(desc.ScrollbarColor));
                     if(desc.Type == UI::WidgetType::LIST_VIEW)
                     {
-                        changed |= PropertyVec2("Item Size", desc.ItemSize, 0.5f, 0.0f, 8192.0f);
-                        changed |= PropertyVec2("Spacing", desc.Spacing, 0.25f);
-                        changed |= PropertyVec4("Padding", desc.Padding, 0.25f);
-                        changed |= PropertyInt("Columns", desc.Columns, 1, 64);
-                        changed |= PropertyInt("Preview Items", desc.PreviewItemCount, 1, 50);
+                        changed |= EditorUI::TDragVec("Item Size", desc.ItemSize, 0.5f, 0.0f, 8192.0f, "%.1f");
+                        changed |= EditorUI::TDragVec("Spacing", desc.Spacing, 0.25f, 0.0f, 0.0f, "%.1f");
+                        changed |= EditorUI::TDragVec("Padding", desc.Padding, 0.25f, 0.0f, 0.0f, "%.1f");
+                        changed |= EditorUI::TDragInt("Columns", &desc.Columns, 0.1f, 1, 64);
+                        changed |= EditorUI::TDragInt("Preview Items", &desc.PreviewItemCount, 0.1f, 1, 50);
                     }
                     break;
 
                 case UI::WidgetType::LAYOUT_GROUP:
-                    changed |= PropertyCombo("Direction", desc.Direction, directionNames, directionValues);
-                    changed |= PropertyVec4("Padding", desc.Padding, 0.25f);
-                    changed |= PropertyVec2("Spacing", desc.Spacing, 0.25f);
+                    changed |= EditorUI::TComboValues("Direction", desc.Direction, directionNames, directionValues);
+                    changed |= EditorUI::TDragVec("Padding", desc.Padding, 0.25f, 0.0f, 0.0f, "%.1f");
+                    changed |= EditorUI::TDragVec("Spacing", desc.Spacing, 0.25f, 0.0f, 0.0f, "%.1f");
                     if(desc.Direction == UI::LayoutDirection::GRID)
                     {
-                        changed |= PropertyVec2("Cell Size", desc.CellSize, 0.5f, 1.0f, 8192.0f);
-                        changed |= PropertyInt("Columns", desc.Columns, 0, 64);
+                        changed |= EditorUI::TDragVec("Cell Size", desc.CellSize, 0.5f, 1.0f, 8192.0f, "%.1f");
+                        changed |= EditorUI::TDragInt("Columns", &desc.Columns, 0.1f, 0, 64);
                     }
-                    changed |= PropertyVec2("Child Alignment", desc.ChildAlignment, 0.01f, 0.0f, 1.0f, "%.2f");
+                    changed |= EditorUI::TDragVec("Child Alignment", desc.ChildAlignment, 0.01f, 0.0f, 1.0f, "%.2f");
                     if(desc.Direction != UI::LayoutDirection::GRID)
                     {
-                        changed |= PropertyBool("Control Width", desc.ControlChildWidth);
-                        changed |= PropertyBool("Control Height", desc.ControlChildHeight);
+                        changed |= EditorUI::TCheckbox("Control Width", &desc.ControlChildWidth);
+                        changed |= EditorUI::TCheckbox("Control Height", &desc.ControlChildHeight);
                     }
-                    changed |= PropertyBool("Fit Content", desc.FitContent);
+                    changed |= EditorUI::TCheckbox("Fit Content", &desc.FitContent);
                     break;
 
                 case UI::WidgetType::INPUT_FIELD:
                     textProperties("Text", desc.MultiLine);
-                    changed |= PropertyText("Placeholder", desc.Placeholder, false);
-                    changed |= PropertyCombo("Content Type", desc.ContentType, contentNames, contentValues);
-                    changed |= PropertyBool("Multi Line", desc.MultiLine);
-                    changed |= PropertyInt("Max Length", desc.MaxLength, 0, 100000);
-                    changed |= PropertyFloat("Text Padding", desc.TextPadding, 0.25f, 0.0f, 500.0f);
-                    changed |= PropertyColor("Text Color", desc.TextColor);
-                    changed |= PropertyColor("Placeholder Color", desc.PlaceholderColor);
-                    changed |= PropertyColor("Caret Color", desc.CaretColor);
-                    changed |= PropertyColor("Selection Color", desc.SelectionColor);
-                    changed |= PropertyColor("Focus Border", desc.HighlightColor);
+                    changed |= EditorUI::TInputText("Placeholder", desc.Placeholder, false);
+                    changed |= EditorUI::TComboValues("Content Type", desc.ContentType, contentNames, contentValues);
+                    changed |= EditorUI::TCheckbox("Multi Line", &desc.MultiLine);
+                    changed |= EditorUI::TDragInt("Max Length", &desc.MaxLength, 0.1f, 0, 100000);
+                    changed |= EditorUI::TDragFloat("Text Padding", &desc.TextPadding, 0.25f, 0.0f, 500.0f, "%.1f");
+                    changed |= EditorUI::TColorEdit4("Text Color", glm::value_ptr(desc.TextColor));
+                    changed |= EditorUI::TColorEdit4("Placeholder Color", glm::value_ptr(desc.PlaceholderColor));
+                    changed |= EditorUI::TColorEdit4("Caret Color", glm::value_ptr(desc.CaretColor));
+                    changed |= EditorUI::TColorEdit4("Selection Color", glm::value_ptr(desc.SelectionColor));
+                    changed |= EditorUI::TColorEdit4("Focus Border", glm::value_ptr(desc.HighlightColor));
                     changed |= PropertyImagePart("Background", desc.Background, true, false, nullptr);
                     break;
 
@@ -1509,7 +1383,7 @@ namespace Surge
                     String options;
                     for(size_t i = 0; i < desc.Options.size(); i++)
                         options += (i > 0 ? "\n" : "") + desc.Options[i];
-                    if(PropertyText("Options (1 per line)", options, true))
+                    if(EditorUI::TInputText("Options (1 per line)", options, true))
                     {
                         desc.Options.clear();
                         size_t start = 0;
@@ -1525,42 +1399,42 @@ namespace Surge
                         }
                         changed = true;
                     }
-                    changed |= PropertyInt("Selected (-1 none)", desc.SelectedIndex, -1, glm::max(static_cast<int>(desc.Options.size()) - 1, -1));
-                    changed |= PropertyText("Placeholder", desc.Placeholder, false);
+                    changed |= EditorUI::TDragInt("Selected (-1 none)", &desc.SelectedIndex, 0.1f, -1, glm::max(static_cast<int>(desc.Options.size()) - 1, -1));
+                    changed |= EditorUI::TInputText("Placeholder", desc.Placeholder, false);
                     textProperties(nullptr, false);
-                    changed |= PropertyColor("Text Color", desc.TextColor);
-                    changed |= PropertyFloat("Text Padding", desc.TextPadding, 0.25f, 0.0f, 500.0f);
-                    changed |= PropertyInt("Max Visible Items", desc.MaxVisibleItems, 1, 50);
-                    changed |= PropertyColor("Item Hover", desc.HoverColor);
-                    changed |= PropertyColor("Selected Item", desc.HighlightColor);
+                    changed |= EditorUI::TColorEdit4("Text Color", glm::value_ptr(desc.TextColor));
+                    changed |= EditorUI::TDragFloat("Text Padding", &desc.TextPadding, 0.25f, 0.0f, 500.0f, "%.1f");
+                    changed |= EditorUI::TDragInt("Max Visible Items", &desc.MaxVisibleItems, 0.1f, 1, 50);
+                    changed |= EditorUI::TColorEdit4("Item Hover", glm::value_ptr(desc.HoverColor));
+                    changed |= EditorUI::TColorEdit4("Selected Item", glm::value_ptr(desc.HighlightColor));
                     changed |= PropertyImagePart("Field", desc.Background, true, false, nullptr);
                     changed |= PropertyImagePart("List", desc.Fill, true, false, nullptr);
                     break;
                 }
 
                 case UI::WidgetType::MODAL:
-                    changed |= PropertyColor("Backdrop", desc.BackdropColor);
-                    changed |= PropertyBool("Close On Backdrop", desc.CloseOnBackdrop);
-                    changed |= PropertyBool("Close On Back", desc.CloseOnBack);
+                    changed |= EditorUI::TColorEdit4("Backdrop", glm::value_ptr(desc.BackdropColor));
+                    changed |= EditorUI::TCheckbox("Close On Backdrop", &desc.CloseOnBackdrop);
+                    changed |= EditorUI::TCheckbox("Close On Back", &desc.CloseOnBack);
                     changed |= PropertyImagePart("Panel", desc.Background, true, false, nullptr);
                     break;
 
                 case UI::WidgetType::TAB_VIEW:
-                    changed |= PropertyInt("Active Tab", desc.ActiveTab, 0, glm::max(static_cast<int>(desc.Children.size()) - 1, 0));
-                    changed |= PropertyBool("Tabs At Bottom", desc.TabsAtBottom);
-                    changed |= PropertyFloat("Tab Bar Height", desc.TabBarHeight, 0.5f, 0.0f, 2000.0f);
+                    changed |= EditorUI::TDragInt("Active Tab", &desc.ActiveTab, 0.1f, 0, glm::max(static_cast<int>(desc.Children.size()) - 1, 0));
+                    changed |= EditorUI::TCheckbox("Tabs At Bottom", &desc.TabsAtBottom);
+                    changed |= EditorUI::TDragFloat("Tab Bar Height", &desc.TabBarHeight, 0.5f, 0.0f, 2000.0f, "%.1f");
                     textProperties(nullptr, false);
-                    changed |= PropertyColor("Text Color", desc.TextColor);
-                    changed |= PropertyColor("Active Text", desc.HighlightColor);
+                    changed |= EditorUI::TColorEdit4("Text Color", glm::value_ptr(desc.TextColor));
+                    changed |= EditorUI::TColorEdit4("Active Text", glm::value_ptr(desc.HighlightColor));
                     changed |= PropertyImagePart("Bar", desc.Background, true, false, nullptr);
                     changed |= PropertyImagePart("Active Tab", desc.Fill, true, false, nullptr);
                     break;
 
                 case UI::WidgetType::SPINNER:
-                    changed |= PropertyColor("Color", desc.Color);
-                    changed |= PropertyInt("Dots", desc.DotCount, 3, 24);
-                    changed |= PropertySlider("Dot Size", desc.DotSize, 0.02f, 0.5f);
-                    changed |= PropertyFloat("Speed (rev/s)", desc.Speed, 0.01f, 0.0f, 10.0f, "%.2f");
+                    changed |= EditorUI::TColorEdit4("Color", glm::value_ptr(desc.Color));
+                    changed |= EditorUI::TDragInt("Dots", &desc.DotCount, 0.1f, 3, 24);
+                    changed |= EditorUI::TSliderFloat("Dot Size", &desc.DotSize, 0.02f, 0.5f);
+                    changed |= EditorUI::TDragFloat("Speed (rev/s)", &desc.Speed, 0.01f, 0.0f, 10.0f, "%.2f");
                     break;
 
                 case UI::WidgetType::SAFE_AREA:
@@ -1569,7 +1443,7 @@ namespace Surge
                     for(int i = 0; i < 4; i++)
                     {
                         bool enabled = (desc.SafeEdges & (1 << i)) != 0;
-                        if(PropertyBool(edgeNames[i], enabled))
+                        if(EditorUI::TCheckbox(edgeNames[i], &enabled))
                         {
                             desc.SafeEdges = enabled ? (desc.SafeEdges | (1 << i)) : (desc.SafeEdges & ~(1 << i));
                             changed = true;
@@ -1590,7 +1464,7 @@ namespace Surge
             case UI::WidgetType::LIST_VIEW:
                 ImGui::TextWrapped("The first child is the item template. At runtime only the visible items exist; fill them from Lua with OnBindItem(item, index) and set ItemCount.");
                 if(desc.Children.size() > 1)
-                    ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "Only the first child is used, the others are ignored");
+                    ImGui::TextColored(Colors::Warning, "Only the first child is used, the others are ignored");
                 break;
             case UI::WidgetType::TAB_VIEW:
                 ImGui::TextWrapped("Each child is a page, its name is the tab label. Set Active Tab to edit another page.");
@@ -1619,11 +1493,6 @@ namespace Surge
                 changed = true;
             }
         }
-
-        const bool needsFont = desc.Type == UI::WidgetType::TEXT || desc.Type == UI::WidgetType::BUTTON || desc.Type == UI::WidgetType::TOGGLE ||
-                               desc.Type == UI::WidgetType::INPUT_FIELD || desc.Type == UI::WidgetType::DROPDOWN || desc.Type == UI::WidgetType::TAB_VIEW;
-        if(needsFont && !desc.Font)
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "No font assigned, the text is invisible. Import a .ttf and pick it above.");
 
         if(changed)
             MarkChanged();
@@ -1878,7 +1747,7 @@ namespace Surge
                     const ImVec2 p = ToScreen(parentMin + (parentMax - parentMin) * anchor);
                     const float dx = (i & 1) ? 6.0f : -6.0f;
                     const float dy = (i & 2) ? 6.0f : -6.0f;
-                    drawList->AddTriangleFilled(p, { p.x + dx, p.y + dy * 0.4f }, { p.x + dx * 0.4f, p.y + dy }, IM_COL32(240, 240, 240, 230));
+                    drawList->AddTriangleFilled(p, { p.x + dx, p.y + dy * 0.4f }, { p.x + dx * 0.4f, p.y + dy }, ToU32(WithAlpha(Colors::Viewport::Text, 0.9f)));
                 }
             }
 
@@ -1887,7 +1756,7 @@ namespace Surge
             if(desc)
             {
                 const ImVec2 pivot = ToScreen(selMin + (selMax - selMin) * desc->Pivot);
-                drawList->AddCircle(pivot, 5.0f, IM_COL32(110, 185, 255, 255), 16, 2.0f);
+                drawList->AddCircle(pivot, 5.0f, ToU32(Colors::Blue), 16, 2.0f);
             }
 
             for(const Handle& handle : handles)
@@ -1895,8 +1764,8 @@ namespace Surge
                 const ImVec2 hMin = { handle.Pos.x - HANDLE_HALF_SIZE, handle.Pos.y - HANDLE_HALF_SIZE };
                 const ImVec2 hMax = { handle.Pos.x + HANDLE_HALF_SIZE, handle.Pos.y + HANDLE_HALF_SIZE };
                 const bool highlighted = handle.Bits == handleUnderMouse || (mDragMode == DragMode::RESIZE && handle.Bits == mDragHandles);
-                drawList->AddRectFilled(hMin, hMax, highlighted ? COLOR_SELECTED : IM_COL32(255, 255, 255, 255));
-                drawList->AddRect(hMin, hMax, IM_COL32(20, 20, 20, 255));
+                drawList->AddRectFilled(hMin, hMax, highlighted ? COLOR_SELECTED : ToU32(Colors::White));
+                drawList->AddRect(hMin, hMax, ToU32(Colors::Viewport::Shade));
             }
 
             // Size readout (UI units)
@@ -1904,8 +1773,8 @@ namespace Surge
             const String sizeText = std::format("{:.0f} x {:.0f}", sizeUI.x, sizeUI.y);
             const ImVec2 textPos = { ToScreen(selMin).x, ToScreen(selMax).y + 6.0f };
             const ImVec2 textSize = ImGui::CalcTextSize(sizeText.c_str());
-            drawList->AddRectFilled({ textPos.x - 3.0f, textPos.y - 1.0f }, { textPos.x + textSize.x + 3.0f, textPos.y + textSize.y + 1.0f }, IM_COL32(15, 15, 15, 200), 3.0f);
-            drawList->AddText(textPos, IM_COL32(230, 230, 230, 255), sizeText.c_str());
+            drawList->AddRectFilled({ textPos.x - 3.0f, textPos.y - 1.0f }, { textPos.x + textSize.x + 3.0f, textPos.y + textSize.y + 1.0f }, ToU32(WithAlpha(Colors::Viewport::Shade, 0.78f)), 3.0f);
+            drawList->AddText(textPos, ToU32(Colors::Viewport::Text), sizeText.c_str());
         }
 
         drawList->PopClipRect();

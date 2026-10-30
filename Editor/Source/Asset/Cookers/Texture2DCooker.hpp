@@ -8,9 +8,9 @@ namespace Surge
     class Texture2DCooker final : public AssetCooker
     {
     public:
-        virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
+        virtual bool Cook(const CookContext& context) const override;
         virtual AssetType GetAssetType() const override { return AssetType::TEXTURE2D; }
-        virtual Uint GetCookerVersion() const override { return 2; }
+        virtual Uint GetCookerVersion() const override { return 3; } // 3: color space from the import settings
 
         // LoadFromSource
         // Loads a texture from a source file (PNG, JPG, etc.) into a TextureSpecification struct

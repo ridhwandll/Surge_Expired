@@ -12,7 +12,7 @@
 #include "Settings/EditorSettings.hpp"
 #include "Viewport/ViewportManager.hpp"
 
-#include "Asset/AssetImporter.hpp"
+#include "Asset/AssetDatabase.hpp"
 #include <functional>
 
 namespace Surge
@@ -72,14 +72,14 @@ namespace Surge
         void OpenShortcutsWindow() { mShowShortcutsWindow = true; }
 
         EditorSettings& GetSettings() { return mSettings; }
+        bool IsLightTheme() const { return mPreferences.LightTheme; }
+        void SetLightTheme(bool light); // Saved right away, applied at frame end (pushed ImGui colors would restore the old theme when popped)
         void FocusEntity(Entity entity);
         void RequestResetLayout() { mResetLayoutRequested = true; }
         ImageHandle GetToolIcon(ToolIcon icon) const { return mToolIcons[static_cast<size_t>(icon)]; }
         ImageHandle LoadEditorIcon(const String& path); // Mipmapped, sampled with GetIconSampler(): for images drawn smaller than their source, caller destroys it
         SamplerHandle GetIconSampler() const { return mIconSampler; }
 
-        const AssetImporter& GetAssetImporter() const { return mAssetImporter; }
-        AssetImporter& GetAssetImporter() { return mAssetImporter; }
         Ref<Scene> GetCurrentScene() { return mActiveScene; }
         PanelManager& GetPanelManager() { return mPanelManager; }
         ViewportManager& GetViewports() { return mViewports; }
@@ -130,7 +130,6 @@ namespace Surge
 
         Ref<Scene> mRuntimeScene;
 
-        AssetImporter mAssetImporter;
         EditorCamera mFrameCamera; // Only drives Renderer::BeginFrame, the viewports draw the scene with their own cameras
         Renderer* mRenderer;
         AssetManager* mAssetManager;
@@ -151,5 +150,7 @@ namespace Surge
         Path mProjectFilePath;
         EditorSettings mSettings;
         EditorSettingsStore mSettingsStore;
+        EditorPreferences mPreferences;
     };
+
 } // namespace Surge

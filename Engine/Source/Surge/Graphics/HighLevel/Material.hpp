@@ -91,7 +91,6 @@ namespace Surge
         mutable bool mIsDirty[RHISettings::FRAMES_IN_FLIGHT];
         GraphicsRHI* mRHI;
 
-        friend class MaterialSerializer;
     };
 
 } // namespace Surge

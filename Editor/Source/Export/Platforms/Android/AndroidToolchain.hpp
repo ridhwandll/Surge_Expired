@@ -22,8 +22,8 @@ namespace Surge
         AndroidToolState State = AndroidToolState::OK;
     };
 
-    // What android/gradlew.bat will use, resolved the way gradlew.bat and the Android Gradle Plugin do.
-    // Versions come from android/app/build.gradle and the Gradle wrapper. Main thread, reads a few small files
+    // What Android/gradlew.bat will use, resolved the way gradlew.bat and the Android Gradle Plugin do.
+    // Versions come from Android/app/build.gradle and the Gradle wrapper. Main thread, reads a few small files
     struct AndroidToolchain
     {
         Path Sdk; // Empty when not found

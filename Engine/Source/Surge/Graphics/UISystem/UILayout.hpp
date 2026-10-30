@@ -162,7 +162,7 @@ namespace Surge
         class LayoutResourceCache
         {
         public:
-            Ref<Font> GetFont(AssetID id);
+            Ref<Font> GetFont(AssetID id); // No font: the engine UI font (Renderer::GetEngineFont)
             Ref<Asset> GetTexture(AssetID id, ImageHandle& outImage);
             void Clear() { mAssets.clear(); }
 

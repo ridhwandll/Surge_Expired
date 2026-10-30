@@ -46,11 +46,11 @@ namespace Surge
         const char* Name;
     };
 
-    // Stages the content into the Gradle project's assets and drives android/gradlew.bat (see android/app/build.gradle for the -P contract)
+    // Stages the content into the Gradle project's assets and drives Android/gradlew.bat (see Android/app/build.gradle for the -P contract)
     class AndroidExporter : public PlatformExporter
     {
     public:
-        static constexpr const char* PROJECT_DIR = "android";
+        static constexpr const char* PROJECT_DIR = "Android";
 
         static constexpr AndroidOrientation ORIENTATIONS[] = {
             {"Landscape (Locked)", "landscape"},

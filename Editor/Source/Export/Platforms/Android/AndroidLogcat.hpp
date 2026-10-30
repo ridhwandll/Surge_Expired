@@ -23,7 +23,7 @@ namespace Surge
             Path Adb;
             String PackageId;
             Path Symbolizer; // NDK llvm-symbolizer.exe, empty: crash frames stay raw
-            Path SymbolsDir; // Searched for the newest unstripped libSurgePlayer.so (android/app/build/intermediates/cxx)
+            Path SymbolsDir; // Searched for the newest unstripped libSurgePlayer.so (Android/app/build/intermediates/cxx)
         };
 
         enum class State

@@ -1,12 +1,14 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/SceneHierarchyPanel.hpp"
+#include "Asset/AssetDatabase.hpp"
+#include "Asset/AssetExtensions.hpp"
 #include "Surge/Core/Core.hpp"
 
 #include "Surge/Asset/Asset.hpp"
 #include "Surge/ECS/Components/Components.hpp"
 #include "Surge/ECS/Components/ScriptComponent.hpp"
 
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "History/SceneCommands.hpp"
 #include "Gizmos/GizmoIcons.hpp"
 #include "Panels/ContentBrowserPanel.hpp"
@@ -28,15 +30,11 @@ namespace Surge
 {
     namespace
     {
-        constexpr ImU32 SELECTED_FOREGROUND = IM_COL32(245, 245, 245, 255);
-        constexpr ImU32 DROP_INDICATOR = IM_COL32(255, 165, 0, 255); // ThemeColor1
+        namespace Colors = EditorUI::Colors;
+        using EditorUI::WithAlpha;
+        constexpr ImU32 DROP_INDICATOR = EditorUI::ToU32(Colors::Accent);
         constexpr float ROW_GRADIENT_WIDTH = 0.2f;  // Fraction of the row the type color fades over
         constexpr float ROW_GRADIENT_ALPHA = 0.22f; // Opacity at the left edge
-
-        ImU32 WithAlpha(ImU32 color, float alpha)
-        {
-            return (color & ~IM_COL32_A_MASK) | (static_cast<ImU32>(alpha * 255.0f + 0.5f) << IM_COL32_A_SHIFT);
-        }
 
         using GizmoIcons::EntityIcon;
         using GizmoIcons::GetEntityIcon;
@@ -72,14 +70,6 @@ namespace Surge
         void ToLower(String& str)
         {
             std::transform(str.begin(), str.end(), str.begin(), [](char c) { return static_cast<char>(::tolower(static_cast<unsigned char>(c))); });
-        }
-
-        void MenuSection(const char* title)
-        {
-            ImGuiAux::StyledSeparator();
-            ImGuiAux::ScopedBoldFont font;
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", title);
-            ImGuiAux::StyledSeparator();
         }
 
         bool IsCreatableAsset(AssetID id)
@@ -123,8 +113,8 @@ namespace Surge
         if(!*show || !mSceneContext)
             return;
 
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.06f));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 1.0f, 1.0f, 0.10f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, WithAlpha(Colors::Ink, 0.06f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, WithAlpha(Colors::Ink, 0.1f));
 
         mHierarchyFocused = false;
         mHierarchyHovered = false;
@@ -186,7 +176,7 @@ namespace Surge
                     if(searching)
                         ImGui::TextDisabled("No entity matches \"%s\"", mSearchBuffer.c_str());
                     else
-                        ImGui::TextDisabled("The scene is empty. Press ADD or right click here to create an entity.");
+                        ImGui::TextDisabled("Seems like this scene is as empty as your brain\nPress + or right click here to create an entity");
                     ImGui::PopTextWrapPos();
                 }
 
@@ -217,21 +207,21 @@ namespace Surge
                 ImGui::OpenPopup("##HierarchySpace");
             mOpenCreatePopup = mOpenSpacePopup = false;
 
-            ImGuiAux::StyledPopupVars::Push();
+            EditorUI::StyledPopupVars::Push();
             if(ImGui::BeginPopup("##CreateEntity"))
             {
                 DrawCreateMenu({});
-                ImGuiAux::EndStyledPopup();
+                EditorUI::EndStyledPopup();
             }
             else
-                ImGuiAux::StyledPopupVars::Pop();
+                EditorUI::StyledPopupVars::Pop();
 
-            ImGuiAux::StyledPopupVars::Push();
+            EditorUI::StyledPopupVars::Push();
             if(ImGui::BeginPopup("##HierarchySpace"))
             {
-                if(ImGuiAux::StyledMenuItem("Paste", "Ctrl+V", nullptr, editor->HasEntityInClipboard() && !editor->IsPlaying()))
+                if(EditorUI::StyledMenuItem("Paste", "Ctrl+V", nullptr, editor->HasEntityInClipboard() && !editor->IsPlaying()))
                     Core::AddFrameEndCallback([editor]() { editor->PasteEntity(); });
-                ImGuiAux::StyledSeparator();
+                EditorUI::StyledSeparator();
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
                 if(ImGui::BeginMenu("Create"))
@@ -240,16 +230,16 @@ namespace Surge
                     ImGui::EndMenu();
                 }
                 ImGui::PopStyleVar();
-                ImGuiAux::StyledSeparator();
+                EditorUI::StyledSeparator();
 
-                if(ImGuiAux::StyledMenuItem("Expand All"))
+                if(EditorUI::StyledMenuItem("Expand All"))
                     mSetAllOpen = 1;
-                if(ImGuiAux::StyledMenuItem("Collapse All"))
+                if(EditorUI::StyledMenuItem("Collapse All"))
                     mSetAllOpen = 0;
-                ImGuiAux::EndStyledPopup();
+                EditorUI::EndStyledPopup();
             }
             else
-                ImGuiAux::StyledPopupVars::Pop();
+                EditorUI::StyledPopupVars::Pop();
 
             HandleKeyboardNavigation();
             ApplyPendingEdits();
@@ -268,7 +258,7 @@ namespace Surge
             const float lineStart = ImGui::GetCursorPosX();
             const float right = lineStart + ImGui::GetContentRegionAvail().x;
             {
-                ImGuiAux::ScopedBoldFont font;
+                EditorUI::ScopedBoldFont font;
                 ImGui::TextUnformatted(title.c_str());
             }
 
@@ -279,7 +269,7 @@ namespace Surge
             ImGui::SameLine(glm::max(right - countWidth - playWidth, lineStart + ImGui::GetItemRectSize().x + 8.0f));
             if(playState)
             {
-                ImGui::TextColored(ImVec4(ImGuiAux::Colors::ThemeColor1), "%s", playState);
+                ImGui::TextColored(Colors::Accent, "%s", playState);
                 ImGui::SameLine();
             }
             ImGui::TextDisabled("%s", count.c_str());
@@ -288,21 +278,21 @@ namespace Surge
         // Search + ADD
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
         {
-            ImGuiAux::ScopedBoldFont font;
-            constexpr const char* addButtonLabel = " ADD ";
+            const float addButtonSize = ImGui::GetFrameHeight();
 
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(addButtonLabel).x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x);
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - addButtonSize - ImGui::GetStyle().ItemSpacing.x);
             if(mFocusSearch)
             {
                 ImGui::SetKeyboardFocusHere();
                 mFocusSearch = false;
             }
             ImGui::InputTextWithHint("##Search", "Search...  (t:mesh, t:light)", &mSearchBuffer, ImGuiInputTextFlags_EscapeClearsAll);
-            ImGuiAux::DelayedToolTip("Filter by name (case insensitive)\nt:<type> filters by component: camera, light, mesh, sprite, text, audio, script, canvas, environment, rigidbody, collider\nCtrl+F: focus, Esc: clear");
+            EditorUI::DelayedToolTip("...");
 
             ImGui::SameLine();
-            if(ImGui::Button(addButtonLabel, ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
+            if(GizmoIcons::IconButton("##Add", GizmoIcon::ADD, ImVec2(addButtonSize, addButtonSize), Colors::Text))
                 mOpenCreatePopup = true;
+            EditorUI::DelayedToolTip("Create entity");
         }
         ImGui::PopStyleVar();
         ImGui::Spacing();
@@ -311,18 +301,20 @@ namespace Surge
     void SceneHierarchyPanel::DrawCreateMenu(Entity parent)
     {
         auto item = [&](const char* label, CreateKind kind, const char* defaultMesh = nullptr) {
-            if(ImGuiAux::StyledMenuItem(label))
+            if(EditorUI::StyledMenuItem(label))
                 mPendingCreate = { .Kind = kind, .Parent = parent, .DefaultMesh = defaultMesh, .Asset = {} };
         };
 
         item("Empty Entity", CreateKind::EMPTY);
 
-        MenuSection("RENDERING");
+        EditorUI::StyledSeparator();
+        EditorUI::MenuHeader("RENDERING");
         item("Camera", CreateKind::CAMERA);
         item("Sprite Renderer", CreateKind::SPRITE);
         item("Particle System", CreateKind::PARTICLE_SYSTEM);
 
-        MenuSection("3D PRIMITIVES");
+        EditorUI::StyledSeparator();
+        EditorUI::MenuHeader("3D PRIMITIVES");
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
         if(ImGui::BeginMenu("Meshes"))
         {
@@ -338,7 +330,8 @@ namespace Surge
         }
         ImGui::PopStyleVar();
 
-        MenuSection("WORLD & UI");
+        EditorUI::StyledSeparator();
+        EditorUI::MenuHeader("WORLD & UI");
         item("Environment", CreateKind::ENVIRONMENT);
         item("Directional Light", CreateKind::DIRECTIONAL_LIGHT);
         item("Point Light", CreateKind::POINT_LIGHT);
@@ -392,11 +385,11 @@ namespace Surge
         ImGui::TableNextColumn();
 
         const float labelX = ImGui::GetCursorScreenPos().x + ImGui::GetTreeNodeToLabelSpacing();
-        ImGui::PushStyleColor(ImGuiCol_Header, ImGuiAux::Colors::Selection);
+        ImGui::PushStyleColor(ImGuiCol_Header, Colors::Selection);
         if(isSelected)
         {
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGuiAux::Colors::Selection);
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGuiAux::Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, Colors::Selection);
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, Colors::Selection);
         }
         const bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(static_cast<Uint>(handle))), flags, "%s", ""); // Label drawn below, with the icon
         ImGui::PopStyleColor(isSelected ? 3 : 1);
@@ -470,19 +463,19 @@ namespace Surge
             const float gradientEnd = rowMin.x + (rowMax.x - rowMin.x) * ROW_GRADIENT_WIDTH;
             const ImU32 left = WithAlpha(icon.Color, ROW_GRADIENT_ALPHA);
             const ImU32 right = WithAlpha(icon.Color, 0.0f);
-            drawList->AddRectFilledMultiColor(rowMin, ImVec2(gradientEnd, rowMax.y), left, right, right, left);
+            EditorUI::AddHorizontalGradient(drawList, rowMin, ImVec2(gradientEnd, rowMax.y), left, right);
         }
 
         // Type icon
-        const ImU32 background = isSelected ? ImGui::GetColorU32(ImGuiAux::Colors::Selection) : ImGui::GetColorU32(ImGuiCol_WindowBg);
-        GizmoIcons::DrawGlyph(drawList, ImVec2(labelX + fontSize * 0.5f, centerY), fontSize * 0.86f, icon.Icon, isSelected ? SELECTED_FOREGROUND : icon.Color, background);
+        const ImU32 background = isSelected ? ImGui::GetColorU32(Colors::Selection) : ImGui::GetColorU32(ImGuiCol_WindowBg);
+        GizmoIcons::DrawGlyph(drawList, ImVec2(labelX + fontSize * 0.5f, centerY), fontSize * 0.86f, icon.Icon, isSelected ? EditorUI::ToU32(Colors::Tone96) : icon.Color, background);
 
         // Script indicator on the right edge
         float textClipX = rowMax.x - 4.0f;
         if(const ScriptComponent* scripts = e.TryGetComponent<ScriptComponent>(); scripts && !scripts->Scripts.empty())
         {
             const ImVec2 center(rowMax.x - fontSize * 0.5f - 6.0f, centerY);
-            GizmoIcons::DrawGlyph(drawList, center, fontSize * 0.72f, GizmoIcon::SCRIPT, isSelected ? SELECTED_FOREGROUND : ImGui::GetColorU32(ImGuiCol_TextDisabled), background);
+            GizmoIcons::DrawGlyph(drawList, center, fontSize * 0.72f, GizmoIcon::SCRIPT, isSelected ? EditorUI::ToU32(Colors::Tone96) : ImGui::GetColorU32(ImGuiCol_TextDisabled), background);
             textClipX = center.x - fontSize * 0.5f - 4.0f;
 
             const ImVec2 half(fontSize * 0.5f, fontSize * 0.5f);
@@ -497,8 +490,8 @@ namespace Surge
         const ImVec2 textPos(labelX + fontSize + 5.0f, centerY - fontSize * 0.5f);
         const ImVec4 clip(rowMin.x, rowMin.y, textClipX, rowMax.y);
 
-        ImFont* font = isSelected ? ImGui::GetIO().Fonts->Fonts[1] : ImGui::GetFont();
-        ImU32 textColor = isSelected ? SELECTED_FOREGROUND : ImGui::GetColorU32(ImGuiCol_Text);
+        ImFont* font = isSelected ? EditorUI::BoldFont() : ImGui::GetFont();
+        ImU32 textColor = isSelected ? EditorUI::ToU32(Colors::Tone96) : ImGui::GetColorU32(ImGuiCol_Text);
 
         if(IsSearching())
         {
@@ -517,7 +510,7 @@ namespace Surge
                 {
                     const float before = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, name.c_str(), name.c_str() + start).x;
                     const float width = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, name.c_str() + start, name.c_str() + start + mSearchName.size()).x;
-                    drawList->AddRectFilled(ImVec2(textPos.x + before - 1.0f, rowMin.y + 3.0f), ImVec2(textPos.x + before + width + 1.0f, rowMax.y - 3.0f), IM_COL32(255, 165, 0, 90), 2.0f);
+                    drawList->AddRectFilled(ImVec2(textPos.x + before - 1.0f, rowMin.y + 3.0f), ImVec2(textPos.x + before + width + 1.0f, rowMax.y - 3.0f), EditorUI::ToU32(WithAlpha(Colors::Accent, 90.0f / 255.0f)), 2.0f);
                 }
             }
         }
@@ -527,24 +520,20 @@ namespace Surge
 
     void SceneHierarchyPanel::DrawEntityContextMenu(Entity e)
     {
-        if(!ImGuiAux::BeginStyledPopupContextItem())
+        if(!EditorUI::BeginStyledPopupContextItem())
             return;
 
         Editor* editor = static_cast<Editor*>(Core::GetClient());
         const RelationshipComponent& rel = e.GetComponent<RelationshipComponent>();
 
-        {
-            ImGuiAux::ScopedBoldFont font;
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", e.GetComponent<NameComponent>().Name.c_str());
-        }
-        ImGuiAux::StyledSeparator();
+        EditorUI::MenuHeader(e.GetComponent<NameComponent>().Name.c_str());
 
-        if(ImGuiAux::StyledMenuItem("Rename", "F2"))
+        if(EditorUI::StyledMenuItem("Rename", "F2"))
         {
             editor->SelectEntity(e); // Renames are recorded through the selection tracker
             StartRename(e);
         }
-        if(ImGuiAux::StyledMenuItem("Focus", "F"))
+        if(EditorUI::StyledMenuItem("Focus", "F"))
             editor->FocusEntity(e);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
@@ -555,21 +544,21 @@ namespace Surge
         }
         ImGui::PopStyleVar();
 
-        if(rel.FirstChild != entt::null && ImGuiAux::StyledMenuItem("Expand All Children"))
+        if(rel.FirstChild != entt::null && EditorUI::StyledMenuItem("Expand All Children"))
             mNextExpandSubtree = e.Raw();
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
 
         if(rel.Parent != entt::null)
         {
-            if(ImGuiAux::StyledMenuItem("Unparent"))
+            if(EditorUI::StyledMenuItem("Unparent"))
                 mPendingMove = { .Target = e, .Parent = {}, .InsertAfter = {}, .KeepOrder = true };
-            ImGuiAux::StyledSeparator();
+            EditorUI::StyledSeparator();
         }
 
         // Creating entities while the tree is being drawn is not safe, these run at the end of the frame
-        if(ImGuiAux::StyledMenuItem("Copy", "Ctrl+C"))
+        if(EditorUI::StyledMenuItem("Copy", "Ctrl+C"))
             editor->CopyEntity(e);
-        if(ImGuiAux::StyledMenuItem("Paste", "Ctrl+V", nullptr, editor->HasEntityInClipboard() && !editor->IsPlaying()))
+        if(EditorUI::StyledMenuItem("Paste", "Ctrl+V", nullptr, editor->HasEntityInClipboard() && !editor->IsPlaying()))
         {
             Entity target = e;
             Core::AddFrameEndCallback([editor, target]() {
@@ -577,11 +566,11 @@ namespace Surge
                 editor->PasteEntity();
             });
         }
-        if(ImGuiAux::StyledMenuItem("Duplicate", "Ctrl+D"))
+        if(EditorUI::StyledMenuItem("Duplicate", "Ctrl+D"))
             Core::AddFrameEndCallback([editor, e]() { editor->DuplicateEntity(e); });
-        if(ImGuiAux::StyledMenuItem("Delete", "Del"))
+        if(EditorUI::StyledMenuItem("Delete", "Del"))
             editor->DeleteEntity(e);
-        ImGuiAux::EndStyledPopup();
+        EditorUI::EndStyledPopup();
     }
 
     void SceneHierarchyPanel::AcceptDrop(Entity target, const ImVec2& rowMin, const ImVec2& rowMax, float labelX, bool targetOpen)
@@ -728,7 +717,7 @@ namespace Surge
                 mSceneContext->CreateEntity(entity, "Mesh");
                 MeshComponent& meshComponent = entity.AddComponent<MeshComponent>();
                 if(request.DefaultMesh)
-                    meshComponent.MeshAsset = assetManager->Load<Mesh>(assetManager->Import(request.DefaultMesh, AssetType::MESH));
+                    meshComponent.MeshAsset = assetManager->Load<Mesh>(AssetDatabase::Get().Import(request.DefaultMesh, AssetType::MESH));
                 break;
             }
             case CreateKind::ENVIRONMENT:

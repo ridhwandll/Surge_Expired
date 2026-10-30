@@ -1,6 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Utility/ParticleWidgets.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include <imgui_internal.h>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -8,12 +8,11 @@ namespace Surge::ParticleWidgets
 {
     namespace
     {
-        constexpr ImU32 BACKGROUND = IM_COL32(24, 24, 27, 255);
-        constexpr ImU32 BORDER = IM_COL32(70, 70, 76, 255);
-        constexpr ImU32 GRID = IM_COL32(255, 255, 255, 18);
-        constexpr ImU32 CURVE_COL = IM_COL32(255, 191, 0, 255);
-        constexpr ImU32 KEY = IM_COL32(230, 230, 230, 255);
-        constexpr ImU32 SELECTED = IM_COL32(255, 168, 0, 255);
+        namespace Colors = EditorUI::Colors;
+        using EditorUI::ToU32;
+        using EditorUI::WithAlpha;
+        constexpr ImU32 CURVE_COL = ToU32(Colors::Curve);
+        constexpr ImU32 SELECTED = ToU32(Colors::Accent);
         constexpr float KEY_RADIUS = 4.0f;
         constexpr float PICK_RADIUS = 7.0f;
 
@@ -22,45 +21,6 @@ namespace Surge::ParticleWidgets
             const float dx = a.x - b.x;
             const float dy = a.y - b.y;
             return std::sqrt(dx * dx + dy * dy);
-        }
-
-        void LabelColumn(const char* label)
-        {
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-        }
-
-        // Small "v" button at the right of a value, opens a list of modes. Returns the picked index or -1
-        int ModeButton(const char* const* names, int count, int current)
-        {
-            int picked = -1;
-            ImGui::SameLine(0.0f, 2.0f);
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-            if(ImGui::ArrowButton("##Mode", ImGuiDir_Down))
-                ImGui::OpenPopup("##ModePopup");
-            ImGui::PopStyleColor();
-            ImGuiAux::DelayedToolTip(names[current]);
-
-            ImGuiAux::StyledPopupVars::Push();
-            if(ImGui::BeginPopup("##ModePopup"))
-            {
-                for(int i = 0; i < count; i++)
-                {
-                    if(ImGuiAux::StyledMenuItem(names[i], nullptr, nullptr, true) && i != current)
-                        picked = i;
-                }
-                ImGuiAux::EndStyledPopup();
-            }
-            else
-                ImGuiAux::StyledPopupVars::Pop();
-            return picked;
-        }
-
-        float ValueWidth()
-        {
-            return ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight() - 2.0f;
         }
     } // namespace
 
@@ -112,16 +72,16 @@ namespace Surge::ParticleWidgets
         };
 
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        drawList->AddRectFilled(min, max, BACKGROUND, 3.0f);
+        drawList->AddRectFilled(min, max, ToU32(Colors::Tone09), 3.0f);
         for(int i = 1; i < 4; i++)
         {
             const float x = min.x + pad + (max.x - min.x - pad * 2.0f) * static_cast<float>(i) * 0.25f;
-            drawList->AddLine(ImVec2(x, min.y + 1.0f), ImVec2(x, max.y - 1.0f), GRID);
+            drawList->AddLine(ImVec2(x, min.y + 1.0f), ImVec2(x, max.y - 1.0f), ToU32(WithAlpha(Colors::Ink, 0.07f)));
         }
         if(low < 0.0f && high > 0.0f)
         {
             const float zeroY = toScreen(0.0f, 0.0f).y;
-            drawList->AddLine(ImVec2(min.x + 1.0f, zeroY), ImVec2(max.x - 1.0f, zeroY), IM_COL32(255, 255, 255, 40));
+            drawList->AddLine(ImVec2(min.x + 1.0f, zeroY), ImVec2(max.x - 1.0f, zeroY), ToU32(WithAlpha(Colors::Ink, 0.16f)));
         }
 
         // Curve, sampled from the keys (exact, not the baked table)
@@ -202,23 +162,23 @@ namespace Surge::ParticleWidgets
         {
             const ImVec2 p = toScreen(curve.Keys[i].Time, curve.Keys[i].Value);
             const bool isSelected = static_cast<int>(i) == selected;
-            drawList->AddCircleFilled(p, KEY_RADIUS + (static_cast<int>(i) == hoveredKey ? 1.5f : 0.0f), isSelected ? SELECTED : KEY, 12);
+            drawList->AddCircleFilled(p, KEY_RADIUS + (static_cast<int>(i) == hoveredKey ? 1.5f : 0.0f), isSelected ? SELECTED : ToU32(Colors::Tone90), 12);
         }
-        drawList->AddRect(min, max, hovered ? IM_COL32(110, 110, 120, 255) : BORDER, 3.0f);
+        drawList->AddRect(min, max, hovered ? ToU32(Colors::Tone45) : ToU32(Colors::Tone28), 3.0f);
 
         // Range labels
         {
             char text[32];
             snprintf(text, sizeof(text), "%.2f", high);
-            drawList->AddText(ImVec2(min.x + 4.0f, min.y + 2.0f), IM_COL32(150, 150, 150, 200), text);
+            drawList->AddText(ImVec2(min.x + 4.0f, min.y + 2.0f), ToU32(WithAlpha(Colors::Tone60, 0.78f)), text);
             snprintf(text, sizeof(text), "%.2f", low);
-            drawList->AddText(ImVec2(min.x + 4.0f, max.y - ImGui::GetFontSize() - 2.0f), IM_COL32(150, 150, 150, 200), text);
+            drawList->AddText(ImVec2(min.x + 4.0f, max.y - ImGui::GetFontSize() - 2.0f), ToU32(WithAlpha(Colors::Tone60, 0.78f)), text);
         }
 
         if(hovered && hoveredKey >= 0 && dragging < 0)
             ImGui::SetTooltip("t %.2f  |  %.3f\nRight-click to remove", curve.Keys[hoveredKey].Time, curve.Keys[hoveredKey].Value);
         else if(hovered && dragging < 0)
-            ImGuiAux::DelayedToolTip("Double-click to add a key");
+            EditorUI::DelayedToolTip("Double-click to add a key");
 
         // Exact values of the selected key
         if(selected >= 0)
@@ -254,7 +214,7 @@ namespace Surge::ParticleWidgets
             for(float x = min.x; x < max.x; x += cell)
             {
                 const bool dark = (static_cast<int>((x - min.x) / cell) + static_cast<int>((y - min.y) / cell)) % 2 == 0;
-                drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + cell, y + cell), dark ? IM_COL32(90, 90, 90, 255) : IM_COL32(140, 140, 140, 255));
+                drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + cell, y + cell), ToU32(dark ? Colors::Tone35 : Colors::Tone55));
             }
         }
 
@@ -268,10 +228,10 @@ namespace Surge::ParticleWidgets
             const glm::vec4 c1 = glm::clamp(gradient.EvaluateKeys(t1), 0.0f, 1.0f);
             const ImU32 left = ImGui::ColorConvertFloat4ToU32(ImVec4(c0.r, c0.g, c0.b, c0.a));
             const ImU32 right = ImGui::ColorConvertFloat4ToU32(ImVec4(c1.r, c1.g, c1.b, c1.a));
-            drawList->AddRectFilledMultiColor(ImVec2(min.x + width * t0, min.y), ImVec2(min.x + width * t1, max.y), left, right, right, left);
+            EditorUI::AddHorizontalGradient(drawList, ImVec2(min.x + width * t0, min.y), ImVec2(min.x + width * t1, max.y), left, right);
         }
         drawList->PopClipRect();
-        drawList->AddRect(min, max, BORDER, 2.0f);
+        drawList->AddRect(min, max, ToU32(Colors::Tone28), 2.0f);
     }
 
     bool GradientEditor(const char* id, ParticleGradient& gradient)
@@ -382,7 +342,7 @@ namespace Surge::ParticleWidgets
             const ImU32 fill = ImGui::ColorConvertFloat4ToU32(ImVec4(a, a, a, 1.0f));
             const bool isSelected = kind == 2 && index == static_cast<int>(i);
             drawList->AddTriangleFilled(ImVec2(x - 5.0f, min.y), ImVec2(x + 5.0f, min.y), ImVec2(x, barMin.y), fill);
-            drawList->AddTriangle(ImVec2(x - 5.0f, min.y), ImVec2(x + 5.0f, min.y), ImVec2(x, barMin.y), isSelected ? SELECTED : IM_COL32(20, 20, 20, 255), isSelected ? 2.0f : 1.0f);
+            drawList->AddTriangle(ImVec2(x - 5.0f, min.y), ImVec2(x + 5.0f, min.y), ImVec2(x, barMin.y), isSelected ? SELECTED : ToU32(Colors::Tone07), isSelected ? 2.0f : 1.0f);
         }
         for(Uint i = 0; i < gradient.ColorKeyCount; i++)
         {
@@ -391,11 +351,11 @@ namespace Surge::ParticleWidgets
             const ImU32 fill = ImGui::ColorConvertFloat4ToU32(ImVec4(c.r, c.g, c.b, 1.0f));
             const bool isSelected = kind == 1 && index == static_cast<int>(i);
             drawList->AddTriangleFilled(ImVec2(x, barMax.y), ImVec2(x + 5.0f, max.y), ImVec2(x - 5.0f, max.y), fill);
-            drawList->AddTriangle(ImVec2(x, barMax.y), ImVec2(x + 5.0f, max.y), ImVec2(x - 5.0f, max.y), isSelected ? SELECTED : IM_COL32(20, 20, 20, 255), isSelected ? 2.0f : 1.0f);
+            drawList->AddTriangle(ImVec2(x, barMax.y), ImVec2(x + 5.0f, max.y), ImVec2(x - 5.0f, max.y), isSelected ? SELECTED : ToU32(Colors::Tone07), isSelected ? 2.0f : 1.0f);
         }
 
         if(hovered && !dragging)
-            ImGuiAux::DelayedToolTip("Color keys below, alpha keys above\nDouble-click to add, right-click to remove");
+            EditorUI::DelayedToolTip("Color keys below, alpha keys above\nDouble-click to add, right-click to remove");
 
         // Selected key
         if(kind == 1)
@@ -439,17 +399,17 @@ namespace Surge::ParticleWidgets
         static constexpr const char* modeNames[] = { "Constant", "Random Between Two Constants", "Curve", "Random Between Two Curves" };
         bool changed = false;
         ImGui::PushID(label);
-        LabelColumn(label);
+        EditorUI::TLabel(label);
 
         switch(value.Mode)
         {
             case ParticleValueMode::CONSTANT:
-                ImGui::SetNextItemWidth(ValueWidth());
+                ImGui::SetNextItemWidth(EditorUI::ModeButtonValueWidth());
                 changed |= ImGui::DragFloat("##Value", &value.Max, speed, min, max, format);
                 break;
             case ParticleValueMode::RANDOM_BETWEEN_CONSTANTS:
             {
-                const float half = (ValueWidth() - 2.0f) * 0.5f;
+                const float half = (EditorUI::ModeButtonValueWidth() - 2.0f) * 0.5f;
                 ImGui::SetNextItemWidth(half);
                 changed |= ImGui::DragFloat("##Min", &value.Min, speed, min, max, format);
                 ImGui::SameLine(0.0f, 2.0f);
@@ -459,12 +419,12 @@ namespace Surge::ParticleWidgets
             }
             case ParticleValueMode::CURVE:
             case ParticleValueMode::RANDOM_BETWEEN_CURVES:
-                ImGui::SetNextItemWidth(ValueWidth());
+                ImGui::SetNextItemWidth(EditorUI::ModeButtonValueWidth());
                 changed |= ImGui::DragFloat("##Multiplier", &value.CurveMultiplier, speed, 0.0f, 0.0f, "x %.2f");
                 break;
         }
 
-        const int picked = ModeButton(modeNames, 4, static_cast<int>(value.Mode));
+        const int picked = EditorUI::ModeButton(modeNames, 4, static_cast<int>(value.Mode));
         if(picked >= 0)
         {
             const ParticleValueMode mode = static_cast<ParticleValueMode>(picked);
@@ -501,13 +461,13 @@ namespace Surge::ParticleWidgets
         static constexpr const char* modeNames[] = { "Color", "Random Between Two Colors", "Gradient (over the duration)", "Random Color In Gradient" };
         bool changed = false;
         ImGui::PushID(label);
-        LabelColumn(label);
+        EditorUI::TLabel(label);
 
         constexpr ImGuiColorEditFlags flags = ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoInputs;
         switch(color.Mode)
         {
             case ParticleColorMode::CONSTANT:
-                ImGui::SetNextItemWidth(ValueWidth());
+                ImGui::SetNextItemWidth(EditorUI::ModeButtonValueWidth());
                 changed |= ImGui::ColorEdit4("##Color", glm::value_ptr(color.ColorA), flags);
                 break;
             case ParticleColorMode::RANDOM_BETWEEN_COLORS:
@@ -521,7 +481,7 @@ namespace Surge::ParticleWidgets
                 break;
         }
 
-        const int picked = ModeButton(modeNames, 4, static_cast<int>(color.Mode));
+        const int picked = EditorUI::ModeButton(modeNames, 4, static_cast<int>(color.Mode));
         if(picked >= 0)
         {
             color.Mode = static_cast<ParticleColorMode>(picked);
@@ -538,7 +498,7 @@ namespace Surge::ParticleWidgets
     bool CurveRow(const char* label, ParticleCurve& curve)
     {
         ImGui::PushID(label);
-        LabelColumn(label);
+        EditorUI::TLabel(label);
         const bool changed = CurveEditor("##Curve", curve);
         ImGui::PopID();
         return changed;
@@ -547,7 +507,7 @@ namespace Surge::ParticleWidgets
     bool GradientRow(const char* label, ParticleGradient& gradient)
     {
         ImGui::PushID(label);
-        LabelColumn(label);
+        EditorUI::TLabel(label);
         const bool changed = GradientEditor("##Gradient", gradient);
         ImGui::PopID();
         return changed;

@@ -1,33 +1,24 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "SceneCooker.hpp"
 #include "Surge/Core/Core.hpp"
-#include "Surge/Asset/AssetManager.hpp"
 #include "Surge/ECS/Scene.hpp"
-#include "Surge/Asset/Serializer/Scene/SceneSerializer.hpp"
-#include "Surge/Utility/Filesystem.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Asset/SourceIO/SceneSourceIO.hpp"
 
 namespace Surge
 {
-    CookResult SceneCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool SceneCooker::Cook(const CookContext& context) const
     {
-        AssetManager* am = Core::GetAssetManager();
-        const String sidecarPath = am->GetSidecarPath(id, AssetType::SCENE);
-
-        CookResult result;
-        result.OutputPath = sidecarPath;
-
         // Builds the scene like opening it does, which loads the assets it references
-        String json;
-        Ref<Scene> scene = Ref<Scene>::Create(Filesystem::GetFilenameWithoutExt(sourceAbsPath), Core::GetSceneContext());
-        if(!Filesystem::ReadTextFile(sourceAbsPath, json) || !SceneSerializer::FromJson(json, *scene))
+        Ref<Scene> scene = Ref<Scene>::Create(context.SourcePath.stem().string(), Core::GetSceneContext());
+        if(!SceneSourceIO::Read(context.SourcePath, *scene))
         {
-            Log<Severity::Error>("[SceneCooker] Failed to read scene: {}", sourceAbsPath);
-            return result;
+            Log<Severity::Error>("[SceneCooker] Failed to read scene: {}", context.SourcePath.string());
+            return false;
         }
 
-        result.Success = SceneBinary::Write(sidecarPath, AssetStampWriter::Build(sourceAbsPath, GetCookerVersion()), scene.Raw());
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(sidecarPath);
-        return result;
+        Rapt0R::Writer payload(64 * 1024);
+        SceneBinary::Write(payload, scene.Raw());
+        return context.Write(SceneBinary::VERSION, payload);
     }
 }

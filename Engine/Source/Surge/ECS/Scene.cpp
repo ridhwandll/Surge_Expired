@@ -1043,7 +1043,7 @@ namespace Surge
             Entity e;
             CreateEntity(e, "Cube");
             MeshComponent& meshComp = e.AddComponent<MeshComponent>();
-            AssetID kek = assetManager->Import(DefaultMesh::CUBE, AssetType::MESH);
+            AssetID kek = assetManager->GetBuiltin(DefaultMesh::CUBE, AssetType::MESH);
             meshComp.MeshAsset = assetManager->Load<Mesh>(kek);
 
             TransformComponent& t = e.GetComponent<TransformComponent>();
@@ -1056,7 +1056,7 @@ namespace Surge
             Entity floor;
             CreateEntity(floor, "Floor");
             MeshComponent& meshComp = floor.AddComponent<MeshComponent>();
-            AssetID kek = assetManager->Import(DefaultMesh::CYLINDER, AssetType::MESH);
+            AssetID kek = assetManager->GetBuiltin(DefaultMesh::CYLINDER, AssetType::MESH);
             meshComp.MeshAsset = assetManager->Load<Mesh>(kek);
 
             TransformComponent& t = floor.GetComponent<TransformComponent>();

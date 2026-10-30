@@ -11,7 +11,7 @@ namespace Surge
         {
             UUID ID;
             UUID Parent; // INVALID for the root of the tree
-            String Data; // SceneSerializer::EntityToJson
+            String Data; // SceneSourceIO::EntityToJson
         };
 
         Vector<Node> Nodes; // Parents always come before their children, siblings keep their order

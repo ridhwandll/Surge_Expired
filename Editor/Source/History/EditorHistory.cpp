@@ -2,7 +2,7 @@
 #include "History/EditorHistory.hpp"
 #include "History/SceneCommands.hpp"
 #include "Surge/ECS/Components/Components.hpp"
-#include "Surge/Asset/Serializer/Scene/SceneSerializer.hpp"
+#include "Asset/SourceIO/SceneSourceIO.hpp"
 
 namespace Surge
 {
@@ -113,7 +113,7 @@ namespace Surge
             FlushTracked(); // Changes made to the previous selection before the switch
             mTrackedID = selectedID;
             mTrackedHandle = validSelection ? selected.Raw() : entt::null;
-            mTrackedState = validSelection ? SceneSerializer::EntityToJson(selected) : String();
+            mTrackedState = validSelection ? SceneSourceIO::EntityToJson(selected) : String();
             mWasInteracting = interacting;
             mPendingChecks = 0;
             return;
@@ -157,7 +157,7 @@ namespace Surge
             return;
         }
 
-        String current = SceneSerializer::EntityToJson(entity);
+        String current = SceneSourceIO::EntityToJson(entity);
         if(current == mTrackedState)
             return;
 
@@ -181,7 +181,7 @@ namespace Surge
         Entity entity = FindTrackedEntity();
         if(entity)
         {
-            mTrackedState = SceneSerializer::EntityToJson(entity);
+            mTrackedState = SceneSourceIO::EntityToJson(entity);
             mWasInteracting = false;
             mPendingChecks = 0;
         }

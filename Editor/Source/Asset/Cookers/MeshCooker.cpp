@@ -4,7 +4,9 @@
 #include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/Mesh/MeshBinaryFormat.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/Mesh/MeshFormat.hpp"
+#include "Asset/AssetDatabase.hpp"
 
 #include <cgltf.h>
 #include <meshoptimizer.h>
@@ -611,7 +613,7 @@ namespace Surge
         return nullptr;
     }
 
-    // Leaves an identical file untouched: its mod time is part of the texture's AssetStamp, rewriting it would re-cook the texture
+    // Leaves an identical file untouched: its write time is an input of the texture's cooked file, rewriting it would re-cook the texture
     static bool WriteFileIfChanged(const Path& path, const Byte* bytes, size_t size)
     {
         Vector<Byte> existing;
@@ -717,7 +719,7 @@ namespace Surge
             const String relativePath = relTexturePath.generic_string();
             if(!assetManager->GetIDFromPath(relativePath).IsValid())
                 importedTextures = true;
-            const AssetID texID = assetManager->Import(relativePath, AssetType::TEXTURE2D);
+            const AssetID texID = AssetDatabase::Get().Import(relativePath, AssetType::TEXTURE2D, false);
 
             if(!texID.IsValid())
                 return false;
@@ -775,7 +777,7 @@ namespace Surge
 
         // The mesh binary references the textures by ID, which must survive an Editor restart
         if(importedTextures)
-            assetManager->SerializeRegistry();
+            AssetDatabase::Get().SaveRegistry();
     }
 
     static void FreeGLTF(cgltf_data* data)
@@ -835,13 +837,12 @@ namespace Surge
         }
     }
 
-    CookResult MeshCooker::Cook(const String & sourceAbsPath, AssetID id) const
+    bool MeshCooker::Cook(const CookContext& context) const
     {
+        const String sourceAbsPath = context.SourcePath.generic_string();
         cgltf_data* data = ParseGLTF(sourceAbsPath);
         if(!data)
-            return {};
-
-        AssetManager* am = Core::GetAssetManager();
+            return false;
 
         MeshSpecification spec;
 
@@ -858,16 +859,18 @@ namespace Surge
         FreeGLTF(data);
         OptimizeMesh(spec);
 
-        const AssetStamp stamp = AssetStampWriter::Build(sourceAbsPath, GetCookerVersion());
+        // Material overrides are the model's import settings (Inspector), baked into the cooked mesh
+        Vector<AssetID> overrides(spec.Materials.size(), AssetID(AssetID::INVALID));
+        for(const auto& [slot, materialID] : context.Settings.MaterialOverrides)
+        {
+            if(slot < overrides.size())
+                overrides[slot] = materialID;
+            else
+                Log<Severity::Warn>("[MeshCooker] '{}' has an override for material slot {}, the model only has {}", sourceAbsPath, slot, overrides.size());
+        }
 
-        const String sidecarPath = am->GetSidecarPath(id);
-        bool res = MeshBinary::Write(sidecarPath, stamp, spec, {});
-
-        CookResult result;
-        result.Success = res;
-        result.OutputPath = sidecarPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(sidecarPath);
-        return result;
+        Rapt0R::Writer payload(spec.Vertices.size() * (sizeof(Vertex) + sizeof(VertexSkin)) + spec.Indices.size() * sizeof(Index) + 4096);
+        MeshBinary::Write(payload, spec, overrides);
+        return context.Write(MeshBinary::VERSION, payload);
     }
 }

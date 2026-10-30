@@ -1,7 +1,12 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Shader/ShaderBinaryFormat.hpp"
-#include "Surge/Asset/Serializer/BinaryHelpers.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
 #include "Surge/Utility/Filesystem.hpp"
+
+namespace Surge
+{
+    SURGE_RAPTOR_FIELDS(SPIRVHandle, v.Type, v.SPIRV)
+}
 
 namespace Surge::ShaderBinary
 {
@@ -19,16 +24,14 @@ namespace Surge::ShaderBinary
         }
     }
 
-    static bool ReadPrefix(BinaryReader& reader, Header& outHeader, Vector<String>& outIncludes)
+    // Everything up to the stages: what the Editor needs to know whether the cooked file is outdated
+    static bool ReadPrefix(Rapt0R::Reader& reader, uint64_t& outHash, ShaderType& outStages, Vector<String>& outIncludes)
     {
-        reader.Read(outHeader);
-        if (reader.Failed || outHeader.Magic != MAGIC || outHeader.Version != VERSION || outHeader.IncludeCount > MAX_INCLUDES)
+        Uint magic = 0;
+        Uint version = 0;
+        if (!reader.Read(magic, version) || magic != MAGIC || version != VERSION)
             return false;
-
-        outIncludes.resize(outHeader.IncludeCount);
-        for (String& include : outIncludes)
-            include = reader.ReadStr();
-        return !reader.Failed;
+        return reader.Read(outHash, outStages, outIncludes) && outIncludes.size() <= MAX_INCLUDES;
     }
 
     String GetCookedPath(const String& sourcePath)
@@ -57,27 +60,15 @@ namespace Surge::ShaderBinary
 
     bool Write(const String& path, const CookedShader& shader)
     {
-        Header header;
-        header.SourceHash = shader.SourceHash;
-        header.Stages = static_cast<Uint>(shader.Stages);
-        header.IncludeCount = static_cast<Uint>(shader.Includes.size());
-
-        Vector<Byte> buffer;
-        WriteData(buffer, header);
-        for (const String& include : shader.Includes)
-            WriteStr(buffer, include);
-
-        WriteData(buffer, static_cast<Uint>(shader.SPIRVs.size()));
+        size_t spirvBytes = 0;
         for (const SPIRVHandle& spirv : shader.SPIRVs)
-        {
-            WriteData(buffer, static_cast<Uint>(spirv.Type));
-            WriteData(buffer, static_cast<Uint>(spirv.SPIRV.size()));
-            WriteDataArray(buffer, spirv.SPIRV.data(), spirv.SPIRV.size());
-        }
-        shader.Reflection.Serialize(buffer);
+            spirvBytes += spirv.SPIRV.size() * sizeof(Uint);
+
+        Rapt0R::Writer writer(spirvBytes + 8192);
+        writer.Write(MAGIC, VERSION, shader.SourceHash, shader.Stages, shader.Includes, shader.SPIRVs, shader.Reflection);
 
         Filesystem::CreateOrEnsureDirectories(Filesystem::GetParentPath(path));
-        if (!Filesystem::WriteBinaryFile(path, buffer.data(), buffer.size()))
+        if (writer.HasError() || !Filesystem::WriteBinaryFile(path, writer.Data(), writer.Size()))
         {
             Log<Severity::Error>("[ShaderBinary] Failed to write: {}", path);
             return false;
@@ -96,42 +87,23 @@ namespace Surge::ShaderBinary
             return false;
         }
 
-        BinaryReader reader(buffer.data(), buffer.size());
-        Header header;
-        if (!ReadPrefix(reader, header, outShader.Includes))
+        Rapt0R::Reader reader(buffer.data(), buffer.size());
+        if (!ReadPrefix(reader, outShader.SourceHash, outShader.Stages, outShader.Includes))
         {
             Log<Severity::Error>("[ShaderBinary] Outdated or corrupted cooked shader (expected version {}): {}", VERSION, path);
             return false;
         }
-        outShader.SourceHash = header.SourceHash;
-        outShader.Stages = static_cast<ShaderType>(header.Stages);
 
-        Uint stageCount = 0;
-        reader.Read(stageCount);
-        if (!reader.Fits(stageCount, sizeof(Uint) * 2))
+        if (!reader.Read(outShader.SPIRVs))
         {
-            Log<Severity::Error>("[ShaderBinary] Corrupted cooked shader (stage count): {}", path);
+            Log<Severity::Error>("[ShaderBinary] Corrupted cooked shader (SPIR-V size): {}", path);
             return false;
         }
 
         ShaderType stagesFound = ShaderType::NONE;
-        outShader.SPIRVs.resize(stageCount);
-        for (SPIRVHandle& spirv : outShader.SPIRVs)
+        for (const SPIRVHandle& spirv : outShader.SPIRVs)
         {
-            Uint type = 0;
-            Uint wordCount = 0;
-            reader.Read(type);
-            reader.Read(wordCount);
-            if (reader.Failed || wordCount == 0 || !reader.Fits(wordCount, sizeof(Uint)))
-            {
-                Log<Severity::Error>("[ShaderBinary] Corrupted cooked shader (SPIR-V size): {}", path);
-                return false;
-            }
-
-            spirv.Type = static_cast<ShaderType>(type);
-            spirv.SPIRV.resize(wordCount);
-            reader.ReadArray(spirv.SPIRV.data(), wordCount);
-            if (spirv.SPIRV[0] != SPIRV_MAGIC || (static_cast<Uint>(spirv.Type) & static_cast<Uint>(outShader.Stages)) == 0)
+            if (spirv.SPIRV.empty() || spirv.SPIRV[0] != SPIRV_MAGIC || (static_cast<Uint>(spirv.Type) & static_cast<Uint>(outShader.Stages)) == 0)
             {
                 Log<Severity::Error>("[ShaderBinary] Corrupted cooked shader (invalid stage): {}", path);
                 return false;
@@ -139,7 +111,7 @@ namespace Surge::ShaderBinary
             stagesFound |= spirv.Type;
         }
 
-        if (stagesFound != outShader.Stages || !outShader.Reflection.Deserialize(reader))
+        if (stagesFound != outShader.Stages || !reader.Read(outShader.Reflection))
         {
             Log<Severity::Error>("[ShaderBinary] Corrupted cooked shader (reflection): {}", path);
             return false;
@@ -153,12 +125,8 @@ namespace Surge::ShaderBinary
         if (!Filesystem::ReadBinaryFile(path, buffer))
             return false;
 
-        BinaryReader reader(buffer.data(), buffer.size());
-        Header header;
-        if (!ReadPrefix(reader, header, outIncludes))
-            return false;
-
-        outHash = header.SourceHash;
-        return true;
+        Rapt0R::Reader reader(buffer.data(), buffer.size());
+        ShaderType stages = ShaderType::NONE;
+        return ReadPrefix(reader, outHash, stages, outIncludes);
     }
 }

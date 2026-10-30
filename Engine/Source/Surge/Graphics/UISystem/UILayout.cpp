@@ -7,6 +7,7 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Graphics/HighLevel/Font.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
+#include "Surge/Graphics/Renderer/Renderer.hpp"
 
 namespace Surge::UI
 {
@@ -305,7 +306,7 @@ namespace Surge::UI
     Ref<Font> LayoutResourceCache::GetFont(AssetID id)
     {
         if(!id)
-            return nullptr;
+            return Core::GetRenderer()->GetEngineFont();
 
         auto it = mAssets.find(id.Get());
         if(it != mAssets.end())

@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Surge/Graphics/Shader/ReflectionData.hpp"
 #include "Surge/Graphics/RHI/Vulkan/VulkanUtils.hpp"
-#include "Surge/Asset/Serializer/BinaryHelpers.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
 #include <SurgeReflect/Enum.hpp>
 
 namespace Surge
@@ -138,171 +138,45 @@ namespace Surge
         }
     }
 
-    // Enums are stored as Uint and range checked on read, a stale/corrupt file must not produce out of range values
-    static bool ReadEnum(BinaryReader& reader, Uint maxValue, Uint& outValue)
+    SURGE_RAPTOR_FIELDS(ShaderResource, v.Set, v.Binding, v.ArraySize, v.Name, v.ShaderUsage, v.ShaderStages)
+    SURGE_RAPTOR_FIELDS(ShaderBufferMember, v.Name, v.MemoryOffset, v.DataType, v.Size)
+    SURGE_RAPTOR_FIELDS(ShaderBuffer, v.Set, v.Binding, v.BufferName, v.Size, v.ShaderUsage, v.ShaderStages, v.Members)
+    SURGE_RAPTOR_FIELDS(ShaderPushConstant, v.BufferName, v.Size, v.ShaderStages)
+    SURGE_RAPTOR_FIELDS(ShaderStageInput, v.Name, v.Size, v.Offset, v.DataType)
+
+    static constexpr ShaderType ALL_SHADER_STAGES = static_cast<ShaderType>(static_cast<Uint>(ShaderType::VERTEX) | static_cast<Uint>(ShaderType::FRAGMENT) | static_cast<Uint>(ShaderType::COMPUTE));
+
+    void ShaderReflectionData::Rapt0RSerialize(Rapt0R::Writer& writer) const
     {
-        reader.Read(outValue);
-        return !reader.Failed && outValue <= maxValue;
+        writer.Write(mShaderName, mShaderResources, mShaderBuffers, mPushConstants, mStageInputs);
     }
 
-    static constexpr Uint MAX_SHADER_TYPE_BITS = static_cast<Uint>(ShaderType::VERTEX) | static_cast<Uint>(ShaderType::FRAGMENT) | static_cast<Uint>(ShaderType::COMPUTE);
-
-    void ShaderReflectionData::Serialize(Vector<Byte>& out) const
-    {
-        WriteStr(out, mShaderName);
-
-        WriteData(out, static_cast<Uint>(mShaderResources.size()));
-        for (const ShaderResource& res : mShaderResources)
-        {
-            WriteData(out, res.Set);
-            WriteData(out, res.Binding);
-            WriteData(out, res.ArraySize);
-            WriteStr(out, res.Name);
-            WriteData(out, static_cast<Uint>(res.ShaderUsage));
-            WriteData(out, static_cast<Uint>(res.ShaderStages));
-        }
-
-        WriteData(out, static_cast<Uint>(mShaderBuffers.size()));
-        for (const ShaderBuffer& buffer : mShaderBuffers)
-        {
-            WriteData(out, buffer.Set);
-            WriteData(out, buffer.Binding);
-            WriteStr(out, buffer.BufferName);
-            WriteData(out, buffer.Size);
-            WriteData(out, static_cast<Uint>(buffer.ShaderUsage));
-            WriteData(out, static_cast<Uint>(buffer.ShaderStages));
-            WriteData(out, static_cast<Uint>(buffer.Members.size()));
-            for (const ShaderBufferMember& member : buffer.Members)
-            {
-                WriteStr(out, member.Name);
-                WriteData(out, member.MemoryOffset);
-                WriteData(out, static_cast<Uint>(member.DataType));
-                WriteData(out, member.Size);
-            }
-        }
-
-        WriteData(out, static_cast<Uint>(mPushConstants.size()));
-        for (const ShaderPushConstant& pushConstant : mPushConstants)
-        {
-            WriteStr(out, pushConstant.BufferName);
-            WriteData(out, pushConstant.Size);
-            WriteData(out, static_cast<Uint>(pushConstant.ShaderStages));
-        }
-
-        WriteData(out, static_cast<Uint>(mStageInputs.size()));
-        for (const auto& [stage, inputs] : mStageInputs)
-        {
-            WriteData(out, static_cast<Uint>(stage));
-            WriteData(out, static_cast<Uint>(inputs.size()));
-            for (const auto& [location, input] : inputs)
-            {
-                WriteData(out, location);
-                WriteStr(out, input.Name);
-                WriteData(out, input.Size);
-                WriteData(out, input.Offset);
-                WriteData(out, static_cast<Uint>(input.DataType));
-            }
-        }
-    }
-
-    bool ShaderReflectionData::Deserialize(BinaryReader& reader)
+    void ShaderReflectionData::Rapt0RDeserialize(Rapt0R::Reader& reader)
     {
         *this = ShaderReflectionData();
-        Uint value = 0;
-        Uint count = 0;
+        if(!reader.Read(mShaderName, mShaderResources, mShaderBuffers, mPushConstants, mStageInputs))
+            return;
 
-        mShaderName = reader.ReadStr();
-
-        reader.Read(count);
-        if (!reader.Fits(count, sizeof(Uint) * 6))
-            return false;
-        mShaderResources.resize(count);
-        for (ShaderResource& res : mShaderResources)
+        // Enums are range checked (stages against the full mask), a stale/corrupt file must not produce out of range values
+        bool valid = true;
+        for(const ShaderResource& res : mShaderResources)
+            valid = valid && IsEnumInRange(res.ShaderUsage, ShaderResource::Usage::STORAGE) && IsEnumInRange(res.ShaderStages, ALL_SHADER_STAGES);
+        for(const ShaderBuffer& buffer : mShaderBuffers)
         {
-            reader.Read(res.Set);
-            reader.Read(res.Binding);
-            reader.Read(res.ArraySize);
-            res.Name = reader.ReadStr();
-            if (!ReadEnum(reader, static_cast<Uint>(ShaderResource::Usage::STORAGE), value))
-                return false;
-            res.ShaderUsage = static_cast<ShaderResource::Usage>(value);
-            if (!ReadEnum(reader, MAX_SHADER_TYPE_BITS, value))
-                return false;
-            res.ShaderStages = static_cast<ShaderType>(value);
+            valid = valid && IsEnumInRange(buffer.ShaderUsage, ShaderBuffer::Usage::UNIFORM) && IsEnumInRange(buffer.ShaderStages, ALL_SHADER_STAGES);
+            for(const ShaderBufferMember& member : buffer.Members)
+                valid = valid && IsEnumInRange(member.DataType, ShaderDataType::STRUCT);
+        }
+        for(const ShaderPushConstant& pushConstant : mPushConstants)
+            valid = valid && IsEnumInRange(pushConstant.ShaderStages, ALL_SHADER_STAGES);
+        for(const auto& [stage, inputs] : mStageInputs)
+        {
+            valid = valid && IsEnumInRange(stage, ALL_SHADER_STAGES);
+            for(const auto& [location, input] : inputs)
+                valid = valid && IsEnumInRange(input.DataType, ShaderDataType::STRUCT);
         }
 
-        reader.Read(count);
-        if (!reader.Fits(count, sizeof(Uint) * 7))
-            return false;
-        mShaderBuffers.resize(count);
-        for (ShaderBuffer& buffer : mShaderBuffers)
-        {
-            reader.Read(buffer.Set);
-            reader.Read(buffer.Binding);
-            buffer.BufferName = reader.ReadStr();
-            reader.Read(buffer.Size);
-            if (!ReadEnum(reader, static_cast<Uint>(ShaderBuffer::Usage::UNIFORM), value))
-                return false;
-            buffer.ShaderUsage = static_cast<ShaderBuffer::Usage>(value);
-            if (!ReadEnum(reader, MAX_SHADER_TYPE_BITS, value))
-                return false;
-            buffer.ShaderStages = static_cast<ShaderType>(value);
-
-            reader.Read(count);
-            if (!reader.Fits(count, sizeof(Uint) * 4))
-                return false;
-            buffer.Members.resize(count);
-            for (ShaderBufferMember& member : buffer.Members)
-            {
-                member.Name = reader.ReadStr();
-                reader.Read(member.MemoryOffset);
-                if (!ReadEnum(reader, static_cast<Uint>(ShaderDataType::STRUCT), value))
-                    return false;
-                member.DataType = static_cast<ShaderDataType>(value);
-                reader.Read(member.Size);
-            }
-        }
-
-        reader.Read(count);
-        if (!reader.Fits(count, sizeof(Uint) * 3))
-            return false;
-        mPushConstants.resize(count);
-        for (ShaderPushConstant& pushConstant : mPushConstants)
-        {
-            pushConstant.BufferName = reader.ReadStr();
-            reader.Read(pushConstant.Size);
-            if (!ReadEnum(reader, MAX_SHADER_TYPE_BITS, value))
-                return false;
-            pushConstant.ShaderStages = static_cast<ShaderType>(value);
-        }
-
-        Uint stageCount = 0;
-        reader.Read(stageCount);
-        if (!reader.Fits(stageCount, sizeof(Uint) * 2))
-            return false;
-        for (Uint i = 0; i < stageCount; i++)
-        {
-            if (!ReadEnum(reader, MAX_SHADER_TYPE_BITS, value))
-                return false;
-            std::map<Uint, ShaderStageInput>& inputs = mStageInputs[static_cast<ShaderType>(value)];
-
-            reader.Read(count);
-            if (!reader.Fits(count, sizeof(Uint) * 5))
-                return false;
-            for (Uint j = 0; j < count; j++)
-            {
-                Uint location = 0;
-                reader.Read(location);
-                ShaderStageInput& input = inputs[location];
-                input.Name = reader.ReadStr();
-                reader.Read(input.Size);
-                reader.Read(input.Offset);
-                if (!ReadEnum(reader, static_cast<Uint>(ShaderDataType::STRUCT), value))
-                    return false;
-                input.DataType = static_cast<ShaderDataType>(value);
-            }
-        }
-
-        return !reader.Failed;
+        if(!valid)
+            reader.SetError(Rapt0R::ErrorCode::CORRUPT_DATA);
     }
 } // namespace Surge

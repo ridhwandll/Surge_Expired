@@ -1,43 +1,31 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "ScriptCooker.hpp"
-#include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/AssetStamp.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
+#include "Surge/Asset/Format/Script/ScriptFormat.hpp"
 #include "Surge/ScriptEngine/ScriptEngine.hpp"
-#include "Surge/ScriptEngine/ScriptAsset.hpp"
-#include "Surge/Asset/Serializer/Script/ScriptBinaryFormat.hpp"
+#include "Surge/Utility/Filesystem.hpp"
 
 namespace Surge
 {
-    CookResult ScriptCooker::Cook(const String& sourceAbsPath, AssetID id) const
+    bool ScriptCooker::Cook(const CookContext& context) const
     {
-        CookResult result;
-        AssetManager* am = Core::GetAssetManager();
-        const String outputPath = am->GetSidecarPath(id, AssetType::SCRIPT);
-
-        String sourceCodeStr;
-        if(Filesystem::ReadTextFile(sourceAbsPath, sourceCodeStr))
+        String sourceCode;
+        if(!Filesystem::ReadTextFile(context.SourcePath, sourceCode))
         {
-            // '@' + asset path: errors and tracebacks read "Scripts/Player.lua:12: ...", and require() names match it
-            Vector<Byte> sourceBytecode = Core::GetScriptEngine()->Compile(sourceCodeStr, "@" + am->GetMetadata(id).RelativePath);
-            if (!sourceBytecode.empty())
-            {
-                Ref<Script> scriptAsset = Script::Create(std::move(sourceBytecode));
-                ScriptBinary::Write(outputPath, AssetStampWriter::Build(sourceAbsPath, GetCookerVersion()), scriptAsset);
-            }
-            else
-            {
-                Log<Severity::Error>("[ScriptCooker] Failed to compile script: {}", sourceAbsPath);
-                result.Success = false;
-                return result;
-            }
+            Log<Severity::Error>("[ScriptCooker] Failed to read script: {}", context.SourcePath.string());
+            return false;
         }
 
-        result.Success = true;
-        result.OutputPath = outputPath;
-        result.InputMegaBytes = Filesystem::FileSizeInMB(sourceAbsPath);
-        result.OutputMegaBytes = Filesystem::FileSizeInMB(outputPath);
-        return result;
+        // '@' + asset path: errors and tracebacks read "Scripts/Player.lua:12: ...", and require() names match it
+        const Vector<Byte> bytecode = Core::GetScriptEngine()->Compile(sourceCode, "@" + context.Metadata.RelativePath);
+        if(bytecode.empty())
+        {
+            Log<Severity::Error>("[ScriptCooker] Failed to compile script: {}", context.SourcePath.string());
+            return false;
+        }
+        Rapt0R::Writer payload(bytecode.size());
+        ScriptBinary::Write(payload, bytecode);
+        return context.Write(ScriptBinary::VERSION, payload);
     }
 }

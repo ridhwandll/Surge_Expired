@@ -10,16 +10,16 @@ cmake-build-release
 *.rSHADER
 
 
-android/local.properties  # machine-specific SDK path
-android/.gradle
-android/.idea
-android/local.properties
-android/app/build/ 
-android/app/release/ 
-android/app/src/release/
-android/app/.cxx/
-android/build/
-android/app/src/main/assets/
+Android/local.properties  # machine-specific SDK path
+Android/.gradle
+Android/.idea
+Android/local.properties
+Android/app/build/ 
+Android/app/release/ 
+Android/app/src/release/
+Android/app/.cxx/
+Android/build/
+Android/app/src/main/assets/
 
-android/local.properties
+Android/local.properties
 

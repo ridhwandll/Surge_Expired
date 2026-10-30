@@ -338,7 +338,7 @@ namespace Surge
                 });
             }
 
-            // Newest android/app/build/intermediates/cxx/<config>/<hash>/obj/arm64-v8a/libSurgePlayer.so
+            // Newest Android/app/build/intermediates/cxx/<config>/<hash>/obj/arm64-v8a/libSurgePlayer.so
             Path FindSymbols() const
             {
                 std::error_code ec;

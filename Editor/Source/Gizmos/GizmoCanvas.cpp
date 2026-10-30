@@ -1,12 +1,13 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Gizmos/GizmoCanvas.hpp"
 #include "Surge/Core/Core.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <glm/gtc/constants.hpp>
 
 namespace Surge
 {
-    static constexpr ImU32 LINE_RIM_COLOR = IM_COL32(0, 0, 0, 70); // Dark rim under every wire, keeps them readable on bright backgrounds
+    static constexpr ImU32 LINE_RIM_COLOR = EditorUI::ToU32(EditorUI::Colors::Gizmo::LineRim);
     static constexpr float LINE_RIM_EXTRA = 2.0f;
 
     static ImVec2 ClipToScreen(const glm::vec4& clip, const ImVec2& viewportMin, const ImVec2& viewportSize)
@@ -26,12 +27,6 @@ namespace Surge
         else if(b.w < nearW)
             b = glm::mix(b, a, (nearW - b.w) / (a.w - b.w));
         return true;
-    }
-
-    ImU32 GizmoCanvas::ScaleAlpha(ImU32 color, float factor)
-    {
-        const ImU32 alpha = (ImU32)((float)((color >> IM_COL32_A_SHIFT) & 0xFF) * glm::clamp(factor, 0.0f, 1.0f));
-        return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
     }
 
     void GizmoCanvas::GetPerpendicularBasis(const glm::vec3& n, glm::vec3& outU, glm::vec3& outV)
@@ -162,7 +157,7 @@ namespace Surge
             return;
 
         // Faint great circles for the volume, the silhouette (what the eye reads as the sphere outline) at full strength
-        const ImU32 axisColor = ScaleAlpha(color, 0.5f);
+        const ImU32 axisColor = EditorUI::ScaleAlpha(color, 0.5f);
         DrawCircle3D(center, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), radius, axisColor, thickness);
         DrawCircle3D(center, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), radius, axisColor, thickness);
         DrawCircle3D(center, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), radius, axisColor, thickness);

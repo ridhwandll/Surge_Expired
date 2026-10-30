@@ -15,7 +15,7 @@
 #include "Surge/Graphics/RenderGraph/Passes/ParticlePass.hpp"
 
 #include "Surge/Graphics/UISystem/UIManager.hpp"
-#include "Surge/Asset/Serializer/Font/FontBinaryFormat.hpp"
+#include "Surge/Asset/Format/Font/FontFormat.hpp"
 #include "Surge/Core/Input/Input.hpp"
 
 #define ENGINE_SHADER_PATH "Engine/Assets/Shaders"
@@ -274,11 +274,15 @@ namespace Surge
         if(!mEngineFontLoaded)
         {
             mEngineFontLoaded = true;
-            AssetStamp stamp;
+            CookedFile file;
             FontSpecification spec;
-            if(FontBinary::Read(EngineFont::COOKED_PATH, stamp, spec))
-                mEngineFont = Font::Create(*this, std::move(spec));
-            else
+            if(CookedFileIO::Read(EngineFont::COOKED_PATH, AssetType::FONT, FontBinary::VERSION, file) == CookedFileError::NONE)
+            {
+                Rapt0R::Reader payload = file.GetPayload();
+                if(FontBinary::Read(payload, spec))
+                    mEngineFont = Font::Create(*this, std::move(spec));
+            }
+            if(!mEngineFont)
                 Log<Severity::Warn>("[Renderer] Engine UI font {} is missing, open the Editor once to cook it", EngineFont::COOKED_PATH);
         }
         return mEngineFont;

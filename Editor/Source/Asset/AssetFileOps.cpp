@@ -1,6 +1,9 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Asset/AssetFileOps.hpp"
-#include "Asset/SourceWriters/MaterialSourceWriter.hpp"
+#include "Asset/AssetDatabase.hpp"
+#include "Asset/AssetExtensions.hpp"
+#include "Asset/ImportSettings.hpp"
+#include "Surge/Graphics/HighLevel/Material.hpp"
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Core/Core.hpp"
 #include "Surge/Utility/Filesystem.hpp"
@@ -36,9 +39,18 @@ namespace Surge::AssetFileOps
         }
 
         for(const auto& [id, relativePath] : updates)
-            assetManager->UpdateAssetPath(id, relativePath, false);
+            AssetDatabase::Get().SetPath(id, relativePath, false);
         if(!updates.empty())
-            assetManager->SerializeRegistry();
+            AssetDatabase::Get().SaveRegistry();
+    }
+
+    // A source's import settings (<source>.import) follow it: renamed, moved, copied and deleted with it
+    static void MoveImportSettings(const Path& from, const Path& to)
+    {
+        const Path settings = ImportSettings::GetPath(from);
+        std::error_code error;
+        if(!fs::is_directory(from) && fs::exists(settings, error))
+            fs::rename(settings, ImportSettings::GetPath(to), error);
     }
 
     static AssetID ImportWithoutSerialize(const Path& file)
@@ -50,7 +62,7 @@ namespace Surge::AssetFileOps
         if(type == AssetType::NONE)
             return AssetID::INVALID;
 
-        return Core::GetAssetManager()->Import(ToRelative(file), type);
+        return AssetDatabase::Get().Import(ToRelative(file), type, false);
     }
 
     Path GetAssetsRoot()
@@ -85,6 +97,9 @@ namespace Surge::AssetFileOps
         const String name = path.filename().string();
         if(name.empty() || name[0] == '.')
             return true;
+
+        if(path.extension() == ImportSettings::EXTENSION)
+            return true; // Source data of the file next to it, edited through the Inspector
 
         // Only the root level ones belong to the engine
         if(path.lexically_normal().parent_path() != GetAssetsRoot())
@@ -197,28 +212,24 @@ namespace Surge::AssetFileOps
             outError = std::format("Could not rename: {}", error.message());
             return false;
         }
-        RebaseAssets(oldRelative, ToRelative(outPath));
+        MoveImportSettings(path, outPath);
+        RebaseAssets(oldRelative, ToRelative(outPath)); // Scripts are re-cooked there: their chunk name is their path
 
-        // A material's name comes from its file, scripts are recompiled from the new path
+        // A material's name comes from its file
         AssetManager* assetManager = Core::GetAssetManager();
         if(!fs::is_directory(outPath))
         {
             const AssetID id = assetManager->GetIDFromPath(ToRelative(outPath));
-            const AssetType type = id ? assetManager->GetMetadata(id).Type : AssetType::NONE;
-            if(type == AssetType::MATERIAL)
+            if(id && assetManager->GetMetadata(id).Type == AssetType::MATERIAL)
             {
+                const bool wasLoaded = assetManager->IsLoaded(id);
                 if(Ref<Material> material = assetManager->Load<Material>(id))
                 {
                     material->SetName(outPath.stem().string());
-                    MaterialSourceWriter::Write(material, outPath.generic_string());
-                    assetManager->Save(id);
-                    assetManager->Unload(id);
+                    AssetDatabase::Get().Save(id);
                 }
-            }
-            else if(type == AssetType::SCRIPT && assetManager->IsLoaded(id))
-            {
-                assetManager->Save(id);
-                assetManager->Unload(id);
+                if(!wasLoaded)
+                    assetManager->Unload(id);
             }
         }
         return true;
@@ -246,6 +257,7 @@ namespace Surge::AssetFileOps
             outError = std::format("Could not move '{}': {}", path.filename().string(), error.message());
             return false;
         }
+        MoveImportSettings(path, outPath);
         RebaseAssets(oldRelative, ToRelative(outPath));
         return true;
     }
@@ -264,7 +276,12 @@ namespace Surge::AssetFileOps
         if(isDirectory)
             fs::copy(source, outPath, fs::copy_options::recursive, error);
         else
+        {
             fs::copy_file(source, outPath, error);
+            std::error_code settingsError;
+            if(!error && fs::exists(ImportSettings::GetPath(source), settingsError))
+                fs::copy_file(ImportSettings::GetPath(source), ImportSettings::GetPath(outPath), settingsError);
+        }
         if(error)
         {
             outError = std::format("Could not copy '{}': {}", source.filename().string(), error.message());
@@ -296,14 +313,15 @@ namespace Surge::AssetFileOps
         }
 
         std::error_code error;
+        if(!fs::is_directory(path) && fs::exists(ImportSettings::GetPath(path), error))
+            Platform::MoveToRecycleBin(ImportSettings::GetPath(path).string());
         for(const String& cooked : cookedFiles)
             fs::remove(cooked, error); // Generated data, recreated by a reimport
 
         for(AssetID id : assets)
-        {
-            assetManager->Unload(id); // Only succeeds when nothing references it anymore
-            assetManager->UnregisterAsset(id);
-        }
+            AssetDatabase::Get().Unregister(id, false); // Unloads it when nothing references it anymore
+        if(!assets.empty())
+            AssetDatabase::Get().SaveRegistry();
         return true;
     }
 
@@ -311,7 +329,7 @@ namespace Surge::AssetFileOps
     {
         const AssetID id = ImportWithoutSerialize(file);
         if(id)
-            Core::GetAssetManager()->SerializeRegistry();
+            AssetDatabase::Get().SaveRegistry();
         return id;
     }
 
@@ -335,7 +353,7 @@ namespace Surge::AssetFileOps
 
         const Uint imported = static_cast<Uint>(assetManager->GetRegistryMap().size() - registeredBefore);
         if(imported > 0)
-            assetManager->SerializeRegistry();
+            AssetDatabase::Get().SaveRegistry();
         return imported;
     }
 

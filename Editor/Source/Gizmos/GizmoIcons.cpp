@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Gizmos/GizmoIcons.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Surge/ECS/Scene.hpp"
 #include "Surge/ECS/Components/Components.hpp"
 #include "Surge/ECS/Components/ScriptComponent.hpp"
@@ -9,7 +10,7 @@ namespace Surge::GizmoIcons
 {
     static constexpr float PI = 3.14159265358979f;
 
-    // Glyphs are authored in a [-1, 1] box (y down), the frame maps that box onto the screen
+    // (Rid) A square from -1 to 1 on both axes. (0, 0) is the center, (-1, -1) the top left, (1, 1) the bottom right. Y POINTS DOWN
     struct GlyphFrame
     {
         ImVec2 Center;
@@ -227,6 +228,13 @@ namespace Surge::GizmoIcons
         drawList->PathFillConvex(color);
     }
 
+    static void DrawAdd(ImDrawList* drawList, const GlyphFrame& p, ImU32 color)
+    {
+        // A plus sign
+        drawList->AddLine(p(-0.70f, 0.0f), p(0.70f, 0.0f), color, p(0.3f));
+        drawList->AddLine(p(0.0f, -0.70f), p(0.0f, 0.70f), color, p(0.3f));
+    }
+
     static void DrawStop(ImDrawList* drawList, const GlyphFrame& p, ImU32 color)
     {
         drawList->AddRectFilled(p(-0.70f, -0.70f), p(0.70f, 0.70f), color, p(0.22f));
@@ -275,6 +283,7 @@ namespace Surge::GizmoIcons
             case GizmoIcon::STOP: DrawStop(drawList, frame, color); break;
             case GizmoIcon::PAUSE: DrawPause(drawList, frame, color); break;
             case GizmoIcon::STEP: DrawStep(drawList, frame, color); break;
+            case GizmoIcon::ADD: DrawAdd(drawList, frame, color); break;
         }
     }
 
@@ -317,26 +326,26 @@ namespace Surge::GizmoIcons
     EntityIcon GetEntityIcon(Entity e)
     {
         if(e.HasComponent<CameraComponent>())
-            return { GizmoIcon::CAMERA, IM_COL32(130, 190, 255, 255) };
+            return { GizmoIcon::CAMERA, EditorUI::ToU32(EditorUI::Colors::Component::Camera) };
         if(const LightComponent* light = e.TryGetComponent<LightComponent>())
-            return { light->Type == LightType::DIRECTIONAL ? GizmoIcon::DIRECTIONAL_LIGHT : GizmoIcon::POINT_LIGHT, IM_COL32(255, 205, 90, 255) };
+            return { light->Type == LightType::DIRECTIONAL ? GizmoIcon::DIRECTIONAL_LIGHT : GizmoIcon::POINT_LIGHT, EditorUI::ToU32(EditorUI::Colors::Component::Light) };
         if(e.HasComponent<EnvironmentComponent>())
-            return { GizmoIcon::ENVIRONMENT, IM_COL32(255, 170, 100, 255) };
+            return { GizmoIcon::ENVIRONMENT, EditorUI::ToU32(EditorUI::Colors::Component::Environment) };
         if(e.HasComponent<ParticleSystemComponent>())
-            return { GizmoIcon::PARTICLES, PARTICLES_COLOR };
+            return { GizmoIcon::PARTICLES, EditorUI::ToU32(EditorUI::Colors::Component::Particles) };
         if(e.HasComponent<AudioSourceComponent>())
-            return { GizmoIcon::AUDIO_SOURCE, IM_COL32(110, 215, 160, 255) };
+            return { GizmoIcon::AUDIO_SOURCE, EditorUI::ToU32(EditorUI::Colors::Component::Audio) };
         if(e.HasComponent<AudioListenerComponent>())
-            return { GizmoIcon::AUDIO_LISTENER, IM_COL32(110, 215, 160, 255) };
+            return { GizmoIcon::AUDIO_LISTENER, EditorUI::ToU32(EditorUI::Colors::Component::Audio) };
         if(e.HasComponent<UICanvasComponent>())
-            return { GizmoIcon::UI_CANVAS, IM_COL32(240, 130, 190, 255) };
+            return { GizmoIcon::UI_CANVAS, EditorUI::ToU32(EditorUI::Colors::Component::UICanvas) };
         if(e.HasComponent<TextComponent>())
-            return { GizmoIcon::TEXT, IM_COL32(225, 225, 225, 255) };
+            return { GizmoIcon::TEXT, EditorUI::ToU32(EditorUI::Colors::Component::Text) };
         if(e.HasComponent<SpriteRendererComponent>())
-            return { GizmoIcon::SPRITE, IM_COL32(255, 145, 95, 255) };
+            return { GizmoIcon::SPRITE, EditorUI::ToU32(EditorUI::Colors::Component::Sprite) };
         if(e.HasComponent<MeshComponent>())
-            return { GizmoIcon::MESH, IM_COL32(150, 160, 255, 255) };
-        return { GizmoIcon::ENTITY, IM_COL32(150, 150, 150, 255) };
+            return { GizmoIcon::MESH, EditorUI::ToU32(EditorUI::Colors::Component::Mesh) };
+        return { GizmoIcon::ENTITY, EditorUI::ToU32(EditorUI::Colors::Component::Entity) };
     }
 
     void DrawBadge(ImDrawList* drawList, const ImVec2& center, float radius, GizmoIcon icon, ImU32 glyphColor, const BadgeStyle& style)

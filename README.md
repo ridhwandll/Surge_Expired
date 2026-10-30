@@ -188,31 +188,7 @@ end
 
 ---
 
-## The editor
-
-| | |
-|---|---|
-| **Project Hub** | Create, open, pin and search projects. Drop a `.surgeproj` on the window to open it. |
-| **Viewports** | Unity-style Scene views (as many as you like, each with its own camera, gizmos and render graph) and the Game view with aspect presets and simulated safe areas. |
-| **Gizmos & picking** | ImGuizmo translate/rotate/scale with snapping, clickable component icons, camera frustums, light/audio ranges, collider wires, selection outlines; CPU ray picking with no GPU readback. |
-| **Hierarchy & Inspector** | Drag-and-drop parenting, multi-script entities, Lua properties as typed fields, asset and entity references. |
-| **Undo / redo** | Every edit recorded while in edit mode, with a History panel. |
-| **Content Browser** | Async thumbnails, favorites, search, file operations that keep the asset registry in sync, drag & drop import. |
-| **Particle Editor** | Every module, curve and gradient editor, an isolated live preview with shape gizmos. |
-| **UI Editor** | WYSIWYG layout editing in the Game view, all widget types and their parts. |
-| **Material Editor** | Edit material parameters and textures with live results. |
-| **Renderer panel** | All quality settings with Mobile/Desktop presets, the render graph visualizer (toggle passes live) and per-pass stats. |
-| **Asset Registry** | Every registered asset with its ID, type, load status and path, searchable and sortable. |
-| **Console & status bar** | Every log line with filters and counters; background tasks (export, thumbnails) report progress in the status bar. |
-| **Export** | Windows executables (icon and version stamped) and Android **APK/AAB** via Gradle, with branding, orientation, immersive mode, cutouts, signing from environment variables, install and launch on a device. |
-
-Editor state (cameras, open viewports, gizmo options, content browser) is saved per project.
-
----
-
 ## Building
-
-> **Learn more about building Surge:** [ridhwandll.github.io/projects/surge/building-the-engine](https://ridhwandll.github.io/projects/surge/building-the-engine/)
 
 Clone the repository:
 
@@ -233,6 +209,9 @@ Requirements: a recent Visual Studio with the **C++ Clang (ClangCL)** toolset, a
 3. Set **Editor** (not **Player**) as the startup project. The working directory is ALWAYS the repository root.
 
 Build the whole solution in Release mode before running editor. Shaders are compiled to SPIR-V with shaderc on Windows and cached in `Engine/Assets/Shaders/SPIRV/`.
+
+> Extension for Lua scripting
+[SurgeLuaExt](https://github.com/ridhwandll/SurgeLuaExt) is the VSCode extension for Surge scripts. I recommend cloning the [extension](https://github.com/ridhwandll/SurgeLuaExt) repository and doing as instructed on the README.md of SurgeLuaExt will make your life easier while scripting in Surge Lua.
 
 ### Android
 
@@ -255,7 +234,7 @@ Engine/                     Surge static library
   Vendor/                   Third-party code with custom CMakeLists.txt
 Editor/                     Windows-only editor via Dear ImGui
 Player/                     Runtime executable (Windows + Android entry points)
-android/                    Gradle project, builds libSurgePlayer.so
+Android/                    Gradle project, builds libSurgePlayer.so
 Scripts/                    Project generation
 ```
 

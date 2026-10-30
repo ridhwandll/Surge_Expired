@@ -3,6 +3,7 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Graphics/RHI/RHI.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <algorithm>
 #include <format>
@@ -11,6 +12,10 @@ namespace Surge
 {
     namespace
     {
+        namespace Colors = EditorUI::Colors;
+        using EditorUI::ToU32;
+        using EditorUI::WithAlpha;
+
         constexpr float MARGIN = 12.0f;
         constexpr float GROUP_MIN_WIDTH = 210.0f;
         constexpr float GROUP_GAP = 46.0f;
@@ -29,26 +34,20 @@ namespace Surge
         constexpr float EDGE_HOVER_DISTANCE = 5.0f;
         constexpr float GRID_STEP = 24.0f;
 
-        ImFont* BoldFont()
-        {
-            const ImGuiIO& io = ImGui::GetIO();
-            return io.Fonts->Fonts.Size > 1 ? io.Fonts->Fonts[1] : nullptr; // nullptr keeps the current font in PushFont()
-        }
-
         bool Contains(const Vector<ImageHandle>& list, ImageHandle h) { return std::find(list.begin(), list.end(), h) != list.end(); }
 
         ImU32 GroupColor(PassGroup type)
         {
             switch(type)
             {
-                case PassGroup::SHADOW:            return IM_COL32(65, 145, 75, 255);
-                case PassGroup::MAIN_SCENE:        return IM_COL32(95, 115, 140, 255);
-                case PassGroup::AMBIENT_OCCLUSION: return IM_COL32(95, 105, 180, 255);
-                case PassGroup::BLOOM:             return IM_COL32(200, 105, 160, 255);
-                case PassGroup::POST_PROCESS:      return IM_COL32(190, 95, 80, 255);
-                case PassGroup::UI_OVERLAY:        return IM_COL32(60, 150, 150, 255);
-                case PassGroup::SWAPCHAIN:         return IM_COL32(175, 140, 45, 255);
-                default:                           return IM_COL32(115, 125, 115, 255);
+                case PassGroup::SHADOW:            return ToU32(Colors::PassGroup::Shadow);
+                case PassGroup::MAIN_SCENE:        return ToU32(Colors::PassGroup::MainScene);
+                case PassGroup::AMBIENT_OCCLUSION: return ToU32(Colors::PassGroup::AmbientOcclusion);
+                case PassGroup::BLOOM:             return ToU32(Colors::PassGroup::Bloom);
+                case PassGroup::POST_PROCESS:      return ToU32(Colors::PassGroup::PostProcess);
+                case PassGroup::UI_OVERLAY:        return ToU32(Colors::PassGroup::UIOverlay);
+                case PassGroup::SWAPCHAIN:         return ToU32(Colors::PassGroup::Swapchain);
+                default:                           return ToU32(Colors::PassGroup::Unknown);
             }
         }
 
@@ -264,7 +263,7 @@ namespace Surge
     void RenderGraphVisualizer::DrawGraph(RenderGraph& graph)
     {
         const ImGuiIO& io = ImGui::GetIO();
-        ImFont* boldFont = BoldFont();
+        ImFont* boldFont = EditorUI::BoldFont();
         const Vector<ExecutionGroup>& groups = graph.GetCompiledGraph().Groups;
         const size_t groupCount = groups.size();
         const bool sceneSkipped = !graph.IsSceneEnabled();
@@ -424,7 +423,7 @@ namespace Surge
         {
             const ImVec2 windowMin = ImGui::GetWindowPos();
             const ImVec2 windowMax(windowMin.x + ImGui::GetWindowSize().x, windowMin.y + ImGui::GetWindowSize().y);
-            const ImU32 gridColor = IM_COL32(255, 255, 255, 10);
+            const ImU32 gridColor = ToU32(WithAlpha(Colors::Ink, 0.04f));
             const float startX = canvasPos.x + static_cast<float>(static_cast<int>((windowMin.x - canvasPos.x) / GRID_STEP) - 1) * GRID_STEP;
             const float startY = canvasPos.y + static_cast<float>(static_cast<int>((windowMin.y - canvasPos.y) / GRID_STEP) - 1) * GRID_STEP;
             for(float gridX = startX; gridX < windowMax.x; gridX += GRID_STEP)
@@ -444,10 +443,10 @@ namespace Surge
             const ExecutionGroup& group = groups[groupIndex];
             const GroupLayout& layout = mLayouts[groupIndex];
             const bool skipped = sceneSkipped && !group.IsSwapchain; // RenderGraph::SetSceneEnabled(false)
-            const ImU32 color = skipped ? IM_COL32(85, 85, 85, 255) : GroupColor(group.Type);
+            const ImU32 color = skipped ? ToU32(Colors::Tone34) : GroupColor(group.Type);
             const ImVec2 headerMax(layout.Max.x, layout.Min.y + HEADER_HEIGHT);
 
-            drawList->AddRectFilled(layout.Min, layout.Max, IM_COL32(18, 18, 18, 235), ROUNDING);
+            drawList->AddRectFilled(layout.Min, layout.Max, ToU32(WithAlpha(Colors::Tone07, 0.92f)), ROUNDING);
             drawList->AddRectFilled(layout.Min, headerMax, color, ROUNDING, ImDrawFlags_RoundCornersTop);
             drawList->AddRect(layout.Min, layout.Max, color, ROUNDING, 0, groupIndex == selectedGroup ? 2.5f : 1.5f);
 
@@ -455,7 +454,7 @@ namespace Surge
             char header[96];
             *std::format_to_n(header, sizeof(header) - 1, "{}{}", group.Name, skipped ? " (Skipped)" : "").out = '\0';
             const ImVec2 nameSize = ImGui::CalcTextSize(header);
-            drawList->AddText(ImVec2(std::floor(layout.Min.x + (groupWidth - nameSize.x) * 0.5f), std::floor(layout.Min.y + (HEADER_HEIGHT - nameSize.y) * 0.5f)), IM_COL32(10, 10, 10, 255), header);
+            drawList->AddText(ImVec2(std::floor(layout.Min.x + (groupWidth - nameSize.x) * 0.5f), std::floor(layout.Min.y + (HEADER_HEIGHT - nameSize.y) * 0.5f)), ToU32(Colors::OnAccent), header);
             ImGui::PopFont();
 
             if(canvasHovered && ImGui::IsMouseHoveringRect(layout.Min, headerMax) && ImGui::BeginTooltip())
@@ -475,15 +474,15 @@ namespace Surge
             // Barriers recorded before this group begins
             if(!group.BarriersBeforeGroup.empty())
             {
-                drawList->AddText(ImVec2(layout.Min.x + PAD_X, y), IM_COL32(255, 195, 70, 255), "BARRIERS");
+                drawList->AddText(ImVec2(layout.Min.x + PAD_X, y), ToU32(Colors::Warning), "BARRIERS");
                 y += lineHeight + 2.0f;
                 for(const ImageBarrier& barrier : group.BarriersBeforeGroup)
                 {
-                    drawList->AddCircleFilled(ImVec2(layout.Min.x + PAD_X + 4.0f, y + lineHeight * 0.5f), 2.5f, IM_COL32(255, 195, 70, 255));
-                    drawList->AddText(ImVec2(layout.Min.x + PAD_X + 14.0f, y), IM_COL32(220, 220, 220, 255), ImageName(barrier.Handle));
+                    drawList->AddCircleFilled(ImVec2(layout.Min.x + PAD_X + 4.0f, y + lineHeight * 0.5f), 2.5f, ToU32(Colors::Warning));
+                    drawList->AddText(ImVec2(layout.Min.x + PAD_X + 14.0f, y), ToU32(Colors::Tone86), ImageName(barrier.Handle));
                     y += lineHeight;
                 }
-                drawList->AddLine(ImVec2(layout.Min.x + PAD_X, y + PAD_Y * 0.5f), ImVec2(layout.Max.x - PAD_X, y + PAD_Y * 0.5f), IM_COL32(80, 80, 80, 200));
+                drawList->AddLine(ImVec2(layout.Min.x + PAD_X, y + PAD_Y * 0.5f), ImVec2(layout.Max.x - PAD_X, y + PAD_Y * 0.5f), ToU32(WithAlpha(Colors::Tone30, 0.78f)));
                 y += PAD_Y;
             }
 
@@ -521,23 +520,23 @@ namespace Surge
                 }
 
                 const bool selected = pass == selectedPass;
-                const ImU32 fillColor = selected ? IM_COL32(72, 52, 28, 255) : hovered ? IM_COL32(64, 64, 64, 255) : enabled ? IM_COL32(48, 48, 48, 255) : IM_COL32(62, 28, 28, 255);
-                const ImU32 borderColor = selected ? IM_COL32(255, 153, 26, 255) : hovered ? color : enabled ? IM_COL32(80, 80, 80, 255) : IM_COL32(150, 55, 55, 255);
+                const ImU32 fillColor = selected ? ToU32(Colors::AccentDeep) : hovered ? ToU32(Colors::Tone25) : enabled ? ToU32(Colors::Tone19) : ToU32(Colors::ErrorDeep);
+                const ImU32 borderColor = selected ? ToU32(Colors::Accent) : hovered ? color : enabled ? ToU32(Colors::Tone30) : ToU32(Colors::ErrorMuted);
                 drawList->AddRectFilled(passMin, passMax, fillColor, 4.0f);
                 drawList->AddRect(passMin, passMax, borderColor, 4.0f, 0, (selected || hovered) ? 1.5f : 1.0f);
 
                 char orderText[16];
                 *std::format_to_n(orderText, sizeof(orderText) - 1, "{}", executionOrder + 1).out = '\0';
                 const float textY = std::floor(passMin.y + (passHeight - lineHeight) * 0.5f);
-                drawList->AddText(ImVec2(passMin.x + 6.0f, textY), IM_COL32(140, 140, 140, 255), orderText);
+                drawList->AddText(ImVec2(passMin.x + 6.0f, textY), ToU32(Colors::TextMuted), orderText);
 
                 const char* passName = pass->GetName().c_str();
                 const ImVec2 nameMin(passMin.x + 6.0f + orderColumnWidth, textY);
-                drawList->AddText(nameMin, enabled && !skipped ? IM_COL32(225, 225, 225, 255) : IM_COL32(150, 150, 150, 255), passName);
+                drawList->AddText(nameMin, enabled && !skipped ? ToU32(Colors::Tone88) : ToU32(Colors::Tone60), passName);
                 if(!enabled)
                 {
                     const float strikeY = textY + lineHeight * 0.55f;
-                    drawList->AddLine(ImVec2(nameMin.x, strikeY), ImVec2(nameMin.x + ImGui::CalcTextSize(passName).x, strikeY), IM_COL32(200, 70, 70, 255), 1.0f);
+                    drawList->AddLine(ImVec2(nameMin.x, strikeY), ImVec2(nameMin.x + ImGui::CalcTextSize(passName).x, strikeY), ToU32(Colors::Danger), 1.0f);
                 }
 
                 // The swapchain pass presents the frame (and ImGui): disabling it would leave no way to turn it back on
@@ -593,7 +592,7 @@ namespace Surge
             }
 
             const bool hovered = static_cast<int>(i) == hoveredEdge;
-            const ImU32 edgeColor = hovered ? IM_COL32(255, 255, 255, 255) : related ? IM_COL32(255, 175, 45, 255) : IM_COL32(255, 153, 26, 140);
+            const ImU32 edgeColor = hovered ? ToU32(Colors::Ink) : related ? ToU32(Colors::AccentLight) : ToU32(WithAlpha(Colors::Accent, 0.55f));
             const float thickness = (hovered || related) ? 2.5f : 1.5f;
 
             const int count = edgePoints(edge, points);
@@ -623,7 +622,7 @@ namespace Surge
                 if(ImGui::CalcTextSize(label).x > maxLabelWidth)
                     *std::format_to_n(label, sizeof(label) - 1, "{} image(s)", edge.ImageCount).out = '\0';
 
-                drawList->AddText(ImVec2(labelX, std::floor((points[0].y + points[1].y - lineHeight) * 0.5f)), hovered ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 200, 200, 200), label);
+                drawList->AddText(ImVec2(labelX, std::floor((points[0].y + points[1].y - lineHeight) * 0.5f)), hovered ? ToU32(Colors::Ink) : ToU32(WithAlpha(Colors::Tone78, 0.78f)), label);
             }
         }
 
@@ -693,7 +692,7 @@ namespace Surge
             return;
         }
 
-        ImFont* boldFont = BoldFont();
+        ImFont* boldFont = EditorUI::BoldFont();
         ImGui::PushID(title);
         for(size_t i = 0; i < images.size(); ++i)
         {
@@ -721,7 +720,7 @@ namespace Surge
                 {
                     const float maxDim = std::min(mPreviewSize, std::max(ImGui::GetContentRegionAvail().x, 32.0f));
                     ImGui::Image(textureID, FitImage(desc, maxDim));
-                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(90, 90, 90, 255));
+                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ToU32(Colors::Tone35));
                     if(ImGui::BeginItemTooltip())
                     {
                         ImGui::Image(textureID, FitImage(desc, 512.0f));
@@ -753,8 +752,8 @@ namespace Surge
             return;
         }
 
-        ImGui::PushFont(BoldFont(), 20.0f);
-        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.1f, 1.0f), "%s", pass->GetName().c_str());
+        ImGui::PushFont(EditorUI::BoldFont(), 20.0f);
+        ImGui::TextColored(Colors::Accent, "%s", pass->GetName().c_str());
         ImGui::PopFont();
         ImGui::TextDisabled("Group: %s  |  Execution order: #%d", graph.GetCompiledGraph().Groups[groupIndex].Name.c_str(), order + 1);
 

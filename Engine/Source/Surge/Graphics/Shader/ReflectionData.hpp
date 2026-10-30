@@ -5,9 +5,14 @@
 #include <unordered_map>
 #include <map>
 
+namespace Rapt0R
+{
+    class Writer;
+    class Reader;
+}
+
 namespace Surge
 {
-    struct BinaryReader;
 
     enum class ShaderType
     {
@@ -127,9 +132,10 @@ namespace Surge
 
         void LogAll() const;
 
-        // Cooked into ShaderBinary by the Editor's ShaderCompiler, the runtime never reflects SPIR-V
-        void Serialize(Vector<Byte>& out) const;
-        bool Deserialize(BinaryReader& reader);
+        // Cooked into ShaderBinary by the Editor's ShaderCompiler, the runtime never reflects SPIR-V. Rapt0R calls them for Write/Read(reflection),
+        // a stale/corrupt file (out of range enums included) fails the reader
+        void Rapt0RSerialize(Rapt0R::Writer& writer) const;
+        void Rapt0RDeserialize(Rapt0R::Reader& reader);
     private:
         void SetShaderName(const String& name) { mShaderName = name; }
         void PushResource(const ShaderResource& res) { mShaderResources.push_back(res); }

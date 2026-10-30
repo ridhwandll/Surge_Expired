@@ -4,7 +4,7 @@
 #include "Surge/Asset/AssetManager.hpp"
 #include "Surge/Core/Core.hpp"
 #include "SurgeReflect/Enum.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Editor.hpp"
 
 #include <algorithm>
@@ -61,7 +61,9 @@ namespace Surge
         for(AssetID id : mToUnload)
             mAssetManager->Unload(id);
         for(AssetID id : mToUnregister)
-            mAssetManager->UnregisterAsset(id);
+            AssetDatabase::Get().Unregister(id, false);
+        if(!mToUnregister.empty())
+            AssetDatabase::Get().SaveRegistry();
         if(!mToUnload.empty() || !mToUnregister.empty())
             mSortDirty = true;
         mToUnload.clear();
@@ -72,12 +74,12 @@ namespace Surge
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
         {
-            ImGuiAux::ScopedBoldFont font;
-            if(ImGuiAux::Button("SERIALIZE TO DISK"))
-                mAssetManager->SerializeRegistry();
+            EditorUI::ScopedBoldFont font;
+            if(EditorUI::Button("SERIALIZE TO DISK"))
+                AssetDatabase::Get().SaveRegistry();
             ImGui::SameLine();
 
-            if(ImGuiAux::Button("UNLOAD UNUSED"))
+            if(EditorUI::Button("UNLOAD UNUSED"))
             {
                 for(const auto& [id, meta] : mAssetManager->GetRegistryMap())
                 {
@@ -86,7 +88,7 @@ namespace Surge
                         mToUnload.push_back(id);
                 }
             }
-            ImGuiAux::ItemTooltip("Frees every loaded asset nothing references anymore");
+            EditorUI::ItemTooltip("Frees every loaded asset nothing references anymore");
         }
 
         ImGui::SameLine();
@@ -193,7 +195,7 @@ namespace Surge
         }
 
         Editor* editor = static_cast<Editor*>(Core::GetClient());
-        ImFont* boldFont = ImGui::GetIO().Fonts->Fonts[1];
+        ImFont* boldFont = EditorUI::BoldFont();
 
         ImGuiListClipper clipper;
         clipper.Begin(static_cast<int>(mRows.size()));
@@ -215,35 +217,31 @@ namespace Surge
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !HasFlag(meta.Flags, AssetFlags::MEMORY))
                     editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(id);
 
-                if(ImGuiAux::BeginStyledPopupContextItem())
+                if(EditorUI::BeginStyledPopupContextItem())
                 {
-                    {
-                        ImGuiAux::ScopedBoldFont font;
-                        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", meta.RelativePath.c_str());
-                    }
-                    ImGuiAux::StyledSeparator();
-                    if(ImGuiAux::StyledMenuItem("Reveal in Content Browser", "Double-click", nullptr, !HasFlag(meta.Flags, AssetFlags::MEMORY)))
+                    EditorUI::MenuHeader(meta.RelativePath.c_str());
+                    if(EditorUI::StyledMenuItem("Reveal in Content Browser", "Double-click", nullptr, !HasFlag(meta.Flags, AssetFlags::MEMORY)))
                         editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(id);
-                    if(ImGuiAux::StyledMenuItem("Copy Asset ID"))
+                    if(EditorUI::StyledMenuItem("Copy Asset ID"))
                         ImGui::SetClipboardText(idText.c_str());
-                    if(ImGuiAux::StyledMenuItem("Copy Path"))
+                    if(EditorUI::StyledMenuItem("Copy Path"))
                         ImGui::SetClipboardText(meta.RelativePath.c_str());
-                    ImGuiAux::EndStyledPopup();
+                    EditorUI::EndStyledPopup();
                 }
 
                 ImGui::TableSetColumnIndex(COLUMN_TYPE);
-                ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", SurgeReflect::EnumToString(meta.Type).data());
+                ImGui::TextColored(EditorUI::Colors::Tone70, "%s", SurgeReflect::EnumToString(meta.Type).data());
 
                 ImGui::TableSetColumnIndex(COLUMN_STATUS);
                 ImGui::PushFont(boldFont);
                 if(HasFlag(meta.Flags, AssetFlags::MISSING))
-                    ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "MISSING");
+                    ImGui::TextColored(EditorUI::Colors::Error, "MISSING");
                 else if(HasFlag(meta.Flags, AssetFlags::MEMORY))
-                    ImGui::TextColored(ImVec4(0.8f, 0.5f, 0.2f, 1.0f), "MEMORY");
+                    ImGui::TextColored(EditorUI::Colors::Orange, "MEMORY");
                 else if(HasFlag(meta.Flags, AssetFlags::LOADED))
-                    ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "LOADED");
+                    ImGui::TextColored(EditorUI::Colors::Success, "LOADED");
                 else
-                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "ON DISK");
+                    ImGui::TextColored(EditorUI::Colors::Hint, "ON DISK");
                 ImGui::PopFont();
 
                 ImGui::TableSetColumnIndex(COLUMN_PATH);
@@ -254,7 +252,7 @@ namespace Surge
                 if(HasFlag(meta.Flags, AssetFlags::MEMORY))
                 {
                     ImGui::BeginDisabled();
-                    ImGuiAux::Button("BUILT-IN");
+                    EditorUI::Button("BUILT-IN");
                     ImGui::EndDisabled();
                 }
                 else if(HasFlag(meta.Flags, AssetFlags::LOADED))
@@ -263,33 +261,29 @@ namespace Surge
                     if(refCount > 1)
                     {
                         ImGui::BeginDisabled();
-                        ImGuiAux::Button(std::format("REFS: {}", refCount - 1).c_str());
+                        EditorUI::Button(std::format("REFS: {}", refCount - 1).c_str());
                         ImGui::EndDisabled();
-                        ImGuiAux::ItemTooltip("Referenced by the scene or another asset, can't be unloaded");
+                        EditorUI::ItemTooltip("Referenced by the scene or another asset, can't be unloaded");
                     }
                     else
                     {
-                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.6f, 0.2f, 1.0f));
-                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.6f, 0.3f, 1.0f));
-                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.7f, 0.4f, 0.1f, 1.0f));
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-                        if(ImGuiAux::Button("UNLOAD"))
-                            mToUnload.push_back(id);
-                        ImGui::PopStyleColor(4);
-                        ImGuiAux::ItemTooltip("Free this asset from GPU/CPU memory");
+                        {
+                            EditorUI::ScopedButtonColor color(EditorUI::Colors::WarningDark, EditorUI::Colors::Tone10);
+                            if(EditorUI::Button("UNLOAD"))
+                                mToUnload.push_back(id);
+                        }
+                        EditorUI::ItemTooltip("Free this asset from GPU/CPU memory");
                     }
                 }
                 else
                 {
                     const bool missing = HasFlag(meta.Flags, AssetFlags::MISSING);
-                    ImGui::PushStyleColor(ImGuiCol_Button, missing ? ImVec4(0.8f, 0.2f, 0.2f, 1.0f) : ImVec4(0.8f, 0.6f, 0.2f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.1f, 0.1f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-                    if(ImGuiAux::Button("UNREGISTER"))
-                        mToUnregister.push_back(id);
-                    ImGui::PopStyleColor(4);
-                    ImGuiAux::ItemTooltip("Removes the entry from the registry, the file stays on disk");
+                    {
+                        EditorUI::ScopedButtonColor color(missing ? EditorUI::Colors::Danger : EditorUI::Colors::WarningDark, EditorUI::Colors::Tone10);
+                        if(EditorUI::Button("UNREGISTER"))
+                            mToUnregister.push_back(id);
+                    }
+                    EditorUI::ItemTooltip("Removes the entry from the registry, the file stays on disk");
                 }
                 ImGui::PopFont();
                 ImGui::PopID();

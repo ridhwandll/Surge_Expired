@@ -6,6 +6,7 @@
 #include "Surge/Graphics/HighLevel/Mesh.hpp"
 #include "Surge/Graphics/Particles/ParticleEffect.hpp"
 #include "Gizmos/ParticleGizmos.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Surge/Physics/Physics.hpp"
 
 #include <Jolt/Renderer/DebugRenderer.h>
@@ -17,19 +18,12 @@ namespace Surge
 {
     static constexpr float SELECTED_THICKNESS = 1.75f;
     static constexpr float UNSELECTED_THICKNESS = 1.25f;
-    static constexpr ImU32 SELECTION_COLOR = IM_COL32(255, 168, 0, 255); // Matches the ImGuizmo selection color (see SceneViewport::SetupManipulatorStyle)
-    static constexpr ImU32 AUDIO_COLOR = IM_COL32(120, 205, 255, 255);
+    static constexpr ImU32 SELECTION_COLOR = EditorUI::ToU32(EditorUI::Colors::Accent); // Matches the ImGuizmo selection color (see SceneViewport::SetupManipulatorStyle)
+    static constexpr ImU32 AUDIO_COLOR = EditorUI::ToU32(EditorUI::Colors::Gizmo::AudioRange);
 
     // ConvexColliderComponent hulls are expensive to build, rebuilt only when the component is dirty or the selection changed
     static JPH::ShapeRefC sConvexShapeCache = nullptr;
     static entt::entity sConvexShapeOwner = entt::null;
-
-    static ImU32 ScaleAlpha(ImU32 color, float factor) { return GizmoCanvas::ScaleAlpha(color, factor); }
-
-    static ImU32 ToU32(const glm::vec3& color, float alpha)
-    {
-        return ImGui::ColorConvertFloat4ToU32(ImVec4(color.r, color.g, color.b, alpha));
-    }
 
     // Keeps the hue of a light color but lifts dark/low intensity ones so the gizmo stays visible
     static glm::vec3 GetDisplayColor(const glm::vec3& color)
@@ -126,7 +120,7 @@ namespace Surge
                 if(!isSelected && !wireForAll)
                     continue;
 
-                const ImU32 color = isSelected ? IM_COL32(235, 235, 235, 255) : IM_COL32(200, 200, 200, 110);
+                const ImU32 color = isSelected ? EditorUI::ToU32(EditorUI::Colors::Viewport::Text) : EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Viewport::TextDim, 0.43f));
                 DrawCameraFrustum(transform.GetTransform(), cameraComp.Camera, color, isSelected ? SELECTED_THICKNESS : UNSELECTED_THICKNESS);
             }
         }
@@ -140,7 +134,7 @@ namespace Surge
                     continue;
 
                 const float alpha = (isSelected ? 0.9f : 0.45f) * (light.Active ? 1.0f : 0.5f);
-                const ImU32 color = ToU32(GetDisplayColor(light.Color), alpha);
+                const ImU32 color = EditorUI::ToU32(ImVec4(glm::vec4(GetDisplayColor(light.Color), alpha)));
                 const float thickness = isSelected ? SELECTED_THICKNESS : UNSELECTED_THICKNESS;
                 const glm::mat4& world = transform.GetTransform();
 
@@ -162,8 +156,8 @@ namespace Surge
                 const float alpha = (isSelected ? 0.85f : 0.4f) * (audioSrc.Active ? 1.0f : 0.5f);
                 const float thickness = isSelected ? SELECTED_THICKNESS : UNSELECTED_THICKNESS;
                 const glm::vec3 position = glm::vec3(transform.GetTransform()[3]);
-                mCanvas.DrawWireSphere(position, audioSrc.MinDistance, ScaleAlpha(AUDIO_COLOR, alpha), thickness);
-                mCanvas.DrawWireSphere(position, audioSrc.MaxDistance, ScaleAlpha(IM_COL32(70, 140, 235, 255), alpha * 0.8f), thickness);
+                mCanvas.DrawWireSphere(position, audioSrc.MinDistance, EditorUI::ScaleAlpha(AUDIO_COLOR, alpha), thickness);
+                mCanvas.DrawWireSphere(position, audioSrc.MaxDistance, EditorUI::ScaleAlpha(EditorUI::ToU32(EditorUI::Colors::Gizmo::AudioRangeInner), alpha * 0.8f), thickness);
             }
         }
 
@@ -176,7 +170,7 @@ namespace Surge
                     continue;
 
                 const float alpha = (isSelected ? 0.85f : 0.4f) * (particles.Active ? 1.0f : 0.5f);
-                DrawParticleShapes(particles, transform.GetTransform(), ScaleAlpha(GizmoIcons::PARTICLES_COLOR, alpha), isSelected ? SELECTED_THICKNESS : UNSELECTED_THICKNESS);
+                DrawParticleShapes(particles, transform.GetTransform(), EditorUI::ScaleAlpha(EditorUI::ToU32(EditorUI::Colors::Component::Particles), alpha), isSelected ? SELECTED_THICKNESS : UNSELECTED_THICKNESS);
             }
         }
 
@@ -184,7 +178,7 @@ namespace Surge
         {
             const AnimatorComponent* animator = selected.TryGetComponent<AnimatorComponent>();
             if(animator && animator->Active && animator->Runtime.HasPose())
-                DrawSkeleton(animator->Runtime, IM_COL32(190, 165, 255, 230), SELECTED_THICKNESS);
+                DrawSkeleton(animator->Runtime, EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Gizmo::Skeleton, 0.9f)), SELECTED_THICKNESS);
         }
 
         if(mSettings.ShowIcons)
@@ -207,12 +201,12 @@ namespace Surge
         };
 
         for(const auto& [entity, transform, cameraComp] : registry.view<TransformComponent, CameraComponent>().each())
-            addIcon(entity, transform, GizmoIcon::CAMERA, cameraComp.Primary ? IM_COL32(245, 245, 245, 255) : IM_COL32(185, 185, 185, 255), !cameraComp.Active);
+            addIcon(entity, transform, GizmoIcon::CAMERA, EditorUI::ToU32(cameraComp.Primary ? EditorUI::Colors::Viewport::Text : EditorUI::Colors::Viewport::TextDim), !cameraComp.Active);
 
         for(const auto& [entity, transform, light] : registry.view<TransformComponent, LightComponent>().each())
         {
             if(!registry.any_of<CameraComponent>(entity))
-                addIcon(entity, transform, light.Type == LightType::DIRECTIONAL ? GizmoIcon::DIRECTIONAL_LIGHT : GizmoIcon::POINT_LIGHT, ToU32(GetDisplayColor(light.Color), 1.0f), !light.Active);
+                addIcon(entity, transform, light.Type == LightType::DIRECTIONAL ? GizmoIcon::DIRECTIONAL_LIGHT : GizmoIcon::POINT_LIGHT, EditorUI::ToU32(ImVec4(glm::vec4(GetDisplayColor(light.Color), 1.0f))), !light.Active);
         }
 
         for(const auto& [entity, transform, audioSrc] : registry.view<TransformComponent, AudioSourceComponent>().each())
@@ -230,13 +224,13 @@ namespace Surge
         for(const auto& [entity, transform, env] : registry.view<TransformComponent, EnvironmentComponent>().each())
         {
             if(!registry.any_of<CameraComponent, LightComponent, AudioSourceComponent, AudioListenerComponent>(entity))
-                addIcon(entity, transform, GizmoIcon::ENVIRONMENT, IM_COL32(255, 200, 110, 255), !env.Active);
+                addIcon(entity, transform, GizmoIcon::ENVIRONMENT, EditorUI::ToU32(EditorUI::Colors::Gizmo::EnvironmentIcon), !env.Active);
         }
 
         for(const auto& [entity, transform, particles] : registry.view<TransformComponent, ParticleSystemComponent>().each())
         {
             if(!registry.any_of<CameraComponent, LightComponent, AudioSourceComponent, AudioListenerComponent, EnvironmentComponent>(entity))
-                addIcon(entity, transform, GizmoIcon::PARTICLES, GizmoIcons::PARTICLES_COLOR, !particles.Active);
+                addIcon(entity, transform, GizmoIcon::PARTICLES, EditorUI::ToU32(EditorUI::Colors::Component::Particles), !particles.Active);
         }
 
         if(mIcons.empty())
@@ -276,11 +270,11 @@ namespace Surge
                 continue;
 
             GizmoIcons::BadgeStyle style;
-            style.Background = ScaleAlpha(isHovered ? IM_COL32(58, 58, 64, 240) : IM_COL32(26, 26, 30, 220), alpha);
-            style.Rim = ScaleAlpha(isSelected ? SELECTION_COLOR : (isHovered ? IM_COL32(255, 255, 255, 160) : IM_COL32(255, 255, 255, 45)), alpha);
+            style.Background = EditorUI::ScaleAlpha(isHovered ? EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Gizmo::IconBackgroundHovered, 0.94f)) : EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Gizmo::IconBackground, 0.86f)), alpha);
+            style.Rim = EditorUI::ScaleAlpha(isSelected ? SELECTION_COLOR : (EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::White, isHovered ? 0.63f : 0.18f))), alpha);
             style.RimThickness = isSelected ? 2.0f : 1.0f;
-            style.Shadow = ScaleAlpha(IM_COL32(0, 0, 0, 90), alpha);
-            GizmoIcons::DrawBadge(mDrawList, icon.ScreenPos, radius, icon.Icon, ScaleAlpha(icon.Tint, alpha), style);
+            style.Shadow = EditorUI::ScaleAlpha(EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Black, 0.35f)), alpha);
+            GizmoIcons::DrawBadge(mDrawList, icon.ScreenPos, radius, icon.Icon, EditorUI::ScaleAlpha(icon.Tint, alpha), style);
         }
 
         if(hoveredIndex >= 0)
@@ -295,8 +289,8 @@ namespace Surge
                 const ImVec2 padding(6.0f, 3.0f);
                 const ImVec2 labelMin(icon.ScreenPos.x - textSize.x * 0.5f - padding.x, icon.ScreenPos.y + radius + 5.0f);
                 const ImVec2 labelMax(labelMin.x + textSize.x + padding.x * 2.0f, labelMin.y + textSize.y + padding.y * 2.0f);
-                mDrawList->AddRectFilled(labelMin, labelMax, IM_COL32(15, 15, 15, 225), 2.0f);
-                mDrawList->AddText(ImVec2(labelMin.x + padding.x, labelMin.y + padding.y), IM_COL32(235, 235, 235, 255), name);
+                mDrawList->AddRectFilled(labelMin, labelMax, EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Viewport::Shade, 0.88f)), 2.0f);
+                mDrawList->AddText(ImVec2(labelMin.x + padding.x, labelMin.y + padding.y), EditorUI::ToU32(EditorUI::Colors::Viewport::Text), name);
             }
         }
     }
@@ -319,7 +313,7 @@ namespace Surge
             farCorners[i] = glm::vec3(cameraWorld * glm::vec4(glm::vec3(f), 1.0f));
         }
 
-        const ImU32 faintColor = ScaleAlpha(color, 0.6f);
+        const ImU32 faintColor = EditorUI::ScaleAlpha(color, 0.6f);
         mCanvas.DrawPolyline3D(nearCorners, 4, true, color, thickness);
         mCanvas.DrawPolyline3D(farCorners, 4, true, faintColor, thickness);
         for(int i = 0; i < 4; i++)
@@ -353,7 +347,7 @@ namespace Surge
         ImVec2 screen[3];
         if(mCanvas.ProjectPoint(triangle[0], screen[0]) && mCanvas.ProjectPoint(triangle[1], screen[1]) && mCanvas.ProjectPoint(triangle[2], screen[2]))
         {
-            mDrawList->AddTriangleFilled(screen[0], screen[1], screen[2], ScaleAlpha(color, 0.45f));
+            mDrawList->AddTriangleFilled(screen[0], screen[1], screen[2], EditorUI::ScaleAlpha(color, 0.45f));
             mDrawList->AddTriangle(screen[0], screen[1], screen[2], color, thickness);
         }
     }
@@ -375,7 +369,7 @@ namespace Surge
         {
             const float angle = static_cast<float>(i) * glm::pi<float>() * 0.25f;
             const glm::vec3 start = origin + (u * glm::cos(angle) + v * glm::sin(angle)) * discRadius;
-            mCanvas.DrawLine3D(start, start + forward * rayLength, ScaleAlpha(color, 0.8f), thickness);
+            mCanvas.DrawLine3D(start, start + forward * rayLength, EditorUI::ScaleAlpha(color, 0.8f), thickness);
         }
 
         const glm::vec3 tip = origin + forward * rayLength * 1.35f;

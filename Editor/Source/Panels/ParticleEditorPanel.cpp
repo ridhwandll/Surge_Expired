@@ -4,7 +4,9 @@
 #include "Surge/Core/Core.hpp"
 #include "Surge/Core/Input/Input.hpp"
 #include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Asset/Serializer/ParticleEffect/ParticleEffectSerializer.hpp"
+#include "Asset/SourceIO/ParticleEffectSourceIO.hpp"
+#include "Asset/AssetDatabase.hpp"
+#include "Asset/AssetExtensions.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Graphics/HighLevel/Texture2D.hpp"
 #include "Surge/Utility/Filesystem.hpp"
@@ -13,7 +15,7 @@
 #include "Gizmos/GizmoIcons.hpp"
 #include "Gizmos/ParticleGizmos.hpp"
 #include "StatusBar/EditorStatusBar.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Utility/ParticleWidgets.hpp"
 
 #include "SurgeMath/Math.hpp"
@@ -33,9 +35,9 @@ namespace Surge
         constexpr float PREVIEW_FAR = 500.0f;
         constexpr float LABEL_WIDTH = 140.0f;
         constexpr int PREVIEW_GIZMO_ID = 0x5EF0; // ImGuizmo ID, the Scene views use their index
-        constexpr ImU32 SHAPE_COLOR = GizmoIcons::PARTICLES_COLOR;
-        constexpr ImU32 COLLISION_COLOR = IM_COL32(90, 220, 200, 255);
-        constexpr ImU32 BOUNDS_COLOR = IM_COL32(255, 210, 90, 255);
+        constexpr ImU32 SHAPE_COLOR = EditorUI::ToU32(EditorUI::Colors::Component::Particles);
+        constexpr ImU32 COLLISION_COLOR = EditorUI::ToU32(EditorUI::Colors::Gizmo::ParticleCollision);
+        constexpr ImU32 BOUNDS_COLOR = EditorUI::ToU32(EditorUI::Colors::Gizmo::ParticleBounds);
 
         constexpr std::array<const char*, 2> sSpaceNames = { "Local", "World" };
         constexpr std::array<const char*, 7> sShapeNames = { "Point", "Sphere", "Hemisphere", "Cone", "Box", "Circle", "Edge" };
@@ -44,127 +46,20 @@ namespace Surge
         constexpr std::array<const char*, 4> sRenderModeNames = { "Billboard", "Stretched", "Horizontal", "Vertical" };
         constexpr std::array<const char*, 4> sSortModeNames = { "None", "By Distance", "Oldest First", "Youngest First" };
 
-        bool DragFloatRow(const char* label, float* value, float speed, float min = 0.0f, float max = 0.0f, const char* format = "%.2f")
-        {
-            ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            const bool changed = ImGui::DragFloat("##v", value, speed, min, max, format, (min != 0.0f || max != 0.0f) ? ImGuiSliderFlags_AlwaysClamp : 0);
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool SliderFloatRow(const char* label, float* value, float min, float max, const char* format = "%.2f")
-        {
-            ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            const bool changed = ImGui::SliderFloat("##v", value, min, max, format, ImGuiSliderFlags_AlwaysClamp);
-            ImGui::PopID();
-            return changed;
-        }
-
-        template<typename T>
-        bool DragIntRow(const char* label, T* value, int min, int max)
-        {
-            ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            int v = static_cast<int>(*value);
-            const bool changed = ImGui::DragInt("##v", &v, 0.2f, min, max, "%d", ImGuiSliderFlags_AlwaysClamp);
-            if(changed)
-                *value = static_cast<T>(v);
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool Vec3Row(const char* label, glm::vec3* value, float speed)
-        {
-            ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            const bool changed = ImGui::DragFloat3("##v", glm::value_ptr(*value), speed, 0.0f, 0.0f, "%.2f");
-            ImGui::PopID();
-            return changed;
-        }
-
-        bool CheckboxRow(const char* label, bool* value)
-        {
-            ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            const bool changed = ImGui::Checkbox("##v", value);
-            ImGui::PopID();
-            return changed;
-        }
-
-        template<typename T, size_t N>
-        bool ComboRow(const char* label, T& value, const std::array<const char*, N>& names)
-        {
-            ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            bool changed = false;
-            const size_t current = static_cast<size_t>(value);
-            if(ImGui::BeginCombo("##v", current < N ? names[current] : "?"))
-            {
-                for(size_t i = 0; i < N; i++)
-                {
-                    if(ImGui::Selectable(names[i], i == current) && i != current)
-                    {
-                        value = static_cast<T>(i);
-                        changed = true;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::PopID();
-            return changed;
-        }
-
-        void HintRow(const char* text)
-        {
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextDisabled("%s", text);
-            ImGui::PopTextWrapPos();
-        }
-
         // Texture2D slot: drop from the Content Browser, x clears it
         bool TextureRow(const char* label, Ref<Asset>& texture)
         {
             bool changed = false;
             AssetManager* am = Core::GetAssetManager();
             ImGui::PushID(label);
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
+            EditorUI::TLabel(label);
 
             const String text = texture ? Filesystem::GetFilenameWithExt(am->GetMetadata(texture->GetID()).RelativePath) : String("Default (soft particle)");
             const float clearWidth = texture ? ImGui::GetFrameHeight() + 4.0f : 0.0f;
             ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
             ImGui::Button(text.c_str(), ImVec2(ImGui::GetContentRegionAvail().x - clearWidth, 0.0f));
             ImGui::PopStyleVar();
-            ImGuiAux::DelayedToolTip("Drop a texture from the Content Browser");
+            EditorUI::DelayedToolTip("Drop a texture from the Content Browser");
             if(ImGui::BeginDragDropTarget())
             {
                 if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
@@ -189,19 +84,10 @@ namespace Surge
                     texture = nullptr;
                     changed = true;
                 }
-                ImGuiAux::DelayedToolTip("Back to the default particle");
+                EditorUI::DelayedToolTip("Back to the default particle");
             }
             ImGui::PopID();
             return changed;
-        }
-
-        bool BeginProperties()
-        {
-            if(!ImGui::BeginTable("##Properties", 2, ImGuiTableFlags_SizingFixedFit))
-                return false;
-            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, LABEL_WIDTH);
-            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-            return true;
         }
 
         // Clip space -> panel pixels (Vulkan: y down, like ImGui)
@@ -244,7 +130,7 @@ namespace Surge
             path = absoluteDirectory / std::format("{} ({}){}", baseName, count, extension);
 
         const String relativePath = Filesystem::GetRelativePath(path, am->GetAssetsDirectory()).generic_string();
-        Ref<ParticleEffect> effect = am->Create<ParticleEffect>(relativePath);
+        Ref<ParticleEffect> effect = AssetDatabase::Get().Create<ParticleEffect>(relativePath);
         return effect ? effect->GetID() : AssetID(UUID::INVALID);
     }
 
@@ -279,7 +165,7 @@ namespace Surge
             mLayoutChanged = false;
             mUndoStack.clear();
             mRedoStack.clear();
-            mCommitted = ParticleEffectSerializer::ToJson(*mEffect);
+            mCommitted = ParticleEffectSourceIO::ToJson(*mEffect);
 
             mPreview = ParticleSystemComponent {};
             mPreview.Effect = mEffect;
@@ -289,7 +175,7 @@ namespace Surge
         };
 
         if(mEffect && mUnsaved)
-            ImGuiAux::ShowConfirmationBox("Unsaved Particle Effect", "The open particle effect has unsaved changes.\nDiscard them and open the other effect?", open);
+            EditorUI::ShowConfirmationBox("Unsaved Particle Effect", "The open particle effect has unsaved changes.\nDiscard them and open the other effect?", open);
         else
             open();
     }
@@ -309,7 +195,7 @@ namespace Surge
         };
 
         if(mEffect && mUnsaved)
-            ImGuiAux::ShowConfirmationBox("Unsaved Particle Effect", "Discard the changes of the open particle effect?", close);
+            EditorUI::ShowConfirmationBox("Unsaved Particle Effect", "Discard the changes of the open particle effect?", close);
         else
             close();
     }
@@ -319,7 +205,7 @@ namespace Surge
         if(!mEffect)
             return;
 
-        Core::GetAssetManager()->Save(mEffect->GetID());
+        AssetDatabase::Get().Save(mEffect->GetID());
         mUnsaved = false;
         const String& path = Core::GetAssetManager()->GetMetadata(mEffect->GetID()).RelativePath;
         Log<Severity::Info>("[ParticleEditor] Saved {}", path);
@@ -333,8 +219,8 @@ namespace Surge
 
         AssetManager* am = Core::GetAssetManager();
         String json;
-        if(Filesystem::ReadTextFile(am->GetAbsolutePath(am->GetMetadata(mEffect->GetID()).RelativePath), json))
-            ParticleEffectSerializer::FromJson(*am, json, *mEffect);
+        if(Filesystem::ReadTextFile(AssetDatabase::Get().GetAbsolutePath(am->GetMetadata(mEffect->GetID()).RelativePath), json))
+            ParticleEffectSourceIO::FromJson(*am, json, *mEffect);
         mUnsaved = false;
     }
 
@@ -359,14 +245,14 @@ namespace Surge
         if(mUndoStack.size() > MAX_UNDO_STEPS)
             mUndoStack.erase(mUndoStack.begin());
         mRedoStack.clear();
-        mCommitted = ParticleEffectSerializer::ToJson(*mEffect);
+        mCommitted = ParticleEffectSourceIO::ToJson(*mEffect);
         mDocumentChanged = false;
         mLayoutChanged = false;
     }
 
     void ParticleEditorPanel::RestoreState(const String& json)
     {
-        ParticleEffectSerializer::FromJson(*Core::GetAssetManager(), json, *mEffect); // Marks the layout changed: instances restart with the restored settings
+        ParticleEffectSourceIO::FromJson(*Core::GetAssetManager(), json, *mEffect); // Marks the layout changed: instances restart with the restored settings
         mSelectedEmitter = std::clamp(mSelectedEmitter, 0, std::max(static_cast<int>(mEffect->Emitters.size()) - 1, 0));
         mDocumentChanged = false;
         mLayoutChanged = false;
@@ -378,7 +264,7 @@ namespace Surge
         if(mDocumentChanged) // A pending edit becomes its own step first
         {
             mUndoStack.push_back(std::move(mCommitted));
-            mCommitted = ParticleEffectSerializer::ToJson(*mEffect);
+            mCommitted = ParticleEffectSourceIO::ToJson(*mEffect);
             mDocumentChanged = false;
         }
         if(mUndoStack.empty())
@@ -600,15 +486,15 @@ namespace Surge
     {
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
         {
-            ImGuiAux::ScopedBoldFont bold(20.0f);
-            ImGuiAux::TextCentered("No particle effect open");
+            EditorUI::ScopedBoldFont bold(20.0f);
+            EditorUI::TextCentered("No particle effect open");
         }
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
         ImGui::TextWrapped("Double click a .spfx file in the Content Browser, drop one on the button below, or create a new effect. "
                            "Add a Particle System component to an entity and assign the effect to see it in the scene.");
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
-        ImGuiAux::ScopedBoldFont bold;
+        EditorUI::ScopedBoldFont bold;
         if(ImGui::Button("Create New Particle Effect", ImVec2(-FLT_MIN, 40.0f)))
         {
             const String assetsDir = Core::GetAssetManager()->GetAssetsDirectory();
@@ -633,24 +519,24 @@ namespace Surge
     {
         const String fileName = Filesystem::GetFilenameWithExt(Core::GetAssetManager()->GetMetadata(mEffect->GetID()).RelativePath);
         {
-            ImGuiAux::ScopedBoldFont bold(18.0f);
+            EditorUI::ScopedBoldFont bold(18.0f);
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.0f, 1.0f), "%s%s", fileName.c_str(), mUnsaved ? " *" : "");
+            ImGui::TextColored(EditorUI::Colors::Accent, "%s%s", fileName.c_str(), mUnsaved ? " *" : "");
         }
 
         ImGui::SameLine();
         if(ImGui::Button("Save"))
             Save();
-        ImGuiAux::DelayedToolTip("Ctrl+S");
+        EditorUI::DelayedToolTip("Ctrl+S");
 
         ImGui::SameLine();
         ImGui::BeginDisabled(!mUnsaved);
         if(ImGui::Button("Revert"))
-            ImGuiAux::ShowConfirmationBox("Revert Particle Effect", "Reload the effect from its file and drop every unsaved change?", [this]() {
+            EditorUI::ShowConfirmationBox("Revert Particle Effect", "Reload the effect from its file and drop every unsaved change?", [this]() {
                 Revert();
                 mUndoStack.clear();
                 mRedoStack.clear();
-                mCommitted = ParticleEffectSerializer::ToJson(*mEffect);
+                mCommitted = ParticleEffectSourceIO::ToJson(*mEffect);
                 mDocumentChanged = false;
             });
         ImGui::EndDisabled();
@@ -660,14 +546,14 @@ namespace Surge
         if(ImGui::Button("Undo"))
             Undo();
         ImGui::EndDisabled();
-        ImGuiAux::DelayedToolTip("Ctrl+Z");
+        EditorUI::DelayedToolTip("Ctrl+Z");
 
         ImGui::SameLine();
         ImGui::BeginDisabled(mRedoStack.empty());
         if(ImGui::Button("Redo"))
             Redo();
         ImGui::EndDisabled();
-        ImGuiAux::DelayedToolTip("Ctrl+Y / Ctrl+Shift+Z");
+        EditorUI::DelayedToolTip("Ctrl+Y / Ctrl+Shift+Z");
 
         ImGui::SameLine();
         if(ImGui::Button("Close"))
@@ -676,7 +562,7 @@ namespace Surge
         ImGui::SameLine();
         if(ImGui::Button(mFullscreen ? "Exit Fullscreen" : "Fullscreen"))
             SetFullscreen(!mFullscreen);
-        ImGuiAux::DelayedToolTip(mFullscreen ? "F11 / Esc" : "F11 while the panel is hovered, Esc leaves");
+        EditorUI::DelayedToolTip(mFullscreen ? "F11 / Esc" : "F11 while the panel is hovered, Esc leaves");
     }
 
     void ParticleEditorPanel::SetFullscreen(bool fullscreen)
@@ -768,7 +654,7 @@ namespace Surge
         constexpr int extent = 5;
         for(int i = -extent; i <= extent; i++)
         {
-            const ImU32 color = i == 0 ? IM_COL32(255, 255, 255, 70) : IM_COL32(255, 255, 255, 28);
+            const ImU32 color = EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::White, i == 0 ? 0.27f : 0.11f));
             ImVec2 a, b;
             if(ProjectToPanel(viewProjection, glm::vec3(static_cast<float>(i), 0.0f, -extent), min, size, a) && ProjectToPanel(viewProjection, glm::vec3(static_cast<float>(i), 0.0f, extent), min, size, b))
                 drawList->AddLine(a, b, color);
@@ -790,7 +676,7 @@ namespace Surge
             ImGui::Image(static_cast<ImTextureID>(renderer->GetViewImGuiID(mView)), size);
         else
         {
-            ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(10, 10, 12, 255));
+            ImGui::GetWindowDrawList()->AddRectFilled(min, max, EditorUI::ToU32(EditorUI::Colors::Viewport::Clear));
             ImGui::Dummy(size);
         }
         const bool imageHovered = ImGui::IsItemHovered();
@@ -808,7 +694,7 @@ namespace Surge
         // Stats in the bottom corner, the toolbar takes the top one
         {
             const String stats = std::format("{} particles  |  {:.2f} s", mPreview.Runtime.GetParticleCount(), mPreview.Runtime.GetTime());
-            drawList->AddText(ImVec2(min.x + 6.0f, max.y - ImGui::GetTextLineHeight() - 4.0f), IM_COL32(220, 220, 220, 220), stats.c_str());
+            drawList->AddText(ImVec2(min.x + 6.0f, max.y - ImGui::GetTextLineHeight() - 4.0f), EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Viewport::Text, 0.86f)), stats.c_str());
         }
         drawList->PopClipRect();
 
@@ -841,28 +727,28 @@ namespace Surge
         const ImVec4 glyphColor = ImGui::GetStyleColorVec4(ImGuiCol_Text);
         if(GizmoIcons::IconButton("##PlayPause", mPreviewPaused ? GizmoIcon::PLAY : GizmoIcon::PAUSE, ImVec2(buttonSize, buttonSize), glyphColor))
             mPreviewPaused = !mPreviewPaused;
-        ImGuiAux::DelayedToolTip(mPreviewPaused ? "Play" : "Pause");
+        EditorUI::DelayedToolTip(mPreviewPaused ? "Play" : "Pause");
         ImGui::SameLine(0.0f, 2.0f);
         if(GizmoIcons::IconButton("##Restart", GizmoIcon::STEP, ImVec2(buttonSize, buttonSize), glyphColor))
         {
             mPreview.Runtime.Restart();
             mPreviewPaused = false;
         }
-        ImGuiAux::DelayedToolTip("Restart");
+        EditorUI::DelayedToolTip("Restart");
         ImGui::SameLine(0.0f, 2.0f);
         if(GizmoIcons::IconButton("##Stop", GizmoIcon::STOP, ImVec2(buttonSize, buttonSize), glyphColor))
             mPreview.Runtime.Stop();
-        ImGuiAux::DelayedToolTip("Stop emitting (the live particles finish)");
+        EditorUI::DelayedToolTip("Stop emitting (the live particles finish)");
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(90.0f);
         ImGui::SliderFloat("##Speed", &mPreviewSpeed, 0.05f, 3.0f, "Speed %.2fx");
         ImGui::SameLine();
         ImGui::Checkbox("Loop", &mLoopPreview);
-        ImGuiAux::DelayedToolTip("Plays one-shot effects again once they finished");
+        EditorUI::DelayedToolTip("Plays one-shot effects again once they finished");
         ImGui::SameLine();
         ImGui::Checkbox("Move", &mMoveEmitter);
-        ImGuiAux::DelayedToolTip("Moves the emitter on a circle: world space trails, rate over distance");
+        EditorUI::DelayedToolTip("Moves the emitter on a circle: world space trails, rate over distance");
     }
 
     void ParticleEditorPanel::HandlePreviewInput(bool hovered)
@@ -958,7 +844,7 @@ namespace Surge
                 const ParticleEmitterDesc& emitter = mEffect->Emitters[i];
                 if(i == mSelectedEmitter || !emitter.Enabled || !emitter.Shape.Enabled || emitter.IsSubEmitterTarget)
                     continue;
-                ParticleGizmos::DrawEmitterShape(mCanvas, emitter.Shape, mPreviewTransform, GizmoCanvas::ScaleAlpha(SHAPE_COLOR, 0.35f), 1.0f);
+                ParticleGizmos::DrawEmitterShape(mCanvas, emitter.Shape, mPreviewTransform, EditorUI::ScaleAlpha(SHAPE_COLOR, 0.35f), 1.0f);
             }
         }
 
@@ -968,9 +854,9 @@ namespace Surge
             const float alpha = selected->IsSubEmitterTarget ? 0.5f : 1.0f; // Sub-emitters spawn on other particles, the shape only shows its size
             if(selected->Shape.Enabled)
             {
-                ParticleGizmos::DrawEmitterShape(mCanvas, selected->Shape, mPreviewTransform, GizmoCanvas::ScaleAlpha(SHAPE_COLOR, alpha), 1.75f);
+                ParticleGizmos::DrawEmitterShape(mCanvas, selected->Shape, mPreviewTransform, EditorUI::ScaleAlpha(SHAPE_COLOR, alpha), 1.75f);
                 if(mShowDirection)
-                    ParticleGizmos::DrawEmitDirection(mCanvas, selected->Shape, mPreviewTransform, GizmoCanvas::ScaleAlpha(IM_COL32(255, 255, 255, 220), alpha), 1.5f);
+                    ParticleGizmos::DrawEmitDirection(mCanvas, selected->Shape, mPreviewTransform, EditorUI::ScaleAlpha(EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::White, 0.86f)), alpha), 1.5f);
             }
 
             if(mShowCollision && selected->Collision.Enabled)
@@ -985,13 +871,13 @@ namespace Surge
         {
             glm::vec3 boundsMin, boundsMax;
             if(mPreview.Runtime.GetWorldBounds(boundsMin, boundsMax))
-                mCanvas.DrawWireBox(boundsMin, boundsMax, GizmoCanvas::ScaleAlpha(BOUNDS_COLOR, 0.8f), 1.0f);
+                mCanvas.DrawWireBox(boundsMin, boundsMax, EditorUI::ScaleAlpha(BOUNDS_COLOR, 0.8f), 1.0f);
         }
 
         if(selected && selected->IsSubEmitterTarget)
         {
             const char* hint = "Sub-emitter: spawns on the particles of another emitter";
-            ImGui::GetWindowDrawList()->AddText(ImVec2(min.x + 6.0f, min.y + ImGui::GetFrameHeight() + 10.0f), IM_COL32(220, 220, 220, 170), hint);
+            ImGui::GetWindowDrawList()->AddText(ImVec2(min.x + 6.0f, min.y + ImGui::GetFrameHeight() + 10.0f), EditorUI::ToU32(EditorUI::WithAlpha(EditorUI::Colors::Viewport::Text, 0.67f)), hint);
         }
     }
 
@@ -1092,7 +978,7 @@ namespace Surge
         Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
 
         ImGui::SetCursorScreenPos(ImVec2(min.x + 3.0f, min.y + 3.0f));
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(15, 15, 15, 200));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Overlay);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 0.0f));
 
         const float frameHeight = ImGui::GetFrameHeight();
@@ -1102,41 +988,41 @@ namespace Surge
             const bool active = mGizmoOperation == tool.Operation;
             if(active)
             {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImGuiAux::Colors::Selection);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiAux::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_Button, EditorUI::Colors::Selection);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorUI::Colors::Selection);
             }
 
             ImGui::PushID(tool.Operation);
-            const ImVec4 tint = active ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.85f, 0.85f, 0.85f, 1.0f);
+            const ImVec4 tint = active ? EditorUI::Colors::Ink : EditorUI::Colors::Tone85;
             if(GizmoIcons::IconButton("##PreviewTool", rhi->GetImGuiImage(editor->GetToolIcon(tool.Icon)), toolButtonSize, tint, 0.9f))
                 mGizmoOperation = tool.Operation;
             ImGui::PopID();
 
             if(active)
                 ImGui::PopStyleColor(2);
-            ImGuiAux::ItemTooltip(tool.Tooltip);
+            EditorUI::ItemTooltip(tool.Tooltip);
             ImGui::SameLine();
         }
 
         ImGui::SameLine(0.0f, 8.0f);
         if(ImGui::Button(mGizmoWorldSpace ? "World" : "Local"))
             mGizmoWorldSpace = !mGizmoWorldSpace;
-        ImGuiAux::ItemTooltip("Manipulator space: local / world (X)");
+        EditorUI::ItemTooltip("Manipulator space: local / world (X)");
 
         ImGui::SameLine(0.0f, 8.0f);
         if(ImGui::Button("Gizmos"))
             ImGui::OpenPopup("PreviewGizmosPopup");
-        ImGuiAux::ItemTooltip("What the preview draws");
+        EditorUI::ItemTooltip("What the preview draws");
 
         ImGui::SameLine(0.0f, 8.0f);
         if(ImGui::Button("Frame"))
             FrameSelectedEmitter();
-        ImGuiAux::ItemTooltip("Centers the camera on the selected emitter (F)");
+        EditorUI::ItemTooltip("Centers the camera on the selected emitter (F)");
 
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
 
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(ImGui::BeginPopup("PreviewGizmosPopup"))
         {
             ImGui::Checkbox("Grid", &mShowGrid);
@@ -1149,7 +1035,7 @@ namespace Surge
             ImGui::SetItemTooltip("World box the scene culls the effect with (live particles + emitting shapes)");
             ImGui::EndPopup();
         }
-        ImGuiAux::StyledPopupVars::Pop();
+        EditorUI::StyledPopupVars::Pop();
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -1160,7 +1046,7 @@ namespace Surge
     {
         ImGui::Dummy(ImVec2(0.0f, 4.0f));
         {
-            ImGuiAux::ScopedBoldFont bold;
+            EditorUI::ScopedBoldFont bold;
             ImGui::TextUnformatted("EMITTERS");
         }
 
@@ -1199,7 +1085,7 @@ namespace Surge
             ImGui::PushID(i);
             if(ImGui::Checkbox("##Enabled", &emitter.Enabled))
                 MarkChanged();
-            ImGuiAux::DelayedToolTip("Enabled");
+            EditorUI::DelayedToolTip("Enabled");
             ImGui::SameLine();
 
             const char* role = emitter.IsSubEmitterTarget ? "  (sub-emitter)" : "";
@@ -1232,13 +1118,13 @@ namespace Surge
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         bool open = false;
         {
-            ImGuiAux::ScopedBoldFont bold;
+            EditorUI::ScopedBoldFont bold;
             open = ImGui::CollapsingHeader(name, defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0);
         }
         if(off)
             ImGui::PopStyleColor();
 
-        if(open && BeginProperties())
+        if(open && EditorUI::BeginPropertyTable("##Properties", LABEL_WIDTH))
             return true;
 
         ImGui::PopID();
@@ -1258,7 +1144,7 @@ namespace Surge
         bool layoutChanged = false;
 
         {
-            ImGuiAux::ScopedBoldFont bold;
+            EditorUI::ScopedBoldFont bold;
             ImGui::SetNextItemWidth(-FLT_MIN);
             if(ImGui::InputTextWithHint("##EmitterName", "Emitter name", &emitter.Name))
                 changed = true;
@@ -1268,20 +1154,20 @@ namespace Surge
 
         if(BeginModule("Main", nullptr, true))
         {
-            changed |= DragFloatRow("Duration", &emitter.Main.Duration, 0.05f, 0.05f, 600.0f, "%.2f s");
-            changed |= CheckboxRow("Loop", &emitter.Main.Loop);
+            changed |= EditorUI::TDragFloat("Duration", &emitter.Main.Duration, 0.05f, 0.05f, 600.0f, "%.2f s");
+            changed |= EditorUI::TCheckbox("Loop", &emitter.Main.Loop);
             if(emitter.Main.Loop)
-                changed |= CheckboxRow("Prewarm", &emitter.Main.Prewarm);
-            changed |= DragFloatRow("Start Delay", &emitter.Main.StartDelay, 0.05f, 0.0f, 600.0f, "%.2f s");
+                changed |= EditorUI::TCheckbox("Prewarm", &emitter.Main.Prewarm);
+            changed |= EditorUI::TDragFloat("Start Delay", &emitter.Main.StartDelay, 0.05f, 0.0f, 600.0f, "%.2f s");
             changed |= ParticleWidgets::FloatRow("Start Lifetime", emitter.Main.StartLifetime, 0.05f, 0.0f, 0.0f, "%.2f s");
             changed |= ParticleWidgets::FloatRow("Start Speed", emitter.Main.StartSpeed);
             changed |= ParticleWidgets::FloatRow("Start Size", emitter.Main.StartSize, 0.01f);
             changed |= ParticleWidgets::FloatRow("Start Rotation", emitter.Main.StartRotation, 1.0f, 0.0f, 0.0f, "%.0f deg");
             changed |= ParticleWidgets::ColorRow("Start Color", emitter.Main.StartColor);
-            changed |= DragFloatRow("Gravity Scale", &emitter.Main.GravityScale, 0.01f);
-            changed |= ComboRow("Simulation Space", emitter.Main.SimulationSpace, sSpaceNames);
-            changed |= DragIntRow("Max Particles", &emitter.Main.MaxParticles, 1, 100000);
-            HintRow("Pool size of this emitter, allocated once when the effect starts");
+            changed |= EditorUI::TDragFloat("Gravity Scale", &emitter.Main.GravityScale, 0.01f);
+            changed |= EditorUI::TComboEnum("Simulation Space", emitter.Main.SimulationSpace, sSpaceNames);
+            changed |= EditorUI::TDragInteger("Max Particles", &emitter.Main.MaxParticles, 0.2f, 1, 100000);
+            EditorUI::THint("Pool size of this emitter, allocated once when the effect starts", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
             EndModule();
         }
 
@@ -1311,11 +1197,11 @@ namespace Surge
                     burst.MaxCount = static_cast<Uint>(std::max(counts[1], 0));
                     changed = true;
                 }
-                ImGuiAux::DelayedToolTip("Count: min, max");
+                EditorUI::DelayedToolTip("Count: min, max");
                 ImGui::SameLine(0.0f, 4.0f);
                 ImGui::SetNextItemWidth(w);
                 changed |= ImGui::DragInt("##Cycles", &burst.Cycles, 0.1f, 0, 1000, burst.Cycles <= 0 ? "repeat" : "%d x");
-                ImGuiAux::DelayedToolTip("Cycles (0 = repeat for the whole duration)");
+                EditorUI::DelayedToolTip("Cycles (0 = repeat for the whole duration)");
                 ImGui::SameLine(0.0f, 4.0f);
                 if(ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0.0f)))
                     removeBurst = b;
@@ -1346,68 +1232,68 @@ namespace Surge
         if(BeginModule("Shape", &emitter.Shape.Enabled))
         {
             ParticleShapeModule& shape = emitter.Shape;
-            changed |= ComboRow("Shape", shape.Type, sShapeNames);
+            changed |= EditorUI::TComboEnum("Shape", shape.Type, sShapeNames);
             if(shape.Type == ParticleShapeType::BOX)
-                changed |= Vec3Row("Box Size", &shape.BoxSize, 0.05f);
+                changed |= EditorUI::TDragVec("Box Size", shape.BoxSize, 0.05f);
             else if(shape.Type != ParticleShapeType::POINT)
             {
-                changed |= DragFloatRow("Radius", &shape.Radius, 0.01f, 0.0f, 1000.0f);
+                changed |= EditorUI::TDragFloat("Radius", &shape.Radius, 0.01f, 0.0f, 1000.0f);
                 if(shape.Type != ParticleShapeType::EDGE)
                 {
-                    changed |= SliderFloatRow("Radius Thickness", &shape.RadiusThickness, 0.0f, 1.0f);
-                    changed |= SliderFloatRow("Arc", &shape.Arc, 0.0f, 360.0f, "%.0f deg");
+                    changed |= EditorUI::TSliderFloat("Radius Thickness", &shape.RadiusThickness, 0.0f, 1.0f);
+                    changed |= EditorUI::TSliderFloat("Arc", &shape.Arc, 0.0f, 360.0f, "%.0f deg");
                 }
             }
             if(shape.Type == ParticleShapeType::CONE)
-                changed |= SliderFloatRow("Angle", &shape.Angle, 0.0f, 90.0f, "%.1f deg");
-            changed |= Vec3Row("Position", &shape.Position, 0.05f);
-            changed |= Vec3Row("Rotation", &shape.Rotation, 0.5f);
-            changed |= SliderFloatRow("Randomize Direction", &shape.RandomizeDirection, 0.0f, 1.0f);
+                changed |= EditorUI::TSliderFloat("Angle", &shape.Angle, 0.0f, 90.0f, "%.1f deg");
+            changed |= EditorUI::TDragVec("Position", shape.Position, 0.05f);
+            changed |= EditorUI::TDragVec("Rotation", shape.Rotation, 0.5f);
+            changed |= EditorUI::TSliderFloat("Randomize Direction", &shape.RandomizeDirection, 0.0f, 1.0f);
             EndModule();
         }
 
         if(BeginModule("Velocity over Lifetime", &emitter.Velocity.Enabled))
         {
-            changed |= Vec3Row("Linear", &emitter.Velocity.Linear, 0.05f);
-            changed |= ComboRow("Space", emitter.Velocity.Space, sSpaceNames);
+            changed |= EditorUI::TDragVec("Linear", emitter.Velocity.Linear, 0.05f);
+            changed |= EditorUI::TComboEnum("Space", emitter.Velocity.Space, sSpaceNames);
             changed |= ParticleWidgets::CurveRow("Speed Modifier", emitter.Velocity.SpeedModifier);
             EndModule();
         }
 
         if(BeginModule("Limit Velocity & Drag", &emitter.LimitVelocity.Enabled))
         {
-            changed |= DragFloatRow("Speed Limit", &emitter.LimitVelocity.SpeedLimit, 0.05f, 0.0f, 10000.0f);
-            changed |= SliderFloatRow("Dampen", &emitter.LimitVelocity.Dampen, 0.0f, 1.0f);
-            changed |= DragFloatRow("Drag", &emitter.LimitVelocity.Drag, 0.01f, 0.0f, 100.0f);
+            changed |= EditorUI::TDragFloat("Speed Limit", &emitter.LimitVelocity.SpeedLimit, 0.05f, 0.0f, 10000.0f);
+            changed |= EditorUI::TSliderFloat("Dampen", &emitter.LimitVelocity.Dampen, 0.0f, 1.0f);
+            changed |= EditorUI::TDragFloat("Drag", &emitter.LimitVelocity.Drag, 0.01f, 0.0f, 100.0f);
             EndModule();
         }
 
         if(BeginModule("Force over Lifetime", &emitter.Force.Enabled))
         {
-            changed |= Vec3Row("Force", &emitter.Force.Force, 0.05f);
-            changed |= ComboRow("Space", emitter.Force.Space, sSpaceNames);
+            changed |= EditorUI::TDragVec("Force", emitter.Force.Force, 0.05f);
+            changed |= EditorUI::TComboEnum("Space", emitter.Force.Space, sSpaceNames);
             EndModule();
         }
 
         if(BeginModule("Noise", &emitter.Noise.Enabled))
         {
-            changed |= DragFloatRow("Strength", &emitter.Noise.Strength, 0.01f, 0.0f, 100.0f);
-            changed |= DragFloatRow("Frequency", &emitter.Noise.Frequency, 0.01f, 0.0f, 50.0f);
-            changed |= DragFloatRow("Scroll Speed", &emitter.Noise.ScrollSpeed, 0.01f, 0.0f, 50.0f);
+            changed |= EditorUI::TDragFloat("Strength", &emitter.Noise.Strength, 0.01f, 0.0f, 100.0f);
+            changed |= EditorUI::TDragFloat("Frequency", &emitter.Noise.Frequency, 0.01f, 0.0f, 50.0f);
+            changed |= EditorUI::TDragFloat("Scroll Speed", &emitter.Noise.ScrollSpeed, 0.01f, 0.0f, 50.0f);
             EndModule();
         }
 
         if(BeginModule("Color over Lifetime", &emitter.ColorOverLifetime.Enabled))
         {
             changed |= ParticleWidgets::GradientRow("Color", emitter.ColorOverLifetime.Gradient);
-            HintRow("Multiplies the start color");
+            EditorUI::THint("Multiplies the start color", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
             EndModule();
         }
 
         if(BeginModule("Size over Lifetime", &emitter.SizeOverLifetime.Enabled))
         {
             changed |= ParticleWidgets::CurveRow("Size", emitter.SizeOverLifetime.Size);
-            HintRow("Multiplies the start size");
+            EditorUI::THint("Multiplies the start size", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
             EndModule();
         }
 
@@ -1420,16 +1306,16 @@ namespace Surge
         if(BeginModule("Texture Sheet Animation", &emitter.TextureSheet.Enabled))
         {
             ParticleTextureSheetModule& sheet = emitter.TextureSheet;
-            changed |= DragIntRow("Columns", &sheet.Columns, 1, 16);
-            changed |= DragIntRow("Rows", &sheet.Rows, 1, 16);
-            changed |= ComboRow("Timing", sheet.Timing, sSheetTimingNames);
+            changed |= EditorUI::TDragInteger("Columns", &sheet.Columns, 0.2f, 1, 16);
+            changed |= EditorUI::TDragInteger("Rows", &sheet.Rows, 0.2f, 1, 16);
+            changed |= EditorUI::TComboEnum("Timing", sheet.Timing, sSheetTimingNames);
             if(sheet.Timing == ParticleSheetTiming::LIFETIME)
-                changed |= DragFloatRow("Cycles", &sheet.Cycles, 0.05f, 0.0f, 100.0f);
+                changed |= EditorUI::TDragFloat("Cycles", &sheet.Cycles, 0.05f, 0.0f, 100.0f);
             else
-                changed |= DragFloatRow("FPS", &sheet.FPS, 0.5f, 0.0f, 240.0f);
-            changed |= CheckboxRow("Random Start Frame", &sheet.RandomStartFrame);
-            changed |= CheckboxRow("Frame Blending", &sheet.FrameBlending);
-            HintRow("Frame blending reads the texture twice per pixel");
+                changed |= EditorUI::TDragFloat("FPS", &sheet.FPS, 0.5f, 0.0f, 240.0f);
+            changed |= EditorUI::TCheckbox("Random Start Frame", &sheet.RandomStartFrame);
+            changed |= EditorUI::TCheckbox("Frame Blending", &sheet.FrameBlending);
+            EditorUI::THint("Frame blending reads the texture twice per pixel", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
             EndModule();
         }
 
@@ -1447,11 +1333,11 @@ namespace Surge
                 const float w = ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight() - 8.0f;
                 ImGui::SetNextItemWidth(w * 0.7f);
                 changed |= ImGui::DragFloat3("##Normal", glm::value_ptr(plane.Normal), 0.01f, -1.0f, 1.0f, "%.2f");
-                ImGuiAux::DelayedToolTip("Normal (world space)");
+                EditorUI::DelayedToolTip("Normal (world space)");
                 ImGui::SameLine(0.0f, 4.0f);
                 ImGui::SetNextItemWidth(w * 0.3f);
                 changed |= ImGui::DragFloat("##Offset", &plane.Offset, 0.01f, 0.0f, 0.0f, "%.2f");
-                ImGuiAux::DelayedToolTip("Offset along the normal (height of a ground plane)");
+                EditorUI::DelayedToolTip("Offset along the normal (height of a ground plane)");
                 ImGui::SameLine(0.0f, 4.0f);
                 if(ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0.0f)) && collision.PlaneCount > 0)
                 {
@@ -1472,10 +1358,10 @@ namespace Surge
             }
             ImGui::EndDisabled();
 
-            changed |= SliderFloatRow("Bounce", &collision.Bounce, 0.0f, 1.0f);
-            changed |= SliderFloatRow("Dampen", &collision.Dampen, 0.0f, 1.0f);
-            changed |= SliderFloatRow("Lifetime Loss", &collision.LifetimeLoss, 0.0f, 1.0f);
-            changed |= DragFloatRow("Radius Scale", &collision.RadiusScale, 0.01f, 0.0f, 10.0f);
+            changed |= EditorUI::TSliderFloat("Bounce", &collision.Bounce, 0.0f, 1.0f);
+            changed |= EditorUI::TSliderFloat("Dampen", &collision.Dampen, 0.0f, 1.0f);
+            changed |= EditorUI::TSliderFloat("Lifetime Loss", &collision.LifetimeLoss, 0.0f, 1.0f);
+            changed |= EditorUI::TDragFloat("Radius Scale", &collision.RadiusScale, 0.01f, 0.0f, 10.0f);
             EndModule();
         }
 
@@ -1523,7 +1409,7 @@ namespace Surge
                     }
                     ImGui::EndCombo();
                 }
-                ImGuiAux::DelayedToolTip("Emitter that spawns (usually with its emission disabled)");
+                EditorUI::DelayedToolTip("Emitter that spawns (usually with its emission disabled)");
                 ImGui::SameLine(0.0f, 4.0f);
                 int count = static_cast<int>(entry.Count);
                 ImGui::SetNextItemWidth(w * 0.25f - 4.0f);
@@ -1535,7 +1421,7 @@ namespace Surge
                 ImGui::SameLine(0.0f, 4.0f);
                 ImGui::SetNextItemWidth(w * 0.25f - 4.0f);
                 changed |= ImGui::SliderFloat("##Probability", &entry.Probability, 0.0f, 1.0f, "%.2f");
-                ImGuiAux::DelayedToolTip("Probability");
+                EditorUI::DelayedToolTip("Probability");
                 ImGui::SameLine(0.0f, 4.0f);
                 if(ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0.0f)))
                     removeEntry = s;
@@ -1554,28 +1440,28 @@ namespace Surge
                 emitter.SubEmitters.Entries.emplace_back();
                 changed = true;
             }
-            HintRow("Spawns particles of another emitter of this effect where a particle is born, dies or collides");
+            EditorUI::THint("Spawns particles of another emitter of this effect where a particle is born, dies or collides", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
             EndModule();
         }
 
         if(BeginModule("Renderer", nullptr, true))
         {
             ParticleRendererModule& renderer = emitter.Renderer;
-            changed |= ComboRow("Render Mode", renderer.Mode, sRenderModeNames);
+            changed |= EditorUI::TComboEnum("Render Mode", renderer.Mode, sRenderModeNames);
             if(renderer.Mode == ParticleRenderMode::STRETCHED)
             {
-                changed |= DragFloatRow("Speed Scale", &renderer.StretchSpeedScale, 0.005f, 0.0f, 10.0f);
-                changed |= DragFloatRow("Length Scale", &renderer.StretchLengthScale, 0.01f, 0.0f, 50.0f);
+                changed |= EditorUI::TDragFloat("Speed Scale", &renderer.StretchSpeedScale, 0.005f, 0.0f, 10.0f);
+                changed |= EditorUI::TDragFloat("Length Scale", &renderer.StretchLengthScale, 0.01f, 0.0f, 50.0f);
             }
             changed |= TextureRow("Texture", renderer.Texture);
-            changed |= SliderFloatRow("Additive", &renderer.AdditiveAmount, 0.0f, 1.0f);
-            HintRow("0 = alpha blended (smoke), 1 = additive (fire, sparks), both in one draw");
-            changed |= DragFloatRow("Emissive Intensity", &renderer.EmissiveIntensity, 0.01f, 0.0f, 100.0f);
-            HintRow("Above 1 the particles glow with Bloom");
-            changed |= ComboRow("Sort Mode", renderer.Sort, sSortModeNames);
-            changed |= DragIntRow("Sorting Order", &renderer.SortingOrder, -1000, 1000);
-            changed |= SliderFloatRow("Max Screen Size", &renderer.MaxScreenSize, 0.01f, 1.0f);
-            HintRow("Caps the particle height to a fraction of the screen, limits overdraw close to the camera (mobile)");
+            changed |= EditorUI::TSliderFloat("Additive", &renderer.AdditiveAmount, 0.0f, 1.0f);
+            EditorUI::THint("0 = alpha blended (smoke), 1 = additive (fire, sparks), both in one draw", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
+            changed |= EditorUI::TDragFloat("Emissive Intensity", &renderer.EmissiveIntensity, 0.01f, 0.0f, 100.0f);
+            EditorUI::THint("Above 1 the particles glow with Bloom", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
+            changed |= EditorUI::TComboEnum("Sort Mode", renderer.Sort, sSortModeNames);
+            changed |= EditorUI::TDragInteger("Sorting Order", &renderer.SortingOrder, 0.2f, -1000, 1000);
+            changed |= EditorUI::TSliderFloat("Max Screen Size", &renderer.MaxScreenSize, 0.01f, 1.0f);
+            EditorUI::THint("Caps the particle height to a fraction of the screen, limits overdraw close to the camera (mobile)", ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), 0.0f);
             EndModule();
         }
 

@@ -4,10 +4,10 @@
 
 namespace Surge
 {
-    class MaterialCooker : public AssetCooker
+    class MaterialCooker final : public AssetCooker
     {
     public:
-        virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
+        virtual bool Cook(const CookContext& context) const override;
         virtual AssetType GetAssetType() const override { return AssetType::MATERIAL; }
         virtual Uint GetCookerVersion() const override { return 3; }
     };

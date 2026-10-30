@@ -9,6 +9,10 @@ namespace Surge
 {
     struct Project
     {
+        // Exported games: Internal/Project.rPROJ in the assets directory, written by the Editor's export. The Editor's source is <Name>.surgeproj (JSON)
+        static constexpr const char* COOKED_FILE_NAME = "Internal/Project.rPROJ";
+        static constexpr uint16_t COOKED_VERSION = 1;
+
         String Name;
         String Version;
         AssetID StartScene = AssetID::INVALID;
@@ -17,8 +21,7 @@ namespace Surge
         bool IsValid() const { return !Name.empty(); }
         void Clear() { Name.clear(); Version.clear(); StartScene = AssetID(AssetID::INVALID); Physics = {}; }
 
-        // <Name>.surgeproj (JSON)
-        bool Save(const Path& path) const;
-        bool Load(const Path& path); // Throws on malformed JSON
+        bool LoadCooked(const Path& path);
+        bool SaveCooked(const Path& path) const;
     };
 }

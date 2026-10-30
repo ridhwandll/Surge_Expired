@@ -13,7 +13,7 @@
 #include "Surge/Utility/Platform.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include <imgui_stdlib.h>
 #include "Viewport/SceneViewport.hpp"
 #include "Viewport/GameViewport.hpp"
@@ -33,6 +33,8 @@
 #include "StatusBar/EditorStatusBar.hpp"
 #include "Surge/ECS/Components/Components.hpp"
 
+#include "Asset/AssetExtensions.hpp"
+#include "Asset/SourceIO/ProjectSourceIO.hpp"
 #include "Asset/Cookers/Texture2DCooker.hpp"
 #include "Asset/Cookers/MeshCooker.hpp"
 #include "Asset/Cookers/MaterialCooker.hpp"
@@ -80,22 +82,6 @@ namespace Surge
         return imageHandle;
     }
 
-    class EditorAssetLoadCallback : public AssetLoadCallback
-    {
-    protected:
-        virtual bool OnAssetLoad(AssetID id, AssetMetadata& meta) override
-        {
-            Editor* editor = static_cast<Editor*>(Core::GetClient());
-            if(editor->GetAssetImporter().NeedsCook(id, meta.Type))
-            {
-                Log<Severity::Trace>("[EditorAssetLoadCallback] Cooked file outdated/missing on Load, cooking now: {}", meta.RelativePath);
-                editor->GetAssetImporter().RecookAsset(id);
-                return true; // Reload the asset from disk after cooking
-            }
-            return false;
-        }
-    };
-
     void Editor::OnInitialize()
     {
         // Dummy Scene to render the project browser ImGui. We can probably find a better way to do this later, but for now it works and doesn't cause any issues
@@ -111,18 +97,12 @@ namespace Surge
 
         SceneViewport::SetupManipulatorStyle();
 
-        mAssetImporter.Initialize(mAssetManager);
-        mAssetImporter.RegisterCooker(CreateScope<Texture2DCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<MaterialCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<MeshCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<ScriptCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<FontCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<AudioCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<SceneCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<ParticleEffectCooker>());
-        mAssetImporter.RegisterCooker(CreateScope<UILayoutCooker>());
+        // Before the first frame: the Project Browser opens in the saved theme
+        mPreferences = EditorPreferences::Load();
+        EditorUI::SetTheme(mPreferences.LightTheme ? EditorUI::Theme::LIGHT : EditorUI::Theme::DARK);
 
-        mAssetManager->AddAssetLoadCallback(CreateScope<EditorAssetLoadCallback>());
+        // Cookers + the cook hook: from here on the AssetManager cooks stale assets as they load
+        AssetDatabase::Get().Initialize(mAssetManager);
 
         // Before the panels, they load their icons with it
         SamplerDesc iconSamplerDesc = {};
@@ -229,7 +209,7 @@ namespace Surge
                 mTitleBar.Render();
                 EditorStatusBar::Get().Render();
             }
-            ImGuiAux::DockSpace(EditorTitleBar::HEIGHT, [this](ImGuiID dockspaceID, ImVec2 size) { BuildDefaultLayout(dockspaceID, size, mViewports); }, mResetLayoutRequested, EditorStatusBar::HEIGHT);
+            EditorUI::DockSpace(EditorTitleBar::HEIGHT, [this](ImGuiID dockspaceID, ImVec2 size) { BuildDefaultLayout(dockspaceID, size, mViewports); }, mResetLayoutRequested, EditorStatusBar::HEIGHT);
             mResetLayoutRequested = false;
             mPanelManager.RenderPanels();
             mViewports.Render();
@@ -246,7 +226,7 @@ namespace Surge
             mTitleBar.Render();
             mProjectBrowser.Render(EditorTitleBar::HEIGHT);
         }
-        ImGuiAux::RenderConfirmationBox();
+        EditorUI::RenderConfirmationBox();
     }
 
     void Editor::ShowTitlebar(bool show)
@@ -410,7 +390,6 @@ namespace Surge
 
         if(mActiveScene->GetID() && mAssetManager->IsRegistered(mActiveScene->GetID()))
             mSettings.LastScene = mActiveScene->GetID();
-        //mAssetImporter.ScanAndCookAll();
     }
 
     void Editor::UpdateGameResolution()
@@ -596,7 +575,7 @@ namespace Surge
         }
 
         mHistory.FlushTracked(); // So the "saved" marker lands after an edit that is still being tracked
-        mAssetManager->Save(sceneID);
+        AssetDatabase::Get().Save(sceneID);
         mHistory.MarkSaved();
         SaveSettings();
         Log<Severity::Info>("[Editor] Saved scene: {}", mAssetManager->GetMetadata(sceneID).RelativePath);
@@ -665,7 +644,7 @@ namespace Surge
             for(int i = 1; Filesystem::Exists(Path(mAssetManager->GetAssetsDirectory()) / relativePath); i++)
                 relativePath = std::format("Scenes/NewScene ({}){}", i, extension);
 
-            Ref<Scene> scene = mAssetManager->Create<Scene>(relativePath, Filesystem::GetFilenameWithoutExt(relativePath), Core::GetSceneContext());
+            Ref<Scene> scene = AssetDatabase::Get().Create<Scene>(relativePath, Filesystem::GetFilenameWithoutExt(relativePath), Core::GetSceneContext());
             if(!scene)
                 return;
 
@@ -710,13 +689,13 @@ namespace Surge
         }
 
         Filesystem::CreateOrEnsureDirectories((Path(mAssetManager->GetAssetsDirectory()) / path).parent_path());
-        Ref<Scene> newScene = mAssetManager->Create<Scene>(path, Filesystem::GetFilenameWithoutExt(path), Core::GetSceneContext());
+        Ref<Scene> newScene = AssetDatabase::Get().Create<Scene>(path, Filesystem::GetFilenameWithoutExt(path), Core::GetSceneContext());
         if(!newScene)
             return;
 
         mHistory.FlushTracked();
         mActiveScene->CopyTo(newScene.Raw());
-        mAssetManager->Save(newScene->GetID());
+        AssetDatabase::Get().Save(newScene->GetID());
 
         // The original file keeps its last saved state, LoadScene() drops its unsaved in-memory edits
         LoadScene(std::move(newScene));
@@ -729,7 +708,7 @@ namespace Surge
     void Editor::SaveProject()
     {
         if(!mProjectFilePath.empty())
-            mCurrentProject.Save(mProjectFilePath);
+            ProjectSourceIO::Save(mCurrentProject, mProjectFilePath);
     }
 
     void Editor::SetStartScene(AssetID sceneID)
@@ -738,8 +717,18 @@ namespace Surge
             return;
 
         mCurrentProject.StartScene = sceneID;
-        mCurrentProject.Save(mProjectFilePath);
+        ProjectSourceIO::Save(mCurrentProject, mProjectFilePath);
         Log<Severity::Info>("[Editor] Start scene set to: {}", mAssetManager->GetMetadata(sceneID).RelativePath);
+    }
+
+    void Editor::SetLightTheme(bool light)
+    {
+        if(mPreferences.LightTheme == light)
+            return;
+
+        mPreferences.LightTheme = light;
+        mPreferences.Save();
+        Core::AddFrameEndCallback([light]() { EditorUI::SetTheme(light ? EditorUI::Theme::LIGHT : EditorUI::Theme::DARK); });
     }
 
     void Editor::FocusEntity(Entity entity)
@@ -836,7 +825,7 @@ namespace Surge
 
         // History is dirty, show a confirmation dialog before discarding changes
         const String message = std::format("The scene has unsaved changes, they will be lost.\n{} without saving?", action);
-        ImGuiAux::ShowConfirmationBox("Unsaved Changes", message, std::move(onConfirm));
+        EditorUI::ShowConfirmationBox("Unsaved Changes", message, std::move(onConfirm));
     }
 
     void Editor::HandleShortcuts()
@@ -921,9 +910,9 @@ namespace Surge
         const bool escapes = !emptyName && (Path(finalPath).is_absolute() || finalPath.find("..") != String::npos);
         const bool valid = !emptyName && !exists && !escapes;
         if(exists)
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.45f, 1.0f), "A file already exists at %s", finalPath.c_str());
+            ImGui::TextColored(EditorUI::Colors::Error, "A file already exists at %s", finalPath.c_str());
         else if(escapes)
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.45f, 1.0f), "The scene must stay inside the Assets folder");
+            ImGui::TextColored(EditorUI::Colors::Error, "The scene must stay inside the Assets folder");
         else
             ImGui::TextDisabled("%s", emptyName ? "Enter a name" : finalPath.c_str());
 
@@ -1004,17 +993,17 @@ namespace Surge
                 {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGuiAux::ScopedBoldFont font;
+                    EditorUI::ScopedBoldFont font;
                     if(!row.Action)
                     {
                         ImGui::Dummy(ImVec2(0.0f, 4.0f));
-                        ImGui::TextColored(ImGuiAux::Colors::ThemeColor1, "%s", row.Keys);
+                        ImGui::TextColored(EditorUI::Colors::Accent, "%s", row.Keys);
                         continue;
                     }
 
                     ImGui::TextUnformatted(row.Keys);
                     ImGui::TableNextColumn();
-                    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]); // Regular
+                    ImGui::PushFont(EditorUI::RegularFont());
                     ImGui::TextUnformatted(row.Action);
                     ImGui::PopFont();
                 }
@@ -1031,7 +1020,7 @@ namespace Surge
 
         mViewports.Clear(); // Their Renderer views go before the Renderer does
         mGizmos.Shutdown();
-        mAssetImporter.Shutdown();
+        AssetDatabase::Get().Shutdown();
         Scope<GraphicsRHI>& rhi = Core::GetRenderer()->GetRHI();
         mTitleBar.Shutdown();
         for(ImageHandle icon : mToolIcons)

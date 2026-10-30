@@ -1,15 +1,15 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #pragma once
 #include "AssetCooker.hpp"
-#include "Surge/Asset/Serializer/Scene/SceneBinaryFormat.hpp"
+#include "Surge/Asset/Format/Scene/SceneFormat.hpp"
 
 namespace Surge
 {
     class SceneCooker final : public AssetCooker
     {
     public:
-        virtual CookResult Cook(const String& sourceAbsPath, AssetID id) const override;
+        virtual bool Cook(const CookContext& context) const override;
         virtual AssetType GetAssetType() const override { return AssetType::SCENE; }
-        virtual Uint GetCookerVersion() const override { return SceneBinary::GetFormatVersion(); }
+        virtual Uint GetCookerVersion() const override { return SceneBinary::GetSchemaVersion(); }
     };
 }

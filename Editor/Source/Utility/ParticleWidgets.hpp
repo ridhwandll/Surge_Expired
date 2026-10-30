@@ -15,7 +15,7 @@ namespace Surge::ParticleWidgets
     // Gradient preview (checkerboard behind the alpha)
     void DrawGradientBar(ImDrawList* drawList, const ImVec2& min, const ImVec2& max, const ParticleGradient& gradient);
 
-    // Two column table rows (label | value), like ImGuiAux::TProperty. The small button on the right switches the mode
+    // Two column table rows (label | value), like EditorUI::TProperty. The small button on the right switches the mode
     bool FloatRow(const char* label, ParticleFloat& value, float speed = 0.05f, float min = 0.0f, float max = 0.0f, const char* format = "%.2f");
     bool ColorRow(const char* label, ParticleColor& color);
     bool CurveRow(const char* label, ParticleCurve& curve);

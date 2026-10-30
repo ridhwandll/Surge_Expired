@@ -1,5 +1,6 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Gizmos/ParticleGizmos.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Surge/Graphics/Particles/ParticleEffect.hpp"
 
 #include <glm/gtc/constants.hpp>
@@ -66,7 +67,7 @@ namespace Surge
                             const glm::vec2 xy = glm::vec2(glm::cos(angle), glm::sin(angle)) * shape.Radius;
                             points[i] = toWorld(side == 0 ? glm::vec3(xy.x, xy.y, 0.0f) : glm::vec3(0.0f, xy.y, xy.x));
                         }
-                        canvas.DrawPolyline3D(points, SEGMENTS / 2 + 1, false, GizmoCanvas::ScaleAlpha(color, 0.6f), thickness);
+                        canvas.DrawPolyline3D(points, SEGMENTS / 2 + 1, false, EditorUI::ScaleAlpha(color, 0.6f), thickness);
                     }
                     break;
                 }
@@ -76,7 +77,7 @@ namespace Surge
                     const float length = glm::max(shape.Radius, 1.0f);
                     const float topRadius = shape.Radius + glm::tan(glm::radians(glm::clamp(shape.Angle, 0.0f, 89.0f))) * length;
                     drawArc(shape.Radius, 0.0f, color);
-                    drawArc(topRadius, length, GizmoCanvas::ScaleAlpha(color, 0.6f));
+                    drawArc(topRadius, length, EditorUI::ScaleAlpha(color, 0.6f));
                     for(int i = 0; i < 4; i++)
                     {
                         const float angle = static_cast<float>(i) * glm::half_pi<float>();
@@ -137,7 +138,7 @@ namespace Surge
             GizmoCanvas::GetPerpendicularBasis(n, u, v);
 
             constexpr int lines = 6;
-            const ImU32 gridColor = GizmoCanvas::ScaleAlpha(color, 0.45f);
+            const ImU32 gridColor = EditorUI::ScaleAlpha(color, 0.45f);
             for(int i = 0; i <= lines; i++)
             {
                 const float t = (static_cast<float>(i) / static_cast<float>(lines) * 2.0f - 1.0f) * halfSize;

@@ -203,7 +203,7 @@ namespace Surge
 
             // Same order as the Android Gradle Plugin: local.properties wins over the environment
             String sdk = ReadSdkDir(projectDir / "local.properties");
-            String source = "sdk.dir in android/local.properties";
+            String source = "sdk.dir in Android/local.properties";
             if(sdk.empty())
             {
                 String varName;
@@ -303,7 +303,7 @@ namespace Surge
             if(!Exists(projectDir / "gradlew.bat"))
             {
                 project.State = AndroidToolState::BLOCKING;
-                project.Note = "gradlew.bat is missing, restore the android/ folder from the repository";
+                project.Note = "gradlew.bat is missing, restore the Android/ folder from the repository";
                 t.Issues.push_back(std::format("Gradle wrapper not found ({}/gradlew.bat)", AndroidExporter::PROJECT_DIR));
                 return;
             }

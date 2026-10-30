@@ -57,8 +57,13 @@ namespace Surge::ScriptBinding
         inputTable["IsMouseButtonPressed"] = &Input::IsMouseButtonPressed;
         inputTable["GetMouseX"] = &Input::GetMouseX;
         inputTable["GetMouseY"] = &Input::GetMouseY;
+        lua.new_enum("CursorMode",
+                     "Normal", CursorMode::Normal,
+                     "Locked", CursorMode::Locked
+        );
         inputTable["SetCursorMode"] = &Input::SetCursorMode;
         inputTable["GetMousePosition"] = []() -> glm::vec2 { auto pos = Input::GetMousePosition(); return glm::vec2(pos.Data1, pos.Data2);};
+        inputTable["SetMousePosition"] = &Input::SetMousePosition; // Mouse look: re-center the locked cursor every frame
         inputTable["WasKeyPressed"] = &Input::WasKeyPressed;
         inputTable["WasKeyReleased"] = &Input::WasKeyReleased;
         inputTable["WasMouseButtonPressed"] = &Input::WasMouseButtonPressed;

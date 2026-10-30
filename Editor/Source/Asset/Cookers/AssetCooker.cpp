@@ -1,36 +1,21 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetCooker.hpp"
-#include "Surge/Core/Core.hpp"
-#include "Surge/Asset/AssetManager.hpp"
-#include "Surge/Utility/Filesystem.hpp"
-#include "Surge/Asset/Serializer/AssetStamp.hpp"
+#include "Surge/Asset/Format/BinarySerialization.hpp"
 
 namespace Surge
 {
-    bool AssetCooker::NeedsCook(AssetID id) const
+    bool CookContext::Write(uint16_t formatVersion, const Rapt0R::Writer& payload) const
     {
-        AssetManager* am = Core::GetAssetManager();
-        const AssetMetadata& meta = am->GetMetadata(id);
-        const String sidecarPath = am->GetSidecarPath(id);
-
-        if (HasFlag(AssetFlags::MEMORY, meta.Flags))
+        if(payload.HasError())
+        {
+            Log<Severity::Error>("[AssetCooker] Could not build the cooked data of {}", Metadata.RelativePath);
             return false;
-
-        // No sidecar, must cook
-        if(!Filesystem::Exists(sidecarPath))
-            return true;
-
-        // Bad stamp, must cook
-        AssetStamp stamp;
-        if(!AssetStampWriter::Read(sidecarPath, stamp))
-            return true;
-
-        const String sourceAbsPath = am->GetAbsolutePath(meta.RelativePath);
-        bool needsCook = !AssetStampWriter::IsUpToDate(stamp, sourceAbsPath, GetCookerVersion());
-
-        if(needsCook)
-            Log<Severity::Debug>("[AssetCooker] Asset {} needs cook, source modified!", meta.RelativePath);
-
-        return needsCook;
+        }
+        if(!CookedFileIO::Write(OutputPath, Header, formatVersion, payload.WrittenSpan()))
+        {
+            Log<Severity::Error>("[AssetCooker] Failed to write {}", OutputPath.string());
+            return false;
+        }
+        return true;
     }
 }

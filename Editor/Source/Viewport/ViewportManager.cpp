@@ -9,7 +9,7 @@
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 #include "Surge/Utility/Filesystem.hpp"
 #include "Editor.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <imgui_internal.h>
 #include <algorithm>
@@ -194,10 +194,10 @@ namespace Surge
     {
         if(ImGui::MenuItem("Add Scene View"))
             AddSceneView();
-        ImGuiAux::ItemTooltip("Another free camera view of the scene");
+        EditorUI::ItemTooltip("Another free camera view of the scene");
         if(ImGui::MenuItem("Game View", nullptr, mGameView != nullptr))
             OpenGameView();
-        ImGuiAux::ItemTooltip("The view through the scene's primary camera, with the in-game UI");
+        EditorUI::ItemTooltip("The view through the scene's primary camera, with the in-game UI");
     }
 
     void ViewportManager::DockWindows(ImGuiID dockNode)

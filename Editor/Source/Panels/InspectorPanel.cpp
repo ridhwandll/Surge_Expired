@@ -12,8 +12,8 @@
 
 #include "Surge/ScriptEngine/ScriptAsset.hpp"
 #include "Surge/Audio/Audio.hpp"
-#include "Surge/Asset/Serializer/Scene/SceneSerializer.hpp"
-#include "Surge/Asset/Serializer/Mesh/MeshBinaryFormat.hpp"
+#include "Surge/Asset/Format/Mesh/MeshFormat.hpp"
+#include "Asset/SourceIO/SceneSourceIO.hpp"
 #include "Surge/Graphics/Renderer/Renderer.hpp"
 
 #include "Editor.hpp"
@@ -23,7 +23,7 @@
 #include "ParticleEditorPanel.hpp"
 #include "Surge/Graphics/Particles/ParticleEffect.hpp"
 #include "Surge/Graphics/UISystem/UILayout.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 #include "Gizmos/GizmoIcons.hpp"
 #include "StatusBar/EditorStatusBar.hpp"
 #include "Scripting/ScriptFields.hpp"
@@ -41,20 +41,12 @@ namespace Surge
 {
     namespace
     {
-        constexpr ImU32 DISABLED_GLYPH = IM_COL32(110, 110, 110, 255);
+        namespace Colors = EditorUI::Colors;
+        using EditorUI::ToU32;
+        using EditorUI::WithAlpha;
         constexpr float HEADER_GRADIENT_WIDTH = 0.45f; // Fraction of the header the component color fades over
         constexpr float HEADER_GRADIENT_ALPHA = 0.8f;  // Opacity at the right edge
         constexpr float OUTLINE_THICKNESS = 1.5f;
-        const ImVec4 SLOT_BG(0.2f, 0.2f, 0.2f, 1.0f);
-        const ImVec4 SLOT_BG_HOVERED(0.07f, 0.07f, 0.07f, 1.0f);
-        const ImVec4 SLOT_BG_ACTIVE(0.11f, 0.11f, 0.11f, 1.0f);
-        const ImVec4 SLOT_BORDER(0.30f, 0.30f, 0.30f, 1.0f);
-        const ImVec4 MUTED_TEXT(0.55f, 0.55f, 0.55f, 1.0f);
-
-        ImU32 WithAlpha(ImU32 color, float alpha)
-        {
-            return (color & ~IM_COL32_A_MASK) | (static_cast<ImU32>(alpha * 255.0f + 0.5f) << IM_COL32_A_SHIFT);
-        }
 
         struct ComponentStyle
         {
@@ -62,29 +54,26 @@ namespace Surge
             ImU32 Color;
         };
 
-        constexpr ImU32 PHYSICS_COLOR = IM_COL32(255, 125, 120, 255);
-        constexpr ImU32 COLLIDER_COLOR = IM_COL32(120, 215, 130, 255);
-        constexpr ImU32 AUDIO_COLOR = IM_COL32(110, 215, 160, 255);
 
         template <typename T>
         ComponentStyle StyleOf()
         {
-            if constexpr(std::is_same_v<T, TransformComponent>)              return { GizmoIcon::TRANSFORM, IM_COL32(205, 205, 205, 255) };
-            else if constexpr(std::is_same_v<T, CameraComponent>)            return { GizmoIcon::CAMERA, IM_COL32(130, 190, 255, 255) };
-            else if constexpr(std::is_same_v<T, SpriteRendererComponent>)    return { GizmoIcon::SPRITE, IM_COL32(255, 145, 95, 255) };
-            else if constexpr(std::is_same_v<T, MeshComponent>)              return { GizmoIcon::MESH, IM_COL32(150, 160, 255, 255) };
-            else if constexpr(std::is_same_v<T, LightComponent>)             return { GizmoIcon::POINT_LIGHT, IM_COL32(255, 205, 90, 255) };
-            else if constexpr(std::is_same_v<T, EnvironmentComponent>)       return { GizmoIcon::ENVIRONMENT, IM_COL32(255, 170, 100, 255) };
-            else if constexpr(std::is_same_v<T, RendererSettingsComponent>)  return { GizmoIcon::CAMERA, IM_COL32(120, 200, 230, 255) };
-            else if constexpr(std::is_same_v<T, TextComponent>)              return { GizmoIcon::TEXT, IM_COL32(225, 225, 225, 255) };
-            else if constexpr(std::is_same_v<T, RigidbodyComponent>)         return { GizmoIcon::RIGIDBODY, PHYSICS_COLOR };
-            else if constexpr(std::is_same_v<T, ScriptComponent>)            return { GizmoIcon::SCRIPT, IM_COL32(230, 220, 80, 255) };
-            else if constexpr(std::is_same_v<T, UICanvasComponent>)          return { GizmoIcon::UI_CANVAS, IM_COL32(240, 130, 190, 255) };
-            else if constexpr(std::is_same_v<T, AudioSourceComponent>)       return { GizmoIcon::AUDIO_SOURCE, AUDIO_COLOR };
-            else if constexpr(std::is_same_v<T, AudioListenerComponent>)     return { GizmoIcon::AUDIO_LISTENER, AUDIO_COLOR };
-            else if constexpr(std::is_same_v<T, ParticleSystemComponent>)    return { GizmoIcon::PARTICLES, GizmoIcons::PARTICLES_COLOR };
-            else if constexpr(std::is_same_v<T, AnimatorComponent>)          return { GizmoIcon::PLAY, IM_COL32(170, 140, 255, 255) };
-            else                                                             return { GizmoIcon::COLLIDER, COLLIDER_COLOR }; // Colliders
+            if constexpr(std::is_same_v<T, TransformComponent>)              return { GizmoIcon::TRANSFORM, ToU32(Colors::Component::Transform) };
+            else if constexpr(std::is_same_v<T, CameraComponent>)            return { GizmoIcon::CAMERA, ToU32(Colors::Component::Camera) };
+            else if constexpr(std::is_same_v<T, SpriteRendererComponent>)    return { GizmoIcon::SPRITE, ToU32(Colors::Component::Sprite) };
+            else if constexpr(std::is_same_v<T, MeshComponent>)              return { GizmoIcon::MESH, ToU32(Colors::Component::Mesh) };
+            else if constexpr(std::is_same_v<T, LightComponent>)             return { GizmoIcon::POINT_LIGHT, ToU32(Colors::Component::Light) };
+            else if constexpr(std::is_same_v<T, EnvironmentComponent>)       return { GizmoIcon::ENVIRONMENT, ToU32(Colors::Component::Environment) };
+            else if constexpr(std::is_same_v<T, RendererSettingsComponent>)  return { GizmoIcon::CAMERA, ToU32(Colors::Component::RendererSettings) };
+            else if constexpr(std::is_same_v<T, TextComponent>)              return { GizmoIcon::TEXT, ToU32(Colors::Component::Text) };
+            else if constexpr(std::is_same_v<T, RigidbodyComponent>)         return { GizmoIcon::RIGIDBODY, ToU32(Colors::Component::Physics) };
+            else if constexpr(std::is_same_v<T, ScriptComponent>)            return { GizmoIcon::SCRIPT, ToU32(Colors::Component::Script) };
+            else if constexpr(std::is_same_v<T, UICanvasComponent>)          return { GizmoIcon::UI_CANVAS, ToU32(Colors::Component::UICanvas) };
+            else if constexpr(std::is_same_v<T, AudioSourceComponent>)       return { GizmoIcon::AUDIO_SOURCE, ToU32(Colors::Component::Audio) };
+            else if constexpr(std::is_same_v<T, AudioListenerComponent>)     return { GizmoIcon::AUDIO_LISTENER, ToU32(Colors::Component::Audio) };
+            else if constexpr(std::is_same_v<T, ParticleSystemComponent>)    return { GizmoIcon::PARTICLES, ToU32(Colors::Component::Particles) };
+            else if constexpr(std::is_same_v<T, AnimatorComponent>)          return { GizmoIcon::PLAY, ToU32(Colors::Component::Animator) };
+            else                                                             return { GizmoIcon::COLLIDER, ToU32(Colors::Component::Collider) }; // Colliders
         }
 
         template <typename T>
@@ -107,7 +96,7 @@ namespace Surge
 
         struct ComponentClipboard
         {
-            String Key; // Reflection class name, the component's key in SceneSerializer::EntityToJson()
+            String Key; // Reflection class name, the component's key in SceneSourceIO::EntityToJson()
             String DisplayName;
             String Json;
             bool (*Has)(Entity) = nullptr;
@@ -122,7 +111,7 @@ namespace Surge
         template <typename T>
         void CopyComponent(Entity entity, const char* displayName)
         {
-            const nlohmann::json state = nlohmann::json::parse(SceneSerializer::EntityToJson(entity), nullptr, false);
+            const nlohmann::json state = nlohmann::json::parse(SceneSourceIO::EntityToJson(entity), nullptr, false);
             const char* key = ComponentKey<T>();
             if(state.is_discarded() || !state.contains(key))
                 return;
@@ -136,12 +125,12 @@ namespace Surge
             Core::AddFrameEndCallback([entity, clipboard = sComponentClipboard]() {
                 if(!entity)
                     return;
-                nlohmann::json state = nlohmann::json::parse(SceneSerializer::EntityToJson(entity), nullptr, false);
+                nlohmann::json state = nlohmann::json::parse(SceneSourceIO::EntityToJson(entity), nullptr, false);
                 nlohmann::json value = nlohmann::json::parse(clipboard.Json, nullptr, false);
                 if(state.is_discarded() || value.is_discarded())
                     return;
                 state[clipboard.Key] = std::move(value);
-                SceneSerializer::EntityFromJson(state.dump(), entity);
+                SceneSourceIO::EntityFromJson(state.dump(), entity);
             });
         }
 
@@ -168,99 +157,6 @@ namespace Surge
 
         // ------------------------------------------------------------------ Property widgets
 
-        // Label column, X/Y/Z fields with a colored axis tag (click: reset that axis), optional uniform lock (scale)
-        bool DrawVec3Control(const char* label, glm::vec3& values, float resetValue, float speed, bool* uniformLock = nullptr)
-        {
-            bool modified = false;
-            ImGui::PushID(label);
-
-            const float frameHeight = ImGui::GetFrameHeight();
-            const float spacing = 4.0f;
-            const bool locked = uniformLock && *uniformLock;
-
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-
-            if(uniformLock)
-            {
-                ImGui::SameLine(0.0f, spacing);
-                const ImVec4 glyphColor = locked ? ImVec4(ImGuiAux::Colors::ThemeColor1) : MUTED_TEXT;
-                if(GizmoIcons::IconButton("##UniformLock", GizmoIcon::LINK, ImVec2(frameHeight, frameHeight), glyphColor, 0.66f))
-                    *uniformLock = !*uniformLock;
-                ImGuiAux::DelayedToolTip(locked ? "Uniform scale: ON" : "Uniform scale: OFF");
-            }
-            ImGui::TableNextColumn();
-
-            const float fieldWidth = glm::max((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f, 30.0f);
-            const float tagWidth = glm::min(frameHeight * 0.85f, fieldWidth * 0.4f);
-            const float rounding = ImGui::GetStyle().FrameRounding;
-            const glm::vec3 before = values;
-
-            constexpr const char* axisNames[] = { "X", "Y", "Z" };
-            constexpr ImU32 axisColors[] = { IM_COL32(200, 70, 70, 255), IM_COL32(80, 170, 80, 255), IM_COL32(70, 115, 210, 255) };
-
-            int changedAxis = -1;
-            bool wasReset = false;
-            for(int axis = 0; axis < 3; axis++)
-            {
-                ImGui::PushID(axis);
-
-                // Axis tag
-                if(ImGui::InvisibleButton("##Tag", ImVec2(tagWidth, frameHeight)))
-                {
-                    values[axis] = resetValue;
-                    changedAxis = axis;
-                    wasReset = true;
-                }
-                ImGuiAux::DelayedToolTip("Click to reset");
-                const ImVec2 tagMin = ImGui::GetItemRectMin();
-                const ImVec2 tagMax = ImGui::GetItemRectMax();
-                const ImU32 tagColor = ImGui::IsItemHovered() ? WithAlpha(axisColors[axis], 0.85f) : axisColors[axis];
-                ImDrawList* drawList = ImGui::GetWindowDrawList();
-                drawList->AddRectFilled(tagMin, tagMax, tagColor, rounding, ImDrawFlags_RoundCornersLeft);
-                {
-                    ImGuiAux::ScopedBoldFont font;
-                    const ImVec2 textSize = ImGui::CalcTextSize(axisNames[axis]);
-                    drawList->AddText(ImVec2((tagMin.x + tagMax.x - textSize.x) * 0.5f, (tagMin.y + tagMax.y - textSize.y) * 0.5f), IM_COL32(245, 245, 245, 255), axisNames[axis]);
-                }
-
-                // Value
-                ImGui::SameLine(0.0f, 0.0f);
-                ImGui::SetNextItemWidth(fieldWidth - tagWidth);
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-                if(ImGui::DragFloat("##Value", &values[axis], speed, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoRoundToFormat))
-                    changedAxis = axis;
-                ImGui::PopStyleVar();
-
-                if(ImGui::IsItemHovered() || ImGui::IsItemActive())
-                    ImGuiAux::DrawRectAroundWidget(ImGuiAux::Colors::Selection, OUTLINE_THICKNESS, 1.0f);
-
-                ImGui::PopID();
-                if(axis < 2)
-                    ImGui::SameLine(0.0f, spacing);
-            }
-
-            if(changedAxis >= 0)
-            {
-                modified = true;
-                if(locked && wasReset)
-                    values = glm::vec3(resetValue);
-                else if(locked)
-                {
-                    // Keep the proportions: every axis scales by the edited axis' factor
-                    const float previous = before[changedAxis];
-                    if(glm::abs(previous) > 1e-6f)
-                        values = before * (values[changedAxis] / previous);
-                    else
-                        values = glm::vec3(values[changedAxis]);
-                }
-            }
-
-            ImGui::PopID();
-            return modified;
-        }
-
         template <typename T>
         bool DrawAssetDropSlot(const char* label, Ref<Asset>& assetPtr, AssetType expectedType, const char* dropHint)
         {
@@ -269,10 +165,7 @@ namespace Surge
             const bool hasAsset = static_cast<bool>(assetPtr);
 
             ImGui::PushID(label); // Several slots per component (UI Canvas: Layout + Script), each needs its own button IDs
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
+            EditorUI::TLabel(label);
 
             String buttonText = dropHint;
             if(hasAsset)
@@ -283,7 +176,7 @@ namespace Surge
             if(const ImGuiPayload* drag = ImGui::GetDragDropPayload(); drag && drag->IsDataType(CONTENT_BROWSER_PAYLOAD))
                 acceptsDrag = am->GetMetadata(*static_cast<const AssetID*>(drag->Data)).Type == expectedType;
 
-            ImGuiAux::ScopedBoldFont font;
+            EditorUI::ScopedBoldFont font;
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, OUTLINE_THICKNESS);
             ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
@@ -292,12 +185,12 @@ namespace Surge
             const float spacing = hasAsset ? 4.0f : 0.0f;
             const float slotWidth = ImGui::GetContentRegionAvail().x - clearWidth - spacing;
 
-            const ImVec4 border = acceptsDrag ? ImVec4(ImGuiAux::Colors::ThemeColor1) : (hasAsset ? SLOT_BORDER : ImVec4(0.65f, 0.25f, 0.25f, 1.0f));
+            const ImVec4 border = acceptsDrag ? Colors::Accent : (hasAsset ? Colors::Tone30 : Colors::ErrorMuted);
             ImGui::PushStyleColor(ImGuiCol_Border, border);
-            ImGui::PushStyleColor(ImGuiCol_Button, SLOT_BG);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SLOT_BG_HOVERED);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, SLOT_BG_ACTIVE);
-            ImGui::PushStyleColor(ImGuiCol_Text, hasAsset ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : ImVec4(0.85f, 0.45f, 0.45f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, Colors::Tone20);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::Tone07);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, Colors::Tone11);
+            ImGui::PushStyleColor(ImGuiCol_Text, hasAsset ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : Colors::ErrorSoft);
 
             if(ImGui::Button(buttonText.c_str(), ImVec2(slotWidth, 0.0f)) && hasAsset)
             {
@@ -305,7 +198,7 @@ namespace Surge
                 editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(assetPtr->GetID());
             }
             ImGui::PopStyleColor(5);
-            ImGuiAux::DelayedToolTip(hasAsset ? "Click: show in the Content Browser\nDrop another asset here to replace it" : "Drop an asset from the Content Browser");
+            EditorUI::DelayedToolTip(hasAsset ? "Click: show in the Content Browser\nDrop another asset here to replace it" : "Drop an asset from the Content Browser");
 
             if(ImGui::BeginDragDropTarget())
             {
@@ -327,9 +220,9 @@ namespace Surge
             if(hasAsset)
             {
                 ImGui::SameLine(0.0f, spacing);
-                ImGui::PushStyleColor(ImGuiCol_Button, SLOT_BG);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_Border, SLOT_BORDER);
+                ImGui::PushStyleColor(ImGuiCol_Button, Colors::Tone20);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::ErrorDark);
+                ImGui::PushStyleColor(ImGuiCol_Border, Colors::Tone30);
                 ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
                 if(ImGui::Button("x", ImVec2(clearWidth, 0.0f)))
                 {
@@ -338,25 +231,12 @@ namespace Surge
                 }
                 ImGui::PopStyleVar();
                 ImGui::PopStyleColor(3);
-                ImGuiAux::DelayedToolTip("Clear");
+                EditorUI::DelayedToolTip("Clear");
             }
 
             ImGui::PopStyleVar(3);
             ImGui::PopID();
             return modified;
-        }
-
-        // An explanatory line in the value column of a component table
-        void HintRow(const char* text, const ImVec4& color = MUTED_TEXT)
-        {
-            ImGui::TableNextColumn();
-            ImGui::TextColored(color, "%s", "Hint");
-            ImGui::TableNextColumn();
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0], 14.0f);
-            ImGui::TextColored(color, "%s", text);
-            ImGui::PopFont();
-            ImGui::PopTextWrapPos();
         }
 
         // ------------------------------------------------------------------ Component header + options
@@ -367,74 +247,51 @@ namespace Surge
             const bool playing = static_cast<Editor*>(Core::GetClient())->IsPlaying();
             bool remove = false;
 
-            {
-                ImGuiAux::ScopedBoldFont font;
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", name);
-            }
-            ImGuiAux::StyledSeparator();
+            EditorUI::MenuHeader(name);
 
             if constexpr(std::is_same_v<XComponent, TransformComponent>)
             {
-                if(ImGuiAux::StyledMenuItem("Reset"))
+                if(EditorUI::StyledMenuItem("Reset"))
                     ResetComponent(component);
-                if(ImGuiAux::StyledMenuItem("Reset Position"))
+                if(EditorUI::StyledMenuItem("Reset Position"))
                 {
                     component.Position = glm::vec3(0.0f);
                     component.MarkDirty();
                 }
-                if(ImGuiAux::StyledMenuItem("Reset Rotation"))
+                if(EditorUI::StyledMenuItem("Reset Rotation"))
                 {
                     component.Rotation = glm::vec3(0.0f);
                     component.MarkDirty();
                 }
-                if(ImGuiAux::StyledMenuItem("Reset Scale"))
+                if(EditorUI::StyledMenuItem("Reset Scale"))
                 {
                     component.Scale = glm::vec3(1.0f);
                     component.MarkDirty();
                 }
-                ImGuiAux::StyledSeparator();
+                EditorUI::StyledSeparator();
             }
             else if constexpr(IsResettable_v<XComponent>)
             {
-                if(ImGuiAux::StyledMenuItem("Reset", nullptr, nullptr, !playing))
+                if(EditorUI::StyledMenuItem("Reset", nullptr, nullptr, !playing))
                     ResetComponent(component);
-                ImGuiAux::StyledSeparator();
+                EditorUI::StyledSeparator();
             }
 
-            if(ImGuiAux::StyledMenuItem("Copy"))
+            if(EditorUI::StyledMenuItem("Copy"))
                 CopyComponent<XComponent>(entity, name);
             const bool canPaste = !playing && sComponentClipboard.IsValid() && sComponentClipboard.Key == ComponentKey<XComponent>();
-            if(ImGuiAux::StyledMenuItem("Paste Values", nullptr, nullptr, canPaste))
+            if(EditorUI::StyledMenuItem("Paste Values", nullptr, nullptr, canPaste))
                 PasteComponent(entity);
 
             if(removable)
             {
-                ImGuiAux::StyledSeparator();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.45f, 1.0f));
-                if(ImGuiAux::StyledMenuItem("Remove Component"))
+                EditorUI::StyledSeparator();
+                ImGui::PushStyleColor(ImGuiCol_Text, Colors::Error);
+                if(EditorUI::StyledMenuItem("Remove Component"))
                     remove = true;
                 ImGui::PopStyleColor();
             }
             return remove;
-        }
-
-        // Kebab "more" button, three dots drawn in place
-        bool OptionsButton(const char* strId, float size)
-        {
-            const bool pressed = ImGui::InvisibleButton(strId, ImVec2(size, size));
-            const ImVec2 min = ImGui::GetItemRectMin();
-            const ImVec2 max = ImGui::GetItemRectMax();
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-            if(ImGui::IsItemHovered())
-                drawList->AddRectFilled(min, max, IM_COL32(255, 255, 255, 22), ImGui::GetStyle().FrameRounding);
-
-            const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
-            const float gap = size * 0.18f;
-            const float radius = glm::max(1.5f, size * 0.06f);
-            const ImU32 color = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_FrameBg);
-            for(int i = -1; i <= 1; i++)
-                drawList->AddCircleFilled(ImVec2(center.x, center.y + gap * static_cast<float>(i)), radius, color, 8);
-            return pressed;
         }
 
         template <typename XComponent, bool IsRemoveable = true, typename Func>
@@ -459,7 +316,7 @@ namespace Surge
             {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 5.0f));
                 ImGui::Checkbox("##Active", &component.Active);
-                ImGuiAux::DelayedToolTip(component.Active ? "Enabled" : "Disabled");
+                EditorUI::DelayedToolTip(component.Active ? "Enabled" : "Disabled");
                 ImGui::PopStyleVar();
                 ImGui::SameLine(0.0f, 8.0f);
             }
@@ -479,14 +336,14 @@ namespace Surge
 
             // Component color fading out from the right edge, glyph and name
             {
-                const ImU32 gradientColor = active ? style.Color : DISABLED_GLYPH;
+                const ImU32 gradientColor = active ? style.Color : ToU32(Colors::Tone43);
                 const ImU32 left = WithAlpha(gradientColor, 0.0f);
                 const ImU32 right = WithAlpha(gradientColor, HEADER_GRADIENT_ALPHA);
-                drawList->AddRectFilledMultiColor(ImVec2(headerMax.x - (headerMax.x - headerMin.x) * HEADER_GRADIENT_WIDTH, headerMin.y), headerMax, left, right, right, left);
+                EditorUI::AddHorizontalGradient(drawList, ImVec2(headerMax.x - (headerMax.x - headerMin.x) * HEADER_GRADIENT_WIDTH, headerMin.y), headerMax, left, right);
             }
-            GizmoIcons::DrawGlyph(drawList, ImVec2(labelX + fontSize * 0.5f, centerY), fontSize * 0.9f, style.Icon, active ? style.Color : DISABLED_GLYPH, ImGui::GetColorU32(ImGuiCol_Header));
+            GizmoIcons::DrawGlyph(drawList, ImVec2(labelX + fontSize * 0.5f, centerY), fontSize * 0.9f, style.Icon, active ? style.Color : ToU32(Colors::Tone43), ImGui::GetColorU32(ImGuiCol_Header));
             {
-                ImGuiAux::ScopedBoldFont font;
+                EditorUI::ScopedBoldFont font;
                 const ImU32 textColor = ImGui::GetColorU32(active ? ImGuiCol_Text : ImGuiCol_TextDisabled);
                 drawList->AddText(ImVec2(labelX + fontSize + 7.0f, centerY - fontSize * 0.5f), textColor, name);
             }
@@ -498,7 +355,7 @@ namespace Surge
                 const float buttonSize = headerHeight - 4.0f;
                 rightX -= buttonSize;
                 ImGui::SetCursorScreenPos(ImVec2(rightX, headerMin.y + 2.0f));
-                if(OptionsButton("##Options", buttonSize))
+                if(EditorUI::KebabButton("##Options", buttonSize))
                     openMenu = true;
             }
             ImGui::SetCursorScreenPos(ImVec2(headerMin.x, headerMax.y + ImGui::GetStyle().ItemSpacing.y));
@@ -508,14 +365,14 @@ namespace Surge
                 ImGui::OpenPopup("##ComponentMenu");
 
             bool removeComponent = false;
-            ImGuiAux::StyledPopupVars::Push();
+            EditorUI::StyledPopupVars::Push();
             if(ImGui::BeginPopup("##ComponentMenu"))
             {
                 removeComponent = DrawComponentMenu(entity, component, name, IsRemoveable);
-                ImGuiAux::EndStyledPopup();
+                EditorUI::EndStyledPopup();
             }
             else
-                ImGuiAux::StyledPopupVars::Pop();
+                EditorUI::StyledPopupVars::Pop();
 
             if(open)
             {
@@ -613,7 +470,7 @@ namespace Surge
             const float fontSize = ImGui::GetFontSize();
             const float centerY = (min.y + max.y) * 0.5f;
 
-            GizmoIcons::DrawGlyph(drawList, ImVec2(min.x + 4.0f + fontSize * 0.5f, centerY), fontSize * 0.85f, style.Icon, enabled ? style.Color : DISABLED_GLYPH, ImGui::GetColorU32(ImGuiCol_PopupBg));
+            GizmoIcons::DrawGlyph(drawList, ImVec2(min.x + 4.0f + fontSize * 0.5f, centerY), fontSize * 0.85f, style.Icon, enabled ? style.Color : ToU32(Colors::Tone43), ImGui::GetColorU32(ImGuiCol_PopupBg));
             drawList->AddText(ImVec2(min.x + fontSize + 12.0f, centerY - fontSize * 0.5f), ImGui::GetColorU32(enabled ? ImGuiCol_Text : ImGuiCol_TextDisabled), label);
             if(note)
             {
@@ -643,9 +500,15 @@ namespace Surge
             AssetManager* am = Core::GetAssetManager();
             if(!mesh->GetMaterials()[slot])
             {
-                AssetStamp stamp;
+                CookedFile file;
                 MeshSpecification spec;
-                if(!MeshBinary::Read(am->GetContext(), am->GetSidecarPath(mesh->GetID()), stamp, spec) || slot >= spec.Materials.size() || !spec.Materials[slot])
+                bool read = CookedFileIO::Read(am->GetSidecarPath(mesh->GetID()), AssetType::MESH, MeshBinary::VERSION, file) == CookedFileError::NONE;
+                if(read)
+                {
+                    Rapt0R::Reader payload = file.GetPayload();
+                    read = MeshBinary::Read(am->GetContext(), payload, spec);
+                }
+                if(!read || slot >= spec.Materials.size() || !spec.Materials[slot])
                 {
                     EditorStatusBar::Get().Notify(Severity::Error, "Could not read the mesh's own material, re-cook the mesh and try again");
                     return;
@@ -654,7 +517,7 @@ namespace Surge
                 mesh->SetGLTFMaterial(slot, spec.Materials[slot]);
             }
             mesh->ClearMaterialOverride(slot);
-            am->Save(mesh->GetID());
+            AssetDatabase::Get().Save(mesh->GetID()); // Its .import, then a re-cook
         }
 
         // Albedo map tinted by the albedo color (what the surface mostly looks like), the plain color without a map
@@ -664,8 +527,8 @@ namespace Surge
             const ImVec2 max(min.x + size, min.y + size);
             if(!material)
             {
-                drawList->AddRectFilled(min, max, ImGui::GetColorU32(SLOT_BG), 3.0f);
-                drawList->AddRect(min, max, IM_COL32(166, 64, 64, 255), 3.0f, 0, OUTLINE_THICKNESS);
+                drawList->AddRectFilled(min, max, ImGui::GetColorU32(Colors::Tone20), 3.0f);
+                drawList->AddRect(min, max, ToU32(Colors::ErrorMuted), 3.0f, 0, OUTLINE_THICKNESS);
                 return;
             }
 
@@ -679,7 +542,7 @@ namespace Surge
             }
             else
                 drawList->AddRectFilled(min, max, tint, 3.0f);
-            drawList->AddRect(min, max, ImGui::GetColorU32(SLOT_BORDER), 3.0f, 0, 1.0f);
+            drawList->AddRect(min, max, ImGui::GetColorU32(Colors::Tone30), 3.0f, 0, 1.0f);
         }
 
         void DrawMaterialSlots(Ref<Mesh> mesh)
@@ -690,9 +553,9 @@ namespace Surge
             const bool builtIn = HasFlag(am->GetMetadata(mesh->GetID()).Flags, AssetFlags::MEMORY);
 
             const String title = slotCount == 1 ? String("Material") : std::format("Materials ({})", slotCount);
-            ImGuiAux::TSperator(title.c_str());
+            EditorUI::TSeparator(title.c_str());
             if(builtIn)
-                HintRow("Built-in mesh: overrides change every entity using it and are not saved with the project", ImVec4(0.95f, 0.70f, 0.30f, 1.0f));
+                EditorUI::THint("Built-in mesh: overrides change every entity using it and are not saved with the project", Colors::Warning, 14.0f, "Hint");
 
             Vector<Uint> submeshCounts(slotCount, 0);
             for(const Submesh& submesh : mesh->GetSubmeshes())
@@ -729,8 +592,8 @@ namespace Surge
 
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextColored(MUTED_TEXT, "Slot %u", i);
-                ImGuiAux::DelayedToolTip(std::format("Used by {} submesh{}", submeshCounts[i], submeshCounts[i] == 1 ? "" : "es").c_str());
+                ImGui::TextColored(Colors::TextMuted, "Slot %u", i);
+                EditorUI::DelayedToolTip(std::format("Used by {} submesh{}", submeshCounts[i], submeshCounts[i] == 1 ? "" : "es").c_str());
                 ImGui::TableNextColumn();
 
                 const float frameHeight = ImGui::GetFrameHeight();
@@ -742,13 +605,13 @@ namespace Surge
 
                 // Name on the left, where the material comes from on the right
                 const float buttonWidth = ImGui::GetContentRegionAvail().x - (overridden ? frameHeight + spacing : 0.0f);
-                const ImVec4 border = acceptsDrag ? ImVec4(ImGuiAux::Colors::ThemeColor1) : (material ? SLOT_BORDER : ImVec4(0.65f, 0.25f, 0.25f, 1.0f));
+                const ImVec4 border = acceptsDrag ? Colors::Accent : (material ? Colors::Tone30 : Colors::ErrorMuted);
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, OUTLINE_THICKNESS);
                 ImGui::PushStyleColor(ImGuiCol_Border, border);
-                ImGui::PushStyleColor(ImGuiCol_Button, SLOT_BG);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SLOT_BG_HOVERED);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, SLOT_BG_ACTIVE);
+                ImGui::PushStyleColor(ImGuiCol_Button, Colors::Tone20);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::Tone07);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, Colors::Tone11);
                 const bool clicked = ImGui::Button("##Material", ImVec2(std::max(buttonWidth, frameHeight), 0.0f));
                 ImGui::PopStyleColor(4);
                 ImGui::PopStyleVar(2);
@@ -758,7 +621,7 @@ namespace Surge
                 {
                     ImDrawList* drawList = ImGui::GetWindowDrawList();
                     const char* tag = !material ? "" : (overridden ? "OVERRIDE" : (material->GetID() ? "ASSET" : "glTF"));
-                    const ImU32 tagColor = overridden ? ImGui::GetColorU32(ImVec4(ImGuiAux::Colors::ThemeColor1)) : ImGui::GetColorU32(MUTED_TEXT);
+                    const ImU32 tagColor = overridden ? ImGui::GetColorU32(Colors::Accent) : ImGui::GetColorU32(Colors::TextMuted);
                     const float tagWidth = ImGui::CalcTextSize(tag).x;
                     const float textY = (buttonMin.y + buttonMax.y - ImGui::GetTextLineHeight()) * 0.5f;
                     const float padding = ImGui::GetStyle().FramePadding.x;
@@ -767,9 +630,9 @@ namespace Surge
 
                     drawList->PushClipRect(buttonMin, ImVec2(buttonMax.x - padding - tagWidth - 8.0f, buttonMax.y), true);
                     {
-                        ImGuiAux::ScopedBoldFont bold;
+                        EditorUI::ScopedBoldFont bold;
                         const char* name = material ? material->GetName().c_str() : "Missing material";
-                        const ImU32 nameColor = material ? ImGui::GetColorU32(ImGuiCol_Text) : IM_COL32(217, 115, 115, 255);
+                        const ImU32 nameColor = material ? ImGui::GetColorU32(ImGuiCol_Text) : ToU32(Colors::ErrorSoft);
                         drawList->AddText(ImVec2(buttonMin.x + padding, (buttonMin.y + buttonMax.y - ImGui::GetTextLineHeight()) * 0.5f), nameColor, name);
                     }
                     drawList->PopClipRect();
@@ -777,7 +640,7 @@ namespace Surge
 
                 if(clicked && material)
                     editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->OpenMaterial(material, mesh, i);
-                ImGuiAux::DelayedToolTip(material ? "Click: edit in the Material Editor, right click: more\nDrop a MATERIAL here to override this slot for every entity using this mesh"
+                EditorUI::DelayedToolTip(material ? "Click: edit in the Material Editor, right click: more\nDrop a MATERIAL here to override this slot for every entity using this mesh"
                                                   : "Drop a MATERIAL here to fill this slot");
 
                 if(ImGui::BeginDragDropTarget())
@@ -791,7 +654,7 @@ namespace Surge
                             if(Ref<Material> newMaterial = am->Load<Material>(dropped))
                             {
                                 mesh->SetMaterialOverride(i, newMaterial);
-                                am->Save(mesh->GetID()); // Only the mesh: saving the material would also write its unsaved Material Editor edits
+                                AssetDatabase::Get().Save(mesh->GetID()); // Only the mesh (its .import + a re-cook): saving the material would also write its unsaved Material Editor edits
                             }
                         }
                         else
@@ -800,16 +663,16 @@ namespace Surge
                     ImGui::EndDragDropTarget();
                 }
 
-                if(ImGuiAux::BeginStyledPopupContextItem("##SlotMenu"))
+                if(EditorUI::BeginStyledPopupContextItem("##SlotMenu"))
                 {
-                    if(ImGuiAux::StyledMenuItem("Edit in Material Editor", nullptr, nullptr, static_cast<bool>(material)))
+                    if(EditorUI::StyledMenuItem("Edit in Material Editor", nullptr, nullptr, static_cast<bool>(material)))
                         editor->GetPanelManager().GetPanel<MaterialEditorPanel>()->OpenMaterial(material, mesh, i);
-                    if(ImGuiAux::StyledMenuItem("Show in Content Browser", nullptr, nullptr, material && material->GetID()))
+                    if(EditorUI::StyledMenuItem("Show in Content Browser", nullptr, nullptr, material && material->GetID()))
                         editor->GetPanelManager().GetPanel<ContentBrowserPanel>()->SetSelectedAsset(material->GetID());
-                    ImGuiAux::StyledSeparator();
-                    if(ImGuiAux::StyledMenuItem("Reset to Mesh Material", nullptr, nullptr, overridden))
+                    EditorUI::StyledSeparator();
+                    if(EditorUI::StyledMenuItem("Reset to Mesh Material", nullptr, nullptr, overridden))
                         resetSlot = static_cast<int>(i);
-                    ImGuiAux::EndStyledPopup();
+                    EditorUI::EndStyledPopup();
                 }
 
                 if(overridden)
@@ -817,14 +680,14 @@ namespace Surge
                     ImGui::SameLine(0.0f, spacing);
                     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
                     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, OUTLINE_THICKNESS);
-                    ImGui::PushStyleColor(ImGuiCol_Button, SLOT_BG);
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_Border, SLOT_BORDER);
+                    ImGui::PushStyleColor(ImGuiCol_Button, Colors::Tone20);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::ErrorDark);
+                    ImGui::PushStyleColor(ImGuiCol_Border, Colors::Tone30);
                     if(ImGui::Button("x", ImVec2(frameHeight, frameHeight)))
                         resetSlot = static_cast<int>(i);
                     ImGui::PopStyleColor(3);
                     ImGui::PopStyleVar(2);
-                    ImGuiAux::DelayedToolTip("Remove the override: back to the mesh's own material");
+                    EditorUI::DelayedToolTip("Remove the override: back to the mesh's own material");
                 }
 
                 ImGui::PopID();
@@ -853,13 +716,13 @@ namespace Surge
             {
                 ImGui::SetCursorPosY(ImGui::GetCursorPosY() + glm::max(ImGui::GetContentRegionAvail().y * 0.35f, 8.0f));
                 {
-                    ImGuiAux::ScopedBoldFont font;
+                    EditorUI::ScopedBoldFont font;
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                    ImGuiAux::TextCentered("Nothing selected");
+                    EditorUI::TextCentered("Nothing selected");
                     ImGui::PopStyleColor();
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                ImGuiAux::TextCentered("Select an entity in the Hierarchy or a Scene view");
+                EditorUI::TextCentered("Select an entity in the Hierarchy or a Scene view");
                 ImGui::PopStyleColor();
             }
             else
@@ -891,7 +754,7 @@ namespace Surge
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
             ImGui::SetNextItemWidth(-FLT_MIN);
             {
-                ImGuiAux::ScopedBoldFont font;
+                EditorUI::ScopedBoldFont font;
                 ImGui::InputTextWithHint("##EntityName", "Name", &entity.GetComponent<NameComponent>().Name);
             }
             ImGui::PopStyleVar(2);
@@ -901,7 +764,7 @@ namespace Surge
             if(ImGui::IsItemHovered())
             {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                ImGuiAux::DelayedToolTip("Click to copy");
+                EditorUI::DelayedToolTip("Click to copy");
             }
             if(ImGui::IsItemClicked())
             {
@@ -930,12 +793,12 @@ namespace Surge
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - width) * 0.5f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 7.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, SLOT_BG);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SLOT_BG_HOVERED);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, SLOT_BG_ACTIVE);
+        ImGui::PushStyleColor(ImGuiCol_Button, Colors::Tone20);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::Tone07);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Colors::Tone11);
         bool openPopup = false;
         {
-            ImGuiAux::ScopedBoldFont font;
+            EditorUI::ScopedBoldFont font;
             openPopup = ImGui::Button("+  Add Component", ImVec2(width, 0.0f));
         }
         ImGui::PopStyleColor(3);
@@ -952,10 +815,10 @@ namespace Surge
         ImGui::SetNextWindowPos(ImVec2(buttonMin.x, ImGui::GetItemRectMax().y + 2.0f), ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(glm::max(width, 260.0f), 420.0f));
 
-        ImGuiAux::StyledPopupVars::Push();
+        EditorUI::StyledPopupVars::Push();
         if(!ImGui::BeginPopup("##AddComponent"))
         {
-            ImGuiAux::StyledPopupVars::Pop();
+            EditorUI::StyledPopupVars::Pop();
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
             return;
         }
@@ -989,8 +852,8 @@ namespace Surge
             const String label = std::format("Paste {}", sComponentClipboard.DisplayName);
             if(ContainsCaseInsensitive(label, needle))
             {
-                ImGuiAux::StyledSeparator();
-                if(AddComponentRow("##PasteComponent", ComponentStyle { GizmoIcon::ENTITY, IM_COL32(255, 165, 0, 255) }, label.c_str(), "CLIPBOARD", true, false))
+                EditorUI::StyledSeparator();
+                if(AddComponentRow("##PasteComponent", ComponentStyle { GizmoIcon::ENTITY, ToU32(Colors::Accent) }, label.c_str(), "CLIPBOARD", true, false))
                     PasteComponent(entity);
             }
         }
@@ -1004,13 +867,13 @@ namespace Surge
 
             if(!searching && (!category || strcmp(category, item.Category) != 0))
             {
-                ImGuiAux::ScopedBoldFont font;
+                EditorUI::ScopedBoldFont font;
                 category = item.Category;
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", item.Category);
-                ImGuiAux::StyledSeparator();
+                ImGui::TextColored(Colors::Hint, "%s", item.Category);
+                EditorUI::StyledSeparator();
             }
             else if(searching && !anyShown)
-                ImGuiAux::StyledSeparator();
+                EditorUI::StyledSeparator();
 
             anyShown = true;
 
@@ -1020,7 +883,7 @@ namespace Surge
             if(AddComponentRow("##Item", item.Style, item.Name, has ? "ADDED" : nullptr, !has && !missing, &item == firstMatch && searching))
                 toAdd = &item;
             if(missing)
-                ImGuiAux::ItemTooltip(missing);
+                EditorUI::ItemTooltip(missing);
             ImGui::PopID();
         }
 
@@ -1036,7 +899,7 @@ namespace Surge
         }
 
         ImGui::EndPopup();
-        ImGuiAux::StyledPopupVars::Pop();
+        EditorUI::StyledPopupVars::Pop();
         ImGui::Dummy(ImVec2(0.0f, 8.0f));
     }
 
@@ -1046,11 +909,11 @@ namespace Surge
         {
             TransformComponent& component = entity.GetComponent<TransformComponent>();
             DrawComponent<TransformComponent, false>(entity, "Transform", [&component, this]() {
-                if(DrawVec3Control("Position", component.Position, 0.0f, 0.05f))
+                if(EditorUI::TVec3Control("Position", component.Position, 0.0f, 0.05f))
                     component.MarkDirty();
-                if(DrawVec3Control("Rotation", component.Rotation, 0.0f, 0.5f))
+                if(EditorUI::TVec3Control("Rotation", component.Rotation, 0.0f, 0.5f))
                     component.MarkDirty();
-                if(DrawVec3Control("Scale", component.Scale, 1.0f, 0.01f, &mUniformScale))
+                if(EditorUI::TVec3Control("Scale", component.Scale, 1.0f, 0.01f, &mUniformScale))
                     component.MarkDirty();
             });
         }
@@ -1060,48 +923,48 @@ namespace Surge
             CameraComponent& component = entity.GetComponent<CameraComponent>();
             DrawComponent<CameraComponent>(entity, "Camera", [&component]() {
                 RuntimeCamera& camera = component.Camera;
-                ImGuiAux::TProperty<bool>("Primary", &component.Primary);
+                EditorUI::TProperty<bool>("Primary", &component.Primary);
 
                 RuntimeCamera::ProjectionType projection = camera.GetProjectionType();
                 constexpr auto projectionTypeStrings = std::array { "PERSPECTIVE", "ORTHOGRAPHIC" };
-                if(ImGuiAux::TComboBox("Projection", projection, projectionTypeStrings))
+                if(EditorUI::TComboBox("Projection", projection, projectionTypeStrings))
                     camera.SetProjectionType(projection);
 
                 if(camera.GetProjectionType() == RuntimeCamera::ProjectionType::Perspective)
                 {
                     float verticalFOV = camera.GetPerspectiveVerticalFOV();
-                    if(ImGuiAux::TProperty<float>("Vertical FOV", &verticalFOV)) // In degree
+                    if(EditorUI::TProperty<float>("Vertical FOV", &verticalFOV)) // In degree
                         camera.SetPerspectiveVerticalFOV(verticalFOV);
 
                     float nearClip = camera.GetPerspectiveNearClip();
-                    if(ImGuiAux::TProperty<float>("Near Clip", &nearClip))
+                    if(EditorUI::TProperty<float>("Near Clip", &nearClip))
                         camera.SetPerspectiveNearClip(nearClip);
 
                     float farClip = camera.GetPerspectiveFarClip();
-                    if(ImGuiAux::TProperty<float>("Far Clip", &farClip))
+                    if(EditorUI::TProperty<float>("Far Clip", &farClip))
                         camera.SetPerspectiveFarClip(farClip);
                 }
                 else
                 {
                     float orthoSize = camera.GetOrthographicSize();
-                    if(ImGuiAux::TProperty<float>("Size", &orthoSize))
+                    if(EditorUI::TProperty<float>("Size", &orthoSize))
                         camera.SetOrthographicSize(orthoSize);
 
                     float nearClip = camera.GetOrthographicNearClip();
-                    if(ImGuiAux::TProperty<float>("Near Clip", &nearClip))
+                    if(EditorUI::TProperty<float>("Near Clip", &nearClip))
                         camera.SetOrthographicNearClip(nearClip);
 
                     float farClip = camera.GetOrthographicFarClip();
-                    if(ImGuiAux::TProperty<float>("Far Clip", &farClip))
+                    if(EditorUI::TProperty<float>("Far Clip", &farClip))
                         camera.SetOrthographicFarClip(farClip);
                 }
 
-                ImGuiAux::TSperator("Aspect");
-                ImGuiAux::TProperty<bool>("Fixed Aspect Ratio", &component.FixedAspectRatio);
+                EditorUI::TSeparator("Aspect");
+                EditorUI::TProperty<bool>("Fixed Aspect Ratio", &component.FixedAspectRatio);
                 if(component.FixedAspectRatio)
                 {
                     glm::vec2 aspectRatio = camera.GetAspectRatio();
-                    if(ImGuiAux::TProperty<glm::vec2>("Aspect Ratio", &aspectRatio))
+                    if(EditorUI::TProperty<glm::vec2>("Aspect Ratio", &aspectRatio))
                         camera.SetAspectRatio(aspectRatio);
                 }
             });
@@ -1112,8 +975,8 @@ namespace Surge
             SpriteRendererComponent& component = entity.GetComponent<SpriteRendererComponent>();
             DrawComponent<SpriteRendererComponent>(entity, "Sprite Renderer", [&component]() {
                 DrawAssetDropSlot<Texture2D>("Texture", component.TextureAsset, AssetType::TEXTURE2D, "None (Texture2D)");
-                ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
-                ImGuiAux::TProperty<bool>("Billboard", &component.Billboard);
+                EditorUI::TProperty<glm::vec4, EditorUI::CustomPropertyFlag::Color4>("Color", &component.Color);
+                EditorUI::TProperty<bool>("Billboard", &component.Billboard);
             });
         }
 
@@ -1125,7 +988,7 @@ namespace Surge
                 if(!component.MeshAsset)
                     return;
 
-                ImGuiAux::TProperty<bool>("Drop Shadow", &component.DropShadow);
+                EditorUI::TProperty<bool>("Drop Shadow", &component.DropShadow);
                 DrawMaterialSlots(component.MeshAsset.As<Mesh>());
             });
         }
@@ -1135,17 +998,17 @@ namespace Surge
             LightComponent& component = entity.GetComponent<LightComponent>();
             DrawComponent<LightComponent>(entity, "Light", [&component]() {
                 constexpr auto lightTypeStrings = std::array { "DIRECTIONAL", "POINT" };
-                ImGuiAux::TComboBox("Type", component.Type, lightTypeStrings);
-                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Color", &component.Color);
-                ImGuiAux::TProperty<float>("Intensity", &component.Intensity, 0.0f, 1000.0f);
+                EditorUI::TComboBox("Type", component.Type, lightTypeStrings);
+                EditorUI::TProperty<glm::vec3, EditorUI::CustomPropertyFlag::Color3>("Color", &component.Color);
+                EditorUI::TProperty<float>("Intensity", &component.Intensity, 0.0f, 1000.0f);
 
                 if(component.Type == LightType::POINT)
                 {
-                    ImGuiAux::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
-                    ImGuiAux::TSlider<float>("Falloff", &component.Falloff, 0.1f, 2.0f);
+                    EditorUI::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
+                    EditorUI::TSlider<float>("Falloff", &component.Falloff, 0.1f, 2.0f);
                 }
                 else
-                    HintRow("Direction follows the entity's rotation");
+                    EditorUI::THint("Direction follows the entity's rotation", Colors::TextMuted, 14.0f, "Hint");
             });
         }
 
@@ -1153,20 +1016,20 @@ namespace Surge
         {
             EnvironmentComponent& component = entity.GetComponent<EnvironmentComponent>();
             DrawComponent<EnvironmentComponent>(entity, "Environment", [&component]() {
-                ImGuiAux::TSperator("Sun Position");
-                ImGuiAux::TProperty<float>("Azimuth", &component.Azimuth);
-                ImGuiAux::TProperty<float>("Elevation", &component.Elevation);
+                EditorUI::TSeparator("Sun Position");
+                EditorUI::TProperty<float>("Azimuth", &component.Azimuth);
+                EditorUI::TProperty<float>("Elevation", &component.Elevation);
 
-                ImGuiAux::TSperator("Sky");
-                ImGuiAux::TProperty<bool>("Sun Disk", &component.EnableSunDisk);
-                ImGuiAux::TSlider<float>("Turbidity", &component.Turbidity, 1.5f, 10.0f, "%.2f");
-                ImGuiAux::TSlider<float>("Exposure", &component.Exposure, 0.001f, 0.1f, "%.4f");
-                ImGuiAux::TSlider<float>("Sun Intensity", &component.SunIntensity, 0.01f, 1.0f, "%.2f");
+                EditorUI::TSeparator("Sky");
+                EditorUI::TProperty<bool>("Sun Disk", &component.EnableSunDisk);
+                EditorUI::TSlider<float>("Turbidity", &component.Turbidity, 1.5f, 10.0f, "%.2f");
+                EditorUI::TSlider<float>("Exposure", &component.Exposure, 0.001f, 0.1f, "%.4f");
+                EditorUI::TSlider<float>("Sun Intensity", &component.SunIntensity, 0.01f, 1.0f, "%.2f");
 
-                ImGuiAux::TSperator("Ambient (Fast GI)");
-                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Sky", &component.SkyAmbient);
-                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Horizon", &component.HorizonAmbient);
-                ImGuiAux::TProperty<glm::vec3, ImGuiAux::CustomProprtyFlag::Color3>("Ground", &component.GroundAmbient);
+                EditorUI::TSeparator("Ambient (Fast GI)");
+                EditorUI::TProperty<glm::vec3, EditorUI::CustomPropertyFlag::Color3>("Sky", &component.SkyAmbient);
+                EditorUI::TProperty<glm::vec3, EditorUI::CustomPropertyFlag::Color3>("Horizon", &component.HorizonAmbient);
+                EditorUI::TProperty<glm::vec3, EditorUI::CustomPropertyFlag::Color3>("Ground", &component.GroundAmbient);
             });
         }
 
@@ -1184,10 +1047,10 @@ namespace Surge
             DrawComponent<RigidbodyComponent>(entity, "Rigidbody", [&entity, &component]() {
 
                 if (entity.GetScene()->IsRunning())
-                    HintRow("Editing Rigidbody fields in the Inspector during Play does not update the live body (they are read at creation). Lua's RigidbodyC.Layer is the exception.");
+                    EditorUI::THint("Editing Rigidbody fields in the Inspector during Play does not update the live body (they are read at creation). Lua's RigidbodyC.Layer is the exception.", Colors::TextMuted, 14.0f, "Hint");
 
                 constexpr auto rbTypeStrings = std::array { "STATIC", "DYNAMIC", "KINEMATIC" };
-                ImGuiAux::TComboBox("Type", component.Type, rbTypeStrings);
+                EditorUI::TComboBox("Type", component.Type, rbTypeStrings);
 
                 // Named layers only (Physics panel); a body on a layer that was renamed away still shows its index
                 const PhysicsSettings& physicsSettings = static_cast<Editor*>(Core::GetClient())->GetPhysicsSettings();
@@ -1213,28 +1076,28 @@ namespace Surge
                 }
 
                 if(component.Type != RigidbodyType::STATIC)
-                    ImGuiAux::TProperty<float>("Mass", &component.Mass, 0.0f, 100000.0f);
+                    EditorUI::TProperty<float>("Mass", &component.Mass, 0.0f, 100000.0f);
 
-                ImGuiAux::TSperator("Simulation");
-                ImGuiAux::TProperty<bool>("Interpolate", &component.Interpolate);
-                ImGuiAux::TProperty<bool>("Use Gravity", &component.UseGravity);
-                ImGuiAux::TProperty<bool>("Is Sensor", &component.IsSensor);
-                ImGuiAux::TProperty<bool>("Continuous (CCD)", &component.ContinuousCollision);
+                EditorUI::TSeparator("Simulation");
+                EditorUI::TProperty<bool>("Interpolate", &component.Interpolate);
+                EditorUI::TProperty<bool>("Use Gravity", &component.UseGravity);
+                EditorUI::TProperty<bool>("Is Sensor", &component.IsSensor);
+                EditorUI::TProperty<bool>("Continuous (CCD)", &component.ContinuousCollision);
 
-                ImGuiAux::TSperator("Surface");
-                ImGuiAux::TProperty<float>("Friction", &component.Friction, 0.0f, 10.0f);
-                ImGuiAux::TProperty<float>("Bounciness", &component.Bounciness, 0.0f, 1.0f);
+                EditorUI::TSeparator("Surface");
+                EditorUI::TProperty<float>("Friction", &component.Friction, 0.0f, 10.0f);
+                EditorUI::TProperty<float>("Bounciness", &component.Bounciness, 0.0f, 1.0f);
 
                 if(component.Type != RigidbodyType::STATIC)
                 {
-                    ImGuiAux::TSperator("Damping");
-                    ImGuiAux::TProperty<float>("Linear", &component.LinearDamping, 0.0f, 100.0f);
-                    ImGuiAux::TProperty<float>("Angular", &component.AngularDamping, 0.0f, 100.0f);
+                    EditorUI::TSeparator("Damping");
+                    EditorUI::TProperty<float>("Linear", &component.LinearDamping, 0.0f, 100.0f);
+                    EditorUI::TProperty<float>("Angular", &component.AngularDamping, 0.0f, 100.0f);
 
-                    ImGuiAux::TSperator("Freeze Rotation");
-                    ImGuiAux::TProperty<bool>("X Axis", &component.FreezeRotationX);
-                    ImGuiAux::TProperty<bool>("Y Axis", &component.FreezeRotationY);
-                    ImGuiAux::TProperty<bool>("Z Axis", &component.FreezeRotationZ);
+                    EditorUI::TSeparator("Freeze Rotation");
+                    EditorUI::TProperty<bool>("X Axis", &component.FreezeRotationX);
+                    EditorUI::TProperty<bool>("Y Axis", &component.FreezeRotationY);
+                    EditorUI::TProperty<bool>("Z Axis", &component.FreezeRotationZ);
                 }
             });
         }
@@ -1243,8 +1106,8 @@ namespace Surge
         {
             BoxColliderComponent& component = entity.GetComponent<BoxColliderComponent>();
             DrawComponent<BoxColliderComponent>(entity, "Box Collider", [&component]() {
-                ImGuiAux::TProperty<glm::vec3>("Half Extents", &component.HalfExtents, 0.0f, 10000.0f);
-                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+                EditorUI::TProperty<glm::vec3>("Half Extents", &component.HalfExtents, 0.0f, 10000.0f);
+                EditorUI::TProperty<bool>("Show Collider", &component.ShowCollider);
             });
         }
 
@@ -1252,8 +1115,8 @@ namespace Surge
         {
             SphereColliderComponent& component = entity.GetComponent<SphereColliderComponent>();
             DrawComponent<SphereColliderComponent>(entity, "Sphere Collider", [&component]() {
-                ImGuiAux::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
-                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+                EditorUI::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
+                EditorUI::TProperty<bool>("Show Collider", &component.ShowCollider);
             });
         }
 
@@ -1261,9 +1124,9 @@ namespace Surge
         {
             CapsuleColliderComponent& component = entity.GetComponent<CapsuleColliderComponent>();
             DrawComponent<CapsuleColliderComponent>(entity, "Capsule Collider", [&component]() {
-                ImGuiAux::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
-                ImGuiAux::TProperty<float>("Height", &component.Height, 0.0f, 10000.0f);
-                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+                EditorUI::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
+                EditorUI::TProperty<float>("Height", &component.Height, 0.0f, 10000.0f);
+                EditorUI::TProperty<bool>("Show Collider", &component.ShowCollider);
             });
         }
 
@@ -1271,9 +1134,9 @@ namespace Surge
         {
             CylinderColliderComponent& component = entity.GetComponent<CylinderColliderComponent>();
             DrawComponent<CylinderColliderComponent>(entity, "Cylinder Collider", [&component]() {
-                ImGuiAux::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
-                ImGuiAux::TProperty<float>("Height", &component.Height, 0.0f, 10000.0f);
-                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+                EditorUI::TProperty<float>("Radius", &component.Radius, 0.0f, 10000.0f);
+                EditorUI::TProperty<float>("Height", &component.Height, 0.0f, 10000.0f);
+                EditorUI::TProperty<bool>("Show Collider", &component.ShowCollider);
             });
         }
 
@@ -1283,14 +1146,14 @@ namespace Surge
             DrawComponent<ConvexColliderComponent>(entity, "Convex Collider", [&component, &entity]() {
                 if(entity.HasComponent<MeshComponent>())
                 {
-                    if(ImGuiAux::TProperty<glm::vec3>("Local Offset", &component.LocalOffset))
+                    if(EditorUI::TProperty<glm::vec3>("Local Offset", &component.LocalOffset))
                         component.IsDirty = true;
-                    if(ImGuiAux::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation))
+                    if(EditorUI::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation))
                         component.IsDirty = true;
                 }
                 else
-                    HintRow("The hull is built from the Mesh component, add one to this entity", ImVec4(0.95f, 0.55f, 0.35f, 1.0f));
-                ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
+                    EditorUI::THint("The hull is built from the Mesh component, add one to this entity", Colors::Warning, 14.0f, "Hint");
+                EditorUI::TProperty<bool>("Show Collider", &component.ShowCollider);
             });
         }
 
@@ -1302,14 +1165,14 @@ namespace Surge
                 {
                     if(entity.HasComponent<MeshComponent>())
                     {
-                        ImGuiAux::TProperty<glm::vec3>("Local Offset", &component.LocalOffset);
-                        ImGuiAux::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation);
+                        EditorUI::TProperty<glm::vec3>("Local Offset", &component.LocalOffset);
+                        EditorUI::TProperty<glm::vec3>("Local Rotation", &component.LocalRotation);
                     }
-                    ImGuiAux::TProperty<bool>("Show Collider", &component.ShowCollider);
-                    HintRow("Generated from the mesh triangles, expensive to visualize: turn Show Collider off when done");
+                    EditorUI::TProperty<bool>("Show Collider", &component.ShowCollider);
+                    EditorUI::THint("Generated from the mesh triangles, expensive to visualize: turn Show Collider off when done", Colors::TextMuted, 14.0f, "Hint");
                 }
                 else
-                    HintRow("Invalid setup: needs a STATIC or KINEMATIC Rigidbody on this entity", ImVec4(0.95f, 0.40f, 0.40f, 1.0f));
+                    EditorUI::THint("Invalid setup: needs a STATIC or KINEMATIC Rigidbody on this entity", Colors::Error, 14.0f, "Hint");
             });
         }
 
@@ -1325,7 +1188,7 @@ namespace Surge
                     ImGui::PushID(static_cast<int>(i));
 
                     const String title = entry.ScriptAsset ? ScriptEngine::GetScriptName(entry.ScriptAsset) : String("Empty slot");
-                    ImGuiAux::TSperator(title.c_str());
+                    EditorUI::TSeparator(title.c_str());
 
                     // Enabled toggles OnEnable/OnDisable while playing; scripts are only added/removed in edit mode
                     ImGui::TableNextColumn();
@@ -1337,7 +1200,7 @@ namespace Surge
                     {
                         const float removeWidth = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - removeWidth);
-                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::ErrorDark);
                         if(ImGui::Button("Remove"))
                             removeIndex = static_cast<int>(i);
                         ImGui::PopStyleColor();
@@ -1357,7 +1220,7 @@ namespace Surge
                     ImGui::TableNextColumn();
                     if(ImGui::Button("+ Add Script", ImVec2(-FLT_MIN, 0.0f)))
                         component.Scripts.emplace_back();
-                    ImGuiAux::ItemTooltip("Adds an empty slot, or drop a SCRIPT from the Content Browser here");
+                    EditorUI::ItemTooltip("Adds an empty slot, or drop a SCRIPT from the Content Browser here");
                     if(ImGui::BeginDragDropTarget())
                     {
                         if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_PAYLOAD))
@@ -1382,7 +1245,7 @@ namespace Surge
                 DrawAssetDropSlot<Font>("Font", component.FontAsset, AssetType::FONT, "None (Font)");
                 if(!component.FontAsset)
                 {
-                    HintRow("Drop a FONT to edit the text");
+                    EditorUI::THint("Drop a FONT to edit the text", Colors::TextMuted, 14.0f, "Hint");
                     return;
                 }
 
@@ -1391,29 +1254,29 @@ namespace Surge
                 ImGui::TextUnformatted("Text");
                 ImGui::TableNextColumn();
                 ImGui::InputTextMultiline("##Text", &component.Text, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 3.5f));
-                ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.Color);
-                ImGuiAux::TProperty<float>("Max Width", &component.MaxWidth, 0.0f, 100000.0f);
+                EditorUI::TProperty<glm::vec4, EditorUI::CustomPropertyFlag::Color4>("Color", &component.Color);
+                EditorUI::TProperty<float>("Max Width", &component.MaxWidth, 0.0f, 100000.0f);
 
-                ImGuiAux::TSperator("Layout");
-                ImGuiAux::TProperty<float>("Letter Spacing", &component.LetterSpacing);
-                ImGuiAux::TProperty<float>("Line Spacing", &component.LineSpacing);
+                EditorUI::TSeparator("Layout");
+                EditorUI::TProperty<float>("Letter Spacing", &component.LetterSpacing);
+                EditorUI::TProperty<float>("Line Spacing", &component.LineSpacing);
                 constexpr auto alignTypeStrings = std::array { "LEFT", "CENTER", "RIGHT" };
-                ImGuiAux::TComboBox("Horizontal Align", component.Alignment, alignTypeStrings);
+                EditorUI::TComboBox("Horizontal Align", component.Alignment, alignTypeStrings);
                 constexpr auto verticalAlignTypeStrings = std::array { "TOP", "CENTER", "BASELINE", "BOTTOM" };
-                ImGuiAux::TComboBox("Vertical Align", component.VerticalAlignment, verticalAlignTypeStrings);
+                EditorUI::TComboBox("Vertical Align", component.VerticalAlignment, verticalAlignTypeStrings);
 
-                ImGuiAux::TSperator("Style");
-                ImGuiAux::TProperty<bool>("Underline", &component.Underline);
-                ImGuiAux::TProperty<bool>("Italic", &component.Italic);
-                ImGuiAux::TProperty<bool>("Billboard", &component.Billboard);
+                EditorUI::TSeparator("Style");
+                EditorUI::TProperty<bool>("Underline", &component.Underline);
+                EditorUI::TProperty<bool>("Italic", &component.Italic);
+                EditorUI::TProperty<bool>("Billboard", &component.Billboard);
 
-                ImGuiAux::TSperator("Shadow");
+                EditorUI::TSeparator("Shadow");
                 ImGui::PushID("Shadow");
-                ImGuiAux::TProperty<bool>("Enabled", &component.ShadowEnabled);
+                EditorUI::TProperty<bool>("Enabled", &component.ShadowEnabled);
                 if(component.ShadowEnabled)
                 {
-                    ImGuiAux::TProperty<glm::vec4, ImGuiAux::CustomProprtyFlag::Color4>("Color", &component.ShadowColor);
-                    ImGuiAux::TProperty<glm::vec2>("Offset", &component.ShadowOffset);
+                    EditorUI::TProperty<glm::vec4, EditorUI::CustomPropertyFlag::Color4>("Color", &component.ShadowColor);
+                    EditorUI::TProperty<glm::vec2>("Offset", &component.ShadowOffset);
                 }
                 ImGui::PopID();
             });
@@ -1448,7 +1311,7 @@ namespace Surge
 
                 // Edit mode previews the effect in the Scene views, Play mode drives the running one
                 ParticleRuntime& runtime = component.Runtime;
-                ImGuiAux::TSperator("Playback");
+                EditorUI::TSeparator("Playback");
                 ImGui::TableNextColumn();
                 ImGui::TableNextColumn();
                 {
@@ -1462,15 +1325,15 @@ namespace Surge
                         else
                             runtime.Play();
                     }
-                    ImGuiAux::DelayedToolTip(runtime.IsPlaying() ? "Pause" : "Play");
+                    EditorUI::DelayedToolTip(runtime.IsPlaying() ? "Pause" : "Play");
                     ImGui::SameLine(0.0f, 2.0f);
                     if(GizmoIcons::IconButton("##Restart", GizmoIcon::STEP, ImVec2(buttonSize, buttonSize), glyphColor))
                         runtime.Restart();
-                    ImGuiAux::DelayedToolTip("Restart");
+                    EditorUI::DelayedToolTip("Restart");
                     ImGui::SameLine(0.0f, 2.0f);
                     if(GizmoIcons::IconButton("##Stop", GizmoIcon::STOP, ImVec2(buttonSize, buttonSize), glyphColor))
                         runtime.Stop(true);
-                    ImGuiAux::DelayedToolTip("Stop and clear");
+                    EditorUI::DelayedToolTip("Stop and clear");
                     ImGui::EndDisabled();
 
                     ImGui::SameLine();
@@ -1478,15 +1341,15 @@ namespace Surge
                     ImGui::TextDisabled("%.2f s  |  %u particles", runtime.GetTime(), runtime.GetParticleCount());
                 }
 
-                ImGuiAux::TSperator("Settings");
-                ImGuiAux::TProperty<bool>("Auto Play", &component.AutoPlay);
-                ImGuiAux::TProperty<bool>("Auto Destroy", &component.AutoDestroy);
-                ImGuiAux::TSlider<float>("Simulation Speed", &component.SimulationSpeed, 0.0f, 4.0f, "%.2f");
-                ImGuiAux::TProperty<float>("Emission Multiplier", &component.EmissionMultiplier, 0.0f, 100.0f);
-                ImGuiAux::TProperty<int>("Seed", &component.Seed);
+                EditorUI::TSeparator("Settings");
+                EditorUI::TProperty<bool>("Auto Play", &component.AutoPlay);
+                EditorUI::TProperty<bool>("Auto Destroy", &component.AutoDestroy);
+                EditorUI::TSlider<float>("Simulation Speed", &component.SimulationSpeed, 0.0f, 4.0f, "%.2f");
+                EditorUI::TProperty<float>("Emission Multiplier", &component.EmissionMultiplier, 0.0f, 100.0f);
+                EditorUI::TProperty<int>("Seed", &component.Seed);
                 constexpr auto cullingModeStrings = std::array { "ALWAYS_SIMULATE", "PAUSE_OFFSCREEN", "PAUSE_AND_CATCH_UP" };
-                ImGuiAux::TComboBox("Culling", component.Culling, cullingModeStrings);
-                HintRow("Seed 0 = a different sequence every play. Culling: what the effect does outside the camera (Player only)");
+                EditorUI::TComboBox("Culling", component.Culling, cullingModeStrings);
+                EditorUI::THint("Seed 0 = a different sequence every play. Culling: what the effect does outside the camera (Player only)", Colors::TextMuted, 14.0f, "Hint");
             });
         }
 
@@ -1498,7 +1361,7 @@ namespace Surge
                 const Ref<Mesh> mesh = meshComponent && meshComponent->MeshAsset ? meshComponent->MeshAsset.As<Mesh>() : nullptr;
                 if(!mesh || !mesh->IsSkinned())
                 {
-                    HintRow("Needs a Mesh component with an animated glTF (a skin or animated nodes). Re-import the model if it was imported before animation support.");
+                    EditorUI::THint("Needs a Mesh component with an animated glTF (a skin or animated nodes). Re-import the model if it was imported before animation support.", Colors::TextMuted, 14.0f, "Hint");
                     return;
                 }
 
@@ -1527,7 +1390,7 @@ namespace Surge
                 ImGui::PopItemWidth();
 
                 // Edit mode previews in the Scene views (not saved), Play mode drives the running animator
-                ImGuiAux::TSperator("Playback");
+                EditorUI::TSeparator("Playback");
                 ImGui::TableNextColumn();
                 ImGui::TableNextColumn();
                 {
@@ -1542,11 +1405,11 @@ namespace Surge
                         else
                             runtime.SetPreview(!playing);
                     }
-                    ImGuiAux::DelayedToolTip(playing ? "Pause" : (running ? "Resume" : "Preview"));
+                    EditorUI::DelayedToolTip(playing ? "Pause" : (running ? "Resume" : "Preview"));
                     ImGui::SameLine(0.0f, 2.0f);
                     if(GizmoIcons::IconButton("##Restart", GizmoIcon::STEP, ImVec2(buttonSize, buttonSize), glyphColor))
                         runtime.SetTime(0.0f);
-                    ImGuiAux::DelayedToolTip("Back to the first frame");
+                    EditorUI::DelayedToolTip("Back to the first frame");
                     ImGui::EndDisabled();
 
                     ImGui::SameLine();
@@ -1559,25 +1422,25 @@ namespace Surge
                 if(!runtime.GetClipName().empty())
                 {
                     float time = runtime.GetTime();
-                    if(ImGuiAux::TSlider<float>("Time", &time, 0.0f, runtime.GetDuration(), "%.2f s"))
+                    if(EditorUI::TSlider<float>("Time", &time, 0.0f, runtime.GetDuration(), "%.2f s"))
                         runtime.SetTime(time);
                 }
 
-                ImGuiAux::TSperator("Settings");
-                ImGuiAux::TProperty<bool>("Play On Awake", &component.PlayOnAwake);
-                ImGuiAux::TProperty<bool>("Loop", &component.Loop);
-                ImGuiAux::TSlider<float>("Speed", &component.Speed, -2.0f, 3.0f, "%.2f");
-                ImGuiAux::TProperty<bool>("Animate Offscreen", &component.AnimateOffscreen);
+                EditorUI::TSeparator("Settings");
+                EditorUI::TProperty<bool>("Play On Awake", &component.PlayOnAwake);
+                EditorUI::TProperty<bool>("Loop", &component.Loop);
+                EditorUI::TSlider<float>("Speed", &component.Speed, -2.0f, 3.0f, "%.2f");
+                EditorUI::TProperty<bool>("Animate Offscreen", &component.AnimateOffscreen);
 
-                ImGuiAux::TSperator("Clip Sources");
+                EditorUI::TSeparator("Clip Sources");
                 DrawAssetDropSlot<Mesh>("Source 1", component.ClipSource1, AssetType::MESH, "None (Mesh)");
                 DrawAssetDropSlot<Mesh>("Source 2", component.ClipSource2, AssetType::MESH, "None (Mesh)");
                 DrawAssetDropSlot<Mesh>("Source 3", component.ClipSource3, AssetType::MESH, "None (Mesh)");
                 DrawAssetDropSlot<Mesh>("Source 4", component.ClipSource4, AssetType::MESH, "None (Mesh)");
 
                 const Skeleton& skeleton = mesh->GetSkeleton();
-                ImGuiAux::TString("Skeleton", "%u nodes, %u joints, %u clips (%u own)", skeleton.GetNodeCount(), skeleton.GetPaletteSize(), runtime.GetClipCount(), static_cast<Uint>(mesh->GetClips().size()));
-                HintRow("Clip sources: other animated glTFs whose joint names match (one animation per file, Mixamo style). Animate Offscreen: Player only, otherwise only the time advances outside the camera");
+                EditorUI::TString("Skeleton", "%u nodes, %u joints, %u clips (%u own)", skeleton.GetNodeCount(), skeleton.GetPaletteSize(), runtime.GetClipCount(), static_cast<Uint>(mesh->GetClips().size()));
+                EditorUI::THint("Clip sources: other animated glTFs whose joint names match (one animation per file, Mixamo style). Animate Offscreen: Player only, otherwise only the time advances outside the camera", Colors::TextMuted, 14.0f, "Hint");
             });
         }
 
@@ -1585,8 +1448,8 @@ namespace Surge
         {
             UICanvasComponent& component = entity.GetComponent<UICanvasComponent>();
             DrawComponent<UICanvasComponent>(entity, "UI Canvas", [&component, &entity]() {
-                ImGuiAux::TProperty<bool>("Show Canvas", &component.ShowCanvas);
-                ImGuiAux::TProperty<int>("Sort Order", &component.SortOrder, -1000.0f, 1000.0f);
+                EditorUI::TProperty<bool>("Show Canvas", &component.ShowCanvas);
+                EditorUI::TProperty<int>("Sort Order", &component.SortOrder, -1000.0f, 1000.0f);
                 DrawAssetDropSlot<UILayout>("Layout", component.Layout, AssetType::UI_LAYOUT, "None (UI Layout)");
 
                 ImGui::TableNextColumn();
@@ -1610,7 +1473,7 @@ namespace Surge
                     }
                 }
 
-                ImGuiAux::TSperator("Script");
+                EditorUI::TSeparator("Script");
                 DrawAssetDropSlot<Script>("Script", component.ScriptAsset, AssetType::SCRIPT, "None (Script)");
                 const bool live = static_cast<Editor*>(Core::GetClient())->IsPlaying() && component.IsInstantiated;
                 ScriptFields::DrawInspector(component.ScriptAsset, component.Fields, live ? &component.Instance : nullptr, entity.GetScene());
@@ -1627,37 +1490,37 @@ namespace Surge
                 if(!component.AudioClip)
                     return;
 
-                if(ImGuiAux::TSlider<float>("Volume", &component.Volume, 0.0f, 2.0f, "%.2f") && component.RuntimeID)
+                if(EditorUI::TSlider<float>("Volume", &component.Volume, 0.0f, 2.0f, "%.2f") && component.RuntimeID)
                     audioEngine->SetVolume(component.RuntimeID, component.Volume);
-                if(ImGuiAux::TSlider<float>("Pitch", &component.Pitch, 0.1f, 3.0f, "%.2f") && component.RuntimeID)
+                if(EditorUI::TSlider<float>("Pitch", &component.Pitch, 0.1f, 3.0f, "%.2f") && component.RuntimeID)
                     audioEngine->SetPitch(component.RuntimeID, component.Pitch);
-                if(ImGuiAux::TProperty<bool>("Loop", &component.Loop) && component.RuntimeID)
+                if(EditorUI::TProperty<bool>("Loop", &component.Loop) && component.RuntimeID)
                     audioEngine->SetLooping(component.RuntimeID, component.Loop);
-                ImGuiAux::TProperty<bool>("Play On Awake", &component.PlayOnAwake);
-                ImGuiAux::TProperty<bool>("Streaming", &component.IsStreaming);
+                EditorUI::TProperty<bool>("Play On Awake", &component.PlayOnAwake);
+                EditorUI::TProperty<bool>("Streaming", &component.IsStreaming);
 
-                ImGuiAux::TSperator("3D Sound");
-                ImGuiAux::TProperty<bool>("Spatialized", &component.IsSpatialized);
+                EditorUI::TSeparator("3D Sound");
+                EditorUI::TProperty<bool>("Spatialized", &component.IsSpatialized);
                 if(component.IsSpatialized)
                 {
                     constexpr auto attenuationModelStrings = std::array { "NONE", "INVERSE_DISTANCE", "LINEAR_DISTANCE", "EXPONENTIAL_DISTANCE" };
-                    ImGuiAux::TComboBox("Attenuation", component.Attenuation, attenuationModelStrings);
+                    EditorUI::TComboBox("Attenuation", component.Attenuation, attenuationModelStrings);
 
-                    if(ImGuiAux::TProperty<float>("Min Distance", &component.MinDistance, 0.0f, 100000.0f) && component.RuntimeID)
+                    if(EditorUI::TProperty<float>("Min Distance", &component.MinDistance, 0.0f, 100000.0f) && component.RuntimeID)
                         audioEngine->SetMinDistance(component.RuntimeID, component.MinDistance);
-                    if(ImGuiAux::TProperty<float>("Max Distance", &component.MaxDistance, 0.0f, 100000.0f) && component.RuntimeID)
+                    if(EditorUI::TProperty<float>("Max Distance", &component.MaxDistance, 0.0f, 100000.0f) && component.RuntimeID)
                         audioEngine->SetMaxDistance(component.RuntimeID, component.MaxDistance);
                 }
-                HintRow("Music and long ambience: use OGG with Streaming on. That keeps about 1 MB per minute in memory and no PCM.\n\n"
+                EditorUI::THint("Music and long ambience: use OGG with Streaming on. That keeps about 1 MB per minute in memory and no PCM.\n\n"
                         "Short SFX : leave Streaming off.They decode once and every source shares the PCM, so there’s no decoding while playing.\n"
-                        "Avoid WAV for music.The encoded WAV already sits in RAM, and a non - streamed WAV adds its full PCM copy on top.");
+                        "Avoid WAV for music.The encoded WAV already sits in RAM, and a non - streamed WAV adds its full PCM copy on top.", Colors::TextMuted, 14.0f, "Hint");
             });
         }
 
         if(entity.HasComponent<AudioListenerComponent>())
         {
             DrawComponent<AudioListenerComponent>(entity, "Audio Listener", []() {
-                HintRow("Hears the scene's 3D sounds from this entity. Keep one active listener per scene");
+                EditorUI::THint("Hears the scene's 3D sounds from this entity. Keep one active listener per scene", Colors::TextMuted, 14.0f, "Hint");
             });
         }
     }

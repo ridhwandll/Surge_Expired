@@ -1,7 +1,7 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "Panels/ConsolePanel.hpp"
 #include "Console/EditorConsole.hpp"
-#include "Utility/ImGuiAux.hpp"
+#include "Utility/EditorUI.hpp"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -24,35 +24,6 @@ namespace Surge
             case Severity::Fatal: return "FATAL";
         }
         return "";
-    }
-
-    static ImVec4 SeverityColor(Severity severity)
-    {
-        switch(severity)
-        {
-            case Severity::Trace: return ImVec4(0.6f,  0.6f,  0.6f, 1.0f);
-            case Severity::Info:  return ImVec4(0.45f, 0.85f, 0.45f, 1.0f);
-            case Severity::Debug: return ImVec4(0.4f,  0.8f,  0.9f, 1.0f);
-            case Severity::Warn:  return ImVec4(1.0f,  0.8f,  0.2f, 1.0f);
-            case Severity::Error: return ImVec4(1.0f,  0.4f,  0.4f, 1.0f);
-            case Severity::Fatal: return ImVec4(1.0f,  0.1f,  0.1f, 1.0f);
-        }
-        return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    }
-
-    // Colored on/off toggle, returns true when flipped
-    static bool FilterToggle(const char* label, bool& value, const ImVec4& color)
-    {
-        const ImVec4 off = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
-        const ImVec4 on = ImVec4(color.x * 0.35f, color.y * 0.35f, color.z * 0.35f, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, value ? on : off);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x * 0.5f, color.y * 0.5f, color.z * 0.5f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, value ? color : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        const bool clicked = ImGui::Button(label);
-        ImGui::PopStyleColor(3);
-        if(clicked)
-            value = !value;
-        return clicked;
     }
 
     void ConsolePanel::Init(void*)
@@ -120,7 +91,7 @@ namespace Surge
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
         {
-            ImGuiAux::ScopedBoldFont font;
+            EditorUI::ScopedBoldFont font;
             if(ImGui::Button("CLEAR"))
                 mClearRequested = true; // Applied once the lock is released
         }
@@ -147,14 +118,14 @@ namespace Surge
 
         ImGui::SameLine();
         {
-            ImGuiAux::ScopedBoldFont font;
-            if(FilterToggle(logsLabel, mShowLogs, SeverityColor(Severity::Trace)))
+            EditorUI::ScopedBoldFont font;
+            if(EditorUI::ColoredToggle(logsLabel, mShowLogs, EditorUI::SeverityColor(Severity::Trace)))
                 mFilterDirty = true;
             ImGui::SameLine();
-            if(FilterToggle(warningsLabel, mShowWarnings, SeverityColor(Severity::Warn)))
+            if(EditorUI::ColoredToggle(warningsLabel, mShowWarnings, EditorUI::SeverityColor(Severity::Warn)))
                 mFilterDirty = true;
             ImGui::SameLine();
-            if(FilterToggle(errorsLabel, mShowErrors, SeverityColor(Severity::Error)))
+            if(EditorUI::ColoredToggle(errorsLabel, mShowErrors, EditorUI::SeverityColor(Severity::Error)))
                 mFilterDirty = true;
         }
         ImGui::PopStyleVar();
@@ -185,21 +156,21 @@ namespace Surge
                 for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++)
                 {
                     const ConsoleMessage& message = messages[mFiltered[row]];
-                    const ImVec4 color = SeverityColor(message.Level);
+                    const ImVec4 color = EditorUI::SeverityColor(message.Level);
                     const bool emphasize = message.Level >= Severity::Warn;
 
                     ImGui::PushID(static_cast<int>(message.ID));
                     ImGui::TableNextRow();
 
                     ImGui::TableSetColumnIndex(0);
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_Text, EditorUI::Colors::TextMuted);
                     if(ImGui::Selectable(message.Time, message.ID == mSelectedID, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
                         mSelectedID = (message.ID == mSelectedID) ? 0 : message.ID;
                     ImGui::PopStyleColor();
 
                     ImGui::TableSetColumnIndex(1);
                     {
-                        ImGuiAux::ScopedBoldFont font;
+                        EditorUI::ScopedBoldFont font;
                         ImGui::TextColored(color, "%s", SeverityTag(message.Level));
                     }
 
@@ -239,12 +210,12 @@ namespace Surge
         // IDs are consecutive, so the slot is a subtraction away
         const ConsoleMessage& message = messages[static_cast<size_t>(mSelectedID - messages.front().ID)];
 
-        ImGuiAux::StyledSeparator();
+        EditorUI::StyledSeparator();
         if(ImGui::BeginChild("##ConsoleDetails"))
         {
             {
-                ImGuiAux::ScopedBoldFont font;
-                ImGui::TextColored(SeverityColor(message.Level), "%s", SeverityTag(message.Level));
+                EditorUI::ScopedBoldFont font;
+                ImGui::TextColored(EditorUI::SeverityColor(message.Level), "%s", SeverityTag(message.Level));
             }
             ImGui::SameLine();
             ImGui::TextDisabled("%s", message.Time);

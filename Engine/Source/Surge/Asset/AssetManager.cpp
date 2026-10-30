@@ -1,25 +1,21 @@
 // Copyright (c) - SurgeTechnologies - All rights reserved
 #include "AssetManager.hpp"
 
-#include "Serializer/Script/ScriptSerializer.hpp"
-#include "Serializer/Material/MaterialSerializer.hpp"
-#include "Serializer/Mesh/MeshSerializer.hpp"
-#include "Serializer/Scene/SceneSerializer.hpp"
-#include "Serializer/Texture2DSerializer.hpp"
-#include "Serializer/Font/FontSerializer.hpp"
-#include "Serializer/Audio/AudioSerializer.hpp"
-#include "Serializer/UILayout/UILayoutSerializer.hpp"
-#include "Serializer/ParticleEffect/ParticleEffectSerializer.hpp"
+#include "Format/Audio/AudioFormat.hpp"
+#include "Format/Font/FontFormat.hpp"
+#include "Format/Material/MaterialFormat.hpp"
+#include "Format/Mesh/MeshFormat.hpp"
+#include "Format/ParticleEffect/ParticleEffectFormat.hpp"
+#include "Format/Registry/RegistryFormat.hpp"
+#include "Format/Scene/SceneFormat.hpp"
+#include "Format/Script/ScriptFormat.hpp"
+#include "Format/Texture2D/Texture2DFormat.hpp"
+#include "Format/UILayout/UILayoutFormat.hpp"
 
-#include "Surge/Utility/Filesystem.hpp"
 #include "Surge/Core/Profiler.hpp"
 
 #include <algorithm>
 #include <cctype>
-#include <cerrno>
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
 
 namespace Surge
 {
@@ -27,112 +23,83 @@ namespace Surge
 
     AssetManager::AssetManager()
     {
-        mSerializers[AssetType::SCENE] = CreateScope<SceneSerializer>();
-        mSerializers[AssetType::TEXTURE2D] = CreateScope<Texture2DSerializer>();
-        mSerializers[AssetType::MESH] = CreateScope<MeshSerializer>();
-        mSerializers[AssetType::MATERIAL] = CreateScope<MaterialSerializer>();
-        mSerializers[AssetType::SCRIPT] = CreateScope<ScriptSerializer>();
-        mSerializers[AssetType::FONT] = CreateScope<FontSerializer>();
-        mSerializers[AssetType::AUDIO] = CreateScope<AudioSerializer>();
-        mSerializers[AssetType::UI_LAYOUT] = CreateScope<UILayoutSerializer>();
-        mSerializers[AssetType::PARTICLE_EFFECT] = CreateScope<ParticleEffectSerializer>();
-
-        for(auto& [type, serializer] : mSerializers)
-            serializer->Initialize();
+        Scope<AssetFormat> formats[] = { CreateScope<SceneFormat>(), CreateScope<Texture2DFormat>(), CreateScope<MeshFormat>(), CreateScope<MaterialFormat>(),
+                                         CreateScope<ScriptFormat>(), CreateScope<FontFormat>(), CreateScope<AudioFormat>(), CreateScope<UILayoutFormat>(),
+                                         CreateScope<ParticleEffectFormat>() };
+        for(Scope<AssetFormat>& format : formats)
+        {
+            const AssetType type = format->GetType();
+            mFormats[type] = std::move(format);
+        }
     }
 
-    AssetManager::~AssetManager()
-    {
-        for(auto& [type, serializer] : mSerializers)
-            serializer->Shutdown();
-    }
+    AssetManager::~AssetManager() = default;
 
     void AssetManager::Initialize(const Path& assetDirectory, const AssetContext& context)
     {
         SG_ASSERT(context.AssetManager_ == this, "[AssetManager] The context must point back to this AssetManager!");
         mContext = context;
-        for(auto& [type, serializer] : mSerializers)
-            serializer->SetContext(&mContext);
-
-        sAssetsDirectory = assetDirectory.generic_string();
-        DeserializeRegistry();
-        Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", sAssetsDirectory, mAssetRegistry.size());
-
-        // Ensure at initialization that all sidecar directories exist
-        for (const auto& [type, serializer] : mSerializers)
-            Filesystem::CreateOrEnsureDirectories(GetSidecarDirectory(type));
-
+        mAssetsDirectory = assetDirectory.generic_string();
+        LoadCookedRegistry();
+        Log<Severity::Info>("[AssetManager] Initialized. Directory: '{}' // {} asset(s) in registry", mAssetsDirectory, mAssetRegistry.size());
         mInitialized = true;
     }
 
     void AssetManager::Shutdown()
     {
-        if (!mInitialized)
+        if(!mInitialized)
             return;
 
-        SerializeRegistry();
-        mLoadedAssets.clear();
-        mAssetRegistry.clear();
-        mPathToID.clear();
+        Clear();
         Log<Severity::Info>("[AssetManager] Shutdown");
         mInitialized = false;
     }
 
-    // Import
-    AssetID AssetManager::Import(const String& relativePath, AssetType type)
+    void AssetManager::LoadCookedRegistry()
     {
-        SG_ASSERT(type != AssetType::NONE, "[AssetManager] Cannot import with AssetType::NONE");
-        SG_ASSERT(!relativePath.empty(), "[AssetManager] Cannot import with an empty path!");
+        // Exported games ship it (the export writes it), the Editor registers the project from its text registry instead
+        Vector<AssetMetadata> entries;
+        if(!RegistryBinary::Read(Path(mAssetsDirectory) / RegistryBinary::FILE_NAME, entries))
+            return;
 
+        mAssetRegistry.reserve(entries.size());
+        mPathToID.reserve(entries.size());
+        for(AssetMetadata& entry : entries)
         {
-            const AssetID existing = GetIDFromPath(relativePath);
-            if(existing.IsValid())
-            {
-                //Log<Severity::Trace>("[AssetManager] Import: '{}' is already registered (ID: {})!", relativePath.c_str(), existing.Get());
-                return existing;
-            }
+            // The export only lists assets whose cooked file it shipped: nothing to check on disk
+            entry.Flags = entry.RelativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX) ? AssetFlags::VALID | AssetFlags::MEMORY : AssetFlags::VALID;
+            Register(entry);
         }
-
-        // If the asset is not created from memory, validate the source file exists on disk
-        bool fromMemory = true;
-        if(!relativePath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
-        {
-            const String absPath = GetAbsolutePath(relativePath);
-            if(!Filesystem::Exists(absPath))
-            {
-                Log<Severity::Warn>("[AssetManager] Import failed: file not found: {}!", absPath);
-                return UUID::INVALID;
-            }
-            fromMemory = false;
-        }
-
-        AssetID id = AssetID();
-
-        AssetMetadata meta;
-        meta.ID = id;
-        meta.Type = type;
-
-        fromMemory ? meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY : meta.Flags = AssetFlags::VALID;
-
-        meta.RelativePath = relativePath;
-        mAssetRegistry[id] = std::move(meta);
-        mPathToID[relativePath] = id;
-
-        Log<Severity::Info>("[AssetManager] Imported '{}' | ID: {} | Type: {}", relativePath, id.Get(), SurgeReflect::EnumToString(type).data());
-        return id;
     }
 
     // Load (template in header points here, do not call directly)
     Ref<Asset> AssetManager::LoadAssetInternal(AssetID id, AssetMetadata* meta)
     {
-        auto serIt = mSerializers.find(meta->Type);
-        SG_ASSERT(serIt != mSerializers.end() && serIt->second, "[AssetManager] No serializer for type {}!", SurgeReflect::EnumToString(meta->Type).data());
+        const AssetFormat* format = GetFormat(meta->Type);
+        if(!format)
+        {
+            Log<Severity::Error>("[AssetManager] Load: No format for type {}!", SurgeReflect::EnumToString(meta->Type).data());
+            return nullptr;
+        }
 
-        Ref<Asset> asset = serIt->second->Deserialize(*meta);
+        Ref<Asset> asset;
+        if(HasFlag(meta->Flags, AssetFlags::MEMORY))
+            asset = format->CreateBuiltin(*meta, mContext);
+        else
+        {
+            const String path = GetSidecarPath(id);
+            CookedFile file;
+            const CookedFileError error = CookedFileIO::Read(path, meta->Type, format->GetFormatVersion(), file);
+            if(error == CookedFileError::NONE)
+                asset = format->Read(file, *meta, mContext);
+            else
+                Log<Severity::Error>("[AssetManager] Can't load {} ({}): {}. Re-cook it in the Editor (or export the game again)", meta->RelativePath, path, CookedFileErrorToString(error));
+        }
+
         if(!asset)
         {
-            Log<Severity::Error>("[AssetManager] Load: Loader returned null for {}! Is the asset Missing?", meta->RelativePath);
             meta->Flags |= AssetFlags::MISSING;
+            meta->Flags &= ~AssetFlags::LOADED;
             return nullptr;
         }
 
@@ -144,16 +111,36 @@ namespace Surge
         return asset;
     }
 
+    AssetID AssetManager::GetBuiltin(const String& name, AssetType type)
+    {
+        if(!name.starts_with(SURGE_MEMORY_ASSET_PREFIX))
+            return AssetID::INVALID;
+
+        const AssetID existing = GetIDFromPath(name);
+        if(existing.IsValid())
+            return existing;
+
+        AssetMetadata meta;
+        meta.ID = AssetID();
+        meta.Type = type;
+        meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY;
+        meta.RelativePath = name;
+        Register(meta);
+        return meta.ID;
+    }
+
     AssetMetadata* AssetManager::GetMetadataForEdit(AssetID id)
     {
         auto it = mAssetRegistry.find(id);
-        if(it != mAssetRegistry.end())
-            return &it->second;
-
-        return nullptr;
+        return it != mAssetRegistry.end() ? &it->second : nullptr;
     }
 
-        // Unload
+    const AssetFormat* AssetManager::GetFormat(AssetType type) const
+    {
+        auto it = mFormats.find(type);
+        return it != mFormats.end() ? it->second.get() : nullptr;
+    }
+
     bool AssetManager::Unload(AssetID id)
     {
         auto cacheIt = mLoadedAssets.find(id);
@@ -165,12 +152,8 @@ namespace Surge
             return false;
 
         mLoadedAssets.erase(cacheIt);
-
-        // Just clear the Loaded flag
-        auto metaIt = mAssetRegistry.find(id);
-        if(metaIt != mAssetRegistry.end())
-            metaIt->second.Flags &= ~AssetFlags::LOADED;
-
+        if(AssetMetadata* meta = GetMetadataForEdit(id))
+            meta->Flags &= ~AssetFlags::LOADED;
         return true;
     }
 
@@ -206,78 +189,34 @@ namespace Surge
         return total;
     }
 
-    bool AssetManager::IsLoaded(AssetID id)
+    bool AssetManager::IsLoaded(AssetID id) const
     {
         return mLoadedAssets.find(id) != mLoadedAssets.end();
     }
 
-    bool AssetManager::Save(AssetID id)
-    {
-        auto cacheIt = mLoadedAssets.find(id);
-        if(cacheIt == mLoadedAssets.end())
-        {
-            Log<Severity::Error>("[AssetManager] Save: AssetID {} is not loaded!", id.Get());
-            return false;
-        }
-
-        auto metaIt = mAssetRegistry.find(id);
-        if(metaIt == mAssetRegistry.end())
-        {
-            Log<Severity::Error>("[AssetManager] Save: AssetID {} is not registered!", id.Get());
-            return false;
-        }
-
-        auto serIt = mSerializers.find(metaIt->second.Type);
-        if(serIt == mSerializers.end() || !serIt->second)
-        {
-            Log<Severity::Error>("[AssetManager] Save: No serializer for type {}!", SurgeReflect::EnumToString(metaIt->second.Type).data());
-            return false;
-        }
-        return serIt->second->Serialize(cacheIt->second);
-    }
-
-    void AssetManager::UnregisterAsset(AssetID id)
-    {
-        auto it = mAssetRegistry.find(id);
-        if(it == mAssetRegistry.end())
-            return;
-
-        auto pathIt = mPathToID.find(it->second.RelativePath);
-        if(pathIt != mPathToID.end() && pathIt->second == id)
-            mPathToID.erase(pathIt);
-
-        mAssetRegistry.erase(it);
-        SerializeRegistry();
-    }
-
-    bool AssetManager::IsRegistered(AssetID id)
+    bool AssetManager::IsRegistered(AssetID id) const
     {
         return mAssetRegistry.find(id) != mAssetRegistry.end();
     }
 
-    const AssetMetadata& AssetManager::GetMetadata(AssetID id)
+    const AssetMetadata& AssetManager::GetMetadata(AssetID id) const
     {
         auto it = mAssetRegistry.find(id);
         return it != mAssetRegistry.end() ? it->second : sNullMetadata;
     }
 
-    String AssetManager::GetSidecarPath(AssetID id, AssetType type)
+    String AssetManager::GetSidecarPath(AssetID id, AssetType type) const
     {
-        const AssetMetadata& meta = GetMetadata(id);
-
-        AssetType t;
-        type != AssetType::NONE ? t = type : t = meta.Type;
-
-        String filename = std::format("{0}.r{1}", id.Get(), SurgeReflect::EnumToString(t).data());
-        return GetSidecarDirectory(t) + "/" + filename;
+        const AssetType t = type != AssetType::NONE ? type : GetMetadata(id).Type;
+        return std::format("{0}/{1}.r{2}", GetSidecarDirectory(t), id.Get(), SurgeReflect::EnumToString(t).data());
     }
 
-    String AssetManager::GetSidecarDirectory(AssetType type)
+    String AssetManager::GetSidecarDirectory(AssetType type) const
     {
-        return sAssetsDirectory + "/Internal/" + SurgeReflect::EnumToString(type).data();
+        return mAssetsDirectory + "/Internal/" + SurgeReflect::EnumToString(type).data();
     }
 
-    AssetID AssetManager::GetIDFromPath(const String& relativePath)
+    AssetID AssetManager::GetIDFromPath(const String& relativePath) const
     {
         auto it = mPathToID.find(relativePath);
         if(it != mPathToID.end())
@@ -285,7 +224,7 @@ namespace Surge
 
 #ifdef SURGE_PLATFORM_WINDOWS
         // Windows paths ignore case, the APK does not: a path that only matches with another case works on desktop but not on device.
-        // Only misses pay for this scan (the same cost the lookup always had before the hash map)
+        // Only misses pay for this scan
         for(const auto& [path, id] : mPathToID)
         {
             if(path.size() == relativePath.size() && std::equal(path.begin(), path.end(), relativePath.begin(), [](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b)); }))
@@ -298,20 +237,53 @@ namespace Surge
         return UUID::INVALID;
     }
 
-    void AssetManager::UpdateAssetPath([[maybe_unused]] AssetID id, [[maybe_unused]] const String& newRelativePath, [[maybe_unused]] bool serialize)
+    bool AssetManager::Register(const AssetMetadata& metadata)
     {
-#ifdef SURGE_PLATFORM_ANDROID
-        Log<Severity::Error>("[AssetManager] UpdateAssetPath is an Editor function. APK assets are readonly!");
-#else
+        if(!metadata.ID.IsValid() || metadata.Type == AssetType::NONE || metadata.RelativePath.empty())
+            return false;
+
+        if(mAssetRegistry.contains(metadata.ID))
+        {
+            Log<Severity::Warn>("[AssetManager] Register: ID {} is registered already ({})", metadata.ID.Get(), mAssetRegistry[metadata.ID].RelativePath);
+            return false;
+        }
+        if(!mPathToID.try_emplace(metadata.RelativePath, metadata.ID).second)
+        {
+            Log<Severity::Warn>("[AssetManager] Register: '{}' is registered twice, path lookups resolve to {}", metadata.RelativePath, mPathToID[metadata.RelativePath].Get());
+            return false;
+        }
+
+        mAssetRegistry[metadata.ID] = metadata;
+        return true;
+    }
+
+    void AssetManager::Unregister(AssetID id)
+    {
         auto it = mAssetRegistry.find(id);
-        if(it == mAssetRegistry.end() || it->second.RelativePath == newRelativePath)
+        if(it == mAssetRegistry.end())
             return;
+
+        auto pathIt = mPathToID.find(it->second.RelativePath);
+        if(pathIt != mPathToID.end() && pathIt->second == id)
+            mPathToID.erase(pathIt);
+
+        Unload(id); // Only succeeds when nothing references it anymore
+        mAssetRegistry.erase(it);
+    }
+
+    bool AssetManager::SetPath(AssetID id, const String& newRelativePath)
+    {
+        auto it = mAssetRegistry.find(id);
+        if(it == mAssetRegistry.end())
+            return false;
+        if(it->second.RelativePath == newRelativePath)
+            return true;
 
         auto takenIt = mPathToID.find(newRelativePath);
         if(takenIt != mPathToID.end() && takenIt->second != id)
         {
-            Log<Severity::Error>("[AssetManager] UpdateAssetPath: '{}' already belongs to asset {}, {} keeps '{}'", newRelativePath, takenIt->second.Get(), id.Get(), it->second.RelativePath);
-            return;
+            Log<Severity::Error>("[AssetManager] SetPath: '{}' already belongs to asset {}, {} keeps '{}'", newRelativePath, takenIt->second.Get(), id.Get(), it->second.RelativePath);
+            return false;
         }
 
         auto oldIt = mPathToID.find(it->second.RelativePath);
@@ -320,140 +292,38 @@ namespace Surge
 
         it->second.RelativePath = newRelativePath;
         mPathToID[newRelativePath] = id;
-        if(serialize)
-            SerializeRegistry();
-#endif
+        return true;
     }
 
-    // Registry
-    // Format (AssetRegistry.surge):
-    //    comment lines start with //
-    //    <UUID>|<TypeString>|<Relative/path/to/asset.ext OR MemoryString>
-    void AssetManager::SerializeRegistry()
+    void AssetManager::Adopt(AssetID id, Ref<Asset> asset)
     {
-#ifdef SURGE_PLATFORM_ANDROID
-        Log<Severity::Warn>("[AssetManager] SerializeRegistry skipped. APK assets are readonly!");
-        return;
-#else
-        const String registryPath = sAssetsDirectory + '/' + kRegistryFilename;
-
-        std::ofstream file(registryPath, std::ios::out | std::ios::trunc);
-        if(!file.is_open())
-        {
-            Log<Severity::Error>("[AssetManager] SerializeRegistry: Failed to open '{}'.", registryPath);
+        AssetMetadata* meta = GetMetadataForEdit(id);
+        SG_ASSERT(meta && asset && asset->GetAssetType() == meta->Type, "[AssetManager] Adopt: the asset must be registered with its type");
+        if(!meta || !asset)
             return;
-        }
 
-        file << "// Surge Asset Registry v1\n";
-        file << "// Format: UUID|Type|RelativePath\n";
-
-        for(const auto& [id, meta] : mAssetRegistry)
-        {
-            file << id.Get()
-                << kRegistryDelimiter
-                << SurgeReflect::EnumToString(meta.Type).data()
-                << kRegistryDelimiter
-                << meta.RelativePath
-                << '\n';
-        }
-
-        Log<Severity::Info>("[AssetManager] Registry serialized ({} entries) -> '{}'.", mAssetRegistry.size(), registryPath.c_str());
-#endif
+        asset->mID = id;
+        mLoadedAssets[id] = asset;
+        meta->Flags |= AssetFlags::LOADED;
+        meta->Flags &= ~AssetFlags::MISSING;
     }
 
-    bool AssetManager::DeserializeRegistry()
+    void AssetManager::Invalidate(AssetID id)
     {
-        const String registryPath = sAssetsDirectory + '/' + kRegistryFilename;
-        String fileContents;
-
-        if(!Filesystem::ReadTextFile(registryPath, fileContents))
+        if(mLoadedAssets.erase(id) > 0)
         {
-            Log<Severity::Warn>("[AssetManager] Failed to open {}", registryPath);
-            return false;
+            if(AssetMetadata* meta = GetMetadataForEdit(id))
+                meta->Flags &= ~AssetFlags::LOADED;
         }
+        if(AssetMetadata* meta = GetMetadataForEdit(id))
+            meta->Flags &= ~AssetFlags::MISSING;
+    }
 
-        if (fileContents.empty())
-        {
-            Log<Severity::Warn>("[AssetManager] Registry file is empty: {}\nIs this intentional?", registryPath);
-            return false;
-        }
-
+    void AssetManager::Clear()
+    {
+        mLoadedAssets.clear();
         mAssetRegistry.clear();
         mPathToID.clear();
-
-        std::istringstream stream(fileContents);
-        String line;
-        Uint count = 0;
-
-        while(std::getline(stream, line))
-        {
-            if(!line.empty() && line.back() == '\r')
-                line.pop_back();
-
-            // Ignore the lines starting with "//"
-            if(line.empty() || (line.size() >= 2 && line[0] == '/' && line[1] == '/'))
-                continue;
-
-            // Parse: UUID|Type|RelativePath
-            const size_t d1 = line.find(kRegistryDelimiter);
-            const size_t d2 = line.find(kRegistryDelimiter, d1 + 1);
-
-            if(d1 == String::npos || d2 == String::npos)
-            {
-                Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Malformed line skipped!");
-                continue;
-            }
-
-            const String uuidStr = line.substr(0, d1);
-            char* endPtr = nullptr;
-            errno = 0;
-            const uint64_t rawID = strtoull(uuidStr.c_str(), &endPtr, 10);
-
-            if(endPtr == uuidStr.c_str() || errno == ERANGE || rawID == 0)
-                continue;
-
-            const String typeStr = line.substr(d1 + 1, d2 - d1 - 1);
-            const String relPath = line.substr(d2 + 1);
-            const AssetID id(rawID);
-            const AssetType type = AssetTypeFromString(typeStr.c_str());
-
-            if(type == AssetType::NONE || relPath.empty())
-                continue;
-
-            AssetMetadata meta;
-            meta.ID = id;
-            meta.Type = type;
-            meta.RelativePath = relPath;
-
-            if(relPath.starts_with(SURGE_MEMORY_ASSET_PREFIX))
-            {
-                meta.Flags = AssetFlags::VALID | AssetFlags::MEMORY;
-            }
-            else
-            {
-                String absPath = GetAbsolutePath(relPath);
-                String sidecarPath = GetSidecarPath(meta.ID, type);
-
-                bool sourceExists = Filesystem::Exists(absPath);
-                bool sidecarExists = Filesystem::Exists(sidecarPath);
-
-                bool exists = sourceExists || sidecarExists;
-                meta.Flags = exists ? AssetFlags::VALID : AssetFlags::MISSING;
-
-                // Exported builds only ship the cooked files, a missing source alone is normal there
-                if (!exists)
-                    Log<Severity::Warn>("[AssetManager] DeserializeRegistry: Asset Source & Sidecar is missing for {}", relPath);
-            }
-
-            if(!mPathToID.try_emplace(relPath, id).second)
-                Log<Severity::Warn>("[AssetManager] DeserializeRegistry: '{}' is registered twice, path lookups resolve to {}", relPath, mPathToID[relPath].Get());
-
-            mAssetRegistry[id] = std::move(meta);
-            count++;
-        }
-
-        Log<Severity::Info>("[AssetManager] Registry deserialized ({} entries).", count);
-        return count > 0;
     }
 
 } // namespace Surge
